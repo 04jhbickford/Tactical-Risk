@@ -62,7 +62,7 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx) {
-    // First pass: Draw merged territories with FULL opacity to completely cover base tile borders
+    // First pass: Draw merged territories - use clipping to completely cover base tile borders
     for (const t of this.territories) {
       if (t.isWater) continue;
       if (t.polygons.length <= 1) continue; // Skip non-merged for now
@@ -71,34 +71,48 @@ export class TerritoryRenderer {
       const color = continent?.color || '#888888';
 
       ctx.save();
-      ctx.globalAlpha = 1.0;
+
+      // Create a clipping region from all polygons
+      ctx.beginPath();
+      for (const poly of t.polygons) {
+        if (poly.length < 3) continue;
+        ctx.moveTo(poly[0][0], poly[0][1]);
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo(poly[i][0], poly[i][1]);
+        }
+        ctx.closePath();
+      }
+      ctx.clip();
+
+      // Calculate bounding box
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const poly of t.polygons) {
+        for (const [x, y] of poly) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+
+      // Fill entire bounding box with solid color (clipped to territory shape)
+      // This completely replaces all pixels including base tile borders
       ctx.fillStyle = color;
-      ctx.strokeStyle = color;
+      ctx.fillRect(minX - 5, minY - 5, maxX - minX + 10, maxY - minY + 10);
+
+      ctx.restore();
+
+      // Draw a subtle inner shadow/gradient for depth
+      ctx.save();
+      ctx.globalAlpha = 0.3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 2;
       ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-
-      // Step 1: Fill all polygons individually with full opacity
-      for (const poly of t.polygons) {
-        this._fillPoly(ctx, poly);
+      // Only stroke the outer edges (first and last polygon typically)
+      this._strokePoly(ctx, t.polygons[0]);
+      if (t.polygons.length > 1) {
+        this._strokePoly(ctx, t.polygons[t.polygons.length - 1]);
       }
-
-      // Step 2: Draw VERY thick strokes (12px) along all edges to cover base tile borders
-      ctx.lineWidth = 12;
-      for (const poly of t.polygons) {
-        this._strokePoly(ctx, poly);
-      }
-
-      // Step 3: Fill again to ensure solid coverage
-      for (const poly of t.polygons) {
-        this._fillPoly(ctx, poly);
-      }
-
-      // Step 4: Medium stroke to smooth edges
-      ctx.lineWidth = 6;
-      for (const poly of t.polygons) {
-        this._strokePoly(ctx, poly);
-      }
-
       ctx.restore();
     }
 
