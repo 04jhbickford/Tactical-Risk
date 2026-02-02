@@ -62,7 +62,7 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx) {
-    // First pass: Draw merged territories with full opacity to cover base tile borders
+    // First pass: Draw merged territories with FULL opacity to completely cover base tile borders
     for (const t of this.territories) {
       if (t.isWater) continue;
       if (t.polygons.length <= 1) continue; // Skip non-merged for now
@@ -70,37 +70,36 @@ export class TerritoryRenderer {
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
-      // For merged territories, we need to completely cover internal borders
-      // First, fill all polygons with full opacity
+      ctx.save();
       ctx.globalAlpha = 1.0;
       ctx.fillStyle = color;
-
-      // Create a combined path for all polygons and fill as one
-      ctx.beginPath();
-      for (const poly of t.polygons) {
-        if (poly.length < 3) continue;
-        ctx.moveTo(poly[0][0], poly[0][1]);
-        for (let i = 1; i < poly.length; i++) {
-          ctx.lineTo(poly[i][0], poly[i][1]);
-        }
-        ctx.closePath();
-      }
-      ctx.fill();
-
-      // Draw thick strokes along all polygon edges to cover any remaining black lines
       ctx.strokeStyle = color;
-      ctx.lineWidth = 8;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
+
+      // Step 1: Fill all polygons individually with full opacity
+      for (const poly of t.polygons) {
+        this._fillPoly(ctx, poly);
+      }
+
+      // Step 2: Draw VERY thick strokes (12px) along all edges to cover base tile borders
+      ctx.lineWidth = 12;
       for (const poly of t.polygons) {
         this._strokePoly(ctx, poly);
       }
 
-      // Another pass with slightly smaller stroke
-      ctx.lineWidth = 5;
+      // Step 3: Fill again to ensure solid coverage
+      for (const poly of t.polygons) {
+        this._fillPoly(ctx, poly);
+      }
+
+      // Step 4: Medium stroke to smooth edges
+      ctx.lineWidth = 6;
       for (const poly of t.polygons) {
         this._strokePoly(ctx, poly);
       }
+
+      ctx.restore();
     }
 
     // Second pass: Draw non-merged territories with transparency
@@ -111,7 +110,7 @@ export class TerritoryRenderer {
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.6;
       ctx.fillStyle = color;
       for (const poly of t.polygons) {
         this._fillPoly(ctx, poly);
@@ -394,27 +393,58 @@ export class TerritoryRenderer {
   /** Draw hover highlight */
   renderHover(ctx, territory) {
     if (!territory) return;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+
+    const isMerged = territory.polygons.length > 1;
+
+    // Fill all polygons
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
     for (const poly of territory.polygons) {
       this._fillPoly(ctx, poly);
     }
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 2;
-    for (const poly of territory.polygons) {
-      this._strokePoly(ctx, poly);
+
+    // For merged territories, only stroke the outer boundary (approximate by using thicker stroke)
+    // For single territories, stroke normally
+    if (isMerged) {
+      // Use a glow effect instead of stroke for merged territories
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      for (const poly of territory.polygons) {
+        this._fillPoly(ctx, poly);
+      }
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      for (const poly of territory.polygons) {
+        this._strokePoly(ctx, poly);
+      }
     }
   }
 
   /** Draw selection highlight */
   renderSelected(ctx, territory) {
     if (!territory) return;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
+
+    const isMerged = territory.polygons.length > 1;
+
     ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 10;
-    for (const poly of territory.polygons) {
-      this._strokePoly(ctx, poly);
+    ctx.shadowBlur = 12;
+
+    if (isMerged) {
+      // For merged territories, use fill with glow instead of stroke
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      for (const poly of territory.polygons) {
+        this._fillPoly(ctx, poly);
+      }
+    } else {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      for (const poly of territory.polygons) {
+        this._strokePoly(ctx, poly);
+      }
     }
+
     ctx.shadowBlur = 0;
   }
 
