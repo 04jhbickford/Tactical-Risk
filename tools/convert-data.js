@@ -12,23 +12,34 @@ const OUT_DIR = path.join(__dirname, '..', 'data');
 // --- Territory merges (mainland only) ---
 // Each entry merges `from` into `into`: polygons combined, production summed,
 // connections unioned, and `from` is deleted from the map.
-// DISABLED: All territories now unmerged for Risk-style play
-const MERGES = [];
+const MERGES = [
+  { from: 'Sinkiang',          into: 'China' },
+  { from: 'French Indo China', into: 'Kwangtung' },
+  { from: 'Yakut S.S.R.',      into: 'Soviet Far East' },
+  { from: 'Afghanistan',       into: 'India' },
+  { from: 'Caucasus',          into: 'Ukraine S.S.R.' },
+  { from: 'Libya',             into: 'Anglo Sudan Egypt' },
+  { from: 'Rio del Oro',       into: 'French West Africa' },
+  { from: 'Angola',            into: 'Congo' },
+  { from: 'Mozambique',        into: 'Kenya-Rhodesia' },
+];
 
 // --- Continent definitions ---
-// Updated for Risk-style play with unmerged territories and user-specified bonuses
+// Updated for Risk-style play with merged territories
+// Note: After merges, territory names change (e.g., Sinkiang merged into China)
 const CONTINENT_DEFS = [
   { name: 'North America', bonus: 15, territories: ['East US','West US','East Canada','West Canada','Mexico','Alaska','Cuba','Panama'] },
   { name: 'South America', bonus: 6, territories: ['Brazil','Argentina-Chile','Peru','Columbia'] },
   { name: 'Europe', bonus: 15, territories: ['United Kingdom','West Europe','Germany','South Europe','East Europe','Eire','Gibraltar','Spain','Sweden','Switzerland','Finland Norway'] },
-  { name: 'Soviet Union', bonus: 9, territories: ['Russia','Karelia S.S.R.','Caucasus','Ukraine S.S.R.','Kazakh S.S.R.','Novosibirsk','Evenki National Okrug','Yakut S.S.R.','Soviet Far East'] },
-  { name: 'Middle East', bonus: 6, territories: ['Turkey','Syria Jordan','Saudi Arabia','Persia','Afghanistan','India'] },
-  { name: 'North Africa', bonus: 6, territories: ['Algeria','Libya','Rio del Oro','French West Africa','Anglo Sudan Egypt'] },
-  { name: 'Sub-Saharan Africa', bonus: 9, territories: ['French Equatorial Africa','Congo','Angola','Kenya-Rhodesia','Mozambique','South Africa','Italian East Africa','Madagascar'] },
-  { name: 'Asia', bonus: 21, territories: ['Mongolia','Manchuria','Sinkiang','China','Kwangtung','French Indo China'] },
-  { name: 'Southeast Asia', bonus: 6, territories: ['Borneo Celebes','East Indies','Philippines','Okinawa'] },
-  { name: 'Oceania & Pacific', bonus: 6, territories: ['Australia','New Zealand','New Guinea','Solomon Islands','Caroline Islands','Hawaiian Islands','Midway','Wake Island'] },
-  { name: 'Japan', bonus: 4, territories: ['Japan'] },
+  // Middle East now includes Kazakh S.S.R., India (merged with Afghanistan), Persia, etc.
+  { name: 'Middle East', bonus: 9, territories: ['Turkey','Syria Jordan','Saudi Arabia','Persia','India','Kazakh S.S.R.'] },
+  // Africa is now one continent (merged North + Sub-Saharan)
+  // After merges: Anglo Sudan Egypt includes Libya, French West Africa includes Rio del Oro, etc.
+  { name: 'Africa', bonus: 12, territories: ['Algeria','Anglo Sudan Egypt','French West Africa','French Equatorial Africa','Congo','Kenya-Rhodesia','South Africa','Italian East Africa','Madagascar'] },
+  // Asia now includes Soviet Union territories + Mongolia, Manchuria, China (merged with Sinkiang), Kwangtung (merged with French Indo China)
+  { name: 'Asia', bonus: 24, territories: ['Russia','Karelia S.S.R.','Ukraine S.S.R.','Novosibirsk','Evenki National Okrug','Soviet Far East','Mongolia','Manchuria','China','Kwangtung'] },
+  // Oceania now includes Japan, East Indies, Borneo Celebes, Philippines, Okinawa + original Oceania
+  { name: 'Oceania', bonus: 10, territories: ['Japan','Borneo Celebes','East Indies','Philippines','Okinawa','Australia','New Zealand','New Guinea','Solomon Islands','Caroline Islands','Hawaiian Islands','Midway','Wake Island'] },
 ];
 
 // Build reverse lookup: territory name -> continent name
@@ -171,6 +182,23 @@ function main() {
   console.log('Parsing classic_3rd_edition.xml...');
   const { territories, connections } = parseXML();
   console.log(`  Found ${Object.keys(territories).length} territories`);
+
+  // --- Add land bridge connections ---
+  // These create direct land connections across water
+  const LAND_BRIDGES = [
+    ['Eire', 'United Kingdom'],
+    ['Brazil', 'Rio del Oro'],  // Rio del Oro will merge into French West Africa
+  ];
+
+  for (const [t1, t2] of LAND_BRIDGES) {
+    if (territories[t1] && territories[t2]) {
+      if (!connections[t1]) connections[t1] = new Set();
+      if (!connections[t2]) connections[t2] = new Set();
+      connections[t1].add(t2);
+      connections[t2].add(t1);
+      console.log(`  Added land bridge: ${t1} <-> ${t2}`);
+    }
+  }
 
   // --- Apply territory merges ---
   const removedNames = new Set();

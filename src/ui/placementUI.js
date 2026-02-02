@@ -1,4 +1,5 @@
 // Placement UI for initial Risk setup - 6-unit clockwise placement rounds
+// Flow: Click territory first, then click units to place on that territory
 
 import { GAME_PHASES } from '../state/gameState.js';
 
@@ -7,7 +8,7 @@ export class PlacementUI {
     this.gameState = null;
     this.unitDefs = null;
     this.territoryByName = null;
-    this.selectedUnit = null;
+    this.selectedTerritory = null;  // Selected territory to place units on
     this.onPlacementComplete = null;
 
     this._create();
@@ -49,7 +50,7 @@ export class PlacementUI {
   }
 
   show() {
-    this.selectedUnit = null;
+    this.selectedTerritory = null;
     this._render();
     this.el.classList.remove('hidden');
   }
@@ -58,18 +59,52 @@ export class PlacementUI {
     this.el.classList.add('hidden');
   }
 
-  // Called when user clicks a territory during placement
+  // Called when user clicks a territory during placement - selects it for unit placement
   handleTerritoryClick(territory) {
-    if (!this.isActive() || !this.selectedUnit) return false;
+    if (!this.isActive()) return false;
 
     const player = this.gameState.currentPlayer;
     if (!player) return false;
 
-    const unitDef = this.unitDefs[this.selectedUnit];
-    if (!unitDef) return false;
+    // Check if this is a valid territory to place on
+    const isValidLand = this.gameState.getOwner(territory.name) === player.id;
+    const isValidSea = territory.isWater && this._isAdjacentToOwnedCoastal(territory.name, player.id);
 
-    // Validate placement
-    const result = this.gameState.placeInitialUnit(territory.name, this.selectedUnit, this.unitDefs);
+    if (isValidLand || isValidSea) {
+      this.selectedTerritory = territory;
+      this._render();
+      return true;
+    }
+
+    return false;
+  }
+
+  _isAdjacentToOwnedCoastal(seaZoneName, playerId) {
+    const seaZone = this.territoryByName[seaZoneName];
+    if (!seaZone || !seaZone.isWater) return false;
+
+    // Check if any adjacent territory is owned by player and is coastal
+    for (const conn of seaZone.connections) {
+      const t = this.territoryByName[conn];
+      if (t && !t.isWater && this.gameState.getOwner(conn) === playerId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Place a unit on the selected territory (called when clicking a unit button)
+  _placeUnit(unitType) {
+    if (!this.selectedTerritory || !this.isActive()) return;
+
+    const player = this.gameState.currentPlayer;
+    if (!player) return;
+
+    const result = this.gameState.placeInitialUnit(
+      this.selectedTerritory.name,
+      unitType,
+      this.unitDefs
+    );
 
     if (result.success) {
       // Check if we've placed 6 units this round (or have no more to place)
@@ -77,7 +112,7 @@ export class PlacementUI {
       if (result.unitsPlacedThisRound >= 6 || totalRemaining === 0) {
         // Automatically end round
         this.gameState.finishPlacementRound();
-        this.selectedUnit = null;
+        this.selectedTerritory = null;
       }
 
       if (this.onPlacementComplete) {
@@ -85,10 +120,7 @@ export class PlacementUI {
       }
 
       this._render();
-      return true;
     }
-
-    return false;
   }
 
   _render() {
@@ -123,45 +155,74 @@ export class PlacementUI {
           <div class="pl-progress-fill" style="width: ${(placedThisRound / maxThisRound) * 100}%"></div>
         </div>
       </div>
-
-      <div class="pl-instructions">
-        ${this.selectedUnit
-          ? `Click a valid territory to place <strong>${this.selectedUnit}</strong>`
-          : 'Select a unit to place'}
-      </div>
-
-      <div class="pl-units">
     `;
 
-    // Group units by type (land/naval)
-    const landUnits = unitsToPlace.filter(u => {
-      const def = this.unitDefs[u.type];
-      return def && (def.isLand || def.isAir || def.isBuilding);
-    });
-    const navalUnits = unitsToPlace.filter(u => {
-      const def = this.unitDefs[u.type];
-      return def && def.isSea;
-    });
+    // Show selected territory or instruction
+    if (this.selectedTerritory) {
+      const isSeaZone = this.selectedTerritory.isWater;
+      html += `
+        <div class="pl-selected-territory">
+          <span class="pl-selected-label">Placing on:</span>
+          <span class="pl-selected-name">${this.selectedTerritory.name}</span>
+          <button class="pl-deselect-btn" data-action="deselect">×</button>
+        </div>
+        <div class="pl-instructions">Click a unit below to place it here</div>
+      `;
 
-    if (landUnits.some(u => u.quantity > 0)) {
-      html += `<div class="pl-unit-group"><div class="pl-group-label">Land/Air Units</div>`;
-      for (const unit of landUnits) {
-        if (unit.quantity <= 0) continue;
-        html += this._renderUnitButton(unit);
+      // Filter units based on territory type
+      const availableUnits = unitsToPlace.filter(u => {
+        if (u.quantity <= 0) return false;
+        const def = this.unitDefs[u.type];
+        if (!def) return false;
+        // Sea zones only accept naval units
+        if (isSeaZone) return def.isSea;
+        // Land territories accept land, air, and buildings
+        return def.isLand || def.isAir || def.isBuilding;
+      });
+
+      if (availableUnits.length > 0) {
+        html += `<div class="pl-units">`;
+        for (const unit of availableUnits) {
+          html += this._renderUnitButton(unit);
+        }
+        html += `</div>`;
+      } else {
+        html += `<div class="pl-no-units">No ${isSeaZone ? 'naval' : 'land'} units available to place</div>`;
+      }
+    } else {
+      html += `
+        <div class="pl-instructions">
+          <strong>Click a territory</strong> on the map to select where to place units
+        </div>
+      `;
+
+      // Show summary of remaining units
+      html += `<div class="pl-remaining-summary">`;
+      html += `<div class="pl-remaining-label">Units to place:</div>`;
+
+      const landUnits = unitsToPlace.filter(u => {
+        const def = this.unitDefs[u.type];
+        return def && (def.isLand || def.isAir || def.isBuilding) && u.quantity > 0;
+      });
+      const navalUnits = unitsToPlace.filter(u => {
+        const def = this.unitDefs[u.type];
+        return def && def.isSea && u.quantity > 0;
+      });
+
+      if (landUnits.length > 0) {
+        html += `<div class="pl-summary-group">`;
+        html += `<span class="pl-summary-label">Land:</span>`;
+        html += landUnits.map(u => `${u.quantity}× ${u.type}`).join(', ');
+        html += `</div>`;
+      }
+      if (navalUnits.length > 0) {
+        html += `<div class="pl-summary-group">`;
+        html += `<span class="pl-summary-label">Naval:</span>`;
+        html += navalUnits.map(u => `${u.quantity}× ${u.type}`).join(', ');
+        html += `</div>`;
       }
       html += `</div>`;
     }
-
-    if (navalUnits.some(u => u.quantity > 0)) {
-      html += `<div class="pl-unit-group"><div class="pl-group-label">Naval Units</div>`;
-      for (const unit of navalUnits) {
-        if (unit.quantity <= 0) continue;
-        html += this._renderUnitButton(unit);
-      }
-      html += `</div>`;
-    }
-
-    html += `</div>`;
 
     // Actions
     html += `
@@ -183,10 +244,9 @@ export class PlacementUI {
   _renderUnitButton(unit) {
     const def = this.unitDefs[unit.type];
     const imageSrc = def?.image ? `assets/units/${def.image}` : null;
-    const isSelected = this.selectedUnit === unit.type;
 
     return `
-      <button class="pl-unit-btn ${isSelected ? 'selected' : ''}" data-unit="${unit.type}">
+      <button class="pl-unit-btn" data-unit="${unit.type}">
         <div class="pl-unit-icon-wrapper">
           ${imageSrc ? `<img src="${imageSrc}" class="pl-unit-icon" alt="${unit.type}">` : ''}
         </div>
@@ -199,13 +259,18 @@ export class PlacementUI {
   }
 
   _bindEvents() {
-    // Unit selection
+    // Unit buttons - clicking places the unit immediately
     this.el.querySelectorAll('.pl-unit-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const unitType = btn.dataset.unit;
-        this.selectedUnit = this.selectedUnit === unitType ? null : unitType;
-        this._render();
+        this._placeUnit(unitType);
       });
+    });
+
+    // Deselect territory
+    this.el.querySelector('[data-action="deselect"]')?.addEventListener('click', () => {
+      this.selectedTerritory = null;
+      this._render();
     });
 
     // Action buttons
@@ -216,12 +281,17 @@ export class PlacementUI {
 
     this.el.querySelector('[data-action="finish"]')?.addEventListener('click', () => {
       this.gameState.finishPlacementRound();
-      this.selectedUnit = null;
+      this.selectedTerritory = null;
       if (this.onPlacementComplete) this.onPlacementComplete();
     });
   }
 
-  getSelectedUnit() {
-    return this.selectedUnit;
+  getSelectedTerritory() {
+    return this.selectedTerritory;
+  }
+
+  clearSelection() {
+    this.selectedTerritory = null;
+    this._render();
   }
 }

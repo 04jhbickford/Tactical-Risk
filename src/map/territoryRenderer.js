@@ -5,13 +5,16 @@
 const CROSS_WATER_CONNECTIONS = [
   // Pacific wrap-around connections
   ['Alaska', 'Soviet Far East'],
+  // Land bridges
+  ['Eire', 'United Kingdom'],
+  ['Brazil', 'French West Africa'],  // After merge (was Rio del Oro)
   // Other notable cross-water connections
   ['United Kingdom', 'Finland Norway'],
-  ['Gibraltar', 'Rio del Oro'],
-  ['Spain', 'Rio del Oro'],
+  ['Gibraltar', 'French West Africa'],  // After merge
+  ['Spain', 'French West Africa'],  // After merge
   ['Spain', 'Algeria'],
   ['South Europe', 'Algeria'],
-  ['South Europe', 'Libya'],
+  ['South Europe', 'Anglo Sudan Egypt'],  // After merge (was Libya)
 ];
 
 export class TerritoryRenderer {
@@ -68,7 +71,7 @@ export class TerritoryRenderer {
 
       // Use higher alpha for merged territories to cover internal borders from base tiles
       const isMerged = t.polygons.length > 1;
-      ctx.globalAlpha = isMerged ? 0.6 : 0.45;
+      ctx.globalAlpha = isMerged ? 0.75 : 0.45;
 
       // Fill all polygons with continent color
       ctx.fillStyle = color;
@@ -76,11 +79,17 @@ export class TerritoryRenderer {
         this._fillPoly(ctx, poly);
       }
 
-      // For merged territories, also stroke along internal edges to further obscure base tile borders
+      // For merged territories, draw thick strokes to fully cover internal base tile borders
       if (isMerged) {
         ctx.strokeStyle = color;
+        ctx.lineWidth = 6;
+        ctx.globalAlpha = 0.85;
+        for (const poly of t.polygons) {
+          this._strokePoly(ctx, poly);
+        }
+        // Second pass with slightly smaller stroke
         ctx.lineWidth = 4;
-        ctx.globalAlpha = 0.65;
+        ctx.globalAlpha = 0.9;
         for (const poly of t.polygons) {
           this._strokePoly(ctx, poly);
         }

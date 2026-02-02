@@ -3774,3 +3774,84 @@ html, body {
 .pl-btn.done:hover {
   background: linear-gradient(135deg, #5CBF60, #489E4C);
 }
+
+.pl-selected-territory {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(65, 105, 225, 0.15);
+  border: 1px solid rgba(65, 105, 225, 0.3);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.pl-selected-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.pl-selected-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.pl-deselect-btn {
+  width: 24px;
+  height: 24px;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  border-radius: 4px;
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pl-deselect-btn:hover {
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.pl-no-units {
+  padding: 16px;
+  text-align: center;
+  color: #666;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.pl-remaining-summary {
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.pl-remaining-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.pl-summary-group {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.pl-summary-group:last-child {
+  margin-bottom: 0;
+}
+
+.pl-summary-label {
+  color: #666;
+  margin-right: 6px;
+}
