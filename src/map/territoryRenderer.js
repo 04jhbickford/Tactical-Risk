@@ -297,12 +297,11 @@ export class TerritoryRenderer {
     for (const t of this.territories) {
       if (t.isWater) continue;
 
-      // For merged territories (multiple polygons), SKIP internal polygon borders entirely
-      // The solid fill color provides the territory shape, and adjacent territories
-      // will draw their own borders to define the boundary
+      // For merged territories (multiple polygons), only draw EXTERNAL edges
+      // Skip internal edges where original territories met
       if (t.polygons.length > 1) {
-        // Don't draw any polygon outlines for merged territories
-        // This prevents internal borders from appearing
+        const externalEdges = this._getExternalEdges(t.polygons);
+        this._strokeEdges(ctx, externalEdges);
         continue;
       }
 
@@ -325,6 +324,58 @@ export class TerritoryRenderer {
     }
 
     ctx.setLineDash([]);
+  }
+
+  /** Find edges that are on the outer boundary of merged polygons (not shared between polygons) */
+  _getExternalEdges(polygons) {
+    const edgeCount = new Map();
+
+    // Count how many times each edge appears across all polygons
+    for (const poly of polygons) {
+      for (let i = 0; i < poly.length; i++) {
+        const p1 = poly[i];
+        const p2 = poly[(i + 1) % poly.length];
+        const key = this._edgeKey(p1, p2);
+        edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
+      }
+    }
+
+    // External edges appear only once; internal edges appear twice (shared)
+    const externalEdges = [];
+    for (const poly of polygons) {
+      for (let i = 0; i < poly.length; i++) {
+        const p1 = poly[i];
+        const p2 = poly[(i + 1) % poly.length];
+        const key = this._edgeKey(p1, p2);
+        if (edgeCount.get(key) === 1) {
+          externalEdges.push([p1, p2]);
+        }
+      }
+    }
+
+    return externalEdges;
+  }
+
+  /** Create a canonical key for an edge that's the same regardless of direction */
+  _edgeKey(p1, p2) {
+    const [x1, y1] = p1;
+    const [x2, y2] = p2;
+    // Sort by coordinates to ensure same key for both directions
+    if (x1 < x2 || (x1 === x2 && y1 < y2)) {
+      return `${x1},${y1}-${x2},${y2}`;
+    } else {
+      return `${x2},${y2}-${x1},${y1}`;
+    }
+  }
+
+  /** Draw a list of edges */
+  _strokeEdges(ctx, edges) {
+    ctx.beginPath();
+    for (const [p1, p2] of edges) {
+      ctx.moveTo(p1[0], p1[1]);
+      ctx.lineTo(p2[0], p2[1]);
+    }
+    ctx.stroke();
   }
 
   /** Draw capital markers with faction flags */
