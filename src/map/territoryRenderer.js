@@ -62,10 +62,10 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx) {
-    // First pass: Draw merged territories - use clipping to completely cover base tile borders
+    // First pass: Merged territories with FULL opacity to completely hide internal borders
     for (const t of this.territories) {
       if (t.isWater) continue;
-      if (t.polygons.length <= 1) continue; // Skip non-merged for now
+      if (t.polygons.length <= 1) continue; // Skip non-merged
 
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
@@ -95,28 +95,15 @@ export class TerritoryRenderer {
         }
       }
 
-      // Fill entire bounding box with solid color (clipped to territory shape)
-      // This completely replaces all pixels including base tile borders
+      // FULL opacity (1.0) to completely cover base map tile borders
       ctx.fillStyle = color;
-      ctx.fillRect(minX - 5, minY - 5, maxX - minX + 10, maxY - minY + 10);
+      ctx.globalAlpha = 1.0;
+      ctx.fillRect(minX - 10, minY - 10, maxX - minX + 20, maxY - minY + 20);
 
-      ctx.restore();
-
-      // Draw a subtle inner shadow/gradient for depth
-      ctx.save();
-      ctx.globalAlpha = 0.3;
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-      ctx.lineWidth = 2;
-      ctx.lineJoin = 'round';
-      // Only stroke the outer edges (first and last polygon typically)
-      this._strokePoly(ctx, t.polygons[0]);
-      if (t.polygons.length > 1) {
-        this._strokePoly(ctx, t.polygons[t.polygons.length - 1]);
-      }
       ctx.restore();
     }
 
-    // Second pass: Draw non-merged territories with transparency
+    // Second pass: Non-merged territories - also use full opacity for visual consistency
     for (const t of this.territories) {
       if (t.isWater) continue;
       if (t.polygons.length > 1) continue; // Skip merged (already drawn)
@@ -124,11 +111,37 @@ export class TerritoryRenderer {
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
-      ctx.globalAlpha = 0.6;
-      ctx.fillStyle = color;
+      ctx.save();
+
+      // Create clipping region
+      ctx.beginPath();
       for (const poly of t.polygons) {
-        this._fillPoly(ctx, poly);
+        if (poly.length < 3) continue;
+        ctx.moveTo(poly[0][0], poly[0][1]);
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo(poly[i][0], poly[i][1]);
+        }
+        ctx.closePath();
       }
+      ctx.clip();
+
+      // Calculate bounding box
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const poly of t.polygons) {
+        for (const [x, y] of poly) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+
+      // Same full opacity as merged territories for visual consistency
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 1.0;
+      ctx.fillRect(minX - 10, minY - 10, maxX - minX + 20, maxY - minY + 20);
+
+      ctx.restore();
     }
 
     ctx.globalAlpha = 1.0;
@@ -283,6 +296,17 @@ export class TerritoryRenderer {
 
     for (const t of this.territories) {
       if (t.isWater) continue;
+
+      // For merged territories (multiple polygons), SKIP internal polygon borders entirely
+      // The solid fill color provides the territory shape, and adjacent territories
+      // will draw their own borders to define the boundary
+      if (t.polygons.length > 1) {
+        // Don't draw any polygon outlines for merged territories
+        // This prevents internal borders from appearing
+        continue;
+      }
+
+      // Single polygon territory - stroke normally
       for (const poly of t.polygons) {
         this._strokePoly(ctx, poly);
       }
