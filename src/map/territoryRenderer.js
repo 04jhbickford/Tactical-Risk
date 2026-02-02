@@ -62,37 +62,59 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx) {
+    // First pass: Draw merged territories with full opacity to cover base tile borders
     for (const t of this.territories) {
       if (t.isWater) continue;
+      if (t.polygons.length <= 1) continue; // Skip non-merged for now
 
-      // Use continent color for territory shading
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
-      // Use higher alpha for merged territories to cover internal borders from base tiles
-      const isMerged = t.polygons.length > 1;
-      ctx.globalAlpha = isMerged ? 0.75 : 0.45;
+      // For merged territories, we need to completely cover internal borders
+      // First, fill all polygons with full opacity
+      ctx.globalAlpha = 1.0;
+      ctx.fillStyle = color;
 
-      // Fill all polygons with continent color
+      // Create a combined path for all polygons and fill as one
+      ctx.beginPath();
+      for (const poly of t.polygons) {
+        if (poly.length < 3) continue;
+        ctx.moveTo(poly[0][0], poly[0][1]);
+        for (let i = 1; i < poly.length; i++) {
+          ctx.lineTo(poly[i][0], poly[i][1]);
+        }
+        ctx.closePath();
+      }
+      ctx.fill();
+
+      // Draw thick strokes along all polygon edges to cover any remaining black lines
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 8;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      for (const poly of t.polygons) {
+        this._strokePoly(ctx, poly);
+      }
+
+      // Another pass with slightly smaller stroke
+      ctx.lineWidth = 5;
+      for (const poly of t.polygons) {
+        this._strokePoly(ctx, poly);
+      }
+    }
+
+    // Second pass: Draw non-merged territories with transparency
+    for (const t of this.territories) {
+      if (t.isWater) continue;
+      if (t.polygons.length > 1) continue; // Skip merged (already drawn)
+
+      const continent = this.continentByTerritory[t.name];
+      const color = continent?.color || '#888888';
+
+      ctx.globalAlpha = 0.55;
       ctx.fillStyle = color;
       for (const poly of t.polygons) {
         this._fillPoly(ctx, poly);
-      }
-
-      // For merged territories, draw thick strokes to fully cover internal base tile borders
-      if (isMerged) {
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 6;
-        ctx.globalAlpha = 0.85;
-        for (const poly of t.polygons) {
-          this._strokePoly(ctx, poly);
-        }
-        // Second pass with slightly smaller stroke
-        ctx.lineWidth = 4;
-        ctx.globalAlpha = 0.9;
-        for (const poly of t.polygons) {
-          this._strokePoly(ctx, poly);
-        }
       }
     }
 

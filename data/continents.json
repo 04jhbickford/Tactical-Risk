@@ -12,7 +12,7 @@
       "Cuba",
       "Panama"
     ],
-    "color": "#1E90FF"
+    "color": "#C4A35A"
   },
   {
     "name": "South America",
@@ -23,7 +23,7 @@
       "Peru",
       "Columbia"
     ],
-    "color": "#9932CC"
+    "color": "#8B4513"
   },
   {
     "name": "Europe",
@@ -41,7 +41,7 @@
       "Switzerland",
       "Finland Norway"
     ],
-    "color": "#4169E1"
+    "color": "#4682B4"
   },
   {
     "name": "Middle East",
@@ -54,7 +54,7 @@
       "India",
       "Kazakh S.S.R."
     ],
-    "color": "#00CED1"
+    "color": "#CD853F"
   },
   {
     "name": "Africa",
@@ -70,7 +70,7 @@
       "Italian East Africa",
       "Madagascar"
     ],
-    "color": "#888888"
+    "color": "#D2691E"
   },
   {
     "name": "Asia",
@@ -87,7 +87,7 @@
       "China",
       "Kwangtung"
     ],
-    "color": "#BA55D3"
+    "color": "#6B8E23"
   },
   {
     "name": "Oceania",
@@ -107,6 +107,6 @@
       "Midway",
       "Wake Island"
     ],
-    "color": "#888888"
+    "color": "#708090"
   }
 ]

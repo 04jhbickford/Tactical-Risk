@@ -326,20 +326,16 @@ function main() {
 }
 
 function getContinentColor(name) {
-  // Colors chosen to be distinct from faction colors:
-  // Factions: Russians(red), Germans(gray), British(gold), Japanese(orange), Americans(olive)
+  // Classic Risk / Axis & Allies inspired color palette
+  // Muted, earthy tones that are easy on the eyes
   const colors = {
-    'North America': '#1E90FF',      // Dodger blue - distinct from olive American
-    'South America': '#9932CC',      // Dark orchid purple
-    'Europe': '#4169E1',             // Royal blue
-    'Soviet Union': '#8B008B',       // Dark magenta
-    'Middle East': '#00CED1',        // Dark turquoise
-    'North Africa': '#FFD700',       // Gold - visible, distinct border
-    'Sub-Saharan Africa': '#32CD32', // Lime green
-    'Asia': '#BA55D3',               // Medium orchid
-    'Southeast Asia': '#00BFFF',     // Deep sky blue
-    'Oceania & Pacific': '#7B68EE',  // Medium slate blue
-    'Japan': '#FF69B4',              // Hot pink - distinct from Japanese orange
+    'North America': '#C4A35A',      // Tan/Gold (classic Risk yellow)
+    'South America': '#8B4513',      // Saddle brown (classic Risk red-brown)
+    'Europe': '#4682B4',             // Steel blue (classic Risk blue)
+    'Middle East': '#CD853F',        // Peru/tan (desert tones)
+    'Africa': '#D2691E',             // Chocolate brown
+    'Asia': '#6B8E23',               // Olive drab (military green)
+    'Oceania': '#708090',            // Slate gray (classic Risk purple-gray)
   };
   return colors[name] || '#888888';
 }
