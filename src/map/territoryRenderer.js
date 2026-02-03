@@ -671,20 +671,19 @@ export class TerritoryRenderer {
   renderHover(ctx, territory) {
     if (!territory) return;
 
-    // Get unified polygons (handles both connected merges and disconnected islands)
-    const polys = this._getUnifiedPolygons(territory.polygons);
-
-    for (const polygon of polys) {
+    // Fill all original polygons with highlight (no internal borders)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    for (const polygon of territory.polygons) {
       if (!polygon || polygon.length < 3) continue;
-
-      // Fill with highlight
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
       this._fillPoly(ctx, polygon);
+    }
 
-      // Stroke the outline
+    // Only stroke outline for single-polygon territories
+    // Multi-polygon territories skip outline to hide internal borders
+    if (territory.polygons.length === 1) {
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
       ctx.lineWidth = 2;
-      this._strokePoly(ctx, polygon);
+      this._strokePoly(ctx, territory.polygons[0]);
     }
   }
 
@@ -692,17 +691,21 @@ export class TerritoryRenderer {
   renderSelected(ctx, territory) {
     if (!territory) return;
 
-    // Get unified polygons (handles both connected merges and disconnected islands)
-    const polys = this._getUnifiedPolygons(territory.polygons);
-
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 12;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
 
-    for (const polygon of polys) {
+    // Fill all original polygons with subtle highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    for (const polygon of territory.polygons) {
       if (!polygon || polygon.length < 3) continue;
-      this._strokePoly(ctx, polygon);
+      this._fillPoly(ctx, polygon);
+    }
+
+    // Only stroke outline for single-polygon territories
+    if (territory.polygons.length === 1) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      this._strokePoly(ctx, territory.polygons[0]);
     }
 
     ctx.shadowBlur = 0;
@@ -716,23 +719,23 @@ export class TerritoryRenderer {
       const t = this.territoryByName[destName];
       if (!t) continue;
 
-      // Get unified polygons (handles both connected merges and disconnected islands)
-      const polys = this._getUnifiedPolygons(t.polygons);
-
       // Green for friendly, red for enemy
       const color = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.3)' : 'rgba(76, 175, 80, 0.3)';
       const borderColor = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.8)' : 'rgba(76, 175, 80, 0.8)';
 
-      for (const polygon of polys) {
+      // Fill all original polygons (no internal borders)
+      ctx.fillStyle = color;
+      for (const polygon of t.polygons) {
         if (!polygon || polygon.length < 3) continue;
-
-        ctx.fillStyle = color;
         this._fillPoly(ctx, polygon);
+      }
 
+      // Only stroke outline for single-polygon territories
+      if (t.polygons.length === 1) {
         ctx.strokeStyle = borderColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 4]);
-        this._strokePoly(ctx, polygon);
+        this._strokePoly(ctx, t.polygons[0]);
         ctx.setLineDash([]);
       }
     }
