@@ -27,20 +27,16 @@ const MERGES = [
 
 // --- Continent definitions ---
 // Updated for Risk-style play with merged territories
+// Bonus = 3x number of territories in the continent
 // Note: After merges, territory names change (e.g., Sinkiang merged into China)
 const CONTINENT_DEFS = [
-  { name: 'North America', bonus: 15, territories: ['East US','West US','East Canada','West Canada','Mexico','Alaska','Cuba','Panama'] },
-  { name: 'South America', bonus: 6, territories: ['Brazil','Argentina-Chile','Peru','Columbia'] },
-  { name: 'Europe', bonus: 15, territories: ['United Kingdom','West Europe','Germany','South Europe','East Europe','Eire','Spain','Sweden','Switzerland','Finland Norway'] },
-  // Middle East now includes Kazakh S.S.R., India (merged with Afghanistan), Persia, etc.
-  { name: 'Middle East', bonus: 9, territories: ['Turkey','Syria Jordan','Saudi Arabia','Persia','India','Kazakh S.S.R.'] },
-  // Africa is now one continent (merged North + Sub-Saharan)
-  // After merges: Anglo Sudan Egypt includes Libya, French West Africa includes Rio del Oro, etc.
-  { name: 'Africa', bonus: 12, territories: ['Algeria','Anglo Sudan Egypt','French West Africa','French Equatorial Africa','Congo','Kenya-Rhodesia','South Africa','Italian East Africa','Madagascar'] },
-  // Asia now includes Soviet Union territories + Mongolia, Manchuria, China (merged with Sinkiang), Kwangtung (merged with French Indo China)
-  { name: 'Asia', bonus: 24, territories: ['Russia','Karelia S.S.R.','Ukraine S.S.R.','Novosibirsk','Evenki National Okrug','Soviet Far East','Mongolia','Manchuria','China','Kwangtung'] },
-  // Oceania now includes Japan, East Indies, Borneo Celebes, Philippines, Okinawa + original Oceania
-  { name: 'Oceania', bonus: 10, territories: ['Japan','Borneo Celebes','East Indies','Philippines','Okinawa','Australia','New Zealand','New Guinea','Solomon Islands','Caroline Islands','Hawaiian Islands','Midway','Wake Island'] },
+  { name: 'North America', territories: ['East US','West US','East Canada','West Canada','Mexico','Alaska','Cuba','Panama'] },                    // 8 territories = 24 bonus
+  { name: 'South America', territories: ['Brazil','Argentina-Chile','Peru','Columbia'] },                                                          // 4 territories = 12 bonus
+  { name: 'Europe', territories: ['United Kingdom','West Europe','Germany','South Europe','East Europe','Eire','Spain','Sweden','Switzerland','Finland Norway'] }, // 10 territories = 30 bonus
+  { name: 'Middle East', territories: ['Turkey','Syria Jordan','Saudi Arabia','Persia','India','Kazakh S.S.R.'] },                                 // 6 territories = 18 bonus
+  { name: 'Africa', territories: ['Algeria','Anglo Sudan Egypt','French West Africa','French Equatorial Africa','Congo','Kenya-Rhodesia','South Africa','Italian East Africa','Madagascar'] }, // 9 territories = 27 bonus
+  { name: 'Asia', territories: ['Russia','Karelia S.S.R.','Ukraine S.S.R.','Novosibirsk','Evenki National Okrug','Soviet Far East','Mongolia','Manchuria','China','Kwangtung'] }, // 10 territories = 30 bonus
+  { name: 'Oceania', territories: ['Japan','Borneo Celebes','East Indies','Philippines','Okinawa','Australia','New Zealand','New Guinea','Solomon Islands','Caroline Islands','Hawaiian Islands','Midway','Wake Island'] }, // 13 territories = 39 bonus
 ];
 
 // Build reverse lookup: territory name -> continent name
@@ -297,10 +293,10 @@ function main() {
     return a.name.localeCompare(b.name);
   });
 
-  // Build continent data
+  // Build continent data (bonus = 3x territory count)
   const continents = CONTINENT_DEFS.map(c => ({
     name: c.name,
-    bonus: c.bonus,
+    bonus: c.territories.length * 3,
     territories: c.territories,
     color: getContinentColor(c.name),
   }));

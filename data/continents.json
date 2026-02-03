@@ -1,7 +1,7 @@
 [
   {
     "name": "North America",
-    "bonus": 15,
+    "bonus": 24,
     "territories": [
       "East US",
       "West US",
@@ -16,7 +16,7 @@
   },
   {
     "name": "South America",
-    "bonus": 6,
+    "bonus": 12,
     "territories": [
       "Brazil",
       "Argentina-Chile",
@@ -27,7 +27,7 @@
   },
   {
     "name": "Europe",
-    "bonus": 15,
+    "bonus": 30,
     "territories": [
       "United Kingdom",
       "West Europe",
@@ -44,7 +44,7 @@
   },
   {
     "name": "Middle East",
-    "bonus": 9,
+    "bonus": 18,
     "territories": [
       "Turkey",
       "Syria Jordan",
@@ -57,7 +57,7 @@
   },
   {
     "name": "Africa",
-    "bonus": 12,
+    "bonus": 27,
     "territories": [
       "Algeria",
       "Anglo Sudan Egypt",
@@ -73,7 +73,7 @@
   },
   {
     "name": "Asia",
-    "bonus": 24,
+    "bonus": 30,
     "territories": [
       "Russia",
       "Karelia S.S.R.",
@@ -90,7 +90,7 @@
   },
   {
     "name": "Oceania",
-    "bonus": 10,
+    "bonus": 39,
     "territories": [
       "Japan",
       "Borneo Celebes",
