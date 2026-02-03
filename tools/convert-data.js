@@ -48,12 +48,9 @@ for (const c of CONTINENT_DEFS) {
 }
 
 // --- Polygon Union Algorithm ---
-// Removes shared internal edges when merging territory polygons
-// Uses simpler approach: just skip rendering internal boundaries at render time
-// For now, simply concatenate polygons and let renderer handle it
+// For merged territories, just concatenate polygons.
+// The renderer will handle hiding internal borders.
 function unionPolygons(polygons) {
-  // Simple approach: just return concatenated polygons
-  // The territory renderer will skip internal boundaries
   return polygons;
 }
 
@@ -184,7 +181,6 @@ function main() {
   // These create direct land connections across water
   const LAND_BRIDGES = [
     ['Eire', 'United Kingdom'],
-    ['Brazil', 'Rio del Oro'],  // Rio del Oro will merge into French West Africa
   ];
 
   for (const [t1, t2] of LAND_BRIDGES) {
@@ -198,12 +194,14 @@ function main() {
   }
 
   // --- Remove unwanted connections ---
-  // Remove the land bridge between Gibraltar/Spain and French West Africa
+  // Remove land bridges to Africa
   const REMOVE_CONNECTIONS = [
     ['Gibraltar', 'French West Africa'],
     ['Gibraltar', 'Rio del Oro'],
-    ['Spain', 'French West Africa'],  // After Gibraltar merges into Spain
+    ['Spain', 'French West Africa'],
     ['Spain', 'Rio del Oro'],
+    ['Brazil', 'French West Africa'],
+    ['Brazil', 'Rio del Oro'],
   ];
 
   for (const [t1, t2] of REMOVE_CONNECTIONS) {

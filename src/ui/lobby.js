@@ -1,5 +1,13 @@
 // Lobby UI for game mode and player selection
 
+// AI Difficulty levels
+const AI_DIFFICULTIES = [
+  { id: 'human', name: 'Human', desc: 'Local player' },
+  { id: 'easy', name: 'Easy AI', desc: 'Defensive, makes mistakes' },
+  { id: 'medium', name: 'Medium AI', desc: 'Balanced strategy' },
+  { id: 'hard', name: 'Hard AI', desc: 'Aggressive, optimized' },
+];
+
 // Available colors for faction selection
 const FACTION_COLORS = [
   { id: 'red', color: '#B22222', light: '#DC143C', name: 'Crimson' },
@@ -22,6 +30,7 @@ export class Lobby {
     this.selectedPlayers = [];
     this.playerNames = {};
     this.playerColors = {}; // Track selected colors per player
+    this.playerAI = {}; // Track AI difficulty per player ('human', 'easy', 'medium', 'hard')
     this.alliancesEnabled = false;
     this.el = null;
     this._create();
@@ -90,6 +99,7 @@ export class Lobby {
           <div class="player-grid classic">
             ${factions.map((p, i) => {
               const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
+              const currentAI = this.playerAI[p.id] || 'human';
               return `
               <div class="player-card ${isClassic ? 'selected' : ''}" data-player="${p.id}" data-alliance="${p.alliance}">
                 <div class="alliance-badge ${p.alliance.toLowerCase()}">${p.alliance}</div>
@@ -100,13 +110,20 @@ export class Lobby {
                        value="${isClassic ? p.name : ''}"
                        maxlength="15"
                        ${isClassic ? '' : 'disabled'}>
-                <div class="player-color-select" data-player="${p.id}">
-                  <div class="color-current" style="background:${p.color}" data-color="${defaultColor.id}"></div>
-                  <div class="color-dropdown hidden">
-                    ${FACTION_COLORS.map(c => `
-                      <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
-                    `).join('')}
+                <div class="player-controls-row">
+                  <div class="player-color-select" data-player="${p.id}">
+                    <div class="color-current" style="background:${p.color}" data-color="${defaultColor.id}"></div>
+                    <div class="color-dropdown hidden">
+                      ${FACTION_COLORS.map(c => `
+                        <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
+                      `).join('')}
+                    </div>
                   </div>
+                  <select class="player-ai-select" data-player="${p.id}" ${isClassic ? '' : 'disabled'}>
+                    ${AI_DIFFICULTIES.map(d => `
+                      <option value="${d.id}" ${currentAI === d.id ? 'selected' : ''}>${d.name}</option>
+                    `).join('')}
+                  </select>
                 </div>
                 ${!isClassic ? '<div class="player-check"></div>' : ''}
                 ${isClassic && p.startingPUs ? `<div class="player-pus">${p.startingPUs} PUs</div>` : ''}
@@ -165,13 +182,16 @@ export class Lobby {
         this.playerNames[p.id] = p.name;
         // Use faction's default color
         this.playerColors[p.id] = { color: p.color, lightColor: p.lightColor };
+        // Default to human
+        if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
       });
     } else {
       this.selectedPlayers = [];
-      // Initialize colors for risk mode
+      // Initialize colors and AI for risk mode
       factions.forEach((p, i) => {
         const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
         this.playerColors[p.id] = { color: defaultColor.color, lightColor: defaultColor.light };
+        if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
       });
     }
 
@@ -247,6 +267,14 @@ export class Lobby {
       });
     });
 
+    // AI select
+    this.el.querySelectorAll('.player-ai-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        this.playerAI[e.target.dataset.player] = e.target.value;
+      });
+      select.addEventListener('click', (e) => e.stopPropagation());
+    });
+
     // Start button
     this.el.querySelector('.lobby-start-btn').addEventListener('click', () => {
       if (isClassic || this.selectedPlayers.length >= 2) {
@@ -258,16 +286,19 @@ export class Lobby {
   _togglePlayer(playerId) {
     const card = this.el.querySelector(`.player-card[data-player="${playerId}"]`);
     const input = card.querySelector('.player-name-input');
+    const aiSelect = card.querySelector('.player-ai-select');
     const idx = this.selectedPlayers.indexOf(playerId);
 
     if (idx >= 0) {
       this.selectedPlayers.splice(idx, 1);
       card.classList.remove('selected');
       input.disabled = true;
+      if (aiSelect) aiSelect.disabled = true;
     } else {
       this.selectedPlayers.push(playerId);
       card.classList.add('selected');
       input.disabled = false;
+      if (aiSelect) aiSelect.disabled = false;
       input.focus();
     }
 
@@ -294,12 +325,16 @@ export class Lobby {
     const players = this.selectedPlayers.map(id => {
       const factionDef = factionSource.find(p => p.id === id);
       const customColor = this.playerColors[id];
+      const aiDifficulty = this.playerAI[id] || 'human';
       return {
         ...factionDef,
         name: this.playerNames[id]?.trim() || factionDef.name,
         // Use custom color if selected, otherwise use faction default
         color: customColor?.color || factionDef.color,
         lightColor: customColor?.lightColor || factionDef.lightColor,
+        // AI settings
+        isAI: aiDifficulty !== 'human',
+        aiDifficulty: aiDifficulty,
       };
     });
 

@@ -7,11 +7,8 @@ const CROSS_WATER_CONNECTIONS = [
   ['Alaska', 'Soviet Far East'],
   // Land bridges
   ['Eire', 'United Kingdom'],
-  ['Brazil', 'French West Africa'],  // After merge (was Rio del Oro)
   // Other notable cross-water connections
   ['United Kingdom', 'Finland Norway'],
-  ['Gibraltar', 'French West Africa'],  // After merge
-  ['Spain', 'French West Africa'],  // After merge
   ['Spain', 'Algeria'],
   ['South Europe', 'Algeria'],
   ['South Europe', 'Anglo Sudan Egypt'],  // After merge (was Libya)
@@ -68,15 +65,12 @@ export class TerritoryRenderer {
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
-      // Get unified polygons (handles both connected merges and disconnected islands)
-      const polys = this._getUnifiedPolygons(t.polygons);
-
       ctx.save();
       ctx.fillStyle = color;
       ctx.globalAlpha = 1.0;
 
-      // Fill each polygon
-      for (const polygon of polys) {
+      // Fill each polygon directly
+      for (const polygon of t.polygons) {
         if (!polygon || polygon.length < 3) continue;
         ctx.beginPath();
         ctx.moveTo(polygon[0][0], polygon[0][1]);
@@ -360,13 +354,11 @@ export class TerritoryRenderer {
       if (t.isWater) continue;
 
       if (t.polygons.length === 1) {
-        // Single polygon territory - stroke normally
-        if (t.polygons[0] && t.polygons[0].length >= 3) {
-          this._strokePoly(ctx, t.polygons[0]);
-        }
+        // Single polygon - draw normally
+        this._strokePoly(ctx, t.polygons[0]);
       } else {
-        // Multi-polygon territory - draw only external edges (not internal shared edges)
-        const externalEdges = this._getExternalEdgesForTerritory(t.polygons);
+        // Multiple polygons - draw only external edges (hide internal shared borders)
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons);
         this._strokeEdges(ctx, externalEdges);
       }
     }
@@ -386,7 +378,10 @@ export class TerritoryRenderer {
     ctx.setLineDash([]);
   }
 
-  /** Get external edges for a multi-polygon territory (edges not shared between polygons) */
+  /**
+   * Get external edges for a multi-polygon territory (edges not shared between polygons).
+   * Returns null if polygons don't share any edges (disconnected) - caller should skip drawing.
+   */
   _getExternalEdgesForTerritory(polygons) {
     const edgeCount = new Map();
     const allEdges = [];
@@ -402,6 +397,20 @@ export class TerritoryRenderer {
         edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
         allEdges.push({ p1, p2, key });
       }
+    }
+
+    // Check if any edges are shared (appear more than once)
+    let hasSharedEdges = false;
+    for (const count of edgeCount.values()) {
+      if (count > 1) {
+        hasSharedEdges = true;
+        break;
+      }
+    }
+
+    // If no shared edges, polygons are disconnected - return null to skip drawing
+    if (!hasSharedEdges) {
+      return null;
     }
 
     // External edges appear only once (not shared between polygons)
@@ -492,9 +501,12 @@ export class TerritoryRenderer {
         if (unified && unified.length >= 3) {
           result.push(unified);
         } else {
-          // Fallback: use the largest polygon in the group
-          const largest = group.reduce((a, b) => a.length > b.length ? a : b);
-          result.push(largest);
+          // Fallback: include all polygons in the group individually
+          for (const poly of group) {
+            if (poly && poly.length >= 3) {
+              result.push(poly);
+            }
+          }
         }
       }
     }
@@ -592,6 +604,99 @@ export class TerritoryRenderer {
       ctx.lineTo(p2[0], p2[1]);
     }
     ctx.stroke();
+  }
+
+  /**
+   * Get external edges for multi-polygon territory using tolerance-based matching.
+   * Edges that approximately match or overlap between polygons are considered internal and excluded.
+   */
+  _getExternalEdgesWithTolerance(polygons) {
+    const TOLERANCE = 12; // pixels
+
+    // Check if a point is close to a line segment, returns distance
+    const pointToEdgeDist = (point, e) => {
+      const [px, py] = point;
+      const [x1, y1] = e.p1;
+      const [x2, y2] = e.p2;
+
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+
+      if (lenSq === 0) {
+        return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
+      }
+
+      // Project point onto line, clamped to segment
+      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+      const projX = x1 + t * dx;
+      const projY = y1 + t * dy;
+
+      return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
+    };
+
+    // Check if an edge is "covered" by any edge from another polygon
+    // Sample points along the edge and check if most are close to edges from other polygon
+    const isEdgeCovered = (edge, otherEdges) => {
+      const samples = 5;
+      let closeCount = 0;
+
+      for (let s = 0; s <= samples; s++) {
+        const t = s / samples;
+        const px = edge.p1[0] + t * (edge.p2[0] - edge.p1[0]);
+        const py = edge.p1[1] + t * (edge.p2[1] - edge.p1[1]);
+        const point = [px, py];
+
+        // Check if this point is close to any edge from other polygon
+        for (const other of otherEdges) {
+          if (pointToEdgeDist(point, other) <= TOLERANCE) {
+            closeCount++;
+            break;
+          }
+        }
+      }
+
+      // If most sample points are close to other edges, this edge is internal
+      return closeCount >= samples * 0.7;
+    };
+
+    // Collect edges grouped by polygon
+    const edgesByPoly = [];
+    for (let polyIdx = 0; polyIdx < polygons.length; polyIdx++) {
+      const poly = polygons[polyIdx];
+      const edges = [];
+      for (let i = 0; i < poly.length; i++) {
+        const p1 = poly[i];
+        const p2 = poly[(i + 1) % poly.length];
+        // Skip zero-length edges
+        if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
+        edges.push({ p1, p2, polyIdx, internal: false });
+      }
+      edgesByPoly.push(edges);
+    }
+
+    // For each edge, check if it's covered by edges from other polygons
+    const allEdges = [];
+    for (let polyIdx = 0; polyIdx < edgesByPoly.length; polyIdx++) {
+      // Collect edges from all OTHER polygons
+      const otherEdges = [];
+      for (let otherIdx = 0; otherIdx < edgesByPoly.length; otherIdx++) {
+        if (otherIdx !== polyIdx) {
+          otherEdges.push(...edgesByPoly[otherIdx]);
+        }
+      }
+
+      // Check each edge in this polygon
+      for (const edge of edgesByPoly[polyIdx]) {
+        edge.internal = isEdgeCovered(edge, otherEdges);
+        allEdges.push(edge);
+      }
+    }
+
+    // Return only external edges
+    return allEdges
+      .filter(e => !e.internal)
+      .map(e => [e.p1, e.p2]);
   }
 
   /** Draw capital markers with faction flags */
@@ -702,20 +807,20 @@ export class TerritoryRenderer {
   renderHover(ctx, territory) {
     if (!territory) return;
 
-    // Fill all original polygons with highlight
+    // Fill with highlight
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    for (const polygon of territory.polygons) {
-      if (!polygon || polygon.length < 3) continue;
-      this._fillPoly(ctx, polygon);
+    for (const poly of territory.polygons) {
+      if (!poly || poly.length < 3) continue;
+      this._fillPoly(ctx, poly);
     }
 
-    // Stroke outline - external edges only for multi-polygon territories
+    // Stroke outline - use external edges only to hide internal borders
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.lineWidth = 2;
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
-      const externalEdges = this._getExternalEdgesForTerritory(territory.polygons);
+      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons);
       this._strokeEdges(ctx, externalEdges);
     }
   }
@@ -727,20 +832,20 @@ export class TerritoryRenderer {
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 12;
 
-    // Fill all original polygons with subtle highlight
+    // Fill with subtle highlight
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    for (const polygon of territory.polygons) {
-      if (!polygon || polygon.length < 3) continue;
-      this._fillPoly(ctx, polygon);
+    for (const poly of territory.polygons) {
+      if (!poly || poly.length < 3) continue;
+      this._fillPoly(ctx, poly);
     }
 
-    // Stroke outline - external edges only for multi-polygon territories
+    // Stroke outline - use external edges only to hide internal borders
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
-      const externalEdges = this._getExternalEdgesForTerritory(territory.polygons);
+      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons);
       this._strokeEdges(ctx, externalEdges);
     }
 
@@ -759,21 +864,21 @@ export class TerritoryRenderer {
       const color = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.3)' : 'rgba(76, 175, 80, 0.3)';
       const borderColor = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.8)' : 'rgba(76, 175, 80, 0.8)';
 
-      // Fill all original polygons
+      // Fill
       ctx.fillStyle = color;
-      for (const polygon of t.polygons) {
-        if (!polygon || polygon.length < 3) continue;
-        this._fillPoly(ctx, polygon);
+      for (const poly of t.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
       }
 
-      // Stroke outline - external edges only for multi-polygon territories
+      // Stroke outline - use external edges only to hide internal borders
       ctx.strokeStyle = borderColor;
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
       if (t.polygons.length === 1) {
         this._strokePoly(ctx, t.polygons[0]);
       } else {
-        const externalEdges = this._getExternalEdgesForTerritory(t.polygons);
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons);
         this._strokeEdges(ctx, externalEdges);
       }
       ctx.setLineDash([]);

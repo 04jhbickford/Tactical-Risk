@@ -75,11 +75,12 @@ export class PlayerPanel {
     let html = '';
 
     // Player header
+    const aiLabel = player.isAI ? `<span class="pp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : '';
     html += `
       <div class="pp-header">
         ${player.flag ? `<img src="assets/flags/${player.flag}" class="pp-flag" alt="${player.name}">` : ''}
         <div class="pp-player-info">
-          <div class="pp-player-name" style="color:${player.color}">${player.name}</div>
+          <div class="pp-player-name" style="color:${player.color}">${player.name} ${aiLabel}</div>
           ${player.alliance ? `<span class="pp-alliance ${player.alliance.toLowerCase()}">${player.alliance}</span>` : ''}
         </div>
       </div>`;

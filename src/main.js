@@ -36,6 +36,7 @@ import { ContinentPanel } from './ui/continentPanel.js';
 import { GameState, GAME_PHASES, TURN_PHASES } from './state/gameState.js';
 import { VictoryScreen } from './ui/victoryScreen.js';
 import { CombatLogPanel } from './ui/combatLogPanel.js';
+import { AIController } from './ai/aiController.js';
 
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
@@ -209,17 +210,44 @@ async function init() {
   // Continent panel
   const continentPanel = new ContinentPanel(continents);
 
+  // AI Controller
+  let aiController = null;
+
+  // Function to check and process AI turns
+  const checkAI = async () => {
+    if (aiController && gameState) {
+      const wasAI = await aiController.checkAndProcessAI();
+      if (wasAI) {
+        camera.dirty = true;
+        // Check again after a delay (for consecutive AI players)
+        setTimeout(checkAI, 500);
+      }
+    }
+  };
+
   // Lobby
   const lobby = new Lobby(setup, (gameMode, selectedPlayers, options = {}) => {
     // Initialize game state
     gameState = new GameState(setup, territories, continents);
     gameState.initGame(gameMode, selectedPlayers, options);
 
+    // Initialize AI controller
+    aiController = new AIController();
+    aiController.setGameState(gameState);
+    aiController.setUnitDefs(unitDefs);
+    aiController.setOnAction((action, data) => {
+      camera.dirty = true;
+      // Continue checking for AI turns after each action
+      setTimeout(checkAI, 300);
+    });
+
     // Wire up components
     hud.setGameState(gameState);
     hud.setNextPhaseCallback(() => {
       gameState.nextPhase();
       camera.dirty = true;
+      // Check if next player is AI
+      setTimeout(checkAI, 300);
     });
     playerPanel.setGameState(gameState);
     tooltip.setGameState(gameState);
@@ -231,18 +259,21 @@ async function init() {
     purchasePopup.setGameState(gameState);
     purchasePopup.setOnComplete(() => {
       camera.dirty = true;
+      setTimeout(checkAI, 300);
     });
 
     // Movement UI
     movementUI.setGameState(gameState);
     movementUI.setOnMoveComplete(() => {
       camera.dirty = true;
+      setTimeout(checkAI, 300);
     });
 
     // Combat UI
     combatUI.setGameState(gameState);
     combatUI.setOnComplete(() => {
       camera.dirty = true;
+      setTimeout(checkAI, 300);
     });
 
     // Tech UI
@@ -253,12 +284,14 @@ async function init() {
       if (gameState.turnPhase === TURN_PHASES.DEVELOP_TECH) {
         gameState.nextPhase();
       }
+      setTimeout(checkAI, 300);
     });
 
     // Placement UI
     placementUI.setGameState(gameState);
     placementUI.setOnComplete(() => {
       camera.dirty = true;
+      setTimeout(checkAI, 300);
     });
 
     // Victory Screen
@@ -274,6 +307,9 @@ async function init() {
 
     // Start with map overview - no auto-pan
     camera.dirty = true;
+
+    // Check if first player is AI
+    setTimeout(checkAI, 500);
   });
 
   // Load map tiles

@@ -60,10 +60,10 @@ export class PurchasePopup {
         <div class="purchase-header">
           <div class="purchase-title">Purchase Units</div>
           <div class="purchase-budget">
-            <span class="budget-label">Budget:</span>
-            <span class="budget-value">${remaining} IPCs</span>
-            <span class="budget-total">of ${ipcs}</span>
+            <span class="budget-value">$${remaining}</span>
+            <span class="budget-total">/ $${ipcs}</span>
           </div>
+          <button class="purchase-close" data-action="close">✕</button>
         </div>
 
         <div class="purchase-grid">
@@ -75,14 +75,16 @@ export class PurchasePopup {
 
             return `
               <div class="purchase-item ${qty > 0 ? 'has-qty' : ''}">
-                <div class="item-visual">
-                  ${imageSrc ? `<img src="${imageSrc}" class="item-icon" alt="${unitType}">` : `<div class="item-placeholder">${unitType[0].toUpperCase()}</div>`}
+                <div class="item-row">
+                  <div class="item-visual">
+                    ${imageSrc ? `<img src="${imageSrc}" class="item-icon" alt="${unitType}">` : `<div class="item-placeholder">${unitType[0].toUpperCase()}</div>`}
+                  </div>
+                  <div class="item-info">
+                    <div class="item-name">${unitType}</div>
+                    <div class="item-stats">A${def.attack}/D${def.defense}/M${def.movement}</div>
+                  </div>
+                  <div class="item-cost">$${def.cost}</div>
                 </div>
-                <div class="item-info">
-                  <div class="item-name">${unitType}</div>
-                  <div class="item-stats">A${def.attack} / D${def.defense} / M${def.movement}</div>
-                </div>
-                <div class="item-cost">${def.cost}$</div>
                 <div class="item-controls">
                   <button class="qty-btn minus ${canRemove ? '' : 'disabled'}" data-action="remove" data-unit="${unitType}">−</button>
                   <span class="qty-display">${qty}</span>
@@ -94,27 +96,22 @@ export class PurchasePopup {
 
         ${this.cartCost > 0 ? `
           <div class="purchase-summary">
-            <div class="summary-items">
+            <span class="summary-items">
               ${Object.entries(this.purchaseCart).map(([type, qty]) => {
                 const def = this.unitDefs[type];
-                return `<span class="summary-item">${qty}x ${type} (${qty * def.cost}$)</span>`;
-              }).join('')}
-            </div>
-            <div class="summary-total">
-              <span>Total:</span>
-              <span class="total-cost">${this.cartCost} IPCs</span>
-            </div>
+                return `${qty}× ${type} ($${qty * def.cost})`;
+              }).join(', ')}
+            </span>
+            <span class="summary-total">Total: $${this.cartCost}</span>
           </div>
         ` : ''}
 
         <div class="purchase-actions">
           ${this.cartCost > 0 ? `
-            <button class="purchase-btn clear" data-action="clear">Clear All</button>
-            <button class="purchase-btn confirm" data-action="confirm">
-              Place at ${capital || 'Capital'}
-            </button>
+            <button class="purchase-btn clear" data-action="clear">Clear</button>
+            <button class="purchase-btn confirm" data-action="confirm">Place Units</button>
           ` : `
-            <button class="purchase-btn skip" data-action="skip">Skip Purchases</button>
+            <button class="purchase-btn skip" data-action="skip">Skip</button>
           `}
         </div>
       </div>
@@ -138,6 +135,11 @@ export class PurchasePopup {
           this._updateCart(unitType, -1);
         }
       });
+    });
+
+    // Close button
+    this.el.querySelector('.purchase-close')?.addEventListener('click', () => {
+      this.hide();
     });
 
     // Action buttons

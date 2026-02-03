@@ -326,8 +326,30 @@ export class GameState {
     return this.territoryState[territoryName]?.isCapital || false;
   }
 
+  getCapital(playerId) {
+    return this.playerState[playerId]?.capitalTerritory || null;
+  }
+
+  getConnections(territoryName) {
+    const territory = this.territoryByName[territoryName];
+    return territory?.connections || [];
+  }
+
+  isWater(territoryName) {
+    const territory = this.territoryByName[territoryName];
+    return territory?.isWater || false;
+  }
+
   getUnitsAt(territoryName) {
     return this.units[territoryName] || [];
+  }
+
+  getUnits(territoryName, playerId = null) {
+    const units = this.units[territoryName] || [];
+    if (playerId) {
+      return units.filter(u => u.owner === playerId);
+    }
+    return units;
   }
 
   getIPCs(playerId) {
