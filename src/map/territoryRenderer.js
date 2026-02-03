@@ -68,25 +68,25 @@ export class TerritoryRenderer {
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
-      // For merged territories, create a unified polygon with no internal edges
-      // For single territories, use the original polygon
-      const polygon = t.polygons.length > 1
-        ? this._getUnifiedPolygon(t.polygons)
-        : t.polygons[0];
+      // Get unified polygons (handles both connected merges and disconnected islands)
+      const polys = this._getUnifiedPolygons(t.polygons);
 
-      if (!polygon || polygon.length < 3) continue;
-
-      // Fill the unified polygon with full opacity
       ctx.save();
       ctx.fillStyle = color;
       ctx.globalAlpha = 1.0;
-      ctx.beginPath();
-      ctx.moveTo(polygon[0][0], polygon[0][1]);
-      for (let i = 1; i < polygon.length; i++) {
-        ctx.lineTo(polygon[i][0], polygon[i][1]);
+
+      // Fill each polygon
+      for (const polygon of polys) {
+        if (!polygon || polygon.length < 3) continue;
+        ctx.beginPath();
+        ctx.moveTo(polygon[0][0], polygon[0][1]);
+        for (let i = 1; i < polygon.length; i++) {
+          ctx.lineTo(polygon[i][0], polygon[i][1]);
+        }
+        ctx.closePath();
+        ctx.fill();
       }
-      ctx.closePath();
-      ctx.fill();
+
       ctx.restore();
     }
 
@@ -102,7 +102,7 @@ export class TerritoryRenderer {
     const flagHeight = flagWidth * 0.67;
 
     for (const t of this.territories) {
-      if (t.isWater || !t.center) continue;
+      if (t.isWater) continue;
 
       const owner = this.gameState.getOwner(t.name);
       if (!owner) continue;
@@ -113,7 +113,10 @@ export class TerritoryRenderer {
       // Skip capitals - they get the big flag treatment
       if (this.gameState.isCapital(t.name)) continue;
 
-      const [cx, cy] = t.center;
+      // Calculate center from all polygons for proper placement on merged territories
+      const [cx, cy] = this._getTerritoryCenter(t);
+      if (cx === null) continue;
+
       // Position to upper-right of center
       const x = cx + 15;
       const y = cy - 20;
@@ -243,14 +246,13 @@ export class TerritoryRenderer {
     for (const t of this.territories) {
       if (t.isWater) continue;
 
-      // For merged territories, use the unified polygon (no internal edges)
-      // For single territories, use the original polygon
-      const polygon = t.polygons.length > 1
-        ? this._getUnifiedPolygon(t.polygons)
-        : t.polygons[0];
+      // Get unified polygons (handles both connected merges and disconnected islands)
+      const polys = this._getUnifiedPolygons(t.polygons);
 
-      if (polygon && polygon.length >= 3) {
-        this._strokePoly(ctx, polygon);
+      for (const polygon of polys) {
+        if (polygon && polygon.length >= 3) {
+          this._strokePoly(ctx, polygon);
+        }
       }
     }
 
@@ -270,16 +272,93 @@ export class TerritoryRenderer {
   }
 
   /**
-   * Merge multiple polygons into a single unified polygon by tracing external edges.
-   * This eliminates internal boundaries where original territories met.
+   * Get unified polygons for a territory, handling both connected and disconnected pieces.
+   * For connected polygons (sharing edges), merges them into a single boundary.
+   * For disconnected polygons (islands, separate land masses), keeps them separate.
+   * Returns an array of polygons to render.
    */
-  _getUnifiedPolygon(polygons) {
-    if (polygons.length === 1) return polygons[0];
+  _getUnifiedPolygons(polygons) {
+    if (polygons.length === 1) return polygons;
 
+    const vertexKey = (p) => `${p[0]},${p[1]}`;
+
+    // First, group polygons by connectivity using shared edges
+    const edgeToPolygons = new Map();
+    for (let i = 0; i < polygons.length; i++) {
+      const poly = polygons[i];
+      for (let j = 0; j < poly.length; j++) {
+        const key = this._edgeKey(poly[j], poly[(j + 1) % poly.length]);
+        if (!edgeToPolygons.has(key)) edgeToPolygons.set(key, []);
+        edgeToPolygons.get(key).push(i);
+      }
+    }
+
+    // Build connectivity graph between polygons
+    const polyGroups = new Array(polygons.length).fill(-1);
+    let groupId = 0;
+
+    for (let i = 0; i < polygons.length; i++) {
+      if (polyGroups[i] !== -1) continue;
+
+      // BFS to find all connected polygons
+      const queue = [i];
+      polyGroups[i] = groupId;
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        const poly = polygons[current];
+
+        for (let j = 0; j < poly.length; j++) {
+          const key = this._edgeKey(poly[j], poly[(j + 1) % poly.length]);
+          const connected = edgeToPolygons.get(key) || [];
+          for (const other of connected) {
+            if (polyGroups[other] === -1) {
+              polyGroups[other] = groupId;
+              queue.push(other);
+            }
+          }
+        }
+      }
+      groupId++;
+    }
+
+    // Group polygons by their group ID
+    const groups = [];
+    for (let g = 0; g < groupId; g++) {
+      const group = polygons.filter((_, i) => polyGroups[i] === g);
+      groups.push(group);
+    }
+
+    // For each group, either return as-is (single polygon) or compute unified boundary
+    const result = [];
+    for (const group of groups) {
+      if (group.length === 1) {
+        result.push(group[0]);
+      } else {
+        // Compute unified polygon for this connected group
+        const unified = this._traceUnifiedBoundary(group);
+        if (unified && unified.length >= 3) {
+          result.push(unified);
+        } else {
+          // Fallback: use the largest polygon in the group
+          const largest = group.reduce((a, b) => a.length > b.length ? a : b);
+          result.push(largest);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Trace the external boundary of connected polygons into a single unified polygon.
+   */
+  _traceUnifiedBoundary(polygons) {
+    const vertexKey = (p) => `${p[0]},${p[1]}`;
     const edgeCount = new Map();
     const edges = [];
 
-    // Count how many times each edge appears across all polygons
+    // Count edge occurrences
     for (const poly of polygons) {
       for (let i = 0; i < poly.length; i++) {
         const p1 = poly[i];
@@ -290,14 +369,12 @@ export class TerritoryRenderer {
       }
     }
 
-    // Get only external edges (appear once, not shared)
+    // Get only external edges (appear once)
     const externalEdges = edges.filter(e => edgeCount.get(e.key) === 1);
-    if (externalEdges.length === 0) return polygons[0];
+    if (externalEdges.length === 0) return null;
 
-    // Build adjacency map: vertex -> list of connected edges
-    const vertexKey = (p) => `${p[0]},${p[1]}`;
+    // Build adjacency map
     const adjacency = new Map();
-
     for (const edge of externalEdges) {
       const k1 = vertexKey(edge.p1);
       const k2 = vertexKey(edge.p2);
@@ -309,7 +386,7 @@ export class TerritoryRenderer {
       adjacency.get(k2).push({ edge, next: edge.p1 });
     }
 
-    // Trace the boundary starting from the first edge
+    // Trace the boundary
     const usedEdges = new Set();
     const unified = [];
     let current = externalEdges[0].p1;
@@ -317,13 +394,11 @@ export class TerritoryRenderer {
 
     unified.push(current);
 
-    // Walk around the boundary
     let safety = externalEdges.length + 10;
     while (safety-- > 0) {
       const currentKey = vertexKey(current);
       const connections = adjacency.get(currentKey) || [];
 
-      // Find an unused edge from this vertex
       let foundNext = null;
       for (const conn of connections) {
         if (!usedEdges.has(conn.edge.key)) {
@@ -333,46 +408,15 @@ export class TerritoryRenderer {
         }
       }
 
-      if (!foundNext) break; // No more edges to follow
+      if (!foundNext) break;
 
       current = foundNext;
-      const nextKey = vertexKey(current);
-
-      // Stop if we've returned to start
-      if (nextKey === startKey) break;
+      if (vertexKey(current) === startKey) break;
 
       unified.push(current);
     }
 
-    return unified.length >= 3 ? unified : polygons[0];
-  }
-
-  /** Get external edges (for stroke only, kept for compatibility) */
-  _getExternalEdges(polygons) {
-    const edgeCount = new Map();
-
-    for (const poly of polygons) {
-      for (let i = 0; i < poly.length; i++) {
-        const p1 = poly[i];
-        const p2 = poly[(i + 1) % poly.length];
-        const key = this._edgeKey(p1, p2);
-        edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
-      }
-    }
-
-    const externalEdges = [];
-    for (const poly of polygons) {
-      for (let i = 0; i < poly.length; i++) {
-        const p1 = poly[i];
-        const p2 = poly[(i + 1) % poly.length];
-        const key = this._edgeKey(p1, p2);
-        if (edgeCount.get(key) === 1) {
-          externalEdges.push([p1, p2]);
-        }
-      }
-    }
-
-    return externalEdges;
+    return unified.length >= 3 ? unified : null;
   }
 
   /** Create a canonical key for an edge that's the same regardless of direction */
@@ -405,10 +449,13 @@ export class TerritoryRenderer {
     const starSize = Math.max(12, Math.min(20, 16 * zoom));
 
     for (const t of this.territories) {
-      if (t.isWater || !t.center) continue;
+      if (t.isWater) continue;
       if (!this.gameState.isCapital(t.name)) continue;
 
-      const [cx, cy] = t.center;
+      // Calculate center from all polygons for proper placement on merged territories
+      const [cx, cy] = this._getTerritoryCenter(t);
+      if (cx === null) continue;
+
       const owner = this.gameState.getOwner(t.name);
       const player = this.gameState.getPlayer(owner);
       const color = this.gameState.getPlayerColor(owner);
@@ -501,40 +548,39 @@ export class TerritoryRenderer {
   renderHover(ctx, territory) {
     if (!territory) return;
 
-    // Use unified polygon for merged territories
-    const polygon = territory.polygons.length > 1
-      ? this._getUnifiedPolygon(territory.polygons)
-      : territory.polygons[0];
+    // Get unified polygons (handles both connected merges and disconnected islands)
+    const polys = this._getUnifiedPolygons(territory.polygons);
 
-    if (!polygon || polygon.length < 3) return;
+    for (const polygon of polys) {
+      if (!polygon || polygon.length < 3) continue;
 
-    // Fill with highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    this._fillPoly(ctx, polygon);
+      // Fill with highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+      this._fillPoly(ctx, polygon);
 
-    // Stroke the outline
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 2;
-    this._strokePoly(ctx, polygon);
+      // Stroke the outline
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 2;
+      this._strokePoly(ctx, polygon);
+    }
   }
 
   /** Draw selection highlight */
   renderSelected(ctx, territory) {
     if (!territory) return;
 
-    // Use unified polygon for merged territories
-    const polygon = territory.polygons.length > 1
-      ? this._getUnifiedPolygon(territory.polygons)
-      : territory.polygons[0];
-
-    if (!polygon || polygon.length < 3) return;
+    // Get unified polygons (handles both connected merges and disconnected islands)
+    const polys = this._getUnifiedPolygons(territory.polygons);
 
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 12;
-
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 3;
-    this._strokePoly(ctx, polygon);
+
+    for (const polygon of polys) {
+      if (!polygon || polygon.length < 3) continue;
+      this._strokePoly(ctx, polygon);
+    }
 
     ctx.shadowBlur = 0;
   }
@@ -547,25 +593,25 @@ export class TerritoryRenderer {
       const t = this.territoryByName[destName];
       if (!t) continue;
 
-      // Use unified polygon for merged territories
-      const polygon = t.polygons.length > 1
-        ? this._getUnifiedPolygon(t.polygons)
-        : t.polygons[0];
-
-      if (!polygon || polygon.length < 3) continue;
+      // Get unified polygons (handles both connected merges and disconnected islands)
+      const polys = this._getUnifiedPolygons(t.polygons);
 
       // Green for friendly, red for enemy
       const color = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.3)' : 'rgba(76, 175, 80, 0.3)';
       const borderColor = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.8)' : 'rgba(76, 175, 80, 0.8)';
 
-      ctx.fillStyle = color;
-      this._fillPoly(ctx, polygon);
+      for (const polygon of polys) {
+        if (!polygon || polygon.length < 3) continue;
 
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      this._strokePoly(ctx, polygon);
-      ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        this._fillPoly(ctx, polygon);
+
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        this._strokePoly(ctx, polygon);
+        ctx.setLineDash([]);
+      }
     }
   }
 
@@ -580,9 +626,10 @@ export class TerritoryRenderer {
 
     for (const t of this.territories) {
       if (t.isWater) continue;
-      if (!t.center) continue;
 
-      const [cx, cy] = t.center;
+      // Calculate center from all polygons for proper centering of merged territories
+      const [cx, cy] = this._getTerritoryCenter(t);
+      if (cx === null) continue;
 
       // Background for readability
       ctx.strokeStyle = 'rgba(0,0,0,0.8)';
@@ -603,6 +650,62 @@ export class TerritoryRenderer {
         ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
       }
     }
+  }
+
+  /** Calculate the centroid of all polygons in a territory */
+  _getTerritoryCenter(territory) {
+    if (!territory.polygons || territory.polygons.length === 0) {
+      return territory.center || [null, null];
+    }
+
+    // Calculate weighted centroid based on polygon areas
+    let totalArea = 0;
+    let sumX = 0;
+    let sumY = 0;
+
+    for (const poly of territory.polygons) {
+      if (poly.length < 3) continue;
+
+      // Calculate polygon centroid and area
+      const { cx, cy, area } = this._getPolygonCentroid(poly);
+      if (area > 0) {
+        sumX += cx * area;
+        sumY += cy * area;
+        totalArea += area;
+      }
+    }
+
+    if (totalArea === 0) {
+      return territory.center || [null, null];
+    }
+
+    return [sumX / totalArea, sumY / totalArea];
+  }
+
+  /** Calculate the centroid and area of a single polygon */
+  _getPolygonCentroid(poly) {
+    let area = 0;
+    let cx = 0;
+    let cy = 0;
+
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % poly.length];
+      const cross = x1 * y2 - x2 * y1;
+      area += cross;
+      cx += (x1 + x2) * cross;
+      cy += (y1 + y2) * cross;
+    }
+
+    area = Math.abs(area) / 2;
+    if (area === 0) return { cx: 0, cy: 0, area: 0 };
+
+    const factor = 1 / (6 * (area > 0 ? area : 1));
+    return {
+      cx: Math.abs(cx * factor),
+      cy: Math.abs(cy * factor),
+      area
+    };
   }
 
   _fillPoly(ctx, points) {
