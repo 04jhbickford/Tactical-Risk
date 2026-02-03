@@ -62,85 +62,31 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx) {
-    // First pass: Merged territories with FULL opacity to completely hide internal borders
     for (const t of this.territories) {
       if (t.isWater) continue;
-      if (t.polygons.length <= 1) continue; // Skip non-merged
 
       const continent = this.continentByTerritory[t.name];
       const color = continent?.color || '#888888';
 
+      // For merged territories, create a unified polygon with no internal edges
+      // For single territories, use the original polygon
+      const polygon = t.polygons.length > 1
+        ? this._getUnifiedPolygon(t.polygons)
+        : t.polygons[0];
+
+      if (!polygon || polygon.length < 3) continue;
+
+      // Fill the unified polygon with full opacity
       ctx.save();
-
-      // Create a clipping region from all polygons
-      ctx.beginPath();
-      for (const poly of t.polygons) {
-        if (poly.length < 3) continue;
-        ctx.moveTo(poly[0][0], poly[0][1]);
-        for (let i = 1; i < poly.length; i++) {
-          ctx.lineTo(poly[i][0], poly[i][1]);
-        }
-        ctx.closePath();
-      }
-      ctx.clip();
-
-      // Calculate bounding box
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const poly of t.polygons) {
-        for (const [x, y] of poly) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-
-      // FULL opacity (1.0) to completely cover base map tile borders
       ctx.fillStyle = color;
       ctx.globalAlpha = 1.0;
-      ctx.fillRect(minX - 10, minY - 10, maxX - minX + 20, maxY - minY + 20);
-
-      ctx.restore();
-    }
-
-    // Second pass: Non-merged territories - also use full opacity for visual consistency
-    for (const t of this.territories) {
-      if (t.isWater) continue;
-      if (t.polygons.length > 1) continue; // Skip merged (already drawn)
-
-      const continent = this.continentByTerritory[t.name];
-      const color = continent?.color || '#888888';
-
-      ctx.save();
-
-      // Create clipping region
       ctx.beginPath();
-      for (const poly of t.polygons) {
-        if (poly.length < 3) continue;
-        ctx.moveTo(poly[0][0], poly[0][1]);
-        for (let i = 1; i < poly.length; i++) {
-          ctx.lineTo(poly[i][0], poly[i][1]);
-        }
-        ctx.closePath();
+      ctx.moveTo(polygon[0][0], polygon[0][1]);
+      for (let i = 1; i < polygon.length; i++) {
+        ctx.lineTo(polygon[i][0], polygon[i][1]);
       }
-      ctx.clip();
-
-      // Calculate bounding box
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const poly of t.polygons) {
-        for (const [x, y] of poly) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
-          if (y < minY) minY = y;
-          if (y > maxY) maxY = y;
-        }
-      }
-
-      // Same full opacity as merged territories for visual consistency
-      ctx.fillStyle = color;
-      ctx.globalAlpha = 1.0;
-      ctx.fillRect(minX - 10, minY - 10, maxX - minX + 20, maxY - minY + 20);
-
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
 
@@ -297,17 +243,14 @@ export class TerritoryRenderer {
     for (const t of this.territories) {
       if (t.isWater) continue;
 
-      // For merged territories (multiple polygons), only draw EXTERNAL edges
-      // Skip internal edges where original territories met
-      if (t.polygons.length > 1) {
-        const externalEdges = this._getExternalEdges(t.polygons);
-        this._strokeEdges(ctx, externalEdges);
-        continue;
-      }
+      // For merged territories, use the unified polygon (no internal edges)
+      // For single territories, use the original polygon
+      const polygon = t.polygons.length > 1
+        ? this._getUnifiedPolygon(t.polygons)
+        : t.polygons[0];
 
-      // Single polygon territory - stroke normally
-      for (const poly of t.polygons) {
-        this._strokePoly(ctx, poly);
+      if (polygon && polygon.length >= 3) {
+        this._strokePoly(ctx, polygon);
       }
     }
 
@@ -326,11 +269,88 @@ export class TerritoryRenderer {
     ctx.setLineDash([]);
   }
 
-  /** Find edges that are on the outer boundary of merged polygons (not shared between polygons) */
+  /**
+   * Merge multiple polygons into a single unified polygon by tracing external edges.
+   * This eliminates internal boundaries where original territories met.
+   */
+  _getUnifiedPolygon(polygons) {
+    if (polygons.length === 1) return polygons[0];
+
+    const edgeCount = new Map();
+    const edges = [];
+
+    // Count how many times each edge appears across all polygons
+    for (const poly of polygons) {
+      for (let i = 0; i < poly.length; i++) {
+        const p1 = poly[i];
+        const p2 = poly[(i + 1) % poly.length];
+        const key = this._edgeKey(p1, p2);
+        edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
+        edges.push({ p1, p2, key });
+      }
+    }
+
+    // Get only external edges (appear once, not shared)
+    const externalEdges = edges.filter(e => edgeCount.get(e.key) === 1);
+    if (externalEdges.length === 0) return polygons[0];
+
+    // Build adjacency map: vertex -> list of connected edges
+    const vertexKey = (p) => `${p[0]},${p[1]}`;
+    const adjacency = new Map();
+
+    for (const edge of externalEdges) {
+      const k1 = vertexKey(edge.p1);
+      const k2 = vertexKey(edge.p2);
+
+      if (!adjacency.has(k1)) adjacency.set(k1, []);
+      if (!adjacency.has(k2)) adjacency.set(k2, []);
+
+      adjacency.get(k1).push({ edge, next: edge.p2 });
+      adjacency.get(k2).push({ edge, next: edge.p1 });
+    }
+
+    // Trace the boundary starting from the first edge
+    const usedEdges = new Set();
+    const unified = [];
+    let current = externalEdges[0].p1;
+    const startKey = vertexKey(current);
+
+    unified.push(current);
+
+    // Walk around the boundary
+    let safety = externalEdges.length + 10;
+    while (safety-- > 0) {
+      const currentKey = vertexKey(current);
+      const connections = adjacency.get(currentKey) || [];
+
+      // Find an unused edge from this vertex
+      let foundNext = null;
+      for (const conn of connections) {
+        if (!usedEdges.has(conn.edge.key)) {
+          usedEdges.add(conn.edge.key);
+          foundNext = conn.next;
+          break;
+        }
+      }
+
+      if (!foundNext) break; // No more edges to follow
+
+      current = foundNext;
+      const nextKey = vertexKey(current);
+
+      // Stop if we've returned to start
+      if (nextKey === startKey) break;
+
+      unified.push(current);
+    }
+
+    return unified.length >= 3 ? unified : polygons[0];
+  }
+
+  /** Get external edges (for stroke only, kept for compatibility) */
   _getExternalEdges(polygons) {
     const edgeCount = new Map();
 
-    // Count how many times each edge appears across all polygons
     for (const poly of polygons) {
       for (let i = 0; i < poly.length; i++) {
         const p1 = poly[i];
@@ -340,7 +360,6 @@ export class TerritoryRenderer {
       }
     }
 
-    // External edges appear only once; internal edges appear twice (shared)
     const externalEdges = [];
     for (const poly of polygons) {
       for (let i = 0; i < poly.length; i++) {
@@ -360,7 +379,6 @@ export class TerritoryRenderer {
   _edgeKey(p1, p2) {
     const [x1, y1] = p1;
     const [x2, y2] = p2;
-    // Sort by coordinates to ensure same key for both directions
     if (x1 < x2 || (x1 === x2 && y1 < y2)) {
       return `${x1},${y1}-${x2},${y2}`;
     } else {
@@ -483,56 +501,40 @@ export class TerritoryRenderer {
   renderHover(ctx, territory) {
     if (!territory) return;
 
-    const isMerged = territory.polygons.length > 1;
+    // Use unified polygon for merged territories
+    const polygon = territory.polygons.length > 1
+      ? this._getUnifiedPolygon(territory.polygons)
+      : territory.polygons[0];
 
-    // Fill all polygons
+    if (!polygon || polygon.length < 3) return;
+
+    // Fill with highlight
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    for (const poly of territory.polygons) {
-      this._fillPoly(ctx, poly);
-    }
+    this._fillPoly(ctx, polygon);
 
-    // For merged territories, only stroke the outer boundary (approximate by using thicker stroke)
-    // For single territories, stroke normally
-    if (isMerged) {
-      // Use a glow effect instead of stroke for merged territories
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
-      ctx.shadowBlur = 15;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-      for (const poly of territory.polygons) {
-        this._fillPoly(ctx, poly);
-      }
-      ctx.shadowBlur = 0;
-    } else {
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.lineWidth = 2;
-      for (const poly of territory.polygons) {
-        this._strokePoly(ctx, poly);
-      }
-    }
+    // Stroke the outline
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 2;
+    this._strokePoly(ctx, polygon);
   }
 
   /** Draw selection highlight */
   renderSelected(ctx, territory) {
     if (!territory) return;
 
-    const isMerged = territory.polygons.length > 1;
+    // Use unified polygon for merged territories
+    const polygon = territory.polygons.length > 1
+      ? this._getUnifiedPolygon(territory.polygons)
+      : territory.polygons[0];
+
+    if (!polygon || polygon.length < 3) return;
 
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 12;
 
-    if (isMerged) {
-      // For merged territories, use fill with glow instead of stroke
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-      for (const poly of territory.polygons) {
-        this._fillPoly(ctx, poly);
-      }
-    } else {
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
-      for (const poly of territory.polygons) {
-        this._strokePoly(ctx, poly);
-      }
-    }
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    this._strokePoly(ctx, polygon);
 
     ctx.shadowBlur = 0;
   }
@@ -545,21 +547,24 @@ export class TerritoryRenderer {
       const t = this.territoryByName[destName];
       if (!t) continue;
 
+      // Use unified polygon for merged territories
+      const polygon = t.polygons.length > 1
+        ? this._getUnifiedPolygon(t.polygons)
+        : t.polygons[0];
+
+      if (!polygon || polygon.length < 3) continue;
+
       // Green for friendly, red for enemy
       const color = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.3)' : 'rgba(76, 175, 80, 0.3)';
       const borderColor = isEnemy?.[destName] ? 'rgba(244, 67, 54, 0.8)' : 'rgba(76, 175, 80, 0.8)';
 
       ctx.fillStyle = color;
-      for (const poly of t.polygons) {
-        this._fillPoly(ctx, poly);
-      }
+      this._fillPoly(ctx, polygon);
 
       ctx.strokeStyle = borderColor;
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 4]);
-      for (const poly of t.polygons) {
-        this._strokePoly(ctx, poly);
-      }
+      this._strokePoly(ctx, polygon);
       ctx.setLineDash([]);
     }
   }
