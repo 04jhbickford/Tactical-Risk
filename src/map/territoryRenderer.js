@@ -287,7 +287,11 @@ export class TerritoryRenderer {
     for (let i = 0; i < polygons.length; i++) {
       const poly = polygons[i];
       for (let j = 0; j < poly.length; j++) {
-        const key = this._edgeKey(poly[j], poly[(j + 1) % poly.length]);
+        const p1 = poly[j];
+        const p2 = poly[(j + 1) % poly.length];
+        // Skip zero-length edges
+        if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
+        const key = this._edgeKey(p1, p2);
         if (!edgeToPolygons.has(key)) edgeToPolygons.set(key, []);
         edgeToPolygons.get(key).push(i);
       }
@@ -309,7 +313,11 @@ export class TerritoryRenderer {
         const poly = polygons[current];
 
         for (let j = 0; j < poly.length; j++) {
-          const key = this._edgeKey(poly[j], poly[(j + 1) % poly.length]);
+          const p1 = poly[j];
+          const p2 = poly[(j + 1) % poly.length];
+          // Skip zero-length edges
+          if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
+          const key = this._edgeKey(p1, p2);
           const connected = edgeToPolygons.get(key) || [];
           for (const other of connected) {
             if (polyGroups[other] === -1) {
@@ -358,11 +366,13 @@ export class TerritoryRenderer {
     const edgeCount = new Map();
     const edges = [];
 
-    // Count edge occurrences
+    // Count edge occurrences, filtering out zero-length edges
     for (const poly of polygons) {
       for (let i = 0; i < poly.length; i++) {
         const p1 = poly[i];
         const p2 = poly[(i + 1) % poly.length];
+        // Skip zero-length edges (degenerate edges where p1 equals p2)
+        if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
         const key = this._edgeKey(p1, p2);
         edgeCount.set(key, (edgeCount.get(key) || 0) + 1);
         edges.push({ p1, p2, key });

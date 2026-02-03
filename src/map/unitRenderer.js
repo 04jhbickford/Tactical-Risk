@@ -46,9 +46,11 @@ export class UnitRenderer {
 
     for (const [territory, placements] of Object.entries(this.gameState.units)) {
       const t = this.territoryByName[territory];
-      if (!t || !t.center) continue;
+      if (!t) continue;
 
-      const [cx, cy] = t.center;
+      // Calculate center from all polygons for proper placement on merged territories
+      const [cx, cy] = this._getTerritoryCenter(t);
+      if (cx === null) continue;
 
       // Group by type - show ALL types
       const grouped = this._groupUnits(placements);
@@ -180,5 +182,60 @@ export class UnitRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(text, x, y);
+  }
+
+  /** Calculate the centroid of all polygons in a territory */
+  _getTerritoryCenter(territory) {
+    if (!territory.polygons || territory.polygons.length === 0) {
+      return territory.center || [null, null];
+    }
+
+    // Calculate weighted centroid based on polygon areas
+    let totalArea = 0;
+    let sumX = 0;
+    let sumY = 0;
+
+    for (const poly of territory.polygons) {
+      if (poly.length < 3) continue;
+
+      const { cx, cy, area } = this._getPolygonCentroid(poly);
+      if (area > 0) {
+        sumX += cx * area;
+        sumY += cy * area;
+        totalArea += area;
+      }
+    }
+
+    if (totalArea === 0) {
+      return territory.center || [null, null];
+    }
+
+    return [sumX / totalArea, sumY / totalArea];
+  }
+
+  /** Calculate the centroid and area of a single polygon */
+  _getPolygonCentroid(poly) {
+    let area = 0;
+    let cx = 0;
+    let cy = 0;
+
+    for (let i = 0; i < poly.length; i++) {
+      const [x1, y1] = poly[i];
+      const [x2, y2] = poly[(i + 1) % poly.length];
+      const cross = x1 * y2 - x2 * y1;
+      area += cross;
+      cx += (x1 + x2) * cross;
+      cy += (y1 + y2) * cross;
+    }
+
+    area = Math.abs(area) / 2;
+    if (area === 0) return { cx: 0, cy: 0, area: 0 };
+
+    const factor = 1 / (6 * (area > 0 ? area : 1));
+    return {
+      cx: Math.abs(cx * factor),
+      cy: Math.abs(cy * factor),
+      area
+    };
   }
 }
