@@ -434,6 +434,9 @@ async function init() {
         // Territory overlays (colored by continent - Risk style)
         territoryRenderer.renderOwnershipOverlays(ctx);
 
+        // Subtle terrain texture (rivers, mountains)
+        territoryRenderer.renderTerrainTexture(ctx, camera.zoom);
+
         // Continent labels (when zoomed out)
         territoryRenderer.renderContinentLabels(ctx, camera.zoom);
 

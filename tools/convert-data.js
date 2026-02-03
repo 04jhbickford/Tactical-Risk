@@ -22,6 +22,7 @@ const MERGES = [
   { from: 'Rio del Oro',       into: 'French West Africa' },
   { from: 'Angola',            into: 'Congo' },
   { from: 'Mozambique',        into: 'Kenya-Rhodesia' },
+  { from: 'Gibraltar',         into: 'Spain' },
 ];
 
 // --- Continent definitions ---
@@ -30,7 +31,7 @@ const MERGES = [
 const CONTINENT_DEFS = [
   { name: 'North America', bonus: 15, territories: ['East US','West US','East Canada','West Canada','Mexico','Alaska','Cuba','Panama'] },
   { name: 'South America', bonus: 6, territories: ['Brazil','Argentina-Chile','Peru','Columbia'] },
-  { name: 'Europe', bonus: 15, territories: ['United Kingdom','West Europe','Germany','South Europe','East Europe','Eire','Gibraltar','Spain','Sweden','Switzerland','Finland Norway'] },
+  { name: 'Europe', bonus: 15, territories: ['United Kingdom','West Europe','Germany','South Europe','East Europe','Eire','Spain','Sweden','Switzerland','Finland Norway'] },
   // Middle East now includes Kazakh S.S.R., India (merged with Afghanistan), Persia, etc.
   { name: 'Middle East', bonus: 9, territories: ['Turkey','Syria Jordan','Saudi Arabia','Persia','India','Kazakh S.S.R.'] },
   // Africa is now one continent (merged North + Sub-Saharan)
@@ -198,6 +199,20 @@ function main() {
       connections[t2].add(t1);
       console.log(`  Added land bridge: ${t1} <-> ${t2}`);
     }
+  }
+
+  // --- Remove unwanted connections ---
+  // Remove the land bridge between Gibraltar/Spain and French West Africa
+  const REMOVE_CONNECTIONS = [
+    ['Gibraltar', 'French West Africa'],
+    ['Gibraltar', 'Rio del Oro'],
+    ['Spain', 'French West Africa'],  // After Gibraltar merges into Spain
+    ['Spain', 'Rio del Oro'],
+  ];
+
+  for (const [t1, t2] of REMOVE_CONNECTIONS) {
+    if (connections[t1]) connections[t1].delete(t2);
+    if (connections[t2]) connections[t2].delete(t1);
   }
 
   // --- Apply territory merges ---

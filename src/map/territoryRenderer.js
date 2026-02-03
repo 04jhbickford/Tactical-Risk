@@ -94,6 +94,92 @@ export class TerritoryRenderer {
     ctx.lineWidth = 1;
   }
 
+  /** Add subtle terrain texture (rivers, mountains) to territories */
+  renderTerrainTexture(ctx, zoom) {
+    if (zoom < 0.5) return; // Only show when zoomed in enough
+
+    ctx.save();
+    ctx.globalAlpha = 0.15;
+
+    for (const t of this.territories) {
+      if (t.isWater) continue;
+
+      const center = this._getTerritoryCenter(t);
+      if (center[0] === null) continue;
+
+      const [cx, cy] = center;
+      // Use territory name hash for consistent random placement
+      const hash = this._hashString(t.name);
+
+      // Draw mountains for territories with certain hash values
+      if (hash % 3 === 0) {
+        this._drawMountains(ctx, cx, cy, hash);
+      }
+
+      // Draw rivers for other territories
+      if (hash % 3 === 1) {
+        this._drawRiver(ctx, cx, cy, hash);
+      }
+    }
+
+    ctx.restore();
+  }
+
+  _hashString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = ((hash << 5) - hash) + str.charCodeAt(i);
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  }
+
+  _drawMountains(ctx, cx, cy, seed) {
+    ctx.strokeStyle = 'rgba(60, 40, 20, 0.5)';
+    ctx.fillStyle = 'rgba(80, 60, 40, 0.3)';
+    ctx.lineWidth = 1;
+
+    const count = 2 + (seed % 3);
+    for (let i = 0; i < count; i++) {
+      const x = cx + ((seed * (i + 1)) % 60) - 30;
+      const y = cy + ((seed * (i + 2)) % 40) - 20;
+      const size = 8 + (seed % 6);
+
+      ctx.beginPath();
+      ctx.moveTo(x - size, y + size / 2);
+      ctx.lineTo(x, y - size / 2);
+      ctx.lineTo(x + size, y + size / 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  _drawRiver(ctx, cx, cy, seed) {
+    ctx.strokeStyle = 'rgba(70, 130, 180, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+
+    const startX = cx - 25 + (seed % 20);
+    const startY = cy - 20 + (seed % 15);
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+
+    // Wavy river line
+    let x = startX, y = startY;
+    for (let i = 0; i < 4; i++) {
+      const dx = 10 + (seed % 8);
+      const dy = 8 + ((seed * i) % 10);
+      const cpx = x + dx / 2 + ((seed * i) % 6) - 3;
+      const cpy = y + dy / 2;
+      x += dx;
+      y += dy;
+      ctx.quadraticCurveTo(cpx, cpy, x, y);
+    }
+    ctx.stroke();
+  }
+
   /** Draw small flag markers on each territory to show ownership */
   renderOwnershipFlags(ctx, zoom) {
     if (!this.gameState || zoom < 0.35) return;
@@ -223,18 +309,45 @@ export class TerritoryRenderer {
   }
 
   _getContinentCenter(continent) {
-    let sumX = 0, sumY = 0, count = 0;
+    const MAP_WIDTH = 3600;
+    const centers = [];
 
     for (const tName of continent.territories) {
       const t = this.territoryByName[tName];
-      if (!t || t.isWater || !t.center) continue;
-      sumX += t.center[0];
-      sumY += t.center[1];
-      count++;
+      if (!t || t.isWater) continue;
+      const center = this._getTerritoryCenter(t);
+      if (center[0] !== null) {
+        centers.push(center);
+      }
     }
 
-    if (count === 0) return null;
-    return [sumX / count, sumY / count];
+    if (centers.length === 0) return null;
+
+    // Check if continent spans the map wrap (some territories on left, some on right)
+    const leftSide = centers.filter(c => c[0] < MAP_WIDTH / 3);
+    const rightSide = centers.filter(c => c[0] > MAP_WIDTH * 2 / 3);
+
+    let sumX = 0, sumY = 0;
+
+    if (leftSide.length > 0 && rightSide.length > 0) {
+      // Continent spans the wrap - shift right-side territories to negative x for averaging
+      for (const [x, y] of centers) {
+        const adjustedX = x > MAP_WIDTH / 2 ? x - MAP_WIDTH : x;
+        sumX += adjustedX;
+        sumY += y;
+      }
+      let avgX = sumX / centers.length;
+      // Wrap back to positive if needed
+      if (avgX < 0) avgX += MAP_WIDTH;
+      return [avgX, sumY / centers.length];
+    } else {
+      // Normal averaging
+      for (const [x, y] of centers) {
+        sumX += x;
+        sumY += y;
+      }
+      return [sumX / centers.length, sumY / centers.length];
+    }
   }
 
   /** Draw territory outlines */
@@ -246,13 +359,13 @@ export class TerritoryRenderer {
     for (const t of this.territories) {
       if (t.isWater) continue;
 
-      // Get unified polygons (handles both connected merges and disconnected islands)
-      const polys = this._getUnifiedPolygons(t.polygons);
+      // For merged territories (multiple polygons), skip outline drawing entirely
+      // to avoid showing internal borders. Adjacent territories will define the boundary.
+      if (t.polygons.length > 1) continue;
 
-      for (const polygon of polys) {
-        if (polygon && polygon.length >= 3) {
-          this._strokePoly(ctx, polygon);
-        }
+      // Single polygon territory - stroke normally
+      if (t.polygons[0] && t.polygons[0].length >= 3) {
+        this._strokePoly(ctx, t.polygons[0]);
       }
     }
 
