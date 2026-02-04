@@ -289,12 +289,22 @@ export class TerritoryRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    for (const continent of this.continents) {
-      // Calculate center of continent
-      const center = this._getContinentCenter(continent);
-      if (!center) continue;
+    // Manual position overrides for continents that span map edges or need adjustment
+    const LABEL_OVERRIDES = {
+      'North America': { x: 550, y: 450 },  // Centered on US, away from Alaska
+    };
 
-      const [cx, cy] = center;
+    for (const continent of this.continents) {
+      // Use override if available, otherwise calculate center
+      let cx, cy;
+      if (LABEL_OVERRIDES[continent.name]) {
+        cx = LABEL_OVERRIDES[continent.name].x;
+        cy = LABEL_OVERRIDES[continent.name].y;
+      } else {
+        const center = this._getContinentCenter(continent);
+        if (!center) continue;
+        [cx, cy] = center;
+      }
 
       // Draw label with continent color
       ctx.save();
@@ -321,7 +331,7 @@ export class TerritoryRenderer {
   }
 
   _getContinentCenter(continent) {
-    const MAP_WIDTH = 3600;
+    const MAP_WIDTH = 3500; // Must match camera.js MAP_WIDTH
     const centers = [];
 
     for (const tName of continent.territories) {

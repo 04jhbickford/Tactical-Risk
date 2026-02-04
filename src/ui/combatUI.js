@@ -247,15 +247,15 @@ export class CombatUI {
     this.combatState.phase = 'rolling';
     this._render();
 
-    // Animate dice for 0.5 seconds
-    const duration = 500;
+    // Animate dice for 1 second
+    const duration = 1000;
     const startTime = Date.now();
 
     return new Promise(resolve => {
       const animate = () => {
         const elapsed = Date.now() - startTime;
         if (elapsed < duration) {
-          // Update with random dice values
+          // Update with random dice values - 3D rolling effect
           this._renderDiceAnimation();
           requestAnimationFrame(animate);
         } else {
@@ -274,7 +274,7 @@ export class CombatUI {
   }
 
   _renderDiceAnimation() {
-    // Just update the dice display with random values
+    // Update dice display with random values - 3D rolling effect
     const diceContainer = this.el.querySelector('.dice-animation');
     if (!diceContainer) return;
 
@@ -283,19 +283,23 @@ export class CombatUI {
     const defenseCount = this._getTotalUnits(defenders);
 
     let html = '<div class="dice-row attacking">';
+    html += '<span class="dice-row-label">Attack:</span>';
     for (let i = 0; i < Math.min(attackCount, 10); i++) {
       const roll = Math.floor(Math.random() * 6) + 1;
-      html += `<div class="die rolling">${roll}</div>`;
+      const delay = i * 30;
+      html += `<div class="die die-3d rolling" style="animation-delay: ${delay}ms">${roll}</div>`;
     }
-    if (attackCount > 10) html += `<span class="dice-more">+${attackCount - 10} more</span>`;
+    if (attackCount > 10) html += `<span class="dice-more">+${attackCount - 10}</span>`;
     html += '</div>';
 
     html += '<div class="dice-row defending">';
+    html += '<span class="dice-row-label">Defense:</span>';
     for (let i = 0; i < Math.min(defenseCount, 10); i++) {
       const roll = Math.floor(Math.random() * 6) + 1;
-      html += `<div class="die rolling">${roll}</div>`;
+      const delay = i * 30;
+      html += `<div class="die die-3d rolling" style="animation-delay: ${delay}ms">${roll}</div>`;
     }
-    if (defenseCount > 10) html += `<span class="dice-more">+${defenseCount - 10} more</span>`;
+    if (defenseCount > 10) html += `<span class="dice-more">+${defenseCount - 10}</span>`;
     html += '</div>';
 
     diceContainer.innerHTML = html;
@@ -667,16 +671,18 @@ export class CombatUI {
       `;
     }
 
-    // Defender casualties (auto-selected)
+    // Defender casualties (now also selectable)
     if (pendingDefenderCasualties > 0) {
       html += `
         <div class="casualty-group defender">
           <div class="casualty-header">
-            <span class="casualty-title">Defender Loses ${pendingDefenderCasualties} Units</span>
-            <span class="casualty-count complete">${defenderTotal}/${pendingDefenderCasualties}</span>
+            <span class="casualty-title">Select ${pendingDefenderCasualties} Defender Casualties</span>
+            <span class="casualty-count ${defenderTotal === pendingDefenderCasualties ? 'complete' : 'incomplete'}">
+              ${defenderTotal}/${pendingDefenderCasualties}
+            </span>
           </div>
-          <div class="casualty-units readonly">
-            ${this._renderCasualtyUnits(defenders, selectedDefenderCasualties, 'defender', true)}
+          <div class="casualty-units">
+            ${this._renderCasualtyUnits(defenders, selectedDefenderCasualties, 'defender')}
           </div>
         </div>
       `;
@@ -758,22 +764,29 @@ export class CombatUI {
   }
 
   _adjustCasualty(side, unitType, delta) {
-    const { attackers, pendingAttackerCasualties, selectedAttackerCasualties } = this.combatState;
+    const {
+      attackers, defenders,
+      pendingAttackerCasualties, pendingDefenderCasualties,
+      selectedAttackerCasualties, selectedDefenderCasualties
+    } = this.combatState;
 
-    if (side !== 'attacker') return; // Only attacker can adjust
+    // Determine which side we're adjusting
+    const units = side === 'attacker' ? attackers : defenders;
+    const pendingCasualties = side === 'attacker' ? pendingAttackerCasualties : pendingDefenderCasualties;
+    const selectedCasualties = side === 'attacker' ? selectedAttackerCasualties : selectedDefenderCasualties;
 
-    const unit = attackers.find(u => u.type === unitType);
+    const unit = units.find(u => u.type === unitType);
     if (!unit) return;
 
-    const current = selectedAttackerCasualties[unitType] || 0;
+    const current = selectedCasualties[unitType] || 0;
     const newValue = Math.max(0, Math.min(unit.quantity, current + delta));
 
     // Check we don't exceed required casualties
-    const currentTotal = this._getTotalSelectedCasualties(selectedAttackerCasualties);
+    const currentTotal = this._getTotalSelectedCasualties(selectedCasualties);
     const newTotal = currentTotal - current + newValue;
 
-    if (newTotal <= pendingAttackerCasualties) {
-      selectedAttackerCasualties[unitType] = newValue;
+    if (newTotal <= pendingCasualties) {
+      selectedCasualties[unitType] = newValue;
       this._render();
     }
   }

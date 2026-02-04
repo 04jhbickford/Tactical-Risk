@@ -718,6 +718,52 @@ html, body {
   cursor: not-allowed;
 }
 
+/* --- Continue Game Button --- */
+.continue-section {
+  margin-bottom: 24px;
+}
+
+.continue-game-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.continue-game-btn:hover {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+}
+
+.continue-icon {
+  font-size: 24px;
+  color: #fff;
+}
+
+.continue-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.continue-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.continue-time {
+  font-size: 12px;
+  color: rgba(255,255,255,0.8);
+}
+
 /* --- Mode Selection Grid --- */
 .mode-grid {
   display: grid;
@@ -2294,6 +2340,59 @@ html, body {
   color: #fff;
 }
 
+/* Select All Units section */
+.mp-select-all {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(65, 105, 225, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(65, 105, 225, 0.2);
+}
+
+.mp-all-units-btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(65, 105, 225, 0.4);
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(65, 105, 225, 0.3), rgba(65, 105, 225, 0.2));
+  color: #7eb8da;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mp-all-units-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(65, 105, 225, 0.5), rgba(65, 105, 225, 0.4));
+  color: #fff;
+  border-color: rgba(65, 105, 225, 0.6);
+}
+
+.mp-all-units-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mp-clear-btn {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  border-radius: 6px;
+  background: rgba(255, 100, 100, 0.1);
+  color: #ff8888;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mp-clear-btn:hover {
+  background: rgba(255, 100, 100, 0.2);
+  color: #ffaaaa;
+  border-color: rgba(255, 100, 100, 0.5);
+}
+
 /* --- Combat Popup --- */
 .combat-popup {
   position: fixed;
@@ -2696,6 +2795,66 @@ html, body {
 @keyframes diceRoll {
   0%, 100% { transform: rotate(-5deg) scale(1); }
   50% { transform: rotate(5deg) scale(1.05); }
+}
+
+/* 3D Dice Animation */
+.die.die-3d {
+  width: 36px;
+  height: 36px;
+  perspective: 100px;
+  transform-style: preserve-3d;
+  background: linear-gradient(145deg, #ffffff, #d0d0d0);
+  border: none;
+  box-shadow:
+    2px 2px 4px rgba(0,0,0,0.4),
+    inset 1px 1px 2px rgba(255,255,255,0.8);
+  color: #222;
+}
+
+.die.die-3d.rolling {
+  animation: diceRoll3D 0.12s infinite ease-in-out;
+}
+
+@keyframes diceRoll3D {
+  0%, 100% { transform: rotateX(0deg) rotateY(0deg) scale(1); }
+  25% { transform: rotateX(20deg) rotateY(-20deg) scale(1.1); }
+  50% { transform: rotateX(-15deg) rotateY(25deg) scale(0.95); }
+  75% { transform: rotateX(25deg) rotateY(-15deg) scale(1.05); }
+}
+
+.die.die-3d.hit {
+  background: linear-gradient(145deg, #4ade80, #22c55e);
+  color: #fff;
+  box-shadow:
+    0 0 12px rgba(74, 222, 128, 0.6),
+    2px 2px 4px rgba(0,0,0,0.3);
+  animation: hitPulse3D 0.4s ease-out;
+}
+
+.die.die-3d.miss {
+  background: linear-gradient(145deg, #888, #666);
+  color: #444;
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+@keyframes hitPulse3D {
+  0% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.dice-row-label {
+  font-size: 11px;
+  color: #aaa;
+  margin-right: 8px;
+  min-width: 50px;
+}
+
+.dice-row.attacking .die.die-3d.hit {
+  background: linear-gradient(145deg, #f87171, #ef4444);
+}
+
+.dice-row.defending .die.die-3d.hit {
+  background: linear-gradient(145deg, #60a5fa, #3b82f6);
 }
 
 .dice-more {
@@ -3827,6 +3986,22 @@ html, body {
 
 .pl-btn.done:hover {
   background: linear-gradient(135deg, #5CBF60, #489E4C);
+}
+
+.pl-btn.primary {
+  background: linear-gradient(135deg, #4169E1, #3154c9);
+  box-shadow: 0 4px 15px rgba(65, 105, 225, 0.4);
+  animation: pulse-primary 1.5s ease-in-out infinite;
+}
+
+.pl-btn.primary:hover {
+  background: linear-gradient(135deg, #5179F1, #4164d9);
+  box-shadow: 0 4px 20px rgba(65, 105, 225, 0.6);
+}
+
+@keyframes pulse-primary {
+  0%, 100% { box-shadow: 0 4px 15px rgba(65, 105, 225, 0.4); }
+  50% { box-shadow: 0 4px 25px rgba(65, 105, 225, 0.7); }
 }
 
 .pl-selected-territory {

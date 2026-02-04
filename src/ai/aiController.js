@@ -9,6 +9,28 @@ export class AIController {
     this.isProcessing = false;
     this.onAction = null; // Callback when AI takes action
     this.unitDefs = null;
+    this.skipMode = false; // Fast-forward AI moves
+    this.onStatusUpdate = null; // Callback for AI status messages
+  }
+
+  // Allow user to skip/fast-forward AI moves
+  setSkipMode(skip) {
+    this.skipMode = skip;
+  }
+
+  toggleSkipMode() {
+    this.skipMode = !this.skipMode;
+    return this.skipMode;
+  }
+
+  setOnStatusUpdate(callback) {
+    this.onStatusUpdate = callback;
+  }
+
+  _updateStatus(message) {
+    if (this.onStatusUpdate) {
+      this.onStatusUpdate(message);
+    }
   }
 
   setGameState(gameState) {
@@ -80,9 +102,13 @@ export class AIController {
   }
 
   async _handleCapitalPlacement(aiPlayer, player) {
+    this._updateStatus(`${player.name} is choosing capital location...`);
+    await this._delay(this._getActionDelay());
+
     const result = await aiPlayer.takeTurn('CAPITAL_PLACEMENT');
 
     if (result.action === 'placeCapital' && result.territory) {
+      this._updateStatus(`${player.name} places capital in ${result.territory}`);
       this.gameState.placeCapital(result.territory);
       this._notifyAction('placeCapital', result);
     }
@@ -242,7 +268,8 @@ export class AIController {
   }
 
   async _handleCombatMove(aiPlayer, player) {
-    await this._delay(500);
+    this._updateStatus(`${player.name} is planning attacks...`);
+    await this._delay(this._getActionDelay());
 
     // Get owned territories with units
     const owned = this.gameState.territories
@@ -350,6 +377,14 @@ export class AIController {
   }
 
   _delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    // In skip mode, use minimal delays
+    const actualDelay = this.skipMode ? Math.min(ms, 100) : ms;
+    return new Promise(resolve => setTimeout(resolve, actualDelay));
+  }
+
+  // Get appropriate delay based on difficulty and skip mode
+  _getActionDelay() {
+    if (this.skipMode) return 100;
+    return 800; // Default visible delay so players can see moves
   }
 }

@@ -229,7 +229,13 @@ async function init() {
   const lobby = new Lobby(setup, (gameMode, selectedPlayers, options = {}) => {
     // Initialize game state
     gameState = new GameState(setup, territories, continents);
-    gameState.initGame(gameMode, selectedPlayers, options);
+
+    // Check if loading from save
+    if (options.loadFromSave) {
+      gameState.loadFromJSON(options.loadFromSave);
+    } else {
+      gameState.initGame(gameMode, selectedPlayers, options);
+    }
 
     // Initialize AI controller
     aiController = new AIController();

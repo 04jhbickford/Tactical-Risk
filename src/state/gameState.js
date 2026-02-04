@@ -659,6 +659,7 @@ export class GameState {
     this.placementHistory = [];
     this._clearMovedFlags();
     this._notify();
+    this.autoSave(); // Auto-save after each turn
   }
 
   // Check if a phase should be skipped (nothing to do)
@@ -715,6 +716,7 @@ export class GameState {
     }
 
     this._notify();
+    this.autoSave(); // Auto-save after each phase change
   }
 
   // Get current turn phase name
@@ -1502,5 +1504,46 @@ export class GameState {
       };
       input.click();
     });
+  }
+
+  // Auto-save to localStorage for pass-and-play
+  autoSave() {
+    try {
+      const data = JSON.stringify(this.toJSON());
+      localStorage.setItem('tacticalRisk_autoSave', data);
+      localStorage.setItem('tacticalRisk_autoSave_time', new Date().toISOString());
+      return true;
+    } catch (err) {
+      console.warn('Auto-save failed:', err);
+      return false;
+    }
+  }
+
+  // Load from auto-save
+  static loadAutoSave() {
+    try {
+      const data = localStorage.getItem('tacticalRisk_autoSave');
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch (err) {
+      console.warn('Load auto-save failed:', err);
+      return null;
+    }
+  }
+
+  // Check if auto-save exists
+  static hasAutoSave() {
+    return localStorage.getItem('tacticalRisk_autoSave') !== null;
+  }
+
+  // Get auto-save timestamp
+  static getAutoSaveTime() {
+    return localStorage.getItem('tacticalRisk_autoSave_time');
+  }
+
+  // Clear auto-save
+  static clearAutoSave() {
+    localStorage.removeItem('tacticalRisk_autoSave');
+    localStorage.removeItem('tacticalRisk_autoSave_time');
   }
 }

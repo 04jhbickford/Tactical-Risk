@@ -311,6 +311,21 @@ export class MovementUI {
 
     html += `</div>`;
 
+    // Move All button
+    const totalMovable = movableUnits.reduce((sum, u) => sum + u.quantity, 0);
+    const totalSelected = Object.values(this.selectedUnits).reduce((sum, q) => sum + q, 0);
+
+    html += `
+      <div class="mp-select-all">
+        <button class="mp-all-units-btn" data-action="select-all" ${totalSelected === totalMovable ? 'disabled' : ''}>
+          Select All Units
+        </button>
+        ${totalSelected > 0 ? `
+          <button class="mp-clear-btn" data-action="clear-all">Clear Selection</button>
+        ` : ''}
+      </div>
+    `;
+
     // Show valid destinations
     const validDests = this.getValidDestinations();
     const hasUnitsSelected = Object.values(this.selectedUnits).some(q => q > 0);
@@ -352,7 +367,7 @@ export class MovementUI {
       });
     });
 
-    // All button
+    // All button (per unit type)
     this.el.querySelectorAll('.mp-all-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const unit = btn.dataset.unit;
@@ -360,6 +375,25 @@ export class MovementUI {
         this.selectedUnits[unit] = qty;
         this._render();
       });
+    });
+
+    // Select All Units button
+    this.el.querySelector('[data-action="select-all"]')?.addEventListener('click', () => {
+      const player = this.gameState.currentPlayer;
+      const units = this.gameState.getUnitsAt(this.selectedFrom.name);
+      const movableUnits = units.filter(u =>
+        u.owner === player.id && !u.moved && this._canUnitMove(u.type)
+      );
+      for (const unit of movableUnits) {
+        this.selectedUnits[unit.type] = unit.quantity;
+      }
+      this._render();
+    });
+
+    // Clear Selection button
+    this.el.querySelector('[data-action="clear-all"]')?.addEventListener('click', () => {
+      this.selectedUnits = {};
+      this._render();
     });
 
     // Destination buttons

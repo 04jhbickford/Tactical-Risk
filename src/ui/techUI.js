@@ -207,13 +207,18 @@ export class TechUI {
     });
   }
 
-  _rollDice() {
+  async _rollDice() {
     if (this.diceCount <= 0) return;
 
     const player = this.gameState.currentPlayer;
 
     // Purchase the dice first
     this.gameState.purchaseTechDice(player.id, this.diceCount);
+
+    // Show rolling animation for 1 second
+    this._showRollingAnimation();
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Roll
     const result = this.gameState.rollTechDice(player.id);
@@ -222,6 +227,35 @@ export class TechUI {
     this.diceCount = 0;
 
     this._render();
+  }
+
+  _showRollingAnimation() {
+    const diceArea = this.el.querySelector('.tech-dice-select');
+    if (!diceArea) return;
+
+    let html = `
+      <div class="tech-rolling">
+        <div class="tech-rolling-title">Rolling ${this.diceCount} dice...</div>
+        <div class="tech-dice-rolling">
+    `;
+
+    for (let i = 0; i < this.diceCount; i++) {
+      const delay = i * 50;
+      html += `<div class="tech-die die-3d rolling" style="animation-delay: ${delay}ms">${Math.floor(Math.random() * 6) + 1}</div>`;
+    }
+
+    html += `</div></div>`;
+    diceArea.innerHTML = html;
+
+    // Animate values
+    const animateInterval = setInterval(() => {
+      const dice = diceArea.querySelectorAll('.tech-die');
+      dice.forEach(die => {
+        die.textContent = Math.floor(Math.random() * 6) + 1;
+      });
+    }, 100);
+
+    setTimeout(() => clearInterval(animateInterval), 1000);
   }
 
   _complete() {

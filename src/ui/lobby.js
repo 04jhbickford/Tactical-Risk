@@ -47,13 +47,30 @@ export class Lobby {
   _renderModeSelect() {
     const modes = this.setup.gameModes;
 
+    // Check for auto-save
+    const hasAutoSave = localStorage.getItem('tacticalRisk_autoSave') !== null;
+    const autoSaveTime = localStorage.getItem('tacticalRisk_autoSave_time');
+    const autoSaveDisplay = autoSaveTime ? new Date(autoSaveTime).toLocaleString() : '';
+
     let html = `
       <div class="lobby-content">
         <h1 class="lobby-title">Tactical Risk</h1>
         <p class="lobby-subtitle">World War II Strategy</p>
 
+        ${hasAutoSave ? `
+          <div class="lobby-section continue-section">
+            <button class="continue-game-btn" data-action="continue">
+              <span class="continue-icon">▶</span>
+              <span class="continue-text">
+                <span class="continue-title">Continue Game</span>
+                <span class="continue-time">Saved: ${autoSaveDisplay}</span>
+              </span>
+            </button>
+          </div>
+        ` : ''}
+
         <div class="lobby-section">
-          <h2>Select Game Mode</h2>
+          <h2>New Game</h2>
           <div class="mode-grid">
             ${modes.map(mode => `
               <div class="mode-card ${mode.enabled ? '' : 'disabled'}" data-mode="${mode.id}">
@@ -76,6 +93,26 @@ export class Lobby {
         this._renderPlayerSelect();
       });
     });
+
+    // Continue game button
+    this.el.querySelector('.continue-game-btn')?.addEventListener('click', () => {
+      this._continueGame();
+    });
+  }
+
+  _continueGame() {
+    const data = localStorage.getItem('tacticalRisk_autoSave');
+    if (!data) return;
+
+    try {
+      const saveData = JSON.parse(data);
+      this.hide();
+      // Pass null for mode/players to signal loading from save
+      this.onStart(null, null, { loadFromSave: saveData });
+    } catch (err) {
+      console.error('Failed to load auto-save:', err);
+      alert('Failed to load saved game. Starting new game.');
+    }
   }
 
   _renderPlayerSelect() {

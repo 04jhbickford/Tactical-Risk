@@ -107,13 +107,8 @@ export class PlacementUI {
     );
 
     if (result.success) {
-      // Check if we've placed 6 units this round (or have no more to place)
-      const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
-      if (result.unitsPlacedThisRound >= 6 || totalRemaining === 0) {
-        // Automatically end round
-        this.gameState.finishPlacementRound();
-        this.selectedTerritory = null;
-      }
+      // Don't auto-advance - let user review and undo if needed
+      // The "Done - Next Player" button will appear when 6 units placed
 
       if (this.onPlacementComplete) {
         this.onPlacementComplete();
@@ -225,13 +220,18 @@ export class PlacementUI {
     }
 
     // Actions
+    const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
+    const roundComplete = placedThisRound >= 6 || totalRemaining === 0;
+
     html += `
       <div class="pl-actions">
-        ${this.gameState.placementHistory.length > 0 ? `
+        ${canUndo ? `
           <button class="pl-btn undo" data-action="undo">Undo Last</button>
         ` : ''}
         ${placedThisRound > 0 ? `
-          <button class="pl-btn done" data-action="finish">End Round</button>
+          <button class="pl-btn done ${roundComplete ? 'primary' : ''}" data-action="finish">
+            ${roundComplete ? '✓ Done - Next Player' : 'End Round Early'}
+          </button>
         ` : ''}
       </div>
     `;
