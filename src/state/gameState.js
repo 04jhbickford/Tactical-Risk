@@ -771,11 +771,19 @@ export class GameState {
     const toOwner = this.getOwner(toTerritory);
     const toT = this.territoryByName[toTerritory];
     const isEnemy = toOwner && toOwner !== player.id && !this.areAllies(player.id, toOwner);
+    const isAllied = toOwner && toOwner !== player.id && this.areAllies(player.id, toOwner);
 
-    // Non-combat move cannot enter enemy territory
-    if (isNonCombatMove && isEnemy) {
-      return { success: false, error: 'Cannot enter enemy territory in non-combat move' };
+    // Non-combat move rules
+    if (isNonCombatMove) {
+      // Cannot enter enemy territory
+      if (isEnemy) {
+        return { success: false, error: 'Cannot enter enemy territory in non-combat move' };
+      }
+      // Can freely pass through allied territories
     }
+
+    // Combat move rules - can move through friendly and allied territories to reach enemy
+    // (Allied territories are passable during combat move)
 
     // Validate and move each unit
     const fromUnits = this.units[fromTerritory] || [];
@@ -912,7 +920,7 @@ export class GameState {
     }
   }
 
-  // Resolve combat in a territory (simplified dice combat)
+  // Resolve combat in a territory (dice combat with naval rules)
   resolveCombat(territory, unitDefs) {
     const units = this.units[territory] || [];
     const player = this.currentPlayer;
@@ -922,20 +930,25 @@ export class GameState {
     const defenders = units.filter(u => u.owner !== player.id && !this.areAllies(player.id, u.owner));
 
     if (attackers.length === 0 || defenders.length === 0) {
+      // Repair damaged ships at end of combat
+      this._repairDamagedShips(units, unitDefs);
       // Remove from combat queue
       this.combatQueue = this.combatQueue.filter(t => t !== territory);
       return { resolved: true, winner: attackers.length > 0 ? 'attacker' : 'defender' };
     }
 
-    // Roll dice for each unit
-    const attackHits = this._rollCombat(attackers, 'attack', unitDefs);
-    const defenseHits = this._rollCombat(defenders, 'defense', unitDefs);
+    const t = this.territoryByName[territory];
+    const isNavalBattle = t?.isWater;
 
-    // Apply casualties
-    this._applyCasualties(defenders, attackHits, unitDefs);
-    this._applyCasualties(attackers, defenseHits, unitDefs);
+    // Roll dice for combat
+    const { hits: attackHits, rolls: attackRolls } = this._rollCombatWithRolls(attackers, 'attack', unitDefs);
+    const { hits: defenseHits, rolls: defenseRolls } = this._rollCombatWithRolls(defenders, 'defense', unitDefs);
 
-    // Clean up empty units
+    // Apply casualties (handles multi-hit ships)
+    const attackerCasualties = this._applyCasualtiesWithDamage(defenders, attackHits, unitDefs, isNavalBattle);
+    const defenderCasualties = this._applyCasualtiesWithDamage(attackers, defenseHits, unitDefs, isNavalBattle);
+
+    // Clean up destroyed units (quantity <= 0)
     this.units[territory] = units.filter(u => u.quantity > 0);
 
     // Check if combat is over
@@ -947,18 +960,28 @@ export class GameState {
     const result = {
       attackHits,
       defenseHits,
+      attackRolls,
+      defenseRolls,
+      attackerCasualties,
+      defenderCasualties,
       attackersRemaining: remainingAttackers.reduce((sum, u) => sum + u.quantity, 0),
       defendersRemaining: remainingDefenders.reduce((sum, u) => sum + u.quantity, 0),
     };
 
     if (remainingDefenders.length === 0) {
-      // Attacker wins - capture territory
-      const defender = defenders[0]?.owner;
-      this.territoryState[territory].owner = player.id;
+      // Attacker wins - capture territory (if land)
+      if (!isNavalBattle) {
+        const defender = defenders[0]?.owner;
+        this.territoryState[territory].owner = player.id;
+      }
+      // Repair surviving damaged ships
+      this._repairDamagedShips(this.units[territory], unitDefs);
       this.combatQueue = this.combatQueue.filter(t => t !== territory);
       result.resolved = true;
       result.winner = 'attacker';
     } else if (remainingAttackers.length === 0) {
+      // Repair surviving damaged ships
+      this._repairDamagedShips(this.units[territory], unitDefs);
       this.combatQueue = this.combatQueue.filter(t => t !== territory);
       result.resolved = true;
       result.winner = 'defender';
@@ -970,8 +993,10 @@ export class GameState {
     return result;
   }
 
-  _rollCombat(units, type, unitDefs) {
+  _rollCombatWithRolls(units, type, unitDefs) {
     let hits = 0;
+    const rolls = [];
+
     for (const unit of units) {
       const def = unitDefs[unit.type];
       if (!def) continue;
@@ -979,27 +1004,122 @@ export class GameState {
 
       for (let i = 0; i < unit.quantity; i++) {
         const roll = Math.floor(Math.random() * 6) + 1;
+        rolls.push({ unit: unit.type, roll, hit: roll <= hitValue });
         if (roll <= hitValue) hits++;
       }
     }
-    return hits;
+    return { hits, rolls };
   }
 
-  _applyCasualties(units, hits, unitDefs) {
-    // Remove cheapest units first
-    const sorted = [...units].sort((a, b) => {
+  _rollCombat(units, type, unitDefs) {
+    return this._rollCombatWithRolls(units, type, unitDefs).hits;
+  }
+
+  _applyCasualtiesWithDamage(units, hits, unitDefs, isNavalBattle) {
+    const casualties = [];
+    let remaining = hits;
+
+    // For naval battles, first try to damage multi-hit ships before destroying units
+    if (isNavalBattle) {
+      // Prioritize damaging already-damaged ships to destroy them
+      const multiHitShips = units.filter(u => {
+        const def = unitDefs[u.type];
+        return def?.hp > 1;
+      });
+
+      // First, finish off damaged ships
+      for (const unit of multiHitShips) {
+        if (remaining <= 0) break;
+        if (unit.damaged && unit.quantity > 0) {
+          // Destroy damaged ship
+          unit.quantity--;
+          remaining--;
+          casualties.push({ type: unit.type, destroyed: true, wasDamaged: true });
+        }
+      }
+
+      // Then, damage undamaged multi-hit ships
+      for (const unit of multiHitShips) {
+        if (remaining <= 0) break;
+        const undamaged = unit.quantity - (unit.damagedCount || 0);
+        if (undamaged > 0) {
+          // Damage the ship instead of destroying
+          unit.damagedCount = (unit.damagedCount || 0) + 1;
+          unit.damaged = true;
+          remaining--;
+          casualties.push({ type: unit.type, damaged: true });
+        }
+      }
+    }
+
+    // Apply remaining hits to cheapest units first
+    const sorted = [...units].filter(u => {
+      const def = unitDefs[u.type];
+      // Skip multi-hit ships that are only damaged (not destroyed)
+      return !(def?.hp > 1 && u.damaged && !u.destroyed);
+    }).sort((a, b) => {
       const costA = unitDefs[a.type]?.cost || 0;
       const costB = unitDefs[b.type]?.cost || 0;
       return costA - costB;
     });
 
-    let remaining = hits;
     for (const unit of sorted) {
       if (remaining <= 0) break;
       const remove = Math.min(unit.quantity, remaining);
       unit.quantity -= remove;
       remaining -= remove;
+      for (let i = 0; i < remove; i++) {
+        casualties.push({ type: unit.type, destroyed: true });
+      }
     }
+
+    return casualties;
+  }
+
+  _applyCasualties(units, hits, unitDefs) {
+    this._applyCasualtiesWithDamage(units, hits, unitDefs, false);
+  }
+
+  // Repair damaged ships at end of combat
+  _repairDamagedShips(units, unitDefs) {
+    for (const unit of units) {
+      const def = unitDefs?.[unit.type];
+      if (def?.hp > 1 && unit.damaged) {
+        // Ship survived combat - repair it
+        unit.damaged = false;
+        unit.damagedCount = 0;
+      }
+    }
+  }
+
+  // Apply specific casualties (for player selection)
+  applyCasualtiesManual(territory, casualties, isAttacker, unitDefs) {
+    const units = this.units[territory] || [];
+    const player = this.currentPlayer;
+    if (!player) return { success: false };
+
+    const targetUnits = isAttacker
+      ? units.filter(u => u.owner === player.id)
+      : units.filter(u => u.owner !== player.id);
+
+    for (const casualty of casualties) {
+      const unit = targetUnits.find(u => u.type === casualty.type && u.quantity > 0);
+      if (unit) {
+        if (casualty.damage) {
+          // Damage a multi-hit ship
+          unit.damaged = true;
+          unit.damagedCount = (unit.damagedCount || 0) + 1;
+        } else {
+          // Destroy unit
+          unit.quantity--;
+        }
+      }
+    }
+
+    // Clean up destroyed units
+    this.units[territory] = units.filter(u => u.quantity > 0);
+    this._notify();
+    return { success: true };
   }
 
   // Place purchased units at factories
@@ -1406,6 +1526,219 @@ export class GameState {
   getNextRiskCardValue(playerId) {
     const tradeNum = this.cardTradeCount[playerId] || 0;
     return RISK_CARD_VALUES[Math.min(tradeNum, RISK_CARD_VALUES.length - 1)];
+  }
+
+  // --- Transport & Carrier System ---
+
+  // Load a unit onto a transport in the same sea zone
+  loadTransport(seaZone, transportIndex, unitType, landTerritory, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const seaUnits = this.units[seaZone] || [];
+    const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+    if (transportIndex >= transports.length) {
+      return { success: false, error: 'Invalid transport' };
+    }
+
+    const transport = transports[transportIndex];
+    const transportDef = unitDefs.transport;
+
+    // Check if transport can carry this unit type
+    if (!transportDef.canCarry?.includes(unitType)) {
+      return { success: false, error: `Transports cannot carry ${unitType}` };
+    }
+
+    // Check cargo capacity
+    const currentCargo = transport.cargo || [];
+    const canLoad = this._canLoadOnTransport(currentCargo, unitType);
+    if (!canLoad) {
+      return { success: false, error: 'Transport is full' };
+    }
+
+    // Check if unit exists in adjacent land territory
+    const landUnits = this.units[landTerritory] || [];
+    const sourceUnit = landUnits.find(u => u.type === unitType && u.owner === player.id && !u.moved);
+    if (!sourceUnit || sourceUnit.quantity < 1) {
+      return { success: false, error: `No ${unitType} available to load` };
+    }
+
+    // Move unit to transport
+    sourceUnit.quantity--;
+    if (sourceUnit.quantity <= 0) {
+      const idx = landUnits.indexOf(sourceUnit);
+      landUnits.splice(idx, 1);
+    }
+
+    transport.cargo = transport.cargo || [];
+    transport.cargo.push({ type: unitType, owner: player.id });
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Check if a unit can be loaded onto a transport given current cargo
+  _canLoadOnTransport(cargo, unitType) {
+    // Transport capacity: 2 infantry OR 1 infantry + 1 other OR 1 non-infantry
+    const infantryCount = cargo.filter(c => c.type === 'infantry').length;
+    const otherCount = cargo.filter(c => c.type !== 'infantry').length;
+
+    if (unitType === 'infantry') {
+      // Can load infantry if: empty, or 1 infantry already, or no other units
+      return cargo.length < 2 && otherCount === 0;
+    } else {
+      // Can load other unit if: empty, or 1 infantry only
+      return cargo.length === 0 || (infantryCount === 1 && otherCount === 0);
+    }
+  }
+
+  // Unload units from transport to coastal territory
+  unloadTransport(seaZone, transportIndex, coastalTerritory) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const seaUnits = this.units[seaZone] || [];
+    const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+    if (transportIndex >= transports.length) {
+      return { success: false, error: 'Invalid transport' };
+    }
+
+    const transport = transports[transportIndex];
+    if (!transport.cargo || transport.cargo.length === 0) {
+      return { success: false, error: 'Transport has no cargo' };
+    }
+
+    // Check adjacency
+    const seaT = this.territoryByName[seaZone];
+    if (!seaT || !seaT.connections.includes(coastalTerritory)) {
+      return { success: false, error: 'Territory not adjacent to sea zone' };
+    }
+
+    const coastalT = this.territoryByName[coastalTerritory];
+    if (coastalT?.isWater) {
+      return { success: false, error: 'Cannot unload to water' };
+    }
+
+    // Unload all cargo to coastal territory
+    const coastalUnits = this.units[coastalTerritory] || [];
+    for (const cargo of transport.cargo) {
+      const existing = coastalUnits.find(u => u.type === cargo.type && u.owner === cargo.owner);
+      if (existing) {
+        existing.quantity++;
+        existing.moved = true;
+      } else {
+        coastalUnits.push({ type: cargo.type, quantity: 1, owner: cargo.owner, moved: true });
+      }
+    }
+    this.units[coastalTerritory] = coastalUnits;
+
+    // Clear transport cargo
+    transport.cargo = [];
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Land a fighter on a carrier
+  landOnCarrier(seaZone, carrierIndex, fighterType, fromTerritory, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const seaUnits = this.units[seaZone] || [];
+    const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+    if (carrierIndex >= carriers.length) {
+      return { success: false, error: 'Invalid carrier' };
+    }
+
+    const carrier = carriers[carrierIndex];
+    const carrierDef = unitDefs.carrier;
+
+    // Check if carrier can carry this aircraft type
+    if (!carrierDef.canCarry?.includes(fighterType)) {
+      return { success: false, error: `Carriers cannot carry ${fighterType}` };
+    }
+
+    // Check capacity
+    const currentAircraft = carrier.aircraft || [];
+    if (currentAircraft.length >= carrierDef.aircraftCapacity) {
+      return { success: false, error: 'Carrier is full' };
+    }
+
+    // Find the fighter in source territory
+    const sourceUnits = this.units[fromTerritory] || [];
+    const sourceUnit = sourceUnits.find(u => u.type === fighterType && u.owner === player.id);
+    if (!sourceUnit || sourceUnit.quantity < 1) {
+      return { success: false, error: `No ${fighterType} available` };
+    }
+
+    // Move fighter to carrier
+    sourceUnit.quantity--;
+    if (sourceUnit.quantity <= 0) {
+      const idx = sourceUnits.indexOf(sourceUnit);
+      sourceUnits.splice(idx, 1);
+    }
+
+    carrier.aircraft = carrier.aircraft || [];
+    carrier.aircraft.push({ type: fighterType, owner: player.id });
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Launch aircraft from carrier (they can then move independently)
+  launchFromCarrier(seaZone, carrierIndex, aircraftIndex) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const seaUnits = this.units[seaZone] || [];
+    const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+    if (carrierIndex >= carriers.length) {
+      return { success: false, error: 'Invalid carrier' };
+    }
+
+    const carrier = carriers[carrierIndex];
+    if (!carrier.aircraft || aircraftIndex >= carrier.aircraft.length) {
+      return { success: false, error: 'Invalid aircraft' };
+    }
+
+    const aircraft = carrier.aircraft[aircraftIndex];
+
+    // Add aircraft to the sea zone as a unit (it will need to land somewhere at end of turn)
+    const existing = seaUnits.find(u => u.type === aircraft.type && u.owner === aircraft.owner);
+    if (existing) {
+      existing.quantity++;
+    } else {
+      seaUnits.push({ type: aircraft.type, quantity: 1, owner: aircraft.owner });
+    }
+
+    // Remove from carrier
+    carrier.aircraft.splice(aircraftIndex, 1);
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Get transport cargo summary for UI
+  getTransportCargo(seaZone, playerId) {
+    const units = this.units[seaZone] || [];
+    const transports = units.filter(u => u.type === 'transport' && u.owner === playerId);
+    return transports.map((t, i) => ({
+      index: i,
+      cargo: t.cargo || [],
+      capacity: 2
+    }));
+  }
+
+  // Get carrier aircraft summary for UI
+  getCarrierAircraft(seaZone, playerId) {
+    const units = this.units[seaZone] || [];
+    const carriers = units.filter(u => u.type === 'carrier' && u.owner === playerId);
+    return carriers.map((c, i) => ({
+      index: i,
+      aircraft: c.aircraft || [],
+      capacity: 2,
+      damaged: c.damaged || false
+    }));
   }
 
   subscribe(callback) {

@@ -46,8 +46,11 @@ export class PlacementUI {
 
   isActive() {
     // Stay active during unit placement phase - even if no units left (to allow passing)
-    return this.gameState &&
-      this.gameState.phase === GAME_PHASES.UNIT_PLACEMENT;
+    // But only for human players - AI handles its own placement
+    if (!this.gameState) return false;
+    if (this.gameState.phase !== GAME_PHASES.UNIT_PLACEMENT) return false;
+    const player = this.gameState.currentPlayer;
+    return player && !player.isAI;
   }
 
   show() {

@@ -1649,6 +1649,34 @@ html, body {
   background: linear-gradient(135deg, #ef5350, #d32f2f);
 }
 
+/* AI Status Display */
+.pp-ai-status {
+  padding: 20px;
+  text-align: center;
+}
+
+.pp-ai-thinking {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.pp-ai-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: #4fc3f7;
+  border-radius: 50%;
+  animation: pp-spin 1s linear infinite;
+}
+
+@keyframes pp-spin {
+  to { transform: rotate(360deg); }
+}
+
 .pp-purchase-header {
   font-size: 12px;
   text-transform: uppercase;
@@ -4268,4 +4296,140 @@ html, body {
 .pl-summary-label {
   color: #666;
   margin-right: 6px;
+}
+
+/* --- Action Log --- */
+.action-log {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  max-height: 300px;
+  background: rgba(20, 20, 40, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.action-log.hidden {
+  display: none;
+}
+
+.action-log.collapsed .action-log-content {
+  display: none;
+}
+
+.action-log.collapsed {
+  max-height: 40px;
+}
+
+.action-log.collapsed .action-log-toggle {
+  transform: rotate(-90deg);
+}
+
+.action-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px 10px 0 0;
+}
+
+.action-log-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.action-log-toggle {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.action-log-toggle:hover {
+  background: rgba(255,255,255,0.1);
+  color: #aaa;
+}
+
+.action-log-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  max-height: 250px;
+}
+
+.log-entry {
+  padding: 6px 12px;
+  font-size: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  transition: background 0.15s ease;
+}
+
+.log-entry:hover {
+  background: rgba(255,255,255,0.03);
+}
+
+.log-time {
+  color: #555;
+  font-size: 10px;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+.log-message {
+  color: #bbb;
+  padding-left: 8px;
+  line-height: 1.4;
+}
+
+/* Log entry type styling */
+.log-move .log-message { color: #8ec8e8; }
+.log-attack .log-message { color: #ff9999; }
+.log-combat .log-message { color: #ffbb66; }
+.log-capture .log-message { color: #88ff88; font-weight: 600; }
+.log-purchase .log-message { color: #b8b8ff; }
+.log-capital .log-message { color: #ffd700; font-weight: 600; }
+.log-phase .log-message { color: #888; font-style: italic; }
+.log-turn .log-message {
+  color: #fff;
+  font-weight: 700;
+  background: rgba(255,255,255,0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.log-tech .log-message { color: #ff88ff; }
+.log-cards .log-message { color: #88ffff; }
+.log-income .log-message { color: #88ff88; }
+
+/* Scrollbar for log */
+.action-log-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.action-log-content::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.2);
+}
+
+.action-log-content::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+.action-log-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.3);
 }

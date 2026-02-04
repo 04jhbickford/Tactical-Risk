@@ -13,6 +13,9 @@ export class AIController {
     this.unitDefs = null;
     this.skipMode = false; // Fast-forward AI moves
     this.onStatusUpdate = null; // Callback for AI status messages
+    this._checkTimeout = null; // For debouncing AI checks
+    this._unsubscribe = null; // Game state subscription
+    this.actionLog = null; // Action log for logging AI moves
   }
 
   // Allow user to skip/fast-forward AI moves
@@ -29,6 +32,10 @@ export class AIController {
     this.onStatusUpdate = callback;
   }
 
+  setActionLog(actionLog) {
+    this.actionLog = actionLog;
+  }
+
   _updateStatus(message) {
     if (this.onStatusUpdate) {
       this.onStatusUpdate(message);
@@ -36,9 +43,38 @@ export class AIController {
     console.log('[AI]', message);
   }
 
+  _logAction(type, data, player) {
+    if (this.actionLog && player) {
+      this.actionLog.log(type, { ...data, color: player.color });
+    }
+  }
+
   setGameState(gameState) {
+    // Unsubscribe from old game state
+    if (this._unsubscribe) {
+      this._unsubscribe();
+    }
+
     this.gameState = gameState;
     this._initAIPlayers();
+
+    // Subscribe to game state changes to auto-trigger AI
+    if (gameState) {
+      this._unsubscribe = gameState.subscribe(() => {
+        this._scheduleAICheck();
+      });
+    }
+  }
+
+  // Schedule an AI check with debouncing
+  _scheduleAICheck() {
+    if (this._checkTimeout) {
+      clearTimeout(this._checkTimeout);
+    }
+    this._checkTimeout = setTimeout(() => {
+      this._checkTimeout = null;
+      this.checkAndProcessAI();
+    }, 100);
   }
 
   setUnitDefs(unitDefs) {
@@ -63,6 +99,7 @@ export class AIController {
 
     for (const player of this.gameState.players) {
       if (player.isAI) {
+        console.log('[AI] Initializing AI player:', player.id, 'difficulty:', player.aiDifficulty);
         const aiPlayer = new AIPlayer(
           this.gameState,
           player.id,
@@ -72,6 +109,9 @@ export class AIController {
         this.aiPlayers[player.id] = aiPlayer;
       }
     }
+
+    // Trigger initial check after a short delay
+    setTimeout(() => this._scheduleAICheck(), 500);
   }
 
   // Check if current player is AI and process their turn
@@ -79,21 +119,39 @@ export class AIController {
     if (this.isProcessing) return false;
     if (!this.gameState) return false;
 
+    // Don't process during lobby phase
+    if (this.gameState.phase === GAME_PHASES.LOBBY) return false;
+
     const currentPlayer = this.gameState.currentPlayer;
     if (!currentPlayer?.isAI) return false;
 
     const aiPlayer = this.aiPlayers[currentPlayer.id];
-    if (!aiPlayer) return false;
+    if (!aiPlayer) {
+      // AI player not initialized, try to create it
+      console.log('[AI] Creating AIPlayer for', currentPlayer.id);
+      const newAI = new AIPlayer(
+        this.gameState,
+        currentPlayer.id,
+        currentPlayer.aiDifficulty || 'medium'
+      );
+      newAI.unitDefs = this.unitDefs;
+      this.aiPlayers[currentPlayer.id] = newAI;
+    }
 
     this.isProcessing = true;
+    this._updateStatus(`${currentPlayer.name} is thinking...`);
 
     try {
-      await this._processAITurn(aiPlayer, currentPlayer);
+      await this._processAITurn(this.aiPlayers[currentPlayer.id], currentPlayer);
     } catch (err) {
-      console.error('AI error:', err);
+      console.error('[AI] Error during AI turn:', err);
     }
 
     this.isProcessing = false;
+
+    // Schedule another check in case we need to continue
+    this._scheduleAICheck();
+
     return true;
   }
 
@@ -144,6 +202,7 @@ export class AIController {
 
     this._updateStatus(`${player.name} places capital in ${choice}`);
     this.gameState.placeCapital(choice);
+    this._logAction('capital', { message: `${player.name} placed capital at ${choice}`, territory: choice }, player);
     this._notifyAction('placeCapital', { territory: choice });
   }
 
@@ -387,11 +446,17 @@ export class AIController {
         if (ratio >= threshold) {
           // Attack!
           this._updateStatus(`${player.name} attacking ${target}...`);
+          const attackingUnits = [];
           for (const unit of myUnits) {
             const def = this.unitDefs?.[unit.type];
             if (def && def.attack > 0) {
-              this.gameState.moveUnits(territory.name, target, unit.type, unit.quantity);
+              this.gameState.moveUnits(territory.name, target, [{ type: unit.type, quantity: unit.quantity }], this.unitDefs);
+              attackingUnits.push({ type: unit.type, quantity: unit.quantity });
             }
+          }
+          if (attackingUnits.length > 0) {
+            const unitStr = attackingUnits.map(u => `${u.quantity} ${u.type}`).join(', ');
+            this._logAction('attack', { message: `${player.name} attacks ${target} with ${unitStr}` }, player);
           }
           await this._delay(200);
         }
@@ -417,21 +482,16 @@ export class AIController {
       // Auto-battle until resolved
       let safety = 100;
       while (safety-- > 0) {
-        const result = this.gameState.resolveCombatRound(combat);
+        const result = this.gameState.resolveCombat(combat, this.unitDefs);
         if (!result || result.resolved) break;
-        await this._delay(50);
+        await this._delay(this.skipMode ? 20 : 200);
       }
 
-      // Remove from queue if still there
-      if (this.gameState.combatQueue[0] === combat) {
-        this.gameState.combatQueue.shift();
-      }
-
-      await this._delay(200);
+      await this._delay(this.skipMode ? 50 : 300);
     }
 
     this._notifyAction('combat', {});
-    await this._delay(300);
+    await this._delay(200);
     this.gameState.nextPhase();
     this._notifyAction('nextPhase', {});
   }

@@ -54,6 +54,12 @@
     "movement": 2,
     "isSea": true,
     "capacity": 2,
+    "cargoCapacity": {
+      "infantry": 2,
+      "other": 1,
+      "combo": "1+1"
+    },
+    "canCarry": ["infantry", "armour", "artillery", "aaGun"],
     "image": "Transport.png"
   },
   "submarine": {
@@ -95,7 +101,9 @@
     "defense": 2,
     "movement": 2,
     "isSea": true,
+    "hp": 2,
     "aircraftCapacity": 2,
+    "canCarry": ["fighter", "tacticalBomber"],
     "image": "Carrier.png"
   },
   "factory": {

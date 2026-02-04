@@ -161,6 +161,18 @@ export class PlayerPanel {
   _renderActions(phase, turnPhase, player) {
     let html = '';
 
+    // If current player is AI, show AI status instead of action buttons
+    if (player.isAI) {
+      html += `
+        <div class="pp-ai-status">
+          <div class="pp-ai-thinking">
+            <span class="pp-ai-spinner"></span>
+            <span>${player.name} is thinking...</span>
+          </div>
+        </div>`;
+      return html;
+    }
+
     // Capital placement phase
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
       if (this.selectedTerritory && !this.selectedTerritory.isWater) {

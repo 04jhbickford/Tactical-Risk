@@ -741,11 +741,19 @@ export class TerritoryRenderer {
 
   /** Draw capital markers with faction flags */
   renderCapitals(ctx, zoom) {
-    if (!this.gameState || zoom < 0.3) return;
+    if (!this.gameState) return;
 
-    const flagWidth = Math.max(28, Math.min(48, 38 * zoom));
+    // Scale parameters based on zoom for visibility at all zoom levels
+    const isZoomedOut = zoom < 0.4;
+
+    // When zoomed out, use larger, more visible markers
+    const flagWidth = isZoomedOut
+      ? Math.max(40, 50 / zoom * 0.3)  // Larger when zoomed out
+      : Math.max(28, Math.min(48, 38 * zoom));
     const flagHeight = flagWidth * 0.75;
-    const starSize = Math.max(12, Math.min(20, 16 * zoom));
+    const starSize = isZoomedOut
+      ? Math.max(24, 30 / zoom * 0.3)  // Larger star when zoomed out
+      : Math.max(12, Math.min(20, 16 * zoom));
 
     for (const t of this.territories) {
       if (t.isWater) continue;
@@ -762,32 +770,58 @@ export class TerritoryRenderer {
       // Position above the territory center/label
       const y = cy - 35;
 
+      // Draw pulsing glow for visibility when zoomed out
+      if (isZoomedOut) {
+        this._drawCapitalGlow(ctx, cx, y, color, zoom);
+      }
+
       // Draw flag if available
-      if (player && player.flag) {
-        this._drawCapitalFlag(ctx, cx, y, flagWidth, flagHeight, player.flag, color);
+      if (player && player.flag && zoom >= 0.2) {
+        this._drawCapitalFlag(ctx, cx, y, flagWidth, flagHeight, player.flag, color, isZoomedOut);
       } else {
-        // Fallback: draw star marker for capital
-        this._drawCapitalStar(ctx, cx, y, starSize * 1.5, color);
+        // Fallback: draw star marker for capital - always visible
+        this._drawCapitalStar(ctx, cx, y, starSize * 1.5, color, isZoomedOut);
       }
     }
   }
 
-  _drawCapitalFlag(ctx, x, y, width, height, flag, color) {
+  _drawCapitalGlow(ctx, x, y, color, zoom) {
+    ctx.save();
+
+    // Static glow effect for capital visibility
+    const glowSize = 50 / Math.max(zoom, 0.15);
+
+    // Draw outer glow
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
+    gradient.addColorStop(0, color + 'cc');
+    gradient.addColorStop(0.3, color + '88');
+    gradient.addColorStop(0.6, color + '44');
+    gradient.addColorStop(1, 'transparent');
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, glowSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  _drawCapitalFlag(ctx, x, y, width, height, flag, color, isZoomedOut = false) {
     const img = this.flagImages[flag];
 
     ctx.save();
 
-    // Draw colored background/border
-    const padding = 3;
+    // Draw colored background/border - more prominent when zoomed out
+    const padding = isZoomedOut ? 5 : 3;
     ctx.fillStyle = color;
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2;
-    ctx.shadowColor = 'rgba(0,0,0,0.5)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 2;
+    ctx.strokeStyle = isZoomedOut ? '#fff' : '#000';
+    ctx.lineWidth = isZoomedOut ? 4 : 2;
+    ctx.shadowColor = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur = isZoomedOut ? 12 : 6;
+    ctx.shadowOffsetY = isZoomedOut ? 4 : 2;
 
     ctx.beginPath();
-    ctx.roundRect(x - width / 2 - padding, y - height / 2 - padding, width + padding * 2, height + padding * 2, 4);
+    ctx.roundRect(x - width / 2 - padding, y - height / 2 - padding, width + padding * 2, height + padding * 2, isZoomedOut ? 6 : 4);
     ctx.fill();
     ctx.stroke();
 
@@ -799,18 +833,19 @@ export class TerritoryRenderer {
       ctx.drawImage(img, x - width / 2, y - height / 2, width, height);
     }
 
-    // Draw border around flag
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 1;
+    // Draw border around flag - white for visibility when zoomed out
+    ctx.strokeStyle = isZoomedOut ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = isZoomedOut ? 2 : 1;
     ctx.strokeRect(x - width / 2, y - height / 2, width, height);
 
-    // Draw small star below flag to indicate capital
-    this._drawCapitalStar(ctx, x, y + height / 2 + 10, 14, '#ffd700');
+    // Draw star below flag - larger when zoomed out
+    const starSize = isZoomedOut ? 20 : 14;
+    this._drawCapitalStar(ctx, x, y + height / 2 + 10, starSize, '#ffd700', isZoomedOut);
 
     ctx.restore();
   }
 
-  _drawCapitalStar(ctx, x, y, size, color) {
+  _drawCapitalStar(ctx, x, y, size, color, isZoomedOut = false) {
     const r = size / 2;
     const innerR = r * 0.4;
     const points = 5;
@@ -818,13 +853,30 @@ export class TerritoryRenderer {
     ctx.save();
     ctx.translate(x, y);
 
-    // Glow effect
+    // Larger glow effect when zoomed out
     ctx.shadowColor = color;
-    ctx.shadowBlur = 6;
+    ctx.shadowBlur = isZoomedOut ? 15 : 6;
+
+    // Add white outline for visibility when zoomed out
+    if (isZoomedOut) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i < points * 2; i++) {
+        const radius = i % 2 === 0 ? r : innerR;
+        const angle = (Math.PI / points) * i - Math.PI / 2;
+        const px = Math.cos(angle) * radius;
+        const py = Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
 
     ctx.fillStyle = color;
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = isZoomedOut ? 2 : 1;
 
     ctx.beginPath();
     for (let i = 0; i < points * 2; i++) {
