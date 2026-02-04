@@ -2518,6 +2518,142 @@ html, body {
   text-transform: capitalize;
 }
 
+/* Expanded Combat Forces Layout */
+.combat-forces-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.force-header-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+}
+
+.force-header-col.attacker,
+.force-header-col.defender {
+  flex: 1;
+  border-top: 3px solid;
+}
+
+.force-header-col.vs {
+  font-size: 14px;
+  font-weight: 700;
+  color: #666;
+  padding: 8px;
+}
+
+.force-header-col .force-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.force-header-col .force-count {
+  font-size: 11px;
+  color: #888;
+}
+
+.combat-forces-expanded {
+  background: rgba(255,255,255,0.02);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+
+.combat-unit-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.combat-unit-row:last-child {
+  border-bottom: none;
+}
+
+.combat-unit-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.combat-unit-side.attacker {
+  justify-content: flex-end;
+}
+
+.combat-unit-side.defender {
+  justify-content: flex-start;
+}
+
+.combat-unit-side.empty {
+  opacity: 0.3;
+}
+
+.combat-unit-type {
+  width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.combat-type-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  opacity: 0.6;
+}
+
+.combat-type-name {
+  font-size: 9px;
+  color: #666;
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.combat-unit-icons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+  border-left: 3px solid var(--player-color, #888);
+}
+
+.combat-unit-side.defender .combat-unit-icons {
+  border-left: none;
+  border-right: 3px solid var(--player-color, #888);
+}
+
+.combat-unit-icons .combat-unit-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.combat-unit-icons .combat-unit-qty {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+
+.combat-unit-stat {
+  font-size: 10px;
+  color: #888;
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+}
+
 .combat-unit-stats {
   font-size: 10px;
   color: #888;
@@ -3955,6 +4091,16 @@ html, body {
 .pl-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.pl-progress-hint {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+  padding: 10px;
 }
 
 .pl-btn {

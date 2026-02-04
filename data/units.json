@@ -45,7 +45,7 @@
     "defense": 3,
     "movement": 4,
     "isAir": true,
-    "image": "TacBomber.png"
+    "image": "Fighter.png"
   },
   "transport": {
     "cost": 7,

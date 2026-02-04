@@ -44,9 +44,9 @@ export class PlacementUI {
   }
 
   isActive() {
+    // Stay active during unit placement phase - even if no units left (to allow passing)
     return this.gameState &&
-      this.gameState.phase === GAME_PHASES.UNIT_PLACEMENT &&
-      this.gameState.hasUnitsToPlace(this.gameState.currentPlayer?.id);
+      this.gameState.phase === GAME_PHASES.UNIT_PLACEMENT;
   }
 
   show() {
@@ -219,7 +219,7 @@ export class PlacementUI {
       html += `</div>`;
     }
 
-    // Actions
+    // Actions - must place 6 units before passing (unless no units left)
     const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
     const roundComplete = placedThisRound >= 6 || totalRemaining === 0;
 
@@ -228,11 +228,13 @@ export class PlacementUI {
         ${canUndo ? `
           <button class="pl-btn undo" data-action="undo">Undo Last</button>
         ` : ''}
-        ${placedThisRound > 0 ? `
-          <button class="pl-btn done ${roundComplete ? 'primary' : ''}" data-action="finish">
-            ${roundComplete ? '✓ Done - Next Player' : 'End Round Early'}
+        ${roundComplete ? `
+          <button class="pl-btn done primary" data-action="finish">
+            ✓ Done - Next Player
           </button>
-        ` : ''}
+        ` : `
+          <div class="pl-progress-hint">Place ${6 - placedThisRound} more unit${6 - placedThisRound !== 1 ? 's' : ''} to continue</div>
+        `}
       </div>
     `;
 

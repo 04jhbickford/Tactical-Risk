@@ -471,31 +471,21 @@ export class CombatUI {
           <div class="prob-label defender">${defenderPlayer?.name || 'Defender'} (${Math.round(100 - probability)}%)</div>
         </div>
 
-        <!-- Forces -->
-        <div class="combat-forces">
-          <div class="force attacker">
-            <div class="force-header" style="border-color: ${player.color}">
-              <span class="force-label">Attacker</span>
-              <span class="force-name" style="color: ${player.color}">${player.name}</span>
-              <span class="force-count">${this._getTotalUnits(attackers)} units</span>
-            </div>
-            <div class="force-units">
-              ${this._renderForceUnits(attackers, 'attacker')}
-            </div>
+        <!-- Forces - Expanded View with Matching Unit Types -->
+        <div class="combat-forces-header">
+          <div class="force-header-col attacker" style="border-color: ${player.color}">
+            <span class="force-name" style="color: ${player.color}">${player.name}</span>
+            <span class="force-count">${this._getTotalUnits(attackers)} units</span>
           </div>
-
-          <div class="combat-vs">VS</div>
-
-          <div class="force defender">
-            <div class="force-header" style="border-color: ${defenderPlayer?.color || '#888'}">
-              <span class="force-label">Defender</span>
-              <span class="force-name" style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Unknown'}</span>
-              <span class="force-count">${this._getTotalUnits(defenders)} units</span>
-            </div>
-            <div class="force-units">
-              ${this._renderForceUnits(defenders, 'defender')}
-            </div>
+          <div class="force-header-col vs">VS</div>
+          <div class="force-header-col defender" style="border-color: ${defenderPlayer?.color || '#888'}">
+            <span class="force-name" style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Unknown'}</span>
+            <span class="force-count">${this._getTotalUnits(defenders)} units</span>
           </div>
+        </div>
+
+        <div class="combat-forces-expanded">
+          ${this._renderExpandedForces(attackers, defenders, player, defenderPlayer)}
         </div>
     `;
 
@@ -594,6 +584,61 @@ export class CombatUI {
 
     this.el.innerHTML = html;
     this._bindEvents();
+  }
+
+  _renderExpandedForces(attackers, defenders, attackerPlayer, defenderPlayer) {
+    // Get all unit types present in either army
+    const allUnitTypes = new Set();
+    attackers.forEach(u => { if (u.quantity > 0) allUnitTypes.add(u.type); });
+    defenders.forEach(u => { if (u.quantity > 0) allUnitTypes.add(u.type); });
+
+    if (allUnitTypes.size === 0) {
+      return '<div class="no-units">No units remaining</div>';
+    }
+
+    // Sort unit types by cost (most expensive first for visual prominence)
+    const sortedTypes = [...allUnitTypes].sort((a, b) => {
+      const costA = this.unitDefs[a]?.cost || 0;
+      const costB = this.unitDefs[b]?.cost || 0;
+      return costB - costA;
+    });
+
+    return sortedTypes.map(unitType => {
+      const attackerUnit = attackers.find(u => u.type === unitType);
+      const defenderUnit = defenders.find(u => u.type === unitType);
+      const def = this.unitDefs[unitType];
+      const imageSrc = def?.image ? `assets/units/${def.image}` : null;
+
+      const attackQty = attackerUnit?.quantity || 0;
+      const defendQty = defenderUnit?.quantity || 0;
+
+      return `
+        <div class="combat-unit-row">
+          <div class="combat-unit-side attacker ${attackQty > 0 ? '' : 'empty'}">
+            ${attackQty > 0 ? `
+              <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
+                ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                <span class="combat-unit-qty">${attackQty}</span>
+              </div>
+              <span class="combat-unit-stat">A${def?.attack || 0}</span>
+            ` : ''}
+          </div>
+          <div class="combat-unit-type">
+            ${imageSrc ? `<img src="${imageSrc}" class="combat-type-icon" alt="${unitType}">` : ''}
+            <span class="combat-type-name">${unitType}</span>
+          </div>
+          <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'}">
+            ${defendQty > 0 ? `
+              <span class="combat-unit-stat">D${def?.defense || 0}</span>
+              <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
+                <span class="combat-unit-qty">${defendQty}</span>
+                ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${unitType}">` : ''}
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 
   _renderForceUnits(units, side) {
