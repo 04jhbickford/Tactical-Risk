@@ -2,16 +2,27 @@
 
 // Cross-water connections that should be drawn as visual lines on the map
 // These are land-to-land connections that cross water (like Alaska-Kamchatka in Risk)
-const CROSS_WATER_CONNECTIONS = [
-  // Pacific wrap-around connections
+// Land bridges - allow land movement between these territories (no naval required)
+const LAND_BRIDGES = [
+  // Pacific wrap-around
   ['Alaska', 'Soviet Far East'],
-  // Land bridges
+  // Atlantic crossings
+  ['East Canada', 'Eire'],
+  ['Brazil', 'French West Africa'],
+  ['East US', 'Cuba'],
+  // UK connections
   ['Eire', 'United Kingdom'],
-  // Other notable cross-water connections
   ['United Kingdom', 'Finland Norway'],
+  // Mediterranean
   ['Spain', 'Algeria'],
   ['South Europe', 'Algeria'],
-  ['South Europe', 'Anglo Sudan Egypt'],  // After merge (was Libya)
+  ['South Europe', 'Anglo Sudan Egypt'],
+  // Pacific / Asian connections
+  ['Kwangtung', 'East Indies'],
+  ['East Indies', 'Australia'],
+  ['Australia', 'New Zealand'],
+  // African
+  ['Kenya-Rhodesia', 'Madagascar'],
 ];
 
 export class TerritoryRenderer {
@@ -38,10 +49,23 @@ export class TerritoryRenderer {
     // Flag images cache
     this.flagImages = {};
 
+    // Territories highlighted from action log
+    this.highlightedTerritories = [];
+
     // Cache for external edges (computed once since polygons never change)
     this._externalEdgesCache = {};
     this._territoryCenterCache = {};
     this._precomputeCaches();
+  }
+
+  /** Set territories to highlight from action log hover */
+  setHighlightedTerritories(territories) {
+    this.highlightedTerritories = territories || [];
+  }
+
+  /** Clear highlighted territories */
+  clearHighlightedTerritories() {
+    this.highlightedTerritories = [];
   }
 
   /** Pre-compute expensive calculations that don't change during gameplay */
@@ -743,17 +767,14 @@ export class TerritoryRenderer {
   renderCapitals(ctx, zoom) {
     if (!this.gameState) return;
 
-    // Scale parameters based on zoom for visibility at all zoom levels
-    const isZoomedOut = zoom < 0.4;
+    // Scale parameters based on zoom - capitals should ALWAYS be very visible
+    const isZoomedOut = zoom < 0.5;
 
-    // When zoomed out, use larger, more visible markers
-    const flagWidth = isZoomedOut
-      ? Math.max(40, 50 / zoom * 0.3)  // Larger when zoomed out
-      : Math.max(28, Math.min(48, 38 * zoom));
+    // Much larger markers when zoomed out
+    const baseSize = isZoomedOut ? 60 / Math.max(zoom, 0.15) : 48;
+    const flagWidth = Math.max(40, baseSize);
     const flagHeight = flagWidth * 0.75;
-    const starSize = isZoomedOut
-      ? Math.max(24, 30 / zoom * 0.3)  // Larger star when zoomed out
-      : Math.max(12, Math.min(20, 16 * zoom));
+    const starSize = Math.max(20, baseSize * 0.5);
 
     for (const t of this.territories) {
       if (t.isWater) continue;
@@ -768,15 +789,18 @@ export class TerritoryRenderer {
       const color = this.gameState.getPlayerColor(owner);
 
       // Position above the territory center/label
-      const y = cy - 35;
+      const y = cy - (isZoomedOut ? 20 : 35);
 
-      // Draw pulsing glow for visibility when zoomed out
-      if (isZoomedOut) {
-        this._drawCapitalGlow(ctx, cx, y, color, zoom);
+      // ALWAYS draw glow for visibility - larger when zoomed out
+      this._drawCapitalGlow(ctx, cx, y, color, zoom);
+
+      // Draw "CAPITAL" label when zoomed out for extra visibility
+      if (isZoomedOut && zoom < 0.3) {
+        this._drawCapitalLabel(ctx, cx, y + flagHeight / 2 + 20, color);
       }
 
       // Draw flag if available
-      if (player && player.flag && zoom >= 0.2) {
+      if (player && player.flag && zoom >= 0.15) {
         this._drawCapitalFlag(ctx, cx, y, flagWidth, flagHeight, player.flag, color, isZoomedOut);
       } else {
         // Fallback: draw star marker for capital - always visible
@@ -788,20 +812,42 @@ export class TerritoryRenderer {
   _drawCapitalGlow(ctx, x, y, color, zoom) {
     ctx.save();
 
-    // Static glow effect for capital visibility
-    const glowSize = 50 / Math.max(zoom, 0.15);
+    // Large, prominent glow effect for capital visibility
+    const glowSize = Math.max(60, 80 / Math.max(zoom, 0.1));
 
-    // Draw outer glow
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
-    gradient.addColorStop(0, color + 'cc');
-    gradient.addColorStop(0.3, color + '88');
-    gradient.addColorStop(0.6, color + '44');
-    gradient.addColorStop(1, 'transparent');
+    // Draw multiple layers for stronger glow
+    for (let i = 3; i >= 0; i--) {
+      const size = glowSize * (1 + i * 0.3);
+      const alpha = Math.floor(180 - i * 40).toString(16).padStart(2, '0');
 
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(x, y, glowSize, 0, Math.PI * 2);
-    ctx.fill();
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
+      gradient.addColorStop(0, color + alpha);
+      gradient.addColorStop(0.5, color + Math.floor(parseInt(alpha, 16) / 2).toString(16).padStart(2, '0'));
+      gradient.addColorStop(1, 'transparent');
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  _drawCapitalLabel(ctx, x, y, color) {
+    ctx.save();
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // White outline
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 4;
+    ctx.strokeText('★ CAPITAL ★', x, y);
+
+    // Colored fill
+    ctx.fillStyle = color;
+    ctx.fillText('★ CAPITAL ★', x, y);
 
     ctx.restore();
   }
@@ -977,6 +1023,40 @@ export class TerritoryRenderer {
     }
   }
 
+  /** Highlight territories from action log hover */
+  renderActionLogHighlights(ctx) {
+    if (!this.highlightedTerritories || this.highlightedTerritories.length === 0) return;
+
+    for (const territoryName of this.highlightedTerritories) {
+      const t = this.territoryByName[territoryName];
+      if (!t) continue;
+
+      // Bright cyan highlight for action log
+      ctx.save();
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 15;
+
+      // Fill
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.3)';
+      for (const poly of t.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
+
+      // Stroke outline with glow
+      ctx.strokeStyle = '#00ffff';
+      ctx.lineWidth = 3;
+      if (t.polygons.length === 1) {
+        this._strokePoly(ctx, t.polygons[0]);
+      } else {
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+        this._strokeEdges(ctx, externalEdges);
+      }
+
+      ctx.restore();
+    }
+  }
+
   /** Draw territory labels */
   renderLabels(ctx, zoom) {
     if (zoom < 0.4) return;
@@ -1104,38 +1184,111 @@ export class TerritoryRenderer {
 
   /** Draw lines showing cross-water connections between territories */
   renderCrossWaterConnections(ctx, zoom) {
-    if (zoom < 0.3) return; // Don't show when too zoomed out
+    // Always show land bridges - they're important for gameplay
+    const lineWidth = Math.max(3, 5 / Math.max(zoom, 0.2));
+    const circleSize = Math.max(5, 8 / Math.max(zoom, 0.2));
 
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([8, 4]);
 
-    for (const [t1Name, t2Name] of CROSS_WATER_CONNECTIONS) {
+    for (const [t1Name, t2Name] of LAND_BRIDGES) {
       const t1 = this.territoryByName[t1Name];
       const t2 = this.territoryByName[t2Name];
 
-      if (!t1 || !t2 || !t1.center || !t2.center) continue;
+      if (!t1 || !t2) continue;
 
-      const [x1, y1] = t1.center;
-      const [x2, y2] = t2.center;
+      // Find closest edge points between territories
+      const [x1, y1, x2, y2] = this._findClosestEdgePoints(t1, t2);
+      if (x1 === null) continue;
 
+      // Draw glow effect for visibility
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+      ctx.lineWidth = lineWidth + 4;
+      ctx.setLineDash([]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Draw small circles at endpoints
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
+      // Draw main line
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
+      ctx.lineWidth = lineWidth;
+      ctx.setLineDash([12, 6]);
       ctx.beginPath();
-      ctx.arc(x1, y1, 4, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Draw anchor circles at endpoints
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ffd700';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+
       ctx.beginPath();
-      ctx.arc(x2, y2, 4, 0, Math.PI * 2);
+      ctx.arc(x1, y1, circleSize, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(x2, y2, circleSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
 
     ctx.setLineDash([]);
     ctx.restore();
+  }
+
+  // Find the closest points between two territories' edges
+  _findClosestEdgePoints(t1, t2) {
+    const points1 = this._getEdgePoints(t1);
+    const points2 = this._getEdgePoints(t2);
+
+    if (points1.length === 0 || points2.length === 0) {
+      // Fallback to centers
+      const c1 = this._getTerritoryCenter(t1);
+      const c2 = this._getTerritoryCenter(t2);
+      return [...c1, ...c2];
+    }
+
+    let minDist = Infinity;
+    let closest = [null, null, null, null];
+
+    // Sample points to find closest pair
+    for (const p1 of points1) {
+      for (const p2 of points2) {
+        const dx = p2[0] - p1[0];
+        const dy = p2[1] - p1[1];
+        const dist = dx * dx + dy * dy;
+        if (dist < minDist) {
+          minDist = dist;
+          closest = [p1[0], p1[1], p2[0], p2[1]];
+        }
+      }
+    }
+
+    return closest;
+  }
+
+  // Get sampled edge points from territory polygons
+  _getEdgePoints(territory) {
+    const points = [];
+    if (!territory.polygons) return points;
+
+    for (const poly of territory.polygons) {
+      if (!poly || poly.length < 3) continue;
+
+      // Sample every few points along the polygon
+      const step = Math.max(1, Math.floor(poly.length / 20));
+      for (let i = 0; i < poly.length; i += step) {
+        points.push(poly[i]);
+      }
+    }
+    return points;
+  }
+
+  // Get land bridges for movement validation
+  static getLandBridges() {
+    return LAND_BRIDGES;
   }
 }

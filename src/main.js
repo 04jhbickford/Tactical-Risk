@@ -318,6 +318,14 @@ async function init() {
 
     // Action Log
     actionLog.setGameState(gameState);
+    actionLog.setHighlightCallback((territories, highlight) => {
+      if (highlight) {
+        territoryRenderer.setHighlightedTerritories(territories);
+      } else {
+        territoryRenderer.clearHighlightedTerritories();
+      }
+      camera.dirty = true;
+    });
     actionLog.show();
     actionLog.logTurnStart(gameState.currentPlayer, gameState.round);
 
@@ -517,6 +525,9 @@ async function init() {
         if (movementUI.getSelectedSource()) {
           territoryRenderer.renderSelected(ctx, movementUI.getSelectedSource());
         }
+
+        // Action log hover highlights
+        territoryRenderer.renderActionLogHighlights(ctx);
 
         // Labels
         territoryRenderer.renderLabels(ctx, camera.zoom);

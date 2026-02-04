@@ -6,8 +6,14 @@ export class ActionLog {
     this.entries = [];
     this.maxEntries = 200; // Keep last 200 entries
     this._unsubscribe = null;
+    this.onHighlightTerritory = null; // Callback for territory highlighting
 
     this._create();
+  }
+
+  // Set callback for highlighting territories on hover
+  setHighlightCallback(callback) {
+    this.onHighlightTerritory = callback;
   }
 
   _create() {
@@ -188,7 +194,34 @@ export class ActionLog {
       <span class="log-message" style="${colorStyle}">${entry.data.message}</span>
     `;
 
+    // Extract territory names from entry data for hover highlighting
+    const territories = this._extractTerritories(entry);
+    if (territories.length > 0 && this.onHighlightTerritory) {
+      div.classList.add('has-territory');
+
+      div.addEventListener('mouseenter', () => {
+        this.onHighlightTerritory(territories, true);
+      });
+
+      div.addEventListener('mouseleave', () => {
+        this.onHighlightTerritory(territories, false);
+      });
+    }
+
     this.contentEl.appendChild(div);
+  }
+
+  // Extract territory names from entry data
+  _extractTerritories(entry) {
+    const territories = [];
+    const data = entry.data;
+
+    // Direct territory references
+    if (data.territory) territories.push(data.territory);
+    if (data.from) territories.push(data.from);
+    if (data.to) territories.push(data.to);
+
+    return territories.filter(t => t && typeof t === 'string');
   }
 
   _render() {

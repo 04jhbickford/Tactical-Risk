@@ -357,7 +357,7 @@ export class AIController {
   }
 
   // ============================================
-  // PURCHASE PHASE
+  // PURCHASE PHASE - Strategic
   // ============================================
   async _handlePurchase(aiPlayer, player) {
     this._updateStatus(`${player.name} purchasing units...`);
@@ -377,28 +377,38 @@ export class AIController {
       return;
     }
 
-    // Purchase strategy based on difficulty
-    const priorities = this._getPurchasePriorities(aiPlayer.difficulty);
-    let remaining = ipcs;
+    // Get strategic analysis
+    const strategy = this._analyzeStrategicSituation(player.id, aiPlayer.difficulty);
 
-    for (const unitType of priorities) {
+    // Determine purchase priorities based on strategic situation
+    const priorities = this._getStrategicPurchasePriorities(
+      aiPlayer.difficulty,
+      strategy,
+      player.id
+    );
+
+    let remaining = ipcs;
+    const purchased = [];
+
+    for (const { unitType, maxCount } of priorities) {
       const def = this.unitDefs[unitType];
       if (!def || def.cost > remaining) continue;
 
-      // Buy units
-      let count = Math.floor(remaining / def.cost);
-
-      // Limit purchases based on difficulty
-      if (aiPlayer.difficulty === 'easy') {
-        count = Math.min(count, 2);
-      } else if (aiPlayer.difficulty === 'medium') {
-        count = Math.min(count, 4);
-      }
+      // Buy units up to max count
+      let count = Math.min(maxCount, Math.floor(remaining / def.cost));
 
       for (let i = 0; i < count && remaining >= def.cost; i++) {
         this.gameState.purchaseUnit(unitType, capital, this.unitDefs);
         remaining -= def.cost;
+        purchased.push(unitType);
       }
+    }
+
+    if (purchased.length > 0) {
+      const summary = {};
+      purchased.forEach(t => summary[t] = (summary[t] || 0) + 1);
+      const unitStr = Object.entries(summary).map(([t, n]) => `${n} ${t}`).join(', ');
+      this._logAction('purchase', { message: `${player.name} purchased ${unitStr}` }, player);
     }
 
     this._notifyAction('purchase', {});
@@ -407,65 +417,351 @@ export class AIController {
     this._notifyAction('nextPhase', {});
   }
 
+  // Get strategic purchase priorities based on game situation
+  _getStrategicPurchasePriorities(difficulty, strategy, playerId) {
+    const priorities = [];
+
+    if (strategy.threatenedCapital && strategy.capitalDefenseNeeded > 0) {
+      // Capital is threatened - buy defenders
+      priorities.push({ unitType: 'infantry', maxCount: 6 }); // Cheap, good defense
+      priorities.push({ unitType: 'artillery', maxCount: 2 }); // Support
+      priorities.push({ unitType: 'fighter', maxCount: 1 }); // Air defense
+    } else if (strategy.nearVictory) {
+      // We're close to winning - buy offensive units
+      priorities.push({ unitType: 'armour', maxCount: 4 }); // Fast, strong attack
+      priorities.push({ unitType: 'fighter', maxCount: 2 }); // Air support
+      priorities.push({ unitType: 'infantry', maxCount: 3 }); // Casualties
+    } else if (strategy.enemyNearVictory) {
+      // Enemy is close to winning - buy mixed units to attack/defend
+      priorities.push({ unitType: 'armour', maxCount: 2 });
+      priorities.push({ unitType: 'infantry', maxCount: 4 });
+      priorities.push({ unitType: 'fighter', maxCount: 1 });
+    } else {
+      // Normal situation - use difficulty-based priorities
+      if (difficulty === 'hard') {
+        priorities.push({ unitType: 'armour', maxCount: 3 });
+        priorities.push({ unitType: 'artillery', maxCount: 2 });
+        priorities.push({ unitType: 'fighter', maxCount: 1 });
+        priorities.push({ unitType: 'infantry', maxCount: 5 });
+      } else if (difficulty === 'easy') {
+        priorities.push({ unitType: 'infantry', maxCount: 4 });
+        priorities.push({ unitType: 'armour', maxCount: 1 });
+      } else {
+        priorities.push({ unitType: 'infantry', maxCount: 4 });
+        priorities.push({ unitType: 'armour', maxCount: 2 });
+        priorities.push({ unitType: 'artillery', maxCount: 2 });
+      }
+    }
+
+    return priorities;
+  }
+
   // ============================================
-  // COMBAT MOVE
+  // COMBAT MOVE - Strategic AI
   // ============================================
   async _handleCombatMove(aiPlayer, player) {
     this._updateStatus(`${player.name} planning attacks...`);
     await this._delay(this._getActionDelay());
 
-    const owned = this.gameState.territories
-      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === player.id);
+    // Get strategic analysis
+    const strategy = this._analyzeStrategicSituation(player.id, aiPlayer.difficulty);
 
-    for (const territory of owned) {
-      const units = this.gameState.units[territory.name];
-      if (!units || units.length === 0) continue;
+    // Get all potential attack targets with priority scores
+    const attackTargets = this._evaluateAttackTargets(player.id, aiPlayer.difficulty, strategy);
 
-      const myUnits = units.filter(u => u.owner === player.id && !u.moved);
-      if (myUnits.length === 0) continue;
+    // Sort by priority (highest first)
+    attackTargets.sort((a, b) => b.priority - a.priority);
 
-      // Find adjacent enemies
-      const connections = this.gameState.getConnections(territory.name);
-      for (const target of connections) {
-        const targetOwner = this.gameState.getOwner(target);
-        const targetTerritory = this.gameState.territories.find(t => t.name === target);
+    // Execute attacks starting with highest priority
+    let attacksMade = 0;
+    const maxAttacks = aiPlayer.difficulty === 'hard' ? 5 :
+                       aiPlayer.difficulty === 'easy' ? 2 : 3;
 
-        if (targetTerritory?.isWater) continue;
-        if (!targetOwner || targetOwner === player.id) continue;
-        if (this.gameState.areAllies?.(player.id, targetOwner)) continue;
+    for (const target of attackTargets) {
+      if (attacksMade >= maxAttacks) break;
+      if (target.priority <= 0) continue;
 
-        // Evaluate attack
-        const myPower = this._calculatePower(myUnits, true);
-        const enemyUnits = this.gameState.units[target] || [];
-        const enemyPower = this._calculatePower(enemyUnits, false);
+      // Check if we still have enough units to attack
+      const currentUnits = this._getAvailableAttackers(target.source, player.id);
+      if (currentUnits.length === 0) continue;
 
-        const ratio = myPower / (enemyPower || 0.5);
-        const threshold = aiPlayer.difficulty === 'hard' ? 1.2 :
-                         aiPlayer.difficulty === 'easy' ? 2.5 : 1.5;
+      const attackPower = this._calculatePower(currentUnits, true);
+      const defensePower = this._calculatePower(target.defenders, false);
 
-        if (ratio >= threshold) {
-          // Attack!
-          this._updateStatus(`${player.name} attacking ${target}...`);
-          const attackingUnits = [];
-          for (const unit of myUnits) {
-            const def = this.unitDefs?.[unit.type];
-            if (def && def.attack > 0) {
-              this.gameState.moveUnits(territory.name, target, [{ type: unit.type, quantity: unit.quantity }], this.unitDefs);
-              attackingUnits.push({ type: unit.type, quantity: unit.quantity });
+      // Recalculate ratio in case units moved
+      const ratio = attackPower / (defensePower || 0.5);
+      const threshold = aiPlayer.difficulty === 'hard' ? 1.2 :
+                       aiPlayer.difficulty === 'easy' ? 2.5 : 1.5;
+
+      // Higher threshold if this would leave capital undefended
+      const effectiveThreshold = target.leavesCapitalWeak ? threshold * 1.5 : threshold;
+
+      if (ratio >= effectiveThreshold) {
+        // Collect units to attack
+        const unitsToMove = [];
+        let unitsCommitted = 0;
+
+        for (const unit of currentUnits) {
+          const def = this.unitDefs?.[unit.type];
+          if (def && def.attack > 0) {
+            // Leave at least 1 unit behind unless this is a capital attack
+            const qtyToMove = target.isEnemyCapital ? unit.quantity :
+                             Math.max(1, unit.quantity - 1);
+
+            if (qtyToMove > 0) {
+              unitsToMove.push({ type: unit.type, quantity: qtyToMove });
+              unitsCommitted += qtyToMove;
             }
           }
-          if (attackingUnits.length > 0) {
-            const unitStr = attackingUnits.map(u => `${u.quantity} ${u.type}`).join(', ');
-            this._logAction('attack', { message: `${player.name} attacks ${target} with ${unitStr}` }, player);
+        }
+
+        // Only attack if we're actually committing troops
+        if (unitsToMove.length > 0 && unitsCommitted > 0) {
+          this._updateStatus(`${player.name} attacking ${target.territory}...`);
+
+          // Execute the move
+          const moveResult = this.gameState.moveUnits(
+            target.source,
+            target.territory,
+            unitsToMove,
+            this.unitDefs
+          );
+
+          if (moveResult && moveResult.success !== false) {
+            attacksMade++;
+            const unitStr = unitsToMove.map(u => `${u.quantity} ${u.type}`).join(', ');
+            this._logAction('attack', {
+              message: `${player.name} attacks ${target.territory} with ${unitStr}`,
+              from: target.source,
+              to: target.territory
+            }, player);
+
+            await this._delay(this.skipMode ? 100 : 300);
           }
-          await this._delay(200);
         }
       }
     }
 
+    if (attacksMade === 0) {
+      this._updateStatus(`${player.name} holds position...`);
+    }
+
     this._notifyAction('combatMove', {});
+    await this._delay(200);
     this.gameState.nextPhase();
     this._notifyAction('nextPhase', {});
+  }
+
+  // ============================================
+  // STRATEGIC ANALYSIS
+  // ============================================
+  _analyzeStrategicSituation(playerId, difficulty) {
+    const strategy = {
+      myCapitals: 0,
+      enemyCapitals: [],
+      threatenedCapital: false,
+      capitalDefenseNeeded: 0,
+      nearVictory: false,
+      enemyNearVictory: null,
+    };
+
+    // Count capitals controlled
+    const capitalControl = {};
+    const capitalLocations = {};
+
+    for (const [territory, state] of Object.entries(this.gameState.territoryState)) {
+      if (state.isCapital) {
+        const owner = state.owner;
+        capitalControl[owner] = (capitalControl[owner] || 0) + 1;
+
+        if (!capitalLocations[owner]) capitalLocations[owner] = [];
+        capitalLocations[owner].push(territory);
+
+        if (owner !== playerId) {
+          strategy.enemyCapitals.push({
+            territory,
+            owner,
+            originalOwner: this._getOriginalCapitalOwner(territory)
+          });
+        }
+      }
+    }
+
+    strategy.myCapitals = capitalControl[playerId] || 0;
+
+    // Check if near victory (controlling 2+ capitals, need 3 to win)
+    if (strategy.myCapitals >= 2) {
+      strategy.nearVictory = true;
+    }
+
+    // Check if any enemy is near victory
+    for (const [enemyId, count] of Object.entries(capitalControl)) {
+      if (enemyId !== playerId && count >= 2) {
+        strategy.enemyNearVictory = enemyId;
+      }
+    }
+
+    // Check if our capital is threatened
+    const myCapital = this.gameState.playerState[playerId]?.capitalTerritory;
+    if (myCapital) {
+      const threats = this._getThreatsToTerritory(myCapital, playerId);
+      strategy.threatenedCapital = threats.totalPower > 0;
+
+      // Calculate how much defense we need
+      const myDefenders = this._getTerritoryDefenders(myCapital, playerId);
+      const myDefense = this._calculatePower(myDefenders, false);
+      strategy.capitalDefenseNeeded = Math.max(0, threats.totalPower * 1.5 - myDefense);
+    }
+
+    return strategy;
+  }
+
+  // Evaluate all potential attack targets with priority scores
+  _evaluateAttackTargets(playerId, difficulty, strategy) {
+    const targets = [];
+
+    const owned = this.gameState.territories
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === playerId);
+
+    const myCapital = this.gameState.playerState[playerId]?.capitalTerritory;
+
+    for (const territory of owned) {
+      const attackers = this._getAvailableAttackers(territory.name, playerId);
+      if (attackers.length === 0) continue;
+
+      const myPower = this._calculatePower(attackers, true);
+      const connections = this.gameState.getConnections(territory.name);
+
+      for (const targetName of connections) {
+        const targetOwner = this.gameState.getOwner(targetName);
+        const targetTerritory = this.gameState.territories.find(t => t.name === targetName);
+
+        if (targetTerritory?.isWater) continue;
+        if (!targetOwner || targetOwner === playerId) continue;
+        if (this.gameState.areAllies?.(playerId, targetOwner)) continue;
+
+        const defenders = this.gameState.units[targetName] || [];
+        const defensePower = this._calculatePower(defenders, false);
+
+        // Base priority: power ratio
+        let priority = (myPower / (defensePower || 0.5)) * 10;
+
+        // Check if this is an enemy capital
+        const isEnemyCapital = strategy.enemyCapitals.some(c => c.territory === targetName);
+
+        // Priority bonuses
+        if (isEnemyCapital) {
+          priority += 50; // High priority to capture capitals
+
+          // Even higher if we're near victory
+          if (strategy.nearVictory) {
+            priority += 30; // Go for the win!
+          }
+        }
+
+        // Bonus for attacking an enemy who is near victory
+        if (strategy.enemyNearVictory === targetOwner) {
+          priority += 25; // Stop them from winning
+        }
+
+        // Bonus for weak targets (easy conquest)
+        if (defensePower < 3) {
+          priority += 15;
+        }
+
+        // Check if attacking from here leaves our capital weak
+        let leavesCapitalWeak = false;
+        if (territory.name === myCapital || this._isAdjacentTo(territory.name, myCapital)) {
+          if (strategy.threatenedCapital) {
+            priority -= 30; // Don't weaken capital defense
+            leavesCapitalWeak = true;
+          }
+        }
+
+        // Difficulty adjustments
+        if (difficulty === 'easy') {
+          priority *= 0.7; // Less aggressive
+          priority += Math.random() * 20; // More random
+        } else if (difficulty === 'hard') {
+          // Hard AI is more calculating, less random
+          priority *= 1.2;
+        } else {
+          priority += Math.random() * 10; // Some randomness for medium
+        }
+
+        targets.push({
+          territory: targetName,
+          source: territory.name,
+          defenders,
+          priority,
+          isEnemyCapital,
+          leavesCapitalWeak,
+        });
+      }
+    }
+
+    return targets;
+  }
+
+  // Get available attacking units from a territory
+  _getAvailableAttackers(territory, playerId) {
+    const units = this.gameState.units[territory];
+    if (!units) return [];
+
+    return units.filter(u =>
+      u.owner === playerId &&
+      !u.moved &&
+      this.unitDefs?.[u.type]?.attack > 0
+    );
+  }
+
+  // Get defenders in a territory for a specific owner
+  _getTerritoryDefenders(territory, playerId) {
+    const units = this.gameState.units[territory];
+    if (!units) return [];
+    return units.filter(u => u.owner === playerId);
+  }
+
+  // Get threats to a territory from adjacent enemies
+  _getThreatsToTerritory(territory, playerId) {
+    const connections = this.gameState.getConnections(territory);
+    let totalPower = 0;
+    const threats = [];
+
+    for (const conn of connections) {
+      const owner = this.gameState.getOwner(conn);
+      const isWater = this.gameState.territories.find(t => t.name === conn)?.isWater;
+
+      if (owner && owner !== playerId && !isWater) {
+        if (!this.gameState.areAllies?.(playerId, owner)) {
+          const units = this.gameState.units[conn] || [];
+          const power = this._calculatePower(units, true);
+          if (power > 0) {
+            totalPower += power;
+            threats.push({ territory: conn, owner, power });
+          }
+        }
+      }
+    }
+
+    return { totalPower, threats };
+  }
+
+  // Get the original owner of a capital territory
+  _getOriginalCapitalOwner(territory) {
+    for (const [playerId, state] of Object.entries(this.gameState.playerState)) {
+      if (state.capitalTerritory === territory) {
+        return playerId;
+      }
+    }
+    return null;
+  }
+
+  // Check if two territories are adjacent
+  _isAdjacentTo(territory1, territory2) {
+    if (!territory1 || !territory2) return false;
+    const connections = this.gameState.getConnections(territory1);
+    return connections.includes(territory2);
   }
 
   // ============================================
@@ -497,54 +793,205 @@ export class AIController {
   }
 
   // ============================================
-  // NON-COMBAT MOVE
+  // NON-COMBAT MOVE - Strategic
   // ============================================
   async _handleNonCombatMove(aiPlayer, player) {
     this._updateStatus(`${player.name} repositioning units...`);
     await this._delay(this._getActionDelay() / 2);
 
-    // Reinforce frontline territories
+    // Get strategic analysis
+    const strategy = this._analyzeStrategicSituation(player.id, aiPlayer.difficulty);
+    const myCapital = this.gameState.playerState[player.id]?.capitalTerritory;
+
+    // Priority 1: Reinforce capital if threatened
+    if (strategy.threatenedCapital && myCapital) {
+      await this._reinforceCapital(player.id, myCapital, strategy);
+    }
+
+    // Priority 2: Move units toward enemy capitals if we're winning
+    if (strategy.nearVictory && strategy.enemyCapitals.length > 0) {
+      await this._advanceTowardCapitals(player.id, strategy);
+    }
+
+    // Priority 3: Reinforce frontline territories
+    await this._reinforceFrontlines(player.id, aiPlayer.difficulty);
+
+    this._notifyAction('nonCombatMove', {});
+    this.gameState.nextPhase();
+    this._notifyAction('nextPhase', {});
+  }
+
+  // Reinforce capital with nearby units
+  async _reinforceCapital(playerId, capital, strategy) {
+    const connections = this.gameState.getConnections(capital);
+    const capitalDefense = this._calculatePower(
+      this._getTerritoryDefenders(capital, playerId), false
+    );
+
+    // Need more defense than threats
+    const needed = strategy.capitalDefenseNeeded;
+    if (needed <= 0) return;
+
+    let reinforced = 0;
+
+    for (const source of connections) {
+      if (this.gameState.getOwner(source) !== playerId) continue;
+      if (reinforced >= needed) break;
+
+      const units = this.gameState.units[source] || [];
+      const myUnits = units.filter(u => u.owner === playerId && !u.moved);
+
+      // Leave at least 1 unit behind
+      for (const unit of myUnits) {
+        if (unit.quantity > 1) {
+          const toMove = Math.min(unit.quantity - 1, Math.ceil(needed - reinforced));
+          if (toMove > 0) {
+            const def = this.unitDefs?.[unit.type];
+            const result = this.gameState.moveUnits(
+              source,
+              capital,
+              [{ type: unit.type, quantity: toMove }],
+              this.unitDefs
+            );
+            if (result && result.success !== false) {
+              reinforced += (def?.defense || 1) * toMove;
+            }
+          }
+        }
+      }
+    }
+
+    if (reinforced > 0) {
+      await this._delay(100);
+    }
+  }
+
+  // Advance units toward enemy capitals when winning
+  async _advanceTowardCapitals(playerId, strategy) {
+    // Find closest enemy capital
+    const targetCapital = strategy.enemyCapitals[0];
+    if (!targetCapital) return;
+
     const owned = this.gameState.territories
-      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === player.id);
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === playerId);
+
+    for (const territory of owned) {
+      const units = this.gameState.units[territory.name];
+      if (!units || units.length <= 1) continue;
+
+      const myUnits = units.filter(u => u.owner === playerId && !u.moved);
+      if (myUnits.length === 0) continue;
+
+      // Find path toward target capital
+      const connections = this.gameState.getConnections(territory.name);
+      const friendlyConnections = connections.filter(c =>
+        this.gameState.getOwner(c) === playerId &&
+        this._isCloserTo(c, targetCapital.territory, territory.name)
+      );
+
+      if (friendlyConnections.length > 0) {
+        const destination = friendlyConnections[0];
+
+        for (const unit of myUnits) {
+          if (unit.quantity > 1) {
+            const toMove = Math.floor(unit.quantity / 2);
+            if (toMove > 0) {
+              this.gameState.moveUnits(
+                territory.name,
+                destination,
+                [{ type: unit.type, quantity: toMove }],
+                this.unitDefs
+              );
+            }
+          }
+        }
+        await this._delay(50);
+      }
+    }
+  }
+
+  // Reinforce frontline territories
+  async _reinforceFrontlines(playerId, difficulty) {
+    const owned = this.gameState.territories
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === playerId);
 
     for (const territory of owned) {
       const units = this.gameState.units[territory.name];
       if (!units || units.length === 0) continue;
 
-      const myUnits = units.filter(u => u.owner === player.id && !u.moved);
+      const myUnits = units.filter(u => u.owner === playerId && !u.moved);
       if (myUnits.length <= 1) continue;
 
-      // Find friendly territories that need reinforcement
+      // Skip frontline territories - they don't need to send units away
+      if (this._isFrontline(territory.name, playerId)) continue;
+
+      // Find friendly frontline territories to reinforce
       const connections = this.gameState.getConnections(territory.name);
       for (const target of connections) {
-        if (this.gameState.getOwner(target) !== player.id) continue;
-
-        const isFrontline = this._isFrontline(target, player.id);
-        if (!isFrontline) continue;
+        if (this.gameState.getOwner(target) !== playerId) continue;
+        if (!this._isFrontline(target, playerId)) continue;
 
         const targetUnits = this.gameState.units[target] || [];
-        const targetCount = targetUnits.filter(u => u.owner === player.id)
+        const targetCount = targetUnits.filter(u => u.owner === playerId)
           .reduce((sum, u) => sum + u.quantity, 0);
         const sourceCount = myUnits.reduce((sum, u) => sum + u.quantity, 0);
 
         // Move half of excess units to frontline
         if (sourceCount > targetCount + 2) {
+          const unitsToMove = [];
           for (const unit of myUnits) {
             if (unit.quantity > 1 && !unit.moved) {
               const toMove = Math.floor(unit.quantity / 2);
               if (toMove > 0) {
-                this.gameState.moveUnits(territory.name, target, unit.type, toMove);
+                unitsToMove.push({ type: unit.type, quantity: toMove });
               }
             }
           }
-          await this._delay(100);
+
+          if (unitsToMove.length > 0) {
+            this.gameState.moveUnits(territory.name, target, unitsToMove, this.unitDefs);
+            await this._delay(50);
+          }
         }
       }
     }
+  }
 
-    this._notifyAction('nonCombatMove', {});
-    this.gameState.nextPhase();
-    this._notifyAction('nextPhase', {});
+  // Check if territory A is closer to target than territory B
+  _isCloserTo(a, target, b) {
+    // Simple distance check using connections (BFS depth)
+    const distA = this._getConnectionDistance(a, target);
+    const distB = this._getConnectionDistance(b, target);
+    return distA < distB;
+  }
+
+  // Get connection distance between two territories (simple BFS)
+  _getConnectionDistance(from, to, maxDepth = 10) {
+    if (from === to) return 0;
+
+    const visited = new Set([from]);
+    let queue = [from];
+    let depth = 0;
+
+    while (queue.length > 0 && depth < maxDepth) {
+      depth++;
+      const nextQueue = [];
+
+      for (const current of queue) {
+        const connections = this.gameState.getConnections(current);
+        for (const conn of connections) {
+          if (conn === to) return depth;
+          if (!visited.has(conn)) {
+            visited.add(conn);
+            nextQueue.push(conn);
+          }
+        }
+      }
+
+      queue = nextQueue;
+    }
+
+    return maxDepth + 1; // Not found within max depth
   }
 
   // ============================================
@@ -574,14 +1021,6 @@ export class AIController {
     return power;
   }
 
-  _getPurchasePriorities(difficulty) {
-    if (difficulty === 'hard') {
-      return ['armour', 'artillery', 'fighter', 'infantry'];
-    } else if (difficulty === 'easy') {
-      return ['infantry', 'armour'];
-    }
-    return ['infantry', 'armour', 'artillery'];
-  }
 
   _pickPlacementTerritory(territories, playerId, difficulty) {
     if (difficulty === 'hard') {

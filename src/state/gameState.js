@@ -51,6 +51,23 @@ export const TECHNOLOGIES = {
 // RISK card trade values (escalating)
 export const RISK_CARD_VALUES = [12, 18, 24, 30, 36, 45, 60, 75];
 
+// Land bridges - allow land movement between these territories without naval transport
+export const LAND_BRIDGES = [
+  ['Alaska', 'Soviet Far East'],
+  ['East Canada', 'Eire'],
+  ['Brazil', 'French West Africa'],
+  ['East US', 'Cuba'],
+  ['Eire', 'United Kingdom'],
+  ['United Kingdom', 'Finland Norway'],
+  ['Spain', 'Algeria'],
+  ['South Europe', 'Algeria'],
+  ['South Europe', 'Anglo Sudan Egypt'],
+  ['Kwangtung', 'East Indies'],
+  ['East Indies', 'Australia'],
+  ['Australia', 'New Zealand'],
+  ['Kenya-Rhodesia', 'Madagascar'],
+];
+
 // Starting IPCs by player count for Risk mode
 export const STARTING_IPCS_BY_PLAYER_COUNT = {
   2: 35,
@@ -332,7 +349,29 @@ export class GameState {
 
   getConnections(territoryName) {
     const territory = this.territoryByName[territoryName];
-    return territory?.connections || [];
+    const baseConnections = territory?.connections || [];
+
+    // Add land bridge connections
+    const landBridgeConnections = [];
+    for (const [t1, t2] of LAND_BRIDGES) {
+      if (t1 === territoryName && !baseConnections.includes(t2)) {
+        landBridgeConnections.push(t2);
+      } else if (t2 === territoryName && !baseConnections.includes(t1)) {
+        landBridgeConnections.push(t1);
+      }
+    }
+
+    return [...baseConnections, ...landBridgeConnections];
+  }
+
+  // Check if two territories are connected by land bridge
+  hasLandBridge(t1Name, t2Name) {
+    for (const [a, b] of LAND_BRIDGES) {
+      if ((a === t1Name && b === t2Name) || (a === t2Name && b === t1Name)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   isWater(territoryName) {
@@ -761,9 +800,12 @@ export class GameState {
     const player = this.currentPlayer;
     if (!player) return { success: false, error: 'No current player' };
 
-    // Validate territories are connected
+    // Validate territories are connected (includes land bridges)
     const fromT = this.territoryByName[fromTerritory];
-    if (!fromT || !fromT.connections.includes(toTerritory)) {
+    const connections = this.getConnections(fromTerritory);
+    const isLandBridge = this.hasLandBridge(fromTerritory, toTerritory);
+
+    if (!fromT || !connections.includes(toTerritory)) {
       return { success: false, error: 'Territories not connected' };
     }
 
@@ -804,11 +846,20 @@ export class GameState {
       }
 
       // Check movement rules
-      if (unitDef.isLand && toT?.isWater) {
-        return { success: false, error: 'Land units cannot enter water' };
-      }
-      if (unitDef.isSea && !toT?.isWater) {
-        return { success: false, error: 'Sea units cannot enter land' };
+      // Land bridges allow land units to cross without naval transport
+      if (isLandBridge) {
+        // Land bridges only allow land/air units, not naval
+        if (unitDef.isSea) {
+          return { success: false, error: 'Naval units cannot use land bridges' };
+        }
+      } else {
+        // Normal movement rules
+        if (unitDef.isLand && toT?.isWater) {
+          return { success: false, error: 'Land units cannot enter water' };
+        }
+        if (unitDef.isSea && !toT?.isWater) {
+          return { success: false, error: 'Sea units cannot enter land' };
+        }
       }
 
       // Perform the move

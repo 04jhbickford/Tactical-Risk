@@ -4384,6 +4384,19 @@ html, body {
   background: rgba(255,255,255,0.03);
 }
 
+.log-entry.has-territory {
+  cursor: pointer;
+}
+
+.log-entry.has-territory:hover {
+  background: rgba(100,180,255,0.15);
+}
+
+.log-entry.has-territory:hover .log-message {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
 .log-time {
   color: #555;
   font-size: 10px;
