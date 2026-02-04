@@ -1337,22 +1337,37 @@ export class GameState {
   }
 
   _checkCapitalVictory() {
-    // Free-for-all: Win by controlling 3 capitals
+    // Count total capitals and who controls what
     const capitalControl = {};
+    let totalCapitals = 0;
 
     for (const [territory, state] of Object.entries(this.territoryState)) {
       if (state.isCapital) {
+        totalCapitals++;
         const owner = state.owner;
         capitalControl[owner] = (capitalControl[owner] || 0) + 1;
       }
     }
 
+    // Determine victory threshold based on player count
+    const playerCount = this.players.length;
+    let requiredCapitals;
+
+    if (playerCount <= 3) {
+      // 2-3 players: must control ALL capitals
+      requiredCapitals = totalCapitals;
+    } else {
+      // 4+ players: must control majority (more than half)
+      requiredCapitals = Math.floor(totalCapitals / 2) + 1;
+    }
+
     for (const [playerId, count] of Object.entries(capitalControl)) {
-      if (count >= 3) {
+      if (count >= requiredCapitals) {
         const player = this.getPlayer(playerId);
         this.gameOver = true;
         this.winner = player?.name || playerId;
-        this.winCondition = `Capital Victory - Controls ${count} capitals`;
+        const condition = playerCount <= 3 ? 'all capitals' : `${count}/${totalCapitals} capitals (majority)`;
+        this.winCondition = `Capital Victory - Controls ${condition}`;
         this._notify();
         return;
       }

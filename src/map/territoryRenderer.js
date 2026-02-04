@@ -52,6 +52,10 @@ export class TerritoryRenderer {
     // Territories highlighted from action log
     this.highlightedTerritories = [];
 
+    // Movement arrow for action log hover
+    this.movementArrowFrom = null;
+    this.movementArrowTo = null;
+
     // Cache for external edges (computed once since polygons never change)
     this._externalEdgesCache = {};
     this._territoryCenterCache = {};
@@ -66,6 +70,18 @@ export class TerritoryRenderer {
   /** Clear highlighted territories */
   clearHighlightedTerritories() {
     this.highlightedTerritories = [];
+  }
+
+  /** Set movement arrow to display (from -> to) */
+  setMovementArrow(from, to) {
+    this.movementArrowFrom = from;
+    this.movementArrowTo = to;
+  }
+
+  /** Clear movement arrow */
+  clearMovementArrow() {
+    this.movementArrowFrom = null;
+    this.movementArrowTo = null;
   }
 
   /** Pre-compute expensive calculations that don't change during gameplay */
@@ -812,17 +828,17 @@ export class TerritoryRenderer {
   _drawCapitalGlow(ctx, x, y, color, zoom) {
     ctx.save();
 
-    // Large, prominent glow effect for capital visibility
-    const glowSize = Math.max(60, 80 / Math.max(zoom, 0.1));
+    // Subtle glow effect for capital visibility
+    const glowSize = Math.max(30, 40 / Math.max(zoom, 0.2));
 
-    // Draw multiple layers for stronger glow
-    for (let i = 3; i >= 0; i--) {
-      const size = glowSize * (1 + i * 0.3);
-      const alpha = Math.floor(180 - i * 40).toString(16).padStart(2, '0');
+    // Draw two layers for subtle glow
+    for (let i = 1; i >= 0; i--) {
+      const size = glowSize * (1 + i * 0.2);
+      const alpha = Math.floor(120 - i * 40).toString(16).padStart(2, '0');
 
       const gradient = ctx.createRadialGradient(x, y, 0, x, y, size);
       gradient.addColorStop(0, color + alpha);
-      gradient.addColorStop(0.5, color + Math.floor(parseInt(alpha, 16) / 2).toString(16).padStart(2, '0'));
+      gradient.addColorStop(0.6, color + Math.floor(parseInt(alpha, 16) / 3).toString(16).padStart(2, '0'));
       gradient.addColorStop(1, 'transparent');
 
       ctx.fillStyle = gradient;
@@ -1057,6 +1073,66 @@ export class TerritoryRenderer {
     }
   }
 
+  /** Render movement arrow between two territories */
+  renderMovementArrow(ctx) {
+    if (!this.movementArrowFrom || !this.movementArrowTo) return;
+
+    const t1 = this.territoryByName[this.movementArrowFrom];
+    const t2 = this.territoryByName[this.movementArrowTo];
+    if (!t1 || !t2) return;
+
+    const [x1, y1] = this._getTerritoryCenter(t1);
+    const [x2, y2] = this._getTerritoryCenter(t2);
+    if (x1 === null || x2 === null) return;
+
+    ctx.save();
+
+    // Calculate arrow properties
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const angle = Math.atan2(dy, dx);
+    const length = Math.sqrt(dx * dx + dy * dy);
+
+    // Shorten the arrow to not overlap territory centers
+    const shortenBy = 30;
+    const startX = x1 + Math.cos(angle) * shortenBy;
+    const startY = y1 + Math.sin(angle) * shortenBy;
+    const endX = x2 - Math.cos(angle) * shortenBy;
+    const endY = y2 - Math.sin(angle) * shortenBy;
+
+    // Draw glow
+    ctx.shadowColor = '#00ffff';
+    ctx.shadowBlur = 10;
+
+    // Draw arrow line
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+
+    // Draw arrowhead
+    const headLength = 15;
+    const headAngle = Math.PI / 6;
+
+    ctx.fillStyle = '#00ffff';
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(
+      endX - headLength * Math.cos(angle - headAngle),
+      endY - headLength * Math.sin(angle - headAngle)
+    );
+    ctx.lineTo(
+      endX - headLength * Math.cos(angle + headAngle),
+      endY - headLength * Math.sin(angle + headAngle)
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
   /** Draw territory labels */
   renderLabels(ctx, zoom) {
     if (zoom < 0.4) return;
@@ -1184,9 +1260,9 @@ export class TerritoryRenderer {
 
   /** Draw lines showing cross-water connections between territories */
   renderCrossWaterConnections(ctx, zoom) {
-    // Always show land bridges - they're important for gameplay
-    const lineWidth = Math.max(3, 5 / Math.max(zoom, 0.2));
-    const circleSize = Math.max(5, 8 / Math.max(zoom, 0.2));
+    // Show land bridges - smaller, less intrusive
+    const lineWidth = Math.max(2, 3 / Math.max(zoom, 0.3));
+    const circleSize = Math.max(3, 4 / Math.max(zoom, 0.3));
 
     ctx.save();
 
@@ -1200,9 +1276,9 @@ export class TerritoryRenderer {
       const [x1, y1, x2, y2] = this._findClosestEdgePoints(t1, t2);
       if (x1 === null) continue;
 
-      // Draw glow effect for visibility
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-      ctx.lineWidth = lineWidth + 4;
+      // Draw subtle glow effect
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+      ctx.lineWidth = lineWidth + 2;
       ctx.setLineDash([]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -1210,19 +1286,19 @@ export class TerritoryRenderer {
       ctx.stroke();
 
       // Draw main line
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
       ctx.lineWidth = lineWidth;
-      ctx.setLineDash([12, 6]);
+      ctx.setLineDash([8, 4]);
       ctx.beginPath();
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Draw anchor circles at endpoints
+      // Draw small anchor circles at endpoints
       ctx.setLineDash([]);
       ctx.fillStyle = '#ffd700';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 1;
 
       ctx.beginPath();
       ctx.arc(x1, y1, circleSize, 0, Math.PI * 2);

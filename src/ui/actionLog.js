@@ -1,4 +1,5 @@
 // Action Log - tracks and displays all player actions during the game
+// Now integrated into the sidebar/player panel
 
 export class ActionLog {
   constructor() {
@@ -7,6 +8,7 @@ export class ActionLog {
     this.maxEntries = 200; // Keep last 200 entries
     this._unsubscribe = null;
     this.onHighlightTerritory = null; // Callback for territory highlighting
+    this.onHighlightMovement = null; // Callback for movement arrow highlighting
 
     this._create();
   }
@@ -16,10 +18,15 @@ export class ActionLog {
     this.onHighlightTerritory = callback;
   }
 
+  // Set callback for highlighting movement arrows
+  setMovementHighlightCallback(callback) {
+    this.onHighlightMovement = callback;
+  }
+
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'actionLog';
-    this.el.className = 'action-log hidden';
+    this.el.className = 'action-log-integrated hidden';
     this.el.innerHTML = `
       <div class="action-log-header">
         <span class="action-log-title">Game Log</span>
@@ -27,7 +34,14 @@ export class ActionLog {
       </div>
       <div class="action-log-content"></div>
     `;
-    document.body.appendChild(this.el);
+
+    // Append to sidebar instead of body
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+      sidebar.appendChild(this.el);
+    } else {
+      document.body.appendChild(this.el);
+    }
 
     // Toggle visibility
     this.el.querySelector('.action-log-toggle').addEventListener('click', () => {
@@ -103,6 +117,30 @@ export class ActionLog {
       message: `Battle at ${territory}: ${winner} wins! (${result.attackHits} vs ${result.defenseHits} hits)`,
       territory, result,
       color: result.winner === 'attacker' ? attacker.color : defender?.color || '#888'
+    });
+  }
+
+  // Log a complete combat summary with attacker, defender, losses, and winner
+  logCombatSummary(territory, attacker, defender, attackerLosses, defenderLosses, winner, conquered) {
+    const attackerLossStr = attackerLosses.length > 0
+      ? attackerLosses.map(u => `${u.quantity} ${u.type}`).join(', ')
+      : 'none';
+    const defenderLossStr = defenderLosses.length > 0
+      ? defenderLosses.map(u => `${u.quantity} ${u.type}`).join(', ')
+      : 'none';
+
+    const winnerName = winner === 'attacker' ? attacker.name : defender?.name || 'Defender';
+    const outcome = conquered ? 'CONQUERED' : 'DEFENDED';
+
+    this.log('combat-summary', {
+      message: `⚔️ ${territory}: ${attacker.name} vs ${defender?.name || 'Defender'} → ${winnerName} ${outcome}`,
+      detail: `Losses: ${attacker.name} lost ${attackerLossStr}, ${defender?.name || 'Defender'} lost ${defenderLossStr}`,
+      territory,
+      attacker: attacker.name,
+      defender: defender?.name || 'Defender',
+      winner: winnerName,
+      conquered,
+      color: winner === 'attacker' ? attacker.color : defender?.color || '#888'
     });
   }
 
@@ -189,22 +227,36 @@ export class ActionLog {
 
     const colorStyle = entry.data.color ? `border-left: 3px solid ${entry.data.color}` : '';
 
+    // Check if entry has detail line (for combat summaries)
+    const detailHtml = entry.data.detail
+      ? `<div class="log-detail">${entry.data.detail}</div>`
+      : '';
+
     div.innerHTML = `
       <span class="log-time">${time}</span>
-      <span class="log-message" style="${colorStyle}">${entry.data.message}</span>
+      <span class="log-message" style="${colorStyle}">${entry.data.message}${detailHtml}</span>
     `;
 
-    // Extract territory names from entry data for hover highlighting
+    // Extract territory names and movement info for hover highlighting
     const territories = this._extractTerritories(entry);
-    if (territories.length > 0 && this.onHighlightTerritory) {
+    const hasMovement = entry.data.from && entry.data.to;
+
+    if ((territories.length > 0 || hasMovement) && this.onHighlightTerritory) {
       div.classList.add('has-territory');
 
       div.addEventListener('mouseenter', () => {
         this.onHighlightTerritory(territories, true);
+        // Also trigger movement arrow if available
+        if (hasMovement && this.onHighlightMovement) {
+          this.onHighlightMovement(entry.data.from, entry.data.to, true);
+        }
       });
 
       div.addEventListener('mouseleave', () => {
         this.onHighlightTerritory(territories, false);
+        if (hasMovement && this.onHighlightMovement) {
+          this.onHighlightMovement(entry.data.from, entry.data.to, false);
+        }
       });
     }
 

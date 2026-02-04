@@ -189,9 +189,12 @@ export class MovementUI {
   }
 
   getValidDestinations() {
-    if (!this.selectedFrom) return [];
+    if (!this.selectedFrom || !this.gameState) return [];
 
-    return this.selectedFrom.connections.filter(connName => {
+    // Use gameState.getConnections() to include land bridge connections
+    const connections = this.gameState.getConnections(this.selectedFrom.name);
+
+    return connections.filter(connName => {
       const t = this.territoryByName[connName];
       return t && this.canMoveTo(t);
     });

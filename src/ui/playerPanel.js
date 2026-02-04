@@ -25,6 +25,11 @@ export class PlayerPanel {
     this.el = document.getElementById('sidebar');
     this.el.innerHTML = '';
     this.el.className = 'player-panel';
+
+    // Create content wrapper so action log can be appended separately
+    this.contentEl = document.createElement('div');
+    this.contentEl.className = 'pp-content';
+    this.el.appendChild(this.contentEl);
   }
 
   setGameState(gameState) {
@@ -57,13 +62,13 @@ export class PlayerPanel {
 
   _render() {
     if (!this.gameState) {
-      this.el.innerHTML = '';
+      this.contentEl.innerHTML = '';
       return;
     }
 
     const player = this.gameState.currentPlayer;
     if (!player) {
-      this.el.innerHTML = '';
+      this.contentEl.innerHTML = '';
       return;
     }
 
@@ -140,7 +145,7 @@ export class PlayerPanel {
     html += this._renderActions(phase, turnPhase, player);
     html += `</div>`;
 
-    this.el.innerHTML = html;
+    this.contentEl.innerHTML = html;
     this._bindEvents();
   }
 
@@ -279,7 +284,7 @@ export class PlayerPanel {
   }
 
   _bindEvents() {
-    this.el.querySelectorAll('[data-action]').forEach(btn => {
+    this.contentEl.querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.action;
         const territory = btn.dataset.territory;

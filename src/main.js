@@ -35,7 +35,6 @@ import { Lobby } from './ui/lobby.js';
 import { ContinentPanel } from './ui/continentPanel.js';
 import { GameState, GAME_PHASES, TURN_PHASES } from './state/gameState.js';
 import { VictoryScreen } from './ui/victoryScreen.js';
-import { CombatLogPanel } from './ui/combatLogPanel.js';
 import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
 
@@ -114,9 +113,6 @@ async function init() {
 
   // Victory Screen
   const victoryScreen = new VictoryScreen();
-
-  // Combat Log Panel
-  const combatLogPanel = new CombatLogPanel();
 
   // Action Log (game event log)
   const actionLog = new ActionLog();
@@ -312,10 +308,6 @@ async function init() {
     // Victory Screen
     victoryScreen.setGameState(gameState);
 
-    // Combat Log Panel
-    combatLogPanel.setGameState(gameState);
-    combatLogPanel.show();
-
     // Action Log
     actionLog.setGameState(gameState);
     actionLog.setHighlightCallback((territories, highlight) => {
@@ -323,6 +315,14 @@ async function init() {
         territoryRenderer.setHighlightedTerritories(territories);
       } else {
         territoryRenderer.clearHighlightedTerritories();
+      }
+      camera.dirty = true;
+    });
+    actionLog.setMovementHighlightCallback((from, to, highlight) => {
+      if (highlight) {
+        territoryRenderer.setMovementArrow(from, to);
+      } else {
+        territoryRenderer.clearMovementArrow();
       }
       camera.dirty = true;
     });
@@ -528,6 +528,9 @@ async function init() {
 
         // Action log hover highlights
         territoryRenderer.renderActionLogHighlights(ctx);
+
+        // Movement arrow for action log
+        territoryRenderer.renderMovementArrow(ctx);
 
         // Labels
         territoryRenderer.renderLabels(ctx, camera.zoom);

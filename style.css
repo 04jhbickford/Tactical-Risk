@@ -1421,6 +1421,10 @@ html, body {
   display: none;
 }
 
+.pp-content {
+  flex: 0 0 auto;
+}
+
 .pp-header {
   padding: 16px;
   border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -4299,6 +4303,7 @@ html, body {
 }
 
 /* --- Action Log --- */
+/* Floating action log (old style - kept for reference) */
 .action-log {
   position: fixed;
   bottom: 20px;
@@ -4312,6 +4317,47 @@ html, body {
   display: flex;
   flex-direction: column;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* Integrated action log (in sidebar) */
+.action-log-integrated {
+  margin-top: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 150px;
+  max-height: 300px;
+}
+
+.action-log-integrated.hidden {
+  display: none;
+}
+
+.action-log-integrated.collapsed .action-log-content {
+  display: none;
+}
+
+.action-log-integrated.collapsed {
+  max-height: 36px;
+  min-height: 36px;
+  flex: 0;
+}
+
+.action-log-integrated.collapsed .action-log-toggle {
+  transform: rotate(-90deg);
+}
+
+.action-log-integrated .action-log-header {
+  padding: 8px 12px;
+  border-radius: 8px 8px 0 0;
+}
+
+.action-log-integrated .action-log-content {
+  max-height: none;
+  flex: 1;
 }
 
 .action-log.hidden {
@@ -4428,6 +4474,20 @@ html, body {
 .log-tech .log-message { color: #ff88ff; }
 .log-cards .log-message { color: #88ffff; }
 .log-income .log-message { color: #88ff88; }
+
+/* Combat summary - more detailed battle results */
+.log-combat-summary .log-message {
+  color: #ffcc44;
+  font-weight: 600;
+}
+
+.log-detail {
+  display: block;
+  font-size: 10px;
+  color: #888;
+  font-weight: 400;
+  margin-top: 2px;
+}
 
 /* Scrollbar for log */
 .action-log-content::-webkit-scrollbar {
