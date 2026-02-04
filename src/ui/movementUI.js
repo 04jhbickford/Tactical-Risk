@@ -262,9 +262,16 @@ export class MovementUI {
     );
 
     if (result.success) {
+      const moveInfo = {
+        from: this.selectedFrom.name,
+        to: destination.name,
+        units: unitsToMove,
+        captured: result.captured,
+        isAttack: result.isAttack,
+      };
       this.cancel();
       if (this.onMoveComplete) {
-        this.onMoveComplete();
+        this.onMoveComplete(moveInfo);
       }
     } else {
       // Show error

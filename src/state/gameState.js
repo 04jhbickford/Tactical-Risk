@@ -62,6 +62,7 @@ export const LAND_BRIDGES = [
   ['Spain', 'Algeria'],
   ['South Europe', 'Algeria'],
   ['South Europe', 'Anglo Sudan Egypt'],
+  ['Syria Jordan', 'Anglo Sudan Egypt'],
   ['Kwangtung', 'East Indies'],
   ['East Indies', 'Australia'],
   ['Australia', 'New Zealand'],
@@ -894,22 +895,45 @@ export class GameState {
       this.units[toTerritory] = toUnits;
     }
 
+    // Check if we captured an empty enemy territory (land only, not water)
+    let captured = false;
+    if (!toT?.isWater && isEnemy) {
+      // Check if there are any enemy units remaining
+      const enemyUnits = this.units[toTerritory]?.filter(u =>
+        u.owner !== player.id && !this.areAllies(player.id, u.owner)
+      ) || [];
+      if (enemyUnits.length === 0) {
+        // Capture the territory immediately
+        this.territoryState[toTerritory].owner = player.id;
+        captured = true;
+      }
+    }
+
     // Record move with full info for undo
     this.moveHistory.push({
       from: fromTerritory,
       to: toTerritory,
       units: unitsToMove.map(u => ({ ...u })),
       player: player.id,
+      captured, // Track if territory was captured for undo
+      previousOwner: isEnemy ? toOwner : null,
     });
 
     this._notify();
-    return { success: true };
+    return {
+      success: true,
+      from: fromTerritory,
+      to: toTerritory,
+      units: unitsToMove,
+      captured,
+      isAttack: isCombatMove && isEnemy && !captured,
+    };
   }
 
-  // Undo the last movement (only during combat move phase)
+  // Undo the last movement (during combat or non-combat move phase)
   undoLastMove() {
-    if (this.turnPhase !== TURN_PHASES.COMBAT_MOVE) {
-      return { success: false, error: 'Can only undo during combat movement' };
+    if (this.turnPhase !== TURN_PHASES.COMBAT_MOVE && this.turnPhase !== TURN_PHASES.NON_COMBAT_MOVE) {
+      return { success: false, error: 'Can only undo during movement phases' };
     }
 
     if (this.moveHistory.length === 0) {
@@ -956,6 +980,11 @@ export class GameState {
 
     this.units[lastMove.from] = fromUnits;
     this.units[lastMove.to] = toUnits;
+
+    // If territory was captured by this move, restore previous owner
+    if (lastMove.captured && lastMove.previousOwner) {
+      this.territoryState[lastMove.to].owner = lastMove.previousOwner;
+    }
 
     this._notify();
     return { success: true };

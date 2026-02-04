@@ -875,8 +875,9 @@ export class TerritoryRenderer {
 
     ctx.save();
 
-    // Draw star BEHIND the flag (before drawing the flag) - bigger than flag
-    const starSize = isZoomedOut ? 50 : 40;
+    // Draw star BEHIND the flag (before drawing the flag) - significantly bigger than flag
+    // Make star very prominent so capitals are always easy to identify
+    const starSize = isZoomedOut ? 70 : 55;
     this._drawCapitalStar(ctx, x, y, starSize, '#ffd700', isZoomedOut);
 
     // Draw colored background/border - more prominent when zoomed out
@@ -917,30 +918,28 @@ export class TerritoryRenderer {
     ctx.save();
     ctx.translate(x, y);
 
-    // Larger glow effect when zoomed out
+    // Strong glow effect for visibility at all zoom levels
     ctx.shadowColor = color;
-    ctx.shadowBlur = isZoomedOut ? 15 : 6;
+    ctx.shadowBlur = isZoomedOut ? 20 : 12;
 
-    // Add white outline for visibility when zoomed out
-    if (isZoomedOut) {
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? r : innerR;
-        const angle = (Math.PI / points) * i - Math.PI / 2;
-        const px = Math.cos(angle) * radius;
-        const py = Math.sin(angle) * radius;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.stroke();
+    // Always add white outline for visibility (not just when zoomed out)
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = isZoomedOut ? 4 : 3;
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+      const radius = i % 2 === 0 ? r : innerR;
+      const angle = (Math.PI / points) * i - Math.PI / 2;
+      const px = Math.cos(angle) * radius;
+      const py = Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
     }
+    ctx.closePath();
+    ctx.stroke();
 
     ctx.fillStyle = color;
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = isZoomedOut ? 2 : 1;
+    ctx.lineWidth = isZoomedOut ? 2 : 1.5;
 
     ctx.beginPath();
     for (let i = 0; i < points * 2; i++) {

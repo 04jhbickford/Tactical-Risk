@@ -281,8 +281,19 @@ async function init() {
 
     // Movement UI
     movementUI.setGameState(gameState);
-    movementUI.setOnMoveComplete(() => {
+    movementUI.setOnMoveComplete((moveInfo) => {
       camera.dirty = true;
+      // Log the movement/attack
+      if (moveInfo) {
+        const player = gameState.currentPlayer;
+        if (moveInfo.isAttack) {
+          actionLog.logAttack(moveInfo.from, moveInfo.to, player, null);
+        } else if (moveInfo.captured) {
+          actionLog.logCapture(moveInfo.to, player);
+        } else {
+          actionLog.logMove(moveInfo.from, moveInfo.to, moveInfo.units, player);
+        }
+      }
     });
 
     // Combat UI

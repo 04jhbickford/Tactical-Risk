@@ -232,9 +232,12 @@ export class ActionLog {
       ? `<div class="log-detail">${entry.data.detail}</div>`
       : '';
 
+    // Build tooltip with more details
+    const tooltipText = this._buildTooltip(entry);
+
     div.innerHTML = `
       <span class="log-time">${time}</span>
-      <span class="log-message" style="${colorStyle}">${entry.data.message}${detailHtml}</span>
+      <span class="log-message" style="${colorStyle}" title="${tooltipText}">${entry.data.message}${detailHtml}</span>
     `;
 
     // Extract territory names and movement info for hover highlighting
@@ -243,7 +246,8 @@ export class ActionLog {
     // Determine if this is a combat entry (for yellow arrow) or regular move (cyan arrow)
     const isCombat = entry.type === 'attack' || entry.type === 'combat' || entry.type === 'combat-summary';
 
-    if ((territories.length > 0 || hasMovement) && this.onHighlightTerritory) {
+    // All entries with territories should highlight on hover
+    if (territories.length > 0 && this.onHighlightTerritory) {
       div.classList.add('has-territory');
 
       div.addEventListener('mouseenter', () => {
@@ -263,6 +267,54 @@ export class ActionLog {
     }
 
     this.contentEl.appendChild(div);
+  }
+
+  // Build detailed tooltip for log entry
+  _buildTooltip(entry) {
+    const parts = [`Round ${entry.round}`];
+    const data = entry.data;
+
+    switch (entry.type) {
+      case 'move':
+        parts.push(`Movement: ${data.from} → ${data.to}`);
+        if (data.units) {
+          parts.push(`Units: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
+        }
+        break;
+      case 'attack':
+        parts.push(`Combat Move: ${data.from} → ${data.to}`);
+        parts.push('Battle pending');
+        break;
+      case 'combat-summary':
+        parts.push(`Battle at ${data.territory}`);
+        parts.push(`${data.attacker} vs ${data.defender}`);
+        parts.push(`Winner: ${data.winner}`);
+        break;
+      case 'capture':
+        parts.push(`Territory captured: ${data.territory}`);
+        break;
+      case 'purchase':
+        if (data.units) {
+          parts.push(`Purchased: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
+        }
+        break;
+      case 'capital':
+        parts.push(`Capital placed at: ${data.territory}`);
+        break;
+      case 'income':
+        parts.push(`Income collected: ${data.amount} IPCs`);
+        break;
+      case 'tech':
+        if (data.tech) {
+          parts.push(`Technology: ${data.tech}`);
+        }
+        break;
+      default:
+        // Generic tooltip
+        break;
+    }
+
+    return parts.join('\\n');
   }
 
   // Extract territory names from entry data
