@@ -85,17 +85,17 @@ export class TechUI {
         </div>
       `;
     } else if (this.lastRolls) {
-      // Show roll results
+      // Show roll results - horizontal row like combat
       html += `
         <div class="tech-results">
           <div class="tech-results-title">Research Results</div>
-          <div class="tech-dice">
+          <div class="dice-display tech-dice-row">
             ${this.lastRolls.map(roll => `
-              <div class="tech-die ${roll === 6 ? 'success' : ''}">${roll}</div>
+              <div class="die ${roll === 6 ? 'hit' : 'miss'}">${roll}</div>
             `).join('')}
           </div>
           <div class="tech-results-msg ${this.lastRolls.some(r => r === 6) ? 'success' : 'fail'}">
-            ${this.lastRolls.some(r => r === 6) ? 'Breakthrough! Roll a 6!' : 'No breakthrough this time.'}
+            ${this.lastRolls.some(r => r === 6) ? 'Breakthrough! Rolled a 6!' : 'No breakthrough this time.'}
           </div>
         </div>
       `;
@@ -236,12 +236,12 @@ export class TechUI {
     let html = `
       <div class="tech-rolling">
         <div class="tech-rolling-title">Rolling ${this.diceCount} dice...</div>
-        <div class="tech-dice-rolling">
+        <div class="dice-display tech-dice-row">
     `;
 
     for (let i = 0; i < this.diceCount; i++) {
-      const delay = i * 50;
-      html += `<div class="tech-die die-3d rolling" style="animation-delay: ${delay}ms">${Math.floor(Math.random() * 6) + 1}</div>`;
+      const delay = i * 30;
+      html += `<div class="die die-3d rolling" style="animation-delay: ${delay}ms">${Math.floor(Math.random() * 6) + 1}</div>`;
     }
 
     html += `</div></div>`;
@@ -249,7 +249,7 @@ export class TechUI {
 
     // Animate values
     const animateInterval = setInterval(() => {
-      const dice = diceArea.querySelectorAll('.tech-die');
+      const dice = diceArea.querySelectorAll('.die');
       dice.forEach(die => {
         die.textContent = Math.floor(Math.random() * 6) + 1;
       });

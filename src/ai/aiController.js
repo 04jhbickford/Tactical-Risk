@@ -1,6 +1,8 @@
 // AI Controller - manages AI players and triggers their turns
+// Handles ALL game phases autonomously for AI players
 
 import { AIPlayer } from './aiPlayer.js';
+import { GAME_PHASES, TURN_PHASES } from '../state/gameState.js';
 
 export class AIController {
   constructor() {
@@ -31,6 +33,7 @@ export class AIController {
     if (this.onStatusUpdate) {
       this.onStatusUpdate(message);
     }
+    console.log('[AI]', message);
   }
 
   setGameState(gameState) {
@@ -40,8 +43,13 @@ export class AIController {
 
   setUnitDefs(unitDefs) {
     this.unitDefs = unitDefs;
+    // Also pass to game state for AI calculations
     if (this.gameState) {
       this.gameState.unitDefs = unitDefs;
+    }
+    // Update AI players
+    for (const aiPlayer of Object.values(this.aiPlayers)) {
+      aiPlayer.unitDefs = unitDefs;
     }
   }
 
@@ -55,11 +63,13 @@ export class AIController {
 
     for (const player of this.gameState.players) {
       if (player.isAI) {
-        this.aiPlayers[player.id] = new AIPlayer(
+        const aiPlayer = new AIPlayer(
           this.gameState,
           player.id,
           player.aiDifficulty || 'medium'
         );
+        aiPlayer.unitDefs = this.unitDefs;
+        this.aiPlayers[player.id] = aiPlayer;
       }
     }
   }
@@ -92,133 +102,149 @@ export class AIController {
     const turnPhase = this.gameState.turnPhase;
 
     // Handle different game phases
-    if (phase === 'CAPITAL_PLACEMENT') {
+    if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
       await this._handleCapitalPlacement(aiPlayer, player);
-    } else if (phase === 'UNIT_PLACEMENT') {
-      await this._handleUnitPlacement(aiPlayer, player);
-    } else if (phase === 'PLAYING') {
+    } else if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+      await this._handleInitialPlacement(aiPlayer, player);
+    } else if (phase === GAME_PHASES.PLAYING) {
       await this._handlePlayingPhase(aiPlayer, player, turnPhase);
     }
   }
 
+  // ============================================
+  // CAPITAL PLACEMENT
+  // ============================================
   async _handleCapitalPlacement(aiPlayer, player) {
     this._updateStatus(`${player.name} is choosing capital location...`);
     await this._delay(this._getActionDelay());
 
-    const result = await aiPlayer.takeTurn('CAPITAL_PLACEMENT');
-
-    if (result.action === 'placeCapital' && result.territory) {
-      this._updateStatus(`${player.name} places capital in ${result.territory}`);
-      this.gameState.placeCapital(result.territory);
-      this._notifyAction('placeCapital', result);
-    }
-  }
-
-  async _handleUnitPlacement(aiPlayer, player) {
-    // AI places units during initial placement
-    const placementState = this.gameState.placementState?.[player.id];
-    if (!placementState) {
-      this.gameState.finishPlacement();
-      this._notifyAction('finishPlacement', {});
-      return;
-    }
-
-    const { unitsToPlace, placedThisRound, maxPerRound } = placementState;
-
-    // Count remaining units
-    let totalRemaining = 0;
-    for (const count of Object.values(unitsToPlace)) {
-      totalRemaining += count;
-    }
-
-    if (totalRemaining === 0) {
-      this.gameState.finishPlacement();
-      this._notifyAction('finishPlacement', {});
-      return;
-    }
-
-    // Place units
-    const territories = this.gameState.territories
+    // Get owned territories
+    const owned = this.gameState.territories
       .filter(t => !t.isWater && this.gameState.getOwner(t.name) === player.id)
       .map(t => t.name);
 
-    if (territories.length === 0) {
-      this.gameState.finishPlacement();
+    if (owned.length === 0) return;
+
+    // Choose based on difficulty
+    let choice;
+    if (aiPlayer.difficulty === 'hard') {
+      // Pick territory with most connections (strategic)
+      choice = owned.reduce((best, t) => {
+        const connections = this.gameState.getConnections(t).length;
+        const bestConnections = this.gameState.getConnections(best).length;
+        return connections > bestConnections ? t : best;
+      });
+    } else if (aiPlayer.difficulty === 'easy') {
+      // Random choice
+      choice = owned[Math.floor(Math.random() * owned.length)];
+    } else {
+      // Medium: pick territory with most friendly neighbors
+      choice = this._findCentralTerritory(owned, player.id);
+    }
+
+    this._updateStatus(`${player.name} places capital in ${choice}`);
+    this.gameState.placeCapital(choice);
+    this._notifyAction('placeCapital', { territory: choice });
+  }
+
+  // ============================================
+  // INITIAL UNIT PLACEMENT (6 units per round)
+  // ============================================
+  async _handleInitialPlacement(aiPlayer, player) {
+    this._updateStatus(`${player.name} is placing units...`);
+    await this._delay(this._getActionDelay() / 2);
+
+    const unitsToPlace = this.gameState.getUnitsToPlace(player.id);
+    const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
+
+    if (totalRemaining === 0) {
+      // No units left, finish placement round
+      this.gameState.finishPlacementRound();
+      this._notifyAction('finishPlacement', {});
       return;
     }
 
-    let placed = placedThisRound || 0;
-    const toPlaceThisRound = Math.min(totalRemaining, maxPerRound - placed);
+    // Get owned territories for land units
+    const ownedLand = this.gameState.territories
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === player.id)
+      .map(t => t.name);
 
-    for (let i = 0; i < toPlaceThisRound; i++) {
+    // Get adjacent sea zones for naval units
+    const ownedSeas = this._getAdjacentSeaZones(player.id);
+
+    // Place up to 6 units this round
+    let placedThisRound = 0;
+    const maxThisRound = Math.min(6, totalRemaining);
+
+    while (placedThisRound < maxThisRound) {
       // Find a unit type to place
       let unitType = null;
-      for (const [type, count] of Object.entries(unitsToPlace)) {
-        if (count > 0) {
-          unitType = type;
-          break;
+      let isNaval = false;
+
+      for (const unit of unitsToPlace) {
+        if (unit.quantity > 0) {
+          const def = this.unitDefs?.[unit.type];
+          if (def) {
+            unitType = unit.type;
+            isNaval = def.isSea;
+            break;
+          }
         }
       }
+
       if (!unitType) break;
 
-      // Pick territory (simple: random or strategic)
-      const territory = this._pickPlacementTerritory(territories, player.id, aiPlayer.difficulty);
+      // Pick territory based on unit type and difficulty
+      let territory;
+      if (isNaval && ownedSeas.length > 0) {
+        territory = ownedSeas[Math.floor(Math.random() * ownedSeas.length)];
+      } else if (ownedLand.length > 0) {
+        territory = this._pickPlacementTerritory(ownedLand, player.id, aiPlayer.difficulty);
+      } else {
+        break;
+      }
 
       // Place the unit
-      const success = this.gameState.placeInitialUnit(unitType, territory);
-      if (success) {
-        await this._delay(200); // Small delay between placements for visual feedback
+      const result = this.gameState.placeInitialUnit(territory, unitType, this.unitDefs);
+      if (result.success) {
+        placedThisRound++;
+        await this._delay(150); // Small delay for visual feedback
         this._notifyAction('placeUnit', { unitType, territory });
+      } else {
+        break;
       }
     }
 
-    // Check if round is complete
-    const newState = this.gameState.placementState?.[player.id];
-    if (newState && newState.placedThisRound >= maxPerRound) {
-      this.gameState.finishPlacement();
-      this._notifyAction('finishPlacement', {});
-    }
+    // Finish placement round after placing 6 units
+    await this._delay(300);
+    this.gameState.finishPlacementRound();
+    this._notifyAction('finishPlacement', {});
   }
 
-  _pickPlacementTerritory(territories, playerId, difficulty) {
-    if (difficulty === 'hard') {
-      // Place on frontline territories
-      const frontline = territories.filter(t => this._isFrontline(t, playerId));
-      if (frontline.length > 0) {
-        return frontline[Math.floor(Math.random() * frontline.length)];
-      }
-    }
-    // Default: random
-    return territories[Math.floor(Math.random() * territories.length)];
-  }
-
-  _isFrontline(territory, playerId) {
-    const connections = this.gameState.getConnections(territory);
-    return connections.some(c => {
-      const owner = this.gameState.getOwner(c);
-      const isWater = this.gameState.isWater(c);
-      return owner && owner !== playerId && !isWater;
-    });
-  }
-
+  // ============================================
+  // PLAYING PHASE (all turn phases)
+  // ============================================
   async _handlePlayingPhase(aiPlayer, player, turnPhase) {
     switch (turnPhase) {
-      case 'PURCHASE':
+      case TURN_PHASES.DEVELOP_TECH:
+        await this._handleTechResearch(aiPlayer, player);
+        break;
+      case TURN_PHASES.PURCHASE:
         await this._handlePurchase(aiPlayer, player);
         break;
-      case 'COMBAT_MOVE':
+      case TURN_PHASES.COMBAT_MOVE:
         await this._handleCombatMove(aiPlayer, player);
         break;
-      case 'COMBAT':
+      case TURN_PHASES.COMBAT:
         await this._handleCombat(aiPlayer, player);
         break;
-      case 'NON_COMBAT_MOVE':
+      case TURN_PHASES.NON_COMBAT_MOVE:
         await this._handleNonCombatMove(aiPlayer, player);
         break;
-      case 'MOBILIZE':
+      case TURN_PHASES.MOBILIZE:
         await this._handleMobilize(aiPlayer, player);
         break;
-      case 'COLLECT_INCOME':
+      case TURN_PHASES.COLLECT_INCOME:
         // Auto-handled by game state
         this.gameState.nextPhase();
         this._notifyAction('nextPhase', {});
@@ -230,8 +256,53 @@ export class AIController {
     }
   }
 
+  // ============================================
+  // TECH RESEARCH
+  // ============================================
+  async _handleTechResearch(aiPlayer, player) {
+    this._updateStatus(`${player.name} considering technology research...`);
+    await this._delay(this._getActionDelay() / 2);
+
+    const ipcs = this.gameState.getIPCs(player.id);
+    const availableTechs = this.gameState.getAvailableTechs?.(player.id) || [];
+
+    // Decide whether to research based on difficulty and resources
+    let diceCount = 0;
+    if (availableTechs.length > 0 && ipcs >= 5) {
+      if (aiPlayer.difficulty === 'hard' && ipcs >= 15) {
+        diceCount = Math.min(3, Math.floor(ipcs / 5));
+      } else if (aiPlayer.difficulty === 'medium' && ipcs >= 20) {
+        diceCount = Math.min(2, Math.floor(ipcs / 5));
+      } else if (aiPlayer.difficulty === 'easy' && ipcs >= 30 && Math.random() > 0.5) {
+        diceCount = 1;
+      }
+    }
+
+    if (diceCount > 0) {
+      this._updateStatus(`${player.name} researching technology (${diceCount} dice)...`);
+      this.gameState.purchaseTechDice(player.id, diceCount);
+      await this._delay(500);
+
+      const result = this.gameState.rollTechDice(player.id);
+      if (result.success && availableTechs.length > 0) {
+        // Pick a tech to unlock
+        const techId = availableTechs[0];
+        this.gameState.unlockTech(player.id, techId);
+        this._updateStatus(`${player.name} unlocked ${techId}!`);
+      }
+      await this._delay(300);
+    }
+
+    this.gameState.nextPhase();
+    this._notifyAction('nextPhase', {});
+  }
+
+  // ============================================
+  // PURCHASE PHASE
+  // ============================================
   async _handlePurchase(aiPlayer, player) {
-    await this._delay(500);
+    this._updateStatus(`${player.name} purchasing units...`);
+    await this._delay(this._getActionDelay());
 
     const ipcs = this.gameState.getIPCs(player.id);
     if (ipcs <= 0 || !this.unitDefs) {
@@ -240,24 +311,34 @@ export class AIController {
       return;
     }
 
-    // Simple purchase logic
-    const priorities = aiPlayer.difficulty === 'hard'
-      ? ['armour', 'artillery', 'infantry']
-      : ['infantry', 'armour'];
+    const capital = this.gameState.playerState[player.id]?.capitalTerritory;
+    if (!capital) {
+      this.gameState.nextPhase();
+      this._notifyAction('nextPhase', {});
+      return;
+    }
 
+    // Purchase strategy based on difficulty
+    const priorities = this._getPurchasePriorities(aiPlayer.difficulty);
     let remaining = ipcs;
+
     for (const unitType of priorities) {
       const def = this.unitDefs[unitType];
-      if (!def) continue;
+      if (!def || def.cost > remaining) continue;
 
-      while (remaining >= def.cost) {
-        const capital = this.gameState.playerState[player.id]?.capitalTerritory;
-        if (capital) {
-          this.gameState.purchaseUnit(unitType, capital, this.unitDefs);
-          remaining -= def.cost;
-        } else {
-          break;
-        }
+      // Buy units
+      let count = Math.floor(remaining / def.cost);
+
+      // Limit purchases based on difficulty
+      if (aiPlayer.difficulty === 'easy') {
+        count = Math.min(count, 2);
+      } else if (aiPlayer.difficulty === 'medium') {
+        count = Math.min(count, 4);
+      }
+
+      for (let i = 0; i < count && remaining >= def.cost; i++) {
+        this.gameState.purchaseUnit(unitType, capital, this.unitDefs);
+        remaining -= def.cost;
       }
     }
 
@@ -267,11 +348,13 @@ export class AIController {
     this._notifyAction('nextPhase', {});
   }
 
+  // ============================================
+  // COMBAT MOVE
+  // ============================================
   async _handleCombatMove(aiPlayer, player) {
-    this._updateStatus(`${player.name} is planning attacks...`);
+    this._updateStatus(`${player.name} planning attacks...`);
     await this._delay(this._getActionDelay());
 
-    // Get owned territories with units
     const owned = this.gameState.territories
       .filter(t => !t.isWater && this.gameState.getOwner(t.name) === player.id);
 
@@ -279,7 +362,7 @@ export class AIController {
       const units = this.gameState.units[territory.name];
       if (!units || units.length === 0) continue;
 
-      const myUnits = units.filter(u => u.owner === player.id);
+      const myUnits = units.filter(u => u.owner === player.id && !u.moved);
       if (myUnits.length === 0) continue;
 
       // Find adjacent enemies
@@ -290,6 +373,7 @@ export class AIController {
 
         if (targetTerritory?.isWater) continue;
         if (!targetOwner || targetOwner === player.id) continue;
+        if (this.gameState.areAllies?.(player.id, targetOwner)) continue;
 
         // Evaluate attack
         const myPower = this._calculatePower(myUnits, true);
@@ -302,13 +386,14 @@ export class AIController {
 
         if (ratio >= threshold) {
           // Attack!
+          this._updateStatus(`${player.name} attacking ${target}...`);
           for (const unit of myUnits) {
             const def = this.unitDefs?.[unit.type];
             if (def && def.attack > 0) {
               this.gameState.moveUnits(territory.name, target, unit.type, unit.quantity);
             }
           }
-          await this._delay(300);
+          await this._delay(200);
         }
       }
     }
@@ -318,23 +403,31 @@ export class AIController {
     this._notifyAction('nextPhase', {});
   }
 
+  // ============================================
+  // COMBAT RESOLUTION
+  // ============================================
   async _handleCombat(aiPlayer, player) {
+    this._updateStatus(`${player.name} resolving combat...`);
+
     // Auto-resolve all combats
     while (this.gameState.combatQueue && this.gameState.combatQueue.length > 0) {
       const combat = this.gameState.combatQueue[0];
+      this._updateStatus(`Battle for ${combat}...`);
 
       // Auto-battle until resolved
       let safety = 100;
       while (safety-- > 0) {
-        const result = this.gameState.resolveCombatRound(combat.territory);
+        const result = this.gameState.resolveCombatRound(combat);
         if (!result || result.resolved) break;
-        await this._delay(100);
+        await this._delay(50);
       }
 
       // Remove from queue if still there
-      if (this.gameState.combatQueue[0]?.territory === combat.territory) {
+      if (this.gameState.combatQueue[0] === combat) {
         this.gameState.combatQueue.shift();
       }
+
+      await this._delay(200);
     }
 
     this._notifyAction('combat', {});
@@ -343,22 +436,73 @@ export class AIController {
     this._notifyAction('nextPhase', {});
   }
 
+  // ============================================
+  // NON-COMBAT MOVE
+  // ============================================
   async _handleNonCombatMove(aiPlayer, player) {
-    await this._delay(400);
-    // Simple: just skip for now, can be enhanced later
+    this._updateStatus(`${player.name} repositioning units...`);
+    await this._delay(this._getActionDelay() / 2);
+
+    // Reinforce frontline territories
+    const owned = this.gameState.territories
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === player.id);
+
+    for (const territory of owned) {
+      const units = this.gameState.units[territory.name];
+      if (!units || units.length === 0) continue;
+
+      const myUnits = units.filter(u => u.owner === player.id && !u.moved);
+      if (myUnits.length <= 1) continue;
+
+      // Find friendly territories that need reinforcement
+      const connections = this.gameState.getConnections(territory.name);
+      for (const target of connections) {
+        if (this.gameState.getOwner(target) !== player.id) continue;
+
+        const isFrontline = this._isFrontline(target, player.id);
+        if (!isFrontline) continue;
+
+        const targetUnits = this.gameState.units[target] || [];
+        const targetCount = targetUnits.filter(u => u.owner === player.id)
+          .reduce((sum, u) => sum + u.quantity, 0);
+        const sourceCount = myUnits.reduce((sum, u) => sum + u.quantity, 0);
+
+        // Move half of excess units to frontline
+        if (sourceCount > targetCount + 2) {
+          for (const unit of myUnits) {
+            if (unit.quantity > 1 && !unit.moved) {
+              const toMove = Math.floor(unit.quantity / 2);
+              if (toMove > 0) {
+                this.gameState.moveUnits(territory.name, target, unit.type, toMove);
+              }
+            }
+          }
+          await this._delay(100);
+        }
+      }
+    }
+
     this._notifyAction('nonCombatMove', {});
     this.gameState.nextPhase();
     this._notifyAction('nextPhase', {});
   }
 
+  // ============================================
+  // MOBILIZE (place purchased units)
+  // ============================================
   async _handleMobilize(aiPlayer, player) {
-    await this._delay(300);
-    // Units are placed during purchase, just advance
+    this._updateStatus(`${player.name} mobilizing units...`);
+    await this._delay(this._getActionDelay() / 2);
+
+    // Units are placed during purchase at capital, just advance
     this._notifyAction('mobilize', {});
     this.gameState.nextPhase();
     this._notifyAction('nextPhase', {});
   }
 
+  // ============================================
+  // HELPER METHODS
+  // ============================================
   _calculatePower(units, isAttack) {
     if (!units || !this.unitDefs) return 0;
     let power = 0;
@@ -370,6 +514,78 @@ export class AIController {
     return power;
   }
 
+  _getPurchasePriorities(difficulty) {
+    if (difficulty === 'hard') {
+      return ['armour', 'artillery', 'fighter', 'infantry'];
+    } else if (difficulty === 'easy') {
+      return ['infantry', 'armour'];
+    }
+    return ['infantry', 'armour', 'artillery'];
+  }
+
+  _pickPlacementTerritory(territories, playerId, difficulty) {
+    if (difficulty === 'hard') {
+      // Place on frontline territories
+      const frontline = territories.filter(t => this._isFrontline(t, playerId));
+      if (frontline.length > 0) {
+        return frontline[Math.floor(Math.random() * frontline.length)];
+      }
+    } else if (difficulty === 'medium') {
+      // Mix of frontline and central
+      const frontline = territories.filter(t => this._isFrontline(t, playerId));
+      if (frontline.length > 0 && Math.random() > 0.4) {
+        return frontline[Math.floor(Math.random() * frontline.length)];
+      }
+    }
+    // Default: random
+    return territories[Math.floor(Math.random() * territories.length)];
+  }
+
+  _findCentralTerritory(territories, playerId) {
+    let best = territories[0];
+    let bestScore = 0;
+
+    for (const t of territories) {
+      const connections = this.gameState.getConnections(t);
+      const friendlyNeighbors = connections.filter(c =>
+        this.gameState.getOwner(c) === playerId
+      ).length;
+      if (friendlyNeighbors > bestScore) {
+        bestScore = friendlyNeighbors;
+        best = t;
+      }
+    }
+    return best;
+  }
+
+  _isFrontline(territory, playerId) {
+    const connections = this.gameState.getConnections(territory);
+    return connections.some(c => {
+      const owner = this.gameState.getOwner(c);
+      const isWater = this.gameState.territories.find(t => t.name === c)?.isWater;
+      return owner && owner !== playerId && !isWater;
+    });
+  }
+
+  _getAdjacentSeaZones(playerId) {
+    const seaZones = new Set();
+    const owned = this.gameState.territories
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === playerId);
+
+    for (const territory of owned) {
+      const t = this.gameState.territories.find(x => x.name === territory.name);
+      if (!t?.connections) continue;
+
+      for (const conn of t.connections) {
+        const connT = this.gameState.territories.find(x => x.name === conn);
+        if (connT?.isWater) {
+          seaZones.add(conn);
+        }
+      }
+    }
+    return [...seaZones];
+  }
+
   _notifyAction(action, data) {
     if (this.onAction) {
       this.onAction(action, data);
@@ -378,11 +594,11 @@ export class AIController {
 
   _delay(ms) {
     // In skip mode, use minimal delays
-    const actualDelay = this.skipMode ? Math.min(ms, 100) : ms;
+    const actualDelay = this.skipMode ? Math.min(ms, 50) : ms;
     return new Promise(resolve => setTimeout(resolve, actualDelay));
   }
 
-  // Get appropriate delay based on difficulty and skip mode
+  // Get appropriate delay based on skip mode
   _getActionDelay() {
     if (this.skipMode) return 100;
     return 800; // Default visible delay so players can see moves

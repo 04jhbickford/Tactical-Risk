@@ -74,10 +74,11 @@ export class PlayerPanel {
 
     let html = '';
 
-    // Player header
+    // Player header - with prominent color indicator
     const aiLabel = player.isAI ? `<span class="pp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : '';
     html += `
-      <div class="pp-header">
+      <div class="pp-header" style="border-left: 5px solid ${player.color}; background: linear-gradient(90deg, ${player.color}22 0%, transparent 100%);">
+        <div class="pp-color-indicator" style="background: ${player.color}"></div>
         ${player.flag ? `<img src="assets/flags/${player.flag}" class="pp-flag" alt="${player.name}">` : ''}
         <div class="pp-player-info">
           <div class="pp-player-name" style="color:${player.color}">${player.name} ${aiLabel}</div>

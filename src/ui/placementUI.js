@@ -139,7 +139,8 @@ export class PlacementUI {
     const maxThisRound = Math.min(6, totalRemaining + placedThisRound);
 
     let html = `
-      <div class="pl-header">
+      <div class="pl-header" style="border-left: 5px solid ${player.color}; background: linear-gradient(90deg, ${player.color}33 0%, transparent 100%);">
+        <div class="pl-color-bar" style="background: ${player.color}"></div>
         <div class="pl-title">Initial Deployment</div>
         <div class="pl-player" style="color: ${player.color}">${player.name}</div>
       </div>
