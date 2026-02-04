@@ -37,6 +37,24 @@ export class TerritoryRenderer {
 
     // Flag images cache
     this.flagImages = {};
+
+    // Cache for external edges (computed once since polygons never change)
+    this._externalEdgesCache = {};
+    this._territoryCenterCache = {};
+    this._precomputeCaches();
+  }
+
+  /** Pre-compute expensive calculations that don't change during gameplay */
+  _precomputeCaches() {
+    for (const t of this.territories) {
+      // Cache territory centers
+      this._territoryCenterCache[t.name] = this._computeTerritoryCenter(t);
+
+      // Cache external edges for multi-polygon territories
+      if (t.polygons && t.polygons.length > 1) {
+        this._externalEdgesCache[t.name] = this._computeExternalEdges(t.polygons);
+      }
+    }
   }
 
   setGameState(gameState) {
@@ -358,7 +376,7 @@ export class TerritoryRenderer {
         this._strokePoly(ctx, t.polygons[0]);
       } else {
         // Multiple polygons - draw only external edges (hide internal shared borders)
-        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons);
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
         this._strokeEdges(ctx, externalEdges);
       }
     }
@@ -607,10 +625,22 @@ export class TerritoryRenderer {
   }
 
   /**
-   * Get external edges for multi-polygon territory using tolerance-based matching.
+   * Get external edges for multi-polygon territory (uses cache for performance).
+   */
+  _getExternalEdgesWithTolerance(polygons, territoryName) {
+    // Use cached result if available
+    if (territoryName && this._externalEdgesCache[territoryName]) {
+      return this._externalEdgesCache[territoryName];
+    }
+    // Fallback to computation (shouldn't happen often)
+    return this._computeExternalEdges(polygons);
+  }
+
+  /**
+   * Compute external edges for multi-polygon territory using tolerance-based matching.
    * Edges that approximately match or overlap between polygons are considered internal and excluded.
    */
-  _getExternalEdgesWithTolerance(polygons) {
+  _computeExternalEdges(polygons) {
     const TOLERANCE = 12; // pixels
 
     // Check if a point is close to a line segment, returns distance
@@ -820,7 +850,7 @@ export class TerritoryRenderer {
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
-      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons);
+      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons, territory.name);
       this._strokeEdges(ctx, externalEdges);
     }
   }
@@ -845,7 +875,7 @@ export class TerritoryRenderer {
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
-      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons);
+      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons, territory.name);
       this._strokeEdges(ctx, externalEdges);
     }
 
@@ -878,7 +908,7 @@ export class TerritoryRenderer {
       if (t.polygons.length === 1) {
         this._strokePoly(ctx, t.polygons[0]);
       } else {
-        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons);
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
         this._strokeEdges(ctx, externalEdges);
       }
       ctx.setLineDash([]);
@@ -922,8 +952,18 @@ export class TerritoryRenderer {
     }
   }
 
-  /** Calculate the centroid of all polygons in a territory */
+  /** Get the centroid of all polygons in a territory (uses cache for performance) */
   _getTerritoryCenter(territory) {
+    // Use cached result if available
+    if (this._territoryCenterCache[territory.name]) {
+      return this._territoryCenterCache[territory.name];
+    }
+    // Fallback to computation
+    return this._computeTerritoryCenter(territory);
+  }
+
+  /** Calculate the centroid of all polygons in a territory */
+  _computeTerritoryCenter(territory) {
     if (!territory.polygons || territory.polygons.length === 0) {
       return territory.center || [null, null];
     }
