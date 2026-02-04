@@ -4477,8 +4477,9 @@ html, body {
 
 /* Combat summary - more detailed battle results */
 .log-combat-summary .log-message {
-  color: #ffcc44;
+  color: #ffff00;
   font-weight: 600;
+  text-shadow: 0 0 8px rgba(255, 255, 0, 0.5);
 }
 
 .log-detail {

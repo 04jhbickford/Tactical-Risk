@@ -81,8 +81,8 @@ export class UnitRenderer {
         const startX = cx - ((typesInRow - 1) * spacingX) / 2;
 
         for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
-          const unitType = types[typeIndex];
-          const { total, owner } = grouped[unitType];
+          const key = types[typeIndex];
+          const { total, owner, type: unitType } = grouped[key];
           const x = startX + col * spacingX;
           const color = this.gameState.getPlayerColor(owner);
 
@@ -98,12 +98,14 @@ export class UnitRenderer {
   }
 
   _groupUnits(placements) {
+    // Group by BOTH type AND owner to show units from different players separately
     const grouped = {};
     for (const p of placements) {
-      if (!grouped[p.type]) {
-        grouped[p.type] = { total: 0, owner: p.owner };
+      const key = `${p.type}_${p.owner}`;
+      if (!grouped[key]) {
+        grouped[key] = { total: 0, owner: p.owner, type: p.type };
       }
-      grouped[p.type].total += p.quantity;
+      grouped[key].total += p.quantity;
     }
     return grouped;
   }

@@ -174,14 +174,33 @@ export class MovementUI {
     // Check terrain compatibility
     const hasLandSelected = Object.keys(this.selectedUnits).some(type => {
       const def = this.unitDefs[type];
-      return def && def.isLand;
+      return def && def.isLand && this.selectedUnits[type] > 0;
     });
 
     const hasSeaSelected = Object.keys(this.selectedUnits).some(type => {
       const def = this.unitDefs[type];
-      return def && def.isSea;
+      return def && def.isSea && this.selectedUnits[type] > 0;
     });
 
+    const hasAirSelected = Object.keys(this.selectedUnits).some(type => {
+      const def = this.unitDefs[type];
+      return def && def.isAir && this.selectedUnits[type] > 0;
+    });
+
+    // Check for land bridge connection
+    const isLandBridge = this.gameState.hasLandBridge?.(this.selectedFrom.name, territory.name);
+
+    // Air units can fly anywhere (over land or water)
+    if (hasAirSelected && !hasLandSelected && !hasSeaSelected) {
+      return true; // Pure air movement is always allowed
+    }
+
+    // Land bridges allow land units to cross
+    if (isLandBridge && hasLandSelected && !territory.isWater) {
+      return true;
+    }
+
+    // Normal terrain checks
     if (hasLandSelected && territory.isWater) return false;
     if (hasSeaSelected && !territory.isWater) return false;
 

@@ -846,14 +846,17 @@ export class GameState {
       }
 
       // Check movement rules
-      // Land bridges allow land units to cross without naval transport
-      if (isLandBridge) {
-        // Land bridges only allow land/air units, not naval
+      // Air units can fly over any terrain (land or water)
+      if (unitDef.isAir) {
+        // Air units can go anywhere - no terrain restrictions
+        // They must land on friendly territory at end of turn (handled elsewhere)
+      } else if (isLandBridge) {
+        // Land bridges allow land units to cross without naval transport
         if (unitDef.isSea) {
           return { success: false, error: 'Naval units cannot use land bridges' };
         }
       } else {
-        // Normal movement rules
+        // Normal movement rules for land and sea units
         if (unitDef.isLand && toT?.isWater) {
           return { success: false, error: 'Land units cannot enter water' };
         }
@@ -991,12 +994,28 @@ export class GameState {
     const t = this.territoryByName[territory];
     const isNavalBattle = t?.isWater;
 
+    // Shore bombardment: ships in adjacent sea zones can bombard land battles (first round only)
+    let bombardmentHits = 0;
+    let bombardmentRolls = [];
+    if (!isNavalBattle && !this._combatRoundsTracker?.[territory]) {
+      const bombardmentResult = this._calculateShoreBombardment(territory, player.id, unitDefs);
+      bombardmentHits = bombardmentResult.hits;
+      bombardmentRolls = bombardmentResult.rolls;
+    }
+    // Track combat rounds
+    if (!this._combatRoundsTracker) this._combatRoundsTracker = {};
+    this._combatRoundsTracker[territory] = (this._combatRoundsTracker[territory] || 0) + 1;
+
     // Roll dice for combat
     const { hits: attackHits, rolls: attackRolls } = this._rollCombatWithRolls(attackers, 'attack', unitDefs);
     const { hits: defenseHits, rolls: defenseRolls } = this._rollCombatWithRolls(defenders, 'defense', unitDefs);
 
+    // Add bombardment hits to attack hits
+    const totalAttackHits = attackHits + bombardmentHits;
+
     // Apply casualties (handles multi-hit ships)
-    const attackerCasualties = this._applyCasualtiesWithDamage(defenders, attackHits, unitDefs, isNavalBattle);
+    // Defenders take hits from attacks + bombardment
+    const attackerCasualties = this._applyCasualtiesWithDamage(defenders, totalAttackHits, unitDefs, isNavalBattle);
     const defenderCasualties = this._applyCasualtiesWithDamage(attackers, defenseHits, unitDefs, isNavalBattle);
 
     // Clean up destroyed units (quantity <= 0)
@@ -1011,6 +1030,8 @@ export class GameState {
     const result = {
       attackHits,
       defenseHits,
+      bombardmentHits,
+      bombardmentRolls,
       attackRolls,
       defenseRolls,
       attackerCasualties,
@@ -1028,12 +1049,16 @@ export class GameState {
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);
       this.combatQueue = this.combatQueue.filter(t => t !== territory);
+      // Clean up combat rounds tracker
+      if (this._combatRoundsTracker) delete this._combatRoundsTracker[territory];
       result.resolved = true;
       result.winner = 'attacker';
     } else if (remainingAttackers.length === 0) {
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);
       this.combatQueue = this.combatQueue.filter(t => t !== territory);
+      // Clean up combat rounds tracker
+      if (this._combatRoundsTracker) delete this._combatRoundsTracker[territory];
       result.resolved = true;
       result.winner = 'defender';
     } else {
@@ -1064,6 +1089,45 @@ export class GameState {
 
   _rollCombat(units, type, unitDefs) {
     return this._rollCombatWithRolls(units, type, unitDefs).hits;
+  }
+
+  // Calculate shore bombardment from ships in adjacent sea zones
+  _calculateShoreBombardment(territory, attackerId, unitDefs) {
+    let hits = 0;
+    const rolls = [];
+
+    // Find adjacent sea zones
+    const t = this.territoryByName[territory];
+    if (!t || t.isWater) return { hits: 0, rolls: [] };
+
+    const connections = t.connections || [];
+    for (const connName of connections) {
+      const connT = this.territoryByName[connName];
+      if (!connT?.isWater) continue;
+
+      // Check for friendly ships that can bombard
+      const seaUnits = this.units[connName] || [];
+      for (const unit of seaUnits) {
+        if (unit.owner !== attackerId) continue;
+
+        const def = unitDefs[unit.type];
+        if (!def?.isSea) continue;
+
+        // Ships that can bombard: battleships (attack 4) and cruisers (attack 3)
+        // In A&A, only battleships and cruisers can shore bombard
+        if (unit.type === 'battleship' || unit.type === 'cruiser') {
+          const bombardValue = def.attack;
+          for (let i = 0; i < unit.quantity; i++) {
+            const roll = Math.floor(Math.random() * 6) + 1;
+            const isHit = roll <= bombardValue;
+            rolls.push({ unit: unit.type, roll, hit: isHit, source: connName });
+            if (isHit) hits++;
+          }
+        }
+      }
+    }
+
+    return { hits, rolls };
   }
 
   _applyCasualtiesWithDamage(units, hits, unitDefs, isNavalBattle) {

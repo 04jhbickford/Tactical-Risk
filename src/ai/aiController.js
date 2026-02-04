@@ -1023,21 +1023,75 @@ export class AIController {
 
 
   _pickPlacementTerritory(territories, playerId, difficulty) {
-    if (difficulty === 'hard') {
-      // Place on frontline territories
-      const frontline = territories.filter(t => this._isFrontline(t, playerId));
-      if (frontline.length > 0) {
-        return frontline[Math.floor(Math.random() * frontline.length)];
+    const myCapital = this.gameState.playerState[playerId]?.capitalTerritory;
+
+    // Score each territory based on strategic value
+    const scored = territories.map(t => {
+      let score = 0;
+
+      // Highest priority: own capital (concentrate defense)
+      if (t === myCapital) {
+        score += 100;
       }
+
+      // High priority: adjacent to own capital
+      if (myCapital && this._isAdjacentTo(t, myCapital)) {
+        score += 60;
+      }
+
+      // High priority: adjacent to enemy capitals (offensive position)
+      const adjacentToEnemyCapital = this._isAdjacentToEnemyCapital(t, playerId);
+      if (adjacentToEnemyCapital) {
+        score += 80;
+      }
+
+      // Medium priority: frontline territories
+      if (this._isFrontline(t, playerId)) {
+        score += 30;
+      }
+
+      // Lower priority: territories with many connections (strategic)
+      const connections = this.gameState.getConnections(t);
+      score += connections.length * 2;
+
+      // Penalty for territories far from any frontline
+      if (!this._isFrontline(t, playerId) && !this._isAdjacentTo(t, myCapital)) {
+        score -= 20;
+      }
+
+      return { territory: t, score };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    if (difficulty === 'hard') {
+      // Hard AI: always pick best or second best
+      const topChoices = scored.slice(0, 2);
+      return topChoices[Math.floor(Math.random() * topChoices.length)].territory;
     } else if (difficulty === 'medium') {
-      // Mix of frontline and central
-      const frontline = territories.filter(t => this._isFrontline(t, playerId));
-      if (frontline.length > 0 && Math.random() > 0.4) {
-        return frontline[Math.floor(Math.random() * frontline.length)];
+      // Medium AI: pick from top 4
+      const topChoices = scored.slice(0, Math.min(4, scored.length));
+      return topChoices[Math.floor(Math.random() * topChoices.length)].territory;
+    } else {
+      // Easy AI: pick from top half, with some randomness
+      const topHalf = scored.slice(0, Math.max(1, Math.floor(scored.length / 2)));
+      return topHalf[Math.floor(Math.random() * topHalf.length)].territory;
+    }
+  }
+
+  // Check if territory is adjacent to any enemy capital
+  _isAdjacentToEnemyCapital(territory, playerId) {
+    const connections = this.gameState.getConnections(territory);
+    for (const conn of connections) {
+      // Check if this connection is someone else's capital
+      for (const [pId, pState] of Object.entries(this.gameState.playerState)) {
+        if (pId !== playerId && pState.capitalTerritory === conn) {
+          return true;
+        }
       }
     }
-    // Default: random
-    return territories[Math.floor(Math.random() * territories.length)];
+    return false;
   }
 
   _findCentralTerritory(territories, playerId) {
