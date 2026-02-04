@@ -520,9 +520,9 @@ html, body {
 .lobby-content {
   background: rgba(20, 20, 40, 0.95);
   border-radius: 16px;
-  padding: 40px 50px;
-  max-width: 650px;
-  width: 90%;
+  padding: 40px 30px;
+  max-width: 800px;
+  width: 95%;
   box-shadow: 0 25px 80px rgba(0,0,0,0.5);
   border: 1px solid rgba(255,255,255,0.1);
 }
@@ -571,20 +571,25 @@ html, body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .player-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 12px;
+  gap: 6px;
+  padding: 12px 8px;
   background: rgba(255,255,255,0.03);
   border: 2px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .player-card:hover {
@@ -622,9 +627,9 @@ html, body {
   background: rgba(0,0,0,0.3);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 4px;
-  padding: 6px 8px;
+  padding: 4px 6px;
   color: #e0e0e0;
-  font-size: 12px;
+  font-size: 11px;
   text-align: center;
 }
 
@@ -801,12 +806,12 @@ html, body {
 /* --- Classic Player Grid (with flags) --- */
 .player-grid.classic {
   grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
+  gap: 10px;
 }
 
 .player-flag {
-  width: 56px;
-  height: 42px;
+  width: 48px;
+  height: 36px;
   border-radius: 4px;
   border: 2px solid rgba(255,255,255,0.2);
   object-fit: cover;
@@ -832,10 +837,12 @@ html, body {
 /* Player controls row in lobby */
 .player-controls-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 4px;
+  width: 100%;
 }
 
 /* AI difficulty select */
@@ -844,10 +851,12 @@ html, body {
   border: 1px solid rgba(255,255,255,0.2);
   border-radius: 4px;
   color: #ccc;
-  font-size: 11px;
-  padding: 4px 6px;
+  font-size: 10px;
+  padding: 3px 4px;
   cursor: pointer;
   transition: all 0.2s ease;
+  width: 100%;
+  text-align: center;
 }
 
 .player-ai-select:hover:not(:disabled) {
