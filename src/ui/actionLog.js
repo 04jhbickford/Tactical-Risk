@@ -240,22 +240,24 @@ export class ActionLog {
     // Extract territory names and movement info for hover highlighting
     const territories = this._extractTerritories(entry);
     const hasMovement = entry.data.from && entry.data.to;
+    // Determine if this is a combat entry (for yellow arrow) or regular move (cyan arrow)
+    const isCombat = entry.type === 'attack' || entry.type === 'combat' || entry.type === 'combat-summary';
 
     if ((territories.length > 0 || hasMovement) && this.onHighlightTerritory) {
       div.classList.add('has-territory');
 
       div.addEventListener('mouseenter', () => {
         this.onHighlightTerritory(territories, true);
-        // Also trigger movement arrow if available
+        // Also trigger movement arrow if available (pass isCombat for color)
         if (hasMovement && this.onHighlightMovement) {
-          this.onHighlightMovement(entry.data.from, entry.data.to, true);
+          this.onHighlightMovement(entry.data.from, entry.data.to, true, isCombat);
         }
       });
 
       div.addEventListener('mouseleave', () => {
         this.onHighlightTerritory(territories, false);
         if (hasMovement && this.onHighlightMovement) {
-          this.onHighlightMovement(entry.data.from, entry.data.to, false);
+          this.onHighlightMovement(entry.data.from, entry.data.to, false, isCombat);
         }
       });
     }

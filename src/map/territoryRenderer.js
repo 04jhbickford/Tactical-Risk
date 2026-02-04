@@ -73,15 +73,17 @@ export class TerritoryRenderer {
   }
 
   /** Set movement arrow to display (from -> to) */
-  setMovementArrow(from, to) {
+  setMovementArrow(from, to, isCombat = false) {
     this.movementArrowFrom = from;
     this.movementArrowTo = to;
+    this.movementArrowIsCombat = isCombat;
   }
 
   /** Clear movement arrow */
   clearMovementArrow() {
     this.movementArrowFrom = null;
     this.movementArrowTo = null;
+    this.movementArrowIsCombat = false;
   }
 
   /** Pre-compute expensive calculations that don't change during gameplay */
@@ -873,6 +875,10 @@ export class TerritoryRenderer {
 
     ctx.save();
 
+    // Draw star BEHIND the flag (before drawing the flag) - bigger than flag
+    const starSize = isZoomedOut ? 50 : 40;
+    this._drawCapitalStar(ctx, x, y, starSize, '#ffd700', isZoomedOut);
+
     // Draw colored background/border - more prominent when zoomed out
     const padding = isZoomedOut ? 5 : 3;
     ctx.fillStyle = color;
@@ -899,10 +905,6 @@ export class TerritoryRenderer {
     ctx.strokeStyle = isZoomedOut ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
     ctx.lineWidth = isZoomedOut ? 2 : 1;
     ctx.strokeRect(x - width / 2, y - height / 2, width, height);
-
-    // Draw star below flag - larger when zoomed out
-    const starSize = isZoomedOut ? 20 : 14;
-    this._drawCapitalStar(ctx, x, y + height / 2 + 10, starSize, '#ffd700', isZoomedOut);
 
     ctx.restore();
   }
@@ -1100,23 +1102,26 @@ export class TerritoryRenderer {
     const endX = x2 - Math.cos(angle) * shortenBy;
     const endY = y2 - Math.sin(angle) * shortenBy;
 
+    // Use neon yellow for combat, cyan for regular movement
+    const arrowColor = this.movementArrowIsCombat ? '#ffff00' : '#00ffff';
+
     // Draw glow
-    ctx.shadowColor = '#00ffff';
-    ctx.shadowBlur = 10;
+    ctx.shadowColor = arrowColor;
+    ctx.shadowBlur = this.movementArrowIsCombat ? 15 : 10;
 
     // Draw arrow line
-    ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = arrowColor;
+    ctx.lineWidth = this.movementArrowIsCombat ? 5 : 4;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
     ctx.stroke();
 
     // Draw arrowhead
-    const headLength = 15;
+    const headLength = this.movementArrowIsCombat ? 18 : 15;
     const headAngle = Math.PI / 6;
 
-    ctx.fillStyle = '#00ffff';
+    ctx.fillStyle = arrowColor;
     ctx.beginPath();
     ctx.moveTo(endX, endY);
     ctx.lineTo(

@@ -123,8 +123,10 @@ async function init() {
 
     switch (action) {
       case 'place-capital':
+        // Capture player BEFORE placeCapital (which advances the turn)
+        const placingPlayer = gameState.currentPlayer;
         if (gameState.placeCapital(data.territory)) {
-          actionLog.logCapitalPlacement(data.territory, gameState.players[gameState.currentPlayerIndex - 1] || gameState.currentPlayer);
+          actionLog.logCapitalPlacement(data.territory, placingPlayer);
           camera.dirty = true;
           selectedTerritory = null;
           playerPanel.setSelectedTerritory(null);
@@ -318,9 +320,9 @@ async function init() {
       }
       camera.dirty = true;
     });
-    actionLog.setMovementHighlightCallback((from, to, highlight) => {
+    actionLog.setMovementHighlightCallback((from, to, highlight, isCombat) => {
       if (highlight) {
-        territoryRenderer.setMovementArrow(from, to);
+        territoryRenderer.setMovementArrow(from, to, isCombat);
       } else {
         territoryRenderer.clearMovementArrow();
       }

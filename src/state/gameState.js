@@ -476,6 +476,11 @@ export class GameState {
     const player = this.currentPlayer;
     if (!player) return { success: false, error: 'No current player' };
 
+    // Enforce 6-unit limit per turn during initial placement
+    if (this.unitsPlacedThisRound >= 6) {
+      return { success: false, error: 'You can only place up to 6 units per turn. Click "End Turn" to continue.' };
+    }
+
     // Check if player has this unit to place
     const unitsToPlace = this.unitsToPlace[player.id] || [];
     const unitEntry = unitsToPlace.find(u => u.type === unitType && u.quantity > 0);

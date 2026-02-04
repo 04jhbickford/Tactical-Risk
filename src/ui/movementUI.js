@@ -156,8 +156,9 @@ export class MovementUI {
   canMoveTo(territory) {
     if (!this.selectedFrom) return false;
 
-    // Check adjacency
-    if (!this.selectedFrom.connections.includes(territory.name)) {
+    // Check adjacency - use getConnections() to include land bridges
+    const connections = this.gameState.getConnections(this.selectedFrom.name);
+    if (!connections.includes(territory.name)) {
       return false;
     }
 
