@@ -1,5 +1,7 @@
 // Purchase popup overlay for buying units
 
+import { getUnitIconPath } from '../utils/unitIcons.js';
+
 export class PurchasePopup {
   constructor() {
     this.gameState = null;
@@ -71,7 +73,9 @@ export class PurchasePopup {
             const qty = this.purchaseCart[unitType] || 0;
             const canAdd = remaining >= def.cost;
             const canRemove = qty > 0;
-            const imageSrc = def.image ? `assets/units/${def.image}` : null;
+            // Use faction-specific icon
+            const player = this.gameState?.currentPlayer;
+            const imageSrc = player ? getUnitIconPath(unitType, player.id) : (def.image ? `assets/units/${def.image}` : null);
 
             return `
               <div class="purchase-item ${qty > 0 ? 'has-qty' : ''}">

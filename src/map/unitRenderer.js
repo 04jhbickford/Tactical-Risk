@@ -1,5 +1,7 @@
 // Renders unit icons at territory centers using sprite images
 
+import { getUnitIconPath } from '../utils/unitIcons.js';
+
 export class UnitRenderer {
   constructor(gameState, territories, unitDefs) {
     this.gameState = gameState;
@@ -10,30 +12,41 @@ export class UnitRenderer {
       this.territoryByName[t.name] = t;
     }
 
-    // Load unit images
-    this.unitImages = {};
+    // Load unit images per faction
+    this.factionUnitImages = {}; // factionId -> { unitType -> Image }
     this.imagesLoaded = false;
     this._loadImages();
   }
 
   async _loadImages() {
     const imagePromises = [];
+    const factions = this.gameState.players?.map(p => p.id) || ['Americans', 'Germans', 'British', 'Japanese', 'Russians'];
+    const unitTypes = Object.keys(this.unitDefs);
 
-    for (const [unitType, def] of Object.entries(this.unitDefs)) {
-      if (def.image) {
-        const img = new Image();
-        const promise = new Promise((resolve) => {
-          img.onload = () => resolve();
-          img.onerror = () => resolve(); // Continue even if image fails
-        });
-        img.src = `assets/units/${def.image}`;
-        this.unitImages[unitType] = img;
-        imagePromises.push(promise);
+    for (const factionId of factions) {
+      this.factionUnitImages[factionId] = {};
+
+      for (const unitType of unitTypes) {
+        const iconPath = getUnitIconPath(unitType, factionId);
+        if (iconPath) {
+          const img = new Image();
+          const promise = new Promise((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve(); // Continue even if image fails
+          });
+          img.src = iconPath;
+          this.factionUnitImages[factionId][unitType] = img;
+          imagePromises.push(promise);
+        }
       }
     }
 
     await Promise.all(imagePromises);
     this.imagesLoaded = true;
+  }
+
+  _getUnitImage(unitType, factionId) {
+    return this.factionUnitImages[factionId]?.[unitType] || null;
   }
 
   render(ctx, zoom) {
@@ -73,7 +86,7 @@ export class UnitRenderer {
           const x = startX + col * spacingX;
           const color = this.gameState.getPlayerColor(owner);
 
-          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color);
+          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner);
 
           if (total > 1) {
             this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, total, zoom);
@@ -95,8 +108,8 @@ export class UnitRenderer {
     return grouped;
   }
 
-  _drawUnitIcon(ctx, x, y, size, unitType, color) {
-    const img = this.unitImages[unitType];
+  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId) {
+    const img = this._getUnitImage(unitType, factionId);
 
     ctx.save();
 

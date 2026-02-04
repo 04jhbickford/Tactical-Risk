@@ -1,5 +1,7 @@
 // Enhanced combat resolution UI with dice animation, probability, and casualty selection
 
+import { getUnitIconPath } from '../utils/unitIcons.js';
+
 export class CombatUI {
   constructor() {
     this.gameState = null;
@@ -607,7 +609,10 @@ export class CombatUI {
       const attackerUnit = attackers.find(u => u.type === unitType);
       const defenderUnit = defenders.find(u => u.type === unitType);
       const def = this.unitDefs[unitType];
-      const imageSrc = def?.image ? `assets/units/${def.image}` : null;
+
+      // Get faction-specific icons
+      const attackerIcon = attackerPlayer ? getUnitIconPath(unitType, attackerPlayer.id) : null;
+      const defenderIcon = defenderPlayer ? getUnitIconPath(unitType, defenderPlayer.id) : null;
 
       const attackQty = attackerUnit?.quantity || 0;
       const defendQty = defenderUnit?.quantity || 0;
@@ -617,14 +622,13 @@ export class CombatUI {
           <div class="combat-unit-side attacker ${attackQty > 0 ? '' : 'empty'}">
             ${attackQty > 0 ? `
               <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-                ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
                 <span class="combat-unit-qty">${attackQty}</span>
               </div>
               <span class="combat-unit-stat">A${def?.attack || 0}</span>
             ` : ''}
           </div>
           <div class="combat-unit-type">
-            ${imageSrc ? `<img src="${imageSrc}" class="combat-type-icon" alt="${unitType}">` : ''}
             <span class="combat-type-name">${unitType}</span>
           </div>
           <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'}">
@@ -632,7 +636,7 @@ export class CombatUI {
               <span class="combat-unit-stat">D${def?.defense || 0}</span>
               <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
                 <span class="combat-unit-qty">${defendQty}</span>
-                ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
               </div>
             ` : ''}
           </div>
@@ -740,7 +744,8 @@ export class CombatUI {
   _renderCasualtyUnits(units, selected, side, readonly = false) {
     return units.filter(u => u.quantity > 0).map(u => {
       const def = this.unitDefs[u.type];
-      const imageSrc = def?.image ? `assets/units/${def.image}` : null;
+      // Use faction-specific icon
+      const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
       const selectedCount = selected[u.type] || 0;
 
       return `

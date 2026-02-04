@@ -1,6 +1,7 @@
 // Movement UI for selecting and moving units between territories
 
 import { TURN_PHASES } from '../state/gameState.js';
+import { getUnitIconPath } from '../utils/unitIcons.js';
 
 export class MovementUI {
   constructor() {
@@ -290,7 +291,8 @@ export class MovementUI {
     for (const unit of movableUnits) {
       const def = this.unitDefs[unit.type];
       const selected = this.selectedUnits[unit.type] || 0;
-      const imageSrc = def?.image ? `assets/units/${def.image}` : null;
+      // Use faction-specific icon
+      const imageSrc = unit.owner ? getUnitIconPath(unit.type, unit.owner) : (def?.image ? `assets/units/${def.image}` : null);
 
       html += `
         <div class="mp-unit-row">

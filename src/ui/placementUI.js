@@ -2,6 +2,7 @@
 // Flow: Click territory first, then click units to place on that territory
 
 import { GAME_PHASES } from '../state/gameState.js';
+import { getUnitIconPath } from '../utils/unitIcons.js';
 
 export class PlacementUI {
   constructor() {
@@ -245,7 +246,9 @@ export class PlacementUI {
 
   _renderUnitButton(unit) {
     const def = this.unitDefs[unit.type];
-    const imageSrc = def?.image ? `assets/units/${def.image}` : null;
+    const player = this.gameState.currentPlayer;
+    // Use faction-specific icon
+    const imageSrc = player ? getUnitIconPath(unit.type, player.id) : (def?.image ? `assets/units/${def.image}` : null);
 
     return `
       <button class="pl-unit-btn" data-unit="${unit.type}">
