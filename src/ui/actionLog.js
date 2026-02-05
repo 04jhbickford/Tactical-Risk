@@ -9,6 +9,7 @@ export class ActionLog {
     this._unsubscribe = null;
     this.onHighlightTerritory = null; // Callback for territory highlighting
     this.onHighlightMovement = null; // Callback for movement arrow highlighting
+    this.isCollapsed = false; // Persist collapsed state
 
     this._create();
   }
@@ -43,9 +44,15 @@ export class ActionLog {
       document.body.appendChild(this.el);
     }
 
-    // Toggle visibility
+    // Toggle visibility - persist collapsed state
     this.el.querySelector('.action-log-toggle').addEventListener('click', () => {
-      this.el.classList.toggle('collapsed');
+      this.isCollapsed = !this.isCollapsed;
+      this.el.classList.toggle('collapsed', this.isCollapsed);
+      // Update toggle button icon
+      const toggleBtn = this.el.querySelector('.action-log-toggle');
+      if (toggleBtn) {
+        toggleBtn.textContent = this.isCollapsed ? '▶' : '▼';
+      }
     });
 
     this.contentEl = this.el.querySelector('.action-log-content');
@@ -402,7 +409,10 @@ export class ActionLog {
   }
 
   _scrollToBottom() {
-    this.contentEl.scrollTop = this.contentEl.scrollHeight;
+    // Only scroll if not collapsed
+    if (!this.isCollapsed) {
+      this.contentEl.scrollTop = this.contentEl.scrollHeight;
+    }
   }
 
   // Get entries for save/load

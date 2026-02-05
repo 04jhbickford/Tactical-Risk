@@ -29,6 +29,7 @@ import { MovementUI } from './ui/movementUI.js';
 import { CombatUI } from './ui/combatUI.js';
 import { TechUI } from './ui/techUI.js';
 import { PlacementUI } from './ui/placementUI.js';
+import { MobilizeUI } from './ui/mobilizeUI.js';
 import { HUD } from './ui/hud.js';
 import { Minimap } from './ui/minimap.js';
 import { Lobby } from './ui/lobby.js';
@@ -110,6 +111,11 @@ async function init() {
   const placementUI = new PlacementUI();
   placementUI.setUnitDefs(unitDefs);
   placementUI.setTerritories(territories);
+
+  // Mobilize UI (for placing purchased units)
+  const mobilizeUI = new MobilizeUI();
+  mobilizeUI.setUnitDefs(unitDefs);
+  mobilizeUI.setTerritories(territories);
 
   // Victory Screen
   const victoryScreen = new VictoryScreen();
@@ -324,6 +330,12 @@ async function init() {
       camera.dirty = true;
     });
 
+    // Mobilize UI
+    mobilizeUI.setGameState(gameState);
+    mobilizeUI.setOnComplete(() => {
+      camera.dirty = true;
+    });
+
     // Victory Screen
     victoryScreen.setGameState(gameState);
 
@@ -408,6 +420,15 @@ async function init() {
       // Check if we're in initial placement phase
       if (hit && gameState && placementUI.isActive()) {
         const handled = placementUI.handleTerritoryClick(hit);
+        if (handled) {
+          camera.dirty = true;
+          return;
+        }
+      }
+
+      // Check if we're in mobilize phase
+      if (hit && gameState && mobilizeUI.isActive()) {
+        const handled = mobilizeUI.handleTerritoryClick(hit);
         if (handled) {
           camera.dirty = true;
           return;

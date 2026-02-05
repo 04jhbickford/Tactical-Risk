@@ -61,12 +61,19 @@ export class UnitRenderer {
       const t = this.territoryByName[territory];
       if (!t) continue;
 
-      // Calculate center from all polygons for proper placement on merged territories
-      const [cx, cy] = this._getTerritoryCenter(t);
+      // For sea zones with islands, offset the center to be over water
+      let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
 
-      // Group by type - show ALL types
-      const grouped = this._groupUnits(placements);
+      // If this is a sea zone, adjust center to avoid land overlap
+      if (t.isWater) {
+        const adjusted = this._adjustSeaZoneCenter(t, cx, cy);
+        cx = adjusted.x;
+        cy = adjusted.y;
+      }
+
+      // Group by type - show ALL types including cargo
+      const grouped = this._groupUnits(placements, true);
       const types = Object.keys(grouped);
       if (types.length === 0) continue;
 
@@ -82,11 +89,11 @@ export class UnitRenderer {
 
         for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
           const key = types[typeIndex];
-          const { total, owner, type: unitType } = grouped[key];
+          const { total, owner, type: unitType, isOnCarrier, isOnTransport } = grouped[key];
           const x = startX + col * spacingX;
           const color = this.gameState.getPlayerColor(owner);
 
-          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner);
+          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport);
 
           if (total > 1) {
             this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, total, zoom);
@@ -97,7 +104,31 @@ export class UnitRenderer {
     }
   }
 
-  _groupUnits(placements) {
+  // Adjust sea zone center to avoid island overlap
+  _adjustSeaZoneCenter(territory, cx, cy) {
+    // For now, just offset slightly - could be improved with actual island detection
+    // Check if there are any adjacent land territories that might overlap
+    const connections = territory.connections || [];
+    let hasAdjacentLand = false;
+
+    for (const conn of connections) {
+      const neighbor = this.territoryByName[conn];
+      if (neighbor && !neighbor.isWater) {
+        hasAdjacentLand = true;
+        break;
+      }
+    }
+
+    // If there's adjacent land, offset the center slightly
+    if (hasAdjacentLand) {
+      // Offset towards the center of the sea zone away from land
+      return { x: cx, y: cy + 30 };
+    }
+
+    return { x: cx, y: cy };
+  }
+
+  _groupUnits(placements, includeCargo = false) {
     // Group by BOTH type AND owner to show units from different players separately
     const grouped = {};
     for (const p of placements) {
@@ -106,11 +137,33 @@ export class UnitRenderer {
         grouped[key] = { total: 0, owner: p.owner, type: p.type };
       }
       grouped[key].total += p.quantity;
+
+      // Include cargo from carriers (aircraft)
+      if (includeCargo && p.type === 'carrier' && p.aircraft) {
+        for (const aircraft of p.aircraft) {
+          const cargoKey = `${aircraft.type}_${aircraft.owner}_carrier`;
+          if (!grouped[cargoKey]) {
+            grouped[cargoKey] = { total: 0, owner: aircraft.owner, type: aircraft.type, isOnCarrier: true };
+          }
+          grouped[cargoKey].total += 1;
+        }
+      }
+
+      // Include cargo from transports
+      if (includeCargo && p.type === 'transport' && p.cargo) {
+        for (const cargo of p.cargo) {
+          const cargoKey = `${cargo.type}_${cargo.owner}_transport`;
+          if (!grouped[cargoKey]) {
+            grouped[cargoKey] = { total: 0, owner: cargo.owner, type: cargo.type, isOnTransport: true };
+          }
+          grouped[cargoKey].total += 1;
+        }
+      }
     }
     return grouped;
   }
 
-  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId) {
+  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false) {
     const img = this._getUnitImage(unitType, factionId);
 
     ctx.save();
@@ -118,7 +171,23 @@ export class UnitRenderer {
     // Draw colored background circle/square
     const bgSize = size + 4;
     ctx.fillStyle = color;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+
+    // Add indicator for units on carriers/transports
+    if (isOnCarrier || isOnTransport) {
+      // Draw a small boat/carrier symbol underneath
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      // Draw a small underline to indicate "on board"
+      ctx.moveTo(x - bgSize / 2, y + bgSize / 2 + 2);
+      ctx.lineTo(x + bgSize / 2, y + bgSize / 2 + 2);
+      ctx.stroke();
+
+      // Slightly different border color for cargo units
+      ctx.strokeStyle = isOnCarrier ? 'rgba(100,150,255,0.8)' : 'rgba(150,100,50,0.8)';
+    } else {
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    }
     ctx.lineWidth = 1.5;
 
     ctx.beginPath();

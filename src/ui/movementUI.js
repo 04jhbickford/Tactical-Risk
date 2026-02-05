@@ -525,16 +525,25 @@ export class MovementUI {
       // Use faction-specific icon
       const imageSrc = unit.owner ? getUnitIconPath(unit.type, unit.owner) : (def?.image ? `assets/units/${def.image}` : null);
 
-      // Build movement info tooltip
-      const movementInfo = this._getUnitMovementInfo(def);
+      // Build detailed tooltip
+      const tooltipParts = [
+        `Attack: ${def?.attack || 0}`,
+        `Defense: ${def?.defense || 0}`,
+        `Movement: ${def?.movement || 1}`,
+        `Cost: $${def?.cost || 0}`
+      ];
+      if (def?.isAir) tooltipParts.push('Air unit');
+      if (def?.isLand) tooltipParts.push('Land unit');
+      if (def?.isSea) tooltipParts.push('Naval unit');
+      const tooltipText = tooltipParts.join(' | ');
 
       html += `
         <div class="mp-unit-row">
-          <div class="mp-unit-info" title="${movementInfo}">
+          <div class="mp-unit-info">
             ${imageSrc ? `<img src="${imageSrc}" class="mp-unit-icon" alt="${unit.type}">` : ''}
             <span class="mp-unit-name">${unit.type}</span>
-            <span class="mp-unit-movement">${def?.movement || 1}</span>
-            <span class="mp-unit-avail">(${unit.quantity} avail)</span>
+            <span class="mp-unit-info-icon" title="${tooltipText}">ⓘ</span>
+            <span class="mp-unit-avail">(${unit.quantity})</span>
           </div>
           <div class="mp-unit-select">
             <button class="mp-qty-btn" data-unit="${unit.type}" data-delta="-1">−</button>

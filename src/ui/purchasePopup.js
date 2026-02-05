@@ -113,11 +113,12 @@ export class PurchasePopup {
         <div class="purchase-actions">
           ${this.cartCost > 0 ? `
             <button class="purchase-btn clear" data-action="clear">Clear</button>
-            <button class="purchase-btn confirm" data-action="confirm">Place Units</button>
+            <button class="purchase-btn confirm" data-action="confirm">Confirm Purchase</button>
           ` : `
             <button class="purchase-btn skip" data-action="skip">Skip</button>
           `}
         </div>
+        <div class="purchase-note">Units will be placed during Mobilize phase</div>
       </div>
     `;
 
@@ -320,13 +321,14 @@ export class PurchasePopup {
     const player = this.gameState.currentPlayer;
     if (!player) return;
 
-    const capital = this.gameState.playerState[player.id]?.capitalTerritory;
-    if (!capital) return;
-
-    // Buy all units in cart
+    // Add all units to pending purchases (will be placed during MOBILIZE phase)
     for (const [unitType, qty] of Object.entries(this.purchaseCart)) {
       for (let i = 0; i < qty; i++) {
-        this.gameState.purchaseUnit(unitType, capital, this.unitDefs);
+        const result = this.gameState.addToPendingPurchases(unitType, this.unitDefs);
+        if (!result.success) {
+          console.warn('Failed to add to pending purchases:', result.error);
+          break;
+        }
       }
     }
 

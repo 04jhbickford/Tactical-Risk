@@ -847,7 +847,176 @@ export class GameState {
     this._notify();
   }
 
-  // Purchase and place a unit (Risk mode - used during initial deployment for buying extra units)
+  // Add unit to pending purchases (PURCHASE phase) - units placed during MOBILIZE
+  addToPendingPurchases(unitType, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const unitDef = unitDefs[unitType];
+    if (!unitDef) return { success: false, error: 'Unknown unit type' };
+
+    const cost = unitDef.cost;
+    if (this.playerState[player.id].ipcs < cost) {
+      return { success: false, error: 'Not enough IPCs' };
+    }
+
+    // Deduct IPCs
+    this.playerState[player.id].ipcs -= cost;
+
+    // Add to pending purchases
+    const existing = this.pendingPurchases.find(p => p.type === unitType && p.owner === player.id);
+    if (existing) {
+      existing.quantity++;
+    } else {
+      this.pendingPurchases.push({ type: unitType, quantity: 1, owner: player.id, cost });
+    }
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Remove unit from pending purchases (undo during PURCHASE phase)
+  removeFromPendingPurchases(unitType, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const unitDef = unitDefs[unitType];
+    if (!unitDef) return { success: false, error: 'Unknown unit type' };
+
+    const existing = this.pendingPurchases.find(p => p.type === unitType && p.owner === player.id);
+    if (!existing || existing.quantity <= 0) {
+      return { success: false, error: 'No units to remove' };
+    }
+
+    // Refund IPCs
+    this.playerState[player.id].ipcs += unitDef.cost;
+
+    // Remove from pending
+    existing.quantity--;
+    if (existing.quantity <= 0) {
+      const idx = this.pendingPurchases.indexOf(existing);
+      this.pendingPurchases.splice(idx, 1);
+    }
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Get pending purchases for current player
+  getPendingPurchases() {
+    const player = this.currentPlayer;
+    if (!player) return [];
+    return this.pendingPurchases.filter(p => p.owner === player.id);
+  }
+
+  // Clear pending purchases (refund IPCs)
+  clearPendingPurchases(unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return;
+
+    for (const purchase of this.pendingPurchases) {
+      if (purchase.owner === player.id) {
+        const unitDef = unitDefs[purchase.type];
+        if (unitDef) {
+          this.playerState[player.id].ipcs += unitDef.cost * purchase.quantity;
+        }
+      }
+    }
+
+    this.pendingPurchases = this.pendingPurchases.filter(p => p.owner !== player.id);
+    this._notify();
+  }
+
+  // Mobilize a single pending unit to a territory (MOBILIZE phase)
+  mobilizeUnit(unitType, territoryName, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const unitDef = unitDefs[unitType];
+    if (!unitDef) return { success: false, error: 'Unknown unit type' };
+
+    // Check if we have this unit pending
+    const pending = this.pendingPurchases.find(p => p.type === unitType && p.owner === player.id && p.quantity > 0);
+    if (!pending) {
+      return { success: false, error: 'No pending units of this type' };
+    }
+
+    const capital = this.playerState[player.id].capitalTerritory;
+
+    // Validate placement location
+    if (unitDef.isSea) {
+      // Naval units: placed on sea zones adjacent to territories with factories
+      const validSeaZones = this._getValidNavalPlacementZones(player.id);
+      if (!validSeaZones.has(territoryName)) {
+        return { success: false, error: 'Naval units must be placed on sea zones adjacent to territories with factories' };
+      }
+    } else {
+      // Land/air units: placed on territories with factories (capital always has one)
+      const factoryTerritories = this._getFactoryTerritories(player.id);
+      if (!factoryTerritories.includes(territoryName)) {
+        return { success: false, error: 'Units must be placed on territories with factories' };
+      }
+    }
+
+    // Place the unit
+    pending.quantity--;
+    if (pending.quantity <= 0) {
+      const idx = this.pendingPurchases.indexOf(pending);
+      this.pendingPurchases.splice(idx, 1);
+    }
+
+    const units = this.units[territoryName] || [];
+    const existing = units.find(u => u.type === unitType && u.owner === player.id);
+    if (existing) {
+      existing.quantity++;
+    } else {
+      units.push({ type: unitType, quantity: 1, owner: player.id });
+    }
+    this.units[territoryName] = units;
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Get territories with factories for a player
+  _getFactoryTerritories(playerId) {
+    const territories = [];
+    const capital = this.playerState[playerId]?.capitalTerritory;
+    if (capital) territories.push(capital);
+
+    // Check for factory buildings
+    for (const [terrName, units] of Object.entries(this.units)) {
+      const hasFactory = units.some(u => u.type === 'factory' && u.owner === playerId);
+      if (hasFactory && !territories.includes(terrName)) {
+        territories.push(terrName);
+      }
+    }
+
+    return territories;
+  }
+
+  // Get valid sea zones for naval unit placement
+  _getValidNavalPlacementZones(playerId) {
+    const validZones = new Set();
+    const factoryTerritories = this._getFactoryTerritories(playerId);
+
+    for (const terrName of factoryTerritories) {
+      const t = this.territoryByName[terrName];
+      if (!t) continue;
+
+      // Find adjacent sea zones
+      for (const conn of t.connections || []) {
+        const ct = this.territoryByName[conn];
+        if (ct && ct.isWater) {
+          validZones.add(conn);
+        }
+      }
+    }
+
+    return validZones;
+  }
+
+  // Legacy method - kept for initial deployment phase
   purchaseUnit(unitType, territoryName, unitDefs) {
     const player = this.currentPlayer;
     if (!player) return false;
@@ -976,9 +1145,14 @@ export class GameState {
           continue;
         }
       } else if (nextPhase === TURN_PHASES.MOBILIZE) {
-        this._mobilizePurchases();
-        // Skip if nothing was purchased (mobilize already done)
-        if (this.pendingPurchases.length === 0) {
+        // For AI players, auto-mobilize purchases
+        // For human players, they use the MobilizeUI to place manually
+        const player = this.currentPlayer;
+        if (player?.isAI) {
+          this._mobilizePurchases();
+        }
+        // Skip if nothing was purchased
+        if (this.pendingPurchases.filter(p => p.owner === player?.id).length === 0) {
           continue;
         }
       } else if (nextPhase === TURN_PHASES.COLLECT_INCOME) {

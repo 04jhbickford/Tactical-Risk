@@ -4892,3 +4892,265 @@ html, body {
 .info-section-content::-webkit-scrollbar-thumb:hover {
   background: rgba(255,255,255,0.25);
 }
+
+/* --- Mobilize Panel --- */
+.mobilize-panel {
+  position: fixed;
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
+  width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: rgba(25, 25, 50, 0.95);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 16px;
+  z-index: 100;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.mobilize-panel.hidden {
+  display: none;
+}
+
+.mob-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.2);
+}
+
+.mob-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.mob-player {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mob-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.mob-label {
+  font-size: 11px;
+  color: #888;
+}
+
+.mob-territory {
+  font-size: 13px;
+  font-weight: 600;
+  color: #81c784;
+  flex: 1;
+}
+
+.mob-deselect {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.mob-deselect:hover {
+  color: #fff;
+}
+
+.mob-instructions {
+  font-size: 12px;
+  color: #aaa;
+  text-align: center;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+}
+
+.mob-units {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mob-unit-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mob-unit-btn:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.mob-unit-icon-wrapper {
+  width: 32px;
+  height: 32px;
+}
+
+.mob-unit-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mob-unit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mob-unit-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.mob-unit-qty {
+  font-size: 11px;
+  color: #888;
+}
+
+.mob-pending {
+  padding: 10px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.mob-pending-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.mob-group {
+  font-size: 12px;
+  color: #e0e0e0;
+  margin-bottom: 4px;
+}
+
+.mob-group-label {
+  color: #888;
+}
+
+.mob-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.mob-remaining {
+  font-size: 11px;
+  color: #ffb74d;
+}
+
+.mob-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mob-btn.primary {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.mob-btn:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.mob-no-units, .mob-empty {
+  text-align: center;
+  padding: 16px;
+  color: #888;
+  font-size: 12px;
+}
+
+.mob-empty button {
+  margin-top: 12px;
+}
+
+/* --- Purchase Note --- */
+.purchase-note {
+  font-size: 10px;
+  color: #888;
+  text-align: center;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+/* --- Modal positioning from left side --- */
+.movement-panel,
+.placement-panel,
+.mobilize-panel {
+  left: 20px;
+  right: auto;
+  transform: none;
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Fixed width and scrolling for modals */
+.movement-panel,
+.placement-panel,
+.mobilize-panel {
+  width: 320px;
+  max-width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Unit info icon improvements */
+.mp-unit-movement {
+  display: none;
+}
+
+.mp-unit-info-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #888;
+  background: rgba(255,255,255,0.1);
+  border-radius: 50%;
+  cursor: help;
+  margin-left: 4px;
+}
+
+.mp-unit-info-icon:hover {
+  color: #fff;
+  background: rgba(255,255,255,0.2);
+}
