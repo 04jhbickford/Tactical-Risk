@@ -79,15 +79,16 @@ export class PlayerPanel {
 
     let html = '';
 
-    // Player header - with prominent color indicator
+    // Player header - prominent color fill to clearly show whose turn it is
     const aiLabel = player.isAI ? `<span class="pp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : '';
+    // Calculate contrasting text color (white or black based on color brightness)
+    const textColor = this._getContrastColor(player.color);
     html += `
-      <div class="pp-header" style="border-left: 5px solid ${player.color}; background: linear-gradient(90deg, ${player.color}22 0%, transparent 100%);">
-        <div class="pp-color-indicator" style="background: ${player.color}"></div>
+      <div class="pp-header" style="background: ${player.color};">
         ${player.flag ? `<img src="assets/flags/${player.flag}" class="pp-flag" alt="${player.name}">` : ''}
         <div class="pp-player-info">
-          <div class="pp-player-name" style="color:${player.color}">${player.name} ${aiLabel}</div>
-          ${player.alliance ? `<span class="pp-alliance ${player.alliance.toLowerCase()}">${player.alliance}</span>` : ''}
+          <div class="pp-player-name" style="color: ${textColor};">${player.name} ${aiLabel}</div>
+          ${player.alliance ? `<span class="pp-alliance ${player.alliance.toLowerCase()}" style="color: ${textColor};">${player.alliance}</span>` : ''}
         </div>
       </div>`;
 
@@ -122,16 +123,37 @@ export class PlayerPanel {
       const nextValue = this.gameState.getNextRiskCardValue?.(player.id) || 12;
 
       if (cards.length > 0 || canTrade) {
+        const cardIcons = {
+          infantry: '🚶',
+          cavalry: '🐎',
+          artillery: '💣',
+          wild: '⭐'
+        };
+
         html += `
           <div class="pp-risk-cards">
-            <div class="pp-cards-label">RISK Cards (${cards.length})</div>
+            <div class="pp-cards-header">
+              <span class="pp-cards-label">RISK Cards</span>
+              <span class="pp-cards-count">${cards.length}/5</span>
+            </div>
             <div class="pp-cards-list">
-              ${cards.map(c => `<span class="pp-card ${c}">${c}</span>`).join('')}
+              ${cards.map(c => `
+                <div class="pp-card ${c}">
+                  <span class="pp-card-icon">${cardIcons[c] || '?'}</span>
+                  <span class="pp-card-label">${c}</span>
+                </div>
+              `).join('')}
             </div>
             ${canTrade ? `
-              <button class="pp-trade-btn" data-action="trade-cards">
-                Trade Cards for ${nextValue} IPCs
-              </button>
+              <div class="pp-trade-section">
+                <div class="pp-trade-info">
+                  <span>Trade value:</span>
+                  <span class="pp-trade-value">${nextValue} IPCs</span>
+                </div>
+                <button class="pp-trade-btn" data-action="trade-cards">
+                  Cash In Cards
+                </button>
+              </div>
             ` : cards.length >= 5 ? `
               <div class="pp-cards-note">Must trade when you have 5+ cards</div>
             ` : ''}
@@ -161,6 +183,18 @@ export class PlayerPanel {
     if (phase === GAME_PHASES.UNIT_PLACEMENT) return PHASE_DESCRIPTIONS[GAME_PHASES.UNIT_PLACEMENT];
     if (phase === GAME_PHASES.PLAYING) return PHASE_DESCRIPTIONS[turnPhase] || '';
     return '';
+  }
+
+  // Calculate contrasting text color (white or black) based on background color
+  _getContrastColor(hexColor) {
+    // Convert hex to RGB
+    const hex = hexColor.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.5 ? '#000000' : '#ffffff';
   }
 
   _renderActions(phase, turnPhase, player) {

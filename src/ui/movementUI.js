@@ -156,12 +156,6 @@ export class MovementUI {
   canMoveTo(territory) {
     if (!this.selectedFrom) return false;
 
-    // Check adjacency - use getConnections() to include land bridges
-    const connections = this.gameState.getConnections(this.selectedFrom.name);
-    if (!connections.includes(territory.name)) {
-      return false;
-    }
-
     const player = this.gameState.currentPlayer;
     const toOwner = this.gameState.getOwner(territory.name);
     const isEnemy = toOwner && toOwner !== player.id &&
@@ -172,7 +166,7 @@ export class MovementUI {
       return false;
     }
 
-    // Check terrain compatibility
+    // Check terrain compatibility based on selected units
     const hasLandSelected = Object.keys(this.selectedUnits).some(type => {
       const def = this.unitDefs[type];
       return def && def.isLand && this.selectedUnits[type] > 0;
@@ -188,12 +182,25 @@ export class MovementUI {
       return def && def.isAir && this.selectedUnits[type] > 0;
     });
 
+    // Get air unit max movement range
+    const airMovementRange = this._getMaxAirMovementRange();
+
+    // Check adjacency - use getConnections() to include land bridges
+    const connections = this.gameState.getConnections(this.selectedFrom.name);
+    const isAdjacent = connections.includes(territory.name);
+
     // Check for land bridge connection
     const isLandBridge = this.gameState.hasLandBridge?.(this.selectedFrom.name, territory.name);
 
-    // Air units can fly anywhere (over land or water)
+    // Air units can fly anywhere within their movement range
     if (hasAirSelected && !hasLandSelected && !hasSeaSelected) {
-      return true; // Pure air movement is always allowed
+      // Pure air movement - use multi-hop pathfinding
+      return this.gameState.canAirUnitReach(this.selectedFrom.name, territory.name, airMovementRange);
+    }
+
+    // Mixed movement (air + land/sea) - land/sea units require adjacency
+    if (!isAdjacent) {
+      return false;
     }
 
     // Land bridges allow land units to cross
@@ -208,10 +215,56 @@ export class MovementUI {
     return true;
   }
 
+  // Get the maximum movement range of selected air units
+  _getMaxAirMovementRange() {
+    let maxRange = 0;
+    for (const [type, qty] of Object.entries(this.selectedUnits)) {
+      if (qty <= 0) continue;
+      const def = this.unitDefs[type];
+      if (def?.isAir && def.movement > maxRange) {
+        maxRange = def.movement;
+      }
+    }
+    return maxRange || 4; // Default to 4 if not found
+  }
+
   getValidDestinations() {
     if (!this.selectedFrom || !this.gameState) return [];
 
-    // Use gameState.getConnections() to include land bridge connections
+    // Check if only air units are selected
+    const hasOnlyAirSelected = Object.entries(this.selectedUnits).every(([type, qty]) => {
+      if (qty <= 0) return true;
+      const def = this.unitDefs[type];
+      return def?.isAir;
+    }) && Object.values(this.selectedUnits).some(q => q > 0);
+
+    if (hasOnlyAirSelected) {
+      // For air units, use multi-hop pathfinding
+      const airMovementRange = this._getMaxAirMovementRange();
+      const reachable = this.gameState.getReachableTerritoriesForAir(
+        this.selectedFrom.name,
+        airMovementRange,
+        this.gameState.currentPlayer?.id,
+        this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE
+      );
+
+      // Filter based on combat/non-combat rules
+      const player = this.gameState.currentPlayer;
+      const isNonCombat = this.gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+
+      return Array.from(reachable.keys()).filter(destName => {
+        const toOwner = this.gameState.getOwner(destName);
+        const isEnemy = toOwner && toOwner !== player.id &&
+          !this.gameState.areAllies(player.id, toOwner);
+
+        // Non-combat move cannot enter enemy territory
+        if (isNonCombat && isEnemy) return false;
+
+        return true;
+      });
+    }
+
+    // For land/sea units, use adjacent connections
     const connections = this.gameState.getConnections(this.selectedFrom.name);
 
     return connections.filter(connName => {
@@ -324,11 +377,15 @@ export class MovementUI {
       // Use faction-specific icon
       const imageSrc = unit.owner ? getUnitIconPath(unit.type, unit.owner) : (def?.image ? `assets/units/${def.image}` : null);
 
+      // Build movement info tooltip
+      const movementInfo = this._getUnitMovementInfo(def);
+
       html += `
         <div class="mp-unit-row">
-          <div class="mp-unit-info">
+          <div class="mp-unit-info" title="${movementInfo}">
             ${imageSrc ? `<img src="${imageSrc}" class="mp-unit-icon" alt="${unit.type}">` : ''}
             <span class="mp-unit-name">${unit.type}</span>
+            <span class="mp-unit-movement">${def?.movement || 1}</span>
             <span class="mp-unit-avail">(${unit.quantity} avail)</span>
           </div>
           <div class="mp-unit-select">
@@ -465,5 +522,25 @@ export class MovementUI {
     this.selectedUnits[unitType] = newValue;
 
     this._render();
+  }
+
+  // Generate movement info tooltip for a unit
+  _getUnitMovementInfo(unitDef) {
+    if (!unitDef) return '';
+
+    const parts = [];
+    parts.push(`Movement: ${unitDef.movement || 1}`);
+    parts.push(`Attack: ${unitDef.attack || 0}`);
+    parts.push(`Defense: ${unitDef.defense || 0}`);
+
+    if (unitDef.isAir) {
+      parts.push('Air unit - can fly over land/water');
+    } else if (unitDef.isLand) {
+      parts.push('Land unit - moves on land only');
+    } else if (unitDef.isSea) {
+      parts.push('Naval unit - moves in sea zones');
+    }
+
+    return parts.join(' | ');
   }
 }

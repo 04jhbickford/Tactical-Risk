@@ -32,6 +32,7 @@ export class Lobby {
     this.playerColors = {}; // Track selected colors per player
     this.playerAI = {}; // Track AI difficulty per player ('human', 'easy', 'medium', 'hard')
     this.alliancesEnabled = false;
+    this.startingIPCs = 80; // Default starting IPCs for Risk mode
     this.el = null;
     this._create();
   }
@@ -171,24 +172,25 @@ export class Lobby {
 
         ${!isClassic ? `
           <div class="lobby-section">
-            <div class="alliance-toggle">
-              <label class="toggle-label">
-                <input type="checkbox" id="allianceToggle" ${this.alliancesEnabled ? 'checked' : ''}>
-                <span class="toggle-slider"></span>
-                <span class="toggle-text">Enable Alliances (Axis vs. Allies)</span>
-              </label>
-              <p class="toggle-hint">When enabled, players on the same alliance work together</p>
-            </div>
-          </div>
-
-          <div class="lobby-info">
-            <div class="info-item">
-              <span class="info-label">Starting IPCs</span>
-              <span class="info-value">${this.setup.risk.startingIPCs}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Setup</span>
-              <span class="info-value">Random territories + 1 infantry each</span>
+            <div class="lobby-info risk-options">
+              <div class="info-item">
+                <span class="info-label">Starting IPCs</span>
+                <select id="startingIPCsSelect" class="starting-ipcs-select">
+                  <option value="30" ${this.startingIPCs === 30 ? 'selected' : ''}>30 IPCs</option>
+                  <option value="50" ${this.startingIPCs === 50 ? 'selected' : ''}>50 IPCs</option>
+                  <option value="80" ${this.startingIPCs === 80 || !this.startingIPCs ? 'selected' : ''}>80 IPCs</option>
+                  <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100 IPCs</option>
+                  <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150 IPCs</option>
+                </select>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Mode</span>
+                <span class="info-value">Free-for-All</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Setup</span>
+                <span class="info-value">Random territories + 1 infantry each</span>
+              </div>
             </div>
           </div>
         ` : `
@@ -255,10 +257,16 @@ export class Lobby {
         });
       });
 
-      // Alliance toggle
-      this.el.querySelector('#allianceToggle')?.addEventListener('change', (e) => {
-        this.alliancesEnabled = e.target.checked;
+      // Starting IPCs selector
+      this.el.querySelector('#startingIPCsSelect')?.addEventListener('change', (e) => {
+        this.startingIPCs = parseInt(e.target.value, 10);
       });
+
+      // Risk mode is always free-for-all (no alliances)
+      this.alliancesEnabled = false;
+    } else {
+      // Classic mode always has alliances enabled
+      this.alliancesEnabled = true;
     }
 
     // Color selectors
@@ -375,9 +383,12 @@ export class Lobby {
       };
     });
 
-    // Pass alliance setting for Risk mode
+    // Pass game options
     const options = {
-      alliancesEnabled: !isClassic && this.alliancesEnabled,
+      // Classic mode: always alliances, Risk mode: always free-for-all
+      alliancesEnabled: isClassic,
+      // Starting IPCs for Risk mode
+      startingIPCs: !isClassic ? this.startingIPCs : undefined,
     };
 
     this.hide();

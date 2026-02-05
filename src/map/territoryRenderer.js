@@ -875,19 +875,19 @@ export class TerritoryRenderer {
 
     ctx.save();
 
-    // Draw a BIG 5-pointed star as the capital marker
+    // Draw a BIG 5-pointed star in the PLAYER'S COLOR as the capital marker
     const starSize = isZoomedOut ? 90 : 70;
-    this._drawCapitalStar(ctx, x, y, starSize, '#ffd700', isZoomedOut);
+    this._drawCapitalStar(ctx, x, y, starSize, color, isZoomedOut);
 
-    // Draw circular flag in the center of the star
-    const circleRadius = isZoomedOut ? 22 : 18;
+    // Draw smaller circular flag in the center of the star
+    const circleRadius = isZoomedOut ? 16 : 13;
 
     // Draw circle border/background
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 4;
     ctx.beginPath();
-    ctx.arc(x, y, circleRadius + 3, 0, Math.PI * 2);
-    ctx.fillStyle = color;
+    ctx.arc(x, y, circleRadius + 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#222';
     ctx.fill();
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
@@ -902,7 +902,7 @@ export class TerritoryRenderer {
       ctx.clip();
 
       // Draw flag image centered and covering the circle
-      const imgSize = circleRadius * 2.2;
+      const imgSize = circleRadius * 2.4;
       ctx.drawImage(img, x - imgSize / 2, y - imgSize / 2, imgSize, imgSize);
       ctx.restore();
     }
@@ -911,7 +911,7 @@ export class TerritoryRenderer {
     ctx.beginPath();
     ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
     ctx.restore();

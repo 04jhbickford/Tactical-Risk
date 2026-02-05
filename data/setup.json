@@ -3,24 +3,20 @@
     {
       "id": "classic",
       "name": "Classic WW2",
-      "description": "Historical 1942 setup with 5 factions",
-      "enabled": false,
-      "useHistoricalSetup": true
+      "description": "Historical 1942 Axis vs Allies setup",
+      "enabled": true,
+      "useHistoricalSetup": true,
+      "alliancesEnabled": true
     },
     {
       "id": "risk",
       "name": "Risk Style",
-      "description": "Random territories, WW2 factions, 80 IPCs each",
+      "description": "Free-for-all with random territories",
       "enabled": true,
       "useHistoricalSetup": false,
       "startingIPCs": 80,
-      "startingInfantryPerTerritory": 1
-    },
-    {
-      "id": "draft",
-      "name": "Territory Draft",
-      "description": "Players take turns drafting territories",
-      "enabled": false
+      "startingInfantryPerTerritory": 1,
+      "alliancesEnabled": false
     }
   ],
   "factions": [

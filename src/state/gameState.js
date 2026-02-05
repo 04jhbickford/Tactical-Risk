@@ -210,7 +210,7 @@ export class GameState {
     if (mode === 'classic') {
       this._initClassicMode(selectedPlayers);
     } else if (mode === 'risk') {
-      this._initRiskMode(selectedPlayers);
+      this._initRiskMode(selectedPlayers, options);
     }
 
     this._notify();
@@ -266,12 +266,12 @@ export class GameState {
     this.currentPlayerIndex = 0;
   }
 
-  _initRiskMode(selectedPlayers) {
+  _initRiskMode(selectedPlayers, options = {}) {
     const riskData = this.setup.risk;
     const playerCount = selectedPlayers.length;
 
-    // Dynamic starting IPCs based on player count
-    const startingIPCs = STARTING_IPCS_BY_PLAYER_COUNT[playerCount] || 18;
+    // Use custom starting IPCs if provided, otherwise use player count-based defaults
+    const startingIPCs = options.startingIPCs || STARTING_IPCS_BY_PLAYER_COUNT[playerCount] || 18;
 
     this.players = selectedPlayers.map((p, i) => ({
       ...p,
@@ -365,6 +365,57 @@ export class GameState {
     }
 
     return [...baseConnections, ...landBridgeConnections];
+  }
+
+  // Get all territories reachable by air unit within movement range
+  // Air units can fly over any terrain (land or water)
+  getReachableTerritoriesForAir(fromTerritory, movementRange, playerId, isCombatMove = false) {
+    const reachable = new Map(); // territory -> { distance, path }
+    const visited = new Set();
+    const queue = [{ territory: fromTerritory, distance: 0, path: [fromTerritory] }];
+
+    while (queue.length > 0) {
+      const { territory, distance, path } = queue.shift();
+
+      if (visited.has(territory)) continue;
+      visited.add(territory);
+
+      // Don't add starting territory to results
+      if (territory !== fromTerritory) {
+        reachable.set(territory, { distance, path });
+      }
+
+      // Stop if we've reached max movement
+      if (distance >= movementRange) continue;
+
+      // Get all connections (including land bridges for air traversal)
+      const connections = this.getConnections(territory);
+
+      for (const conn of connections) {
+        if (visited.has(conn)) continue;
+
+        queue.push({
+          territory: conn,
+          distance: distance + 1,
+          path: [...path, conn]
+        });
+      }
+    }
+
+    return reachable;
+  }
+
+  // Check if air unit can reach destination within movement range
+  canAirUnitReach(fromTerritory, toTerritory, movementRange) {
+    const reachable = this.getReachableTerritoriesForAir(fromTerritory, movementRange, null, false);
+    return reachable.has(toTerritory);
+  }
+
+  // Get flight path for air unit (for validation and display)
+  getAirFlightPath(fromTerritory, toTerritory, movementRange) {
+    const reachable = this.getReachableTerritoriesForAir(fromTerritory, movementRange, null, false);
+    const info = reachable.get(toTerritory);
+    return info ? info.path : null;
   }
 
   // Check if two territories are connected by land bridge
@@ -813,18 +864,17 @@ export class GameState {
     const player = this.currentPlayer;
     if (!player) return { success: false, error: 'No current player' };
 
-    // Validate territories are connected (includes land bridges)
     const fromT = this.territoryByName[fromTerritory];
+    const toT = this.territoryByName[toTerritory];
+    if (!fromT || !toT) return { success: false, error: 'Invalid territory' };
+
+    // Check for adjacent connection (includes land bridges)
     const connections = this.getConnections(fromTerritory);
+    const isAdjacent = connections.includes(toTerritory);
     const isLandBridge = this.hasLandBridge(fromTerritory, toTerritory);
 
-    if (!fromT || !connections.includes(toTerritory)) {
-      return { success: false, error: 'Territories not connected' };
-    }
-
-    // Check destination
+    // Check destination ownership
     const toOwner = this.getOwner(toTerritory);
-    const toT = this.territoryByName[toTerritory];
     const isEnemy = toOwner && toOwner !== player.id && !this.areAllies(player.id, toOwner);
     const isAllied = toOwner && toOwner !== player.id && this.areAllies(player.id, toOwner);
 
@@ -843,6 +893,28 @@ export class GameState {
     // Validate and move each unit
     const fromUnits = this.units[fromTerritory] || [];
 
+    // Separate air units from land/sea units for different validation
+    const airUnits = unitsToMove.filter(u => unitDefs[u.type]?.isAir);
+    const nonAirUnits = unitsToMove.filter(u => !unitDefs[u.type]?.isAir);
+
+    // For non-air units, require adjacent connection
+    if (nonAirUnits.length > 0 && !isAdjacent) {
+      return { success: false, error: 'Territories not connected for land/sea units' };
+    }
+
+    // For air units, check if destination is within movement range
+    for (const airUnit of airUnits) {
+      const unitDef = unitDefs[airUnit.type];
+      if (!unitDef) continue;
+
+      const movementRange = unitDef.movement || 4;
+
+      // Check if destination is reachable within air unit's movement range
+      if (!this.canAirUnitReach(fromTerritory, toTerritory, movementRange)) {
+        return { success: false, error: `${airUnit.type} cannot reach ${toTerritory} (movement: ${movementRange})` };
+      }
+    }
+
     for (const moveUnit of unitsToMove) {
       const unitDef = unitDefs[moveUnit.type];
       if (!unitDef) continue;
@@ -859,10 +931,10 @@ export class GameState {
       }
 
       // Check movement rules
-      // Air units can fly over any terrain (land or water)
+      // Air units can fly over any terrain (land or water) - already validated above
       if (unitDef.isAir) {
-        // Air units can go anywhere - no terrain restrictions
-        // They must land on friendly territory at end of turn (handled elsewhere)
+        // Air units validated above for multi-hop movement
+        // They can land on water only if there's a carrier (handled elsewhere)
       } else if (isLandBridge) {
         // Land bridges allow land units to cross without naval transport
         if (unitDef.isSea) {
