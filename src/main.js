@@ -30,6 +30,7 @@ import { CombatUI } from './ui/combatUI.js';
 import { TechUI } from './ui/techUI.js';
 import { PlacementUI } from './ui/placementUI.js';
 import { MobilizeUI } from './ui/mobilizeUI.js';
+import { RulesPanel } from './ui/rulesPanel.js';
 import { HUD } from './ui/hud.js';
 import { Minimap } from './ui/minimap.js';
 import { Lobby } from './ui/lobby.js';
@@ -122,6 +123,16 @@ async function init() {
 
   // Action Log (game event log)
   const actionLog = new ActionLog();
+
+  // Rules Panel
+  const rulesPanel = new RulesPanel();
+
+  // Rules button (fixed position)
+  const rulesBtn = document.createElement('button');
+  rulesBtn.className = 'hud-rules-btn';
+  rulesBtn.textContent = '📖 Rules';
+  rulesBtn.addEventListener('click', () => rulesPanel.toggle());
+  document.body.appendChild(rulesBtn);
 
   // Action handler for player panel buttons
   playerPanel.setActionCallback((action, data) => {
