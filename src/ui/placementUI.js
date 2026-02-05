@@ -174,8 +174,47 @@ export class PlacementUI {
         if (u.quantity <= 0) return false;
         const def = this.unitDefs[u.type];
         if (!def) return false;
-        // Sea zones only accept naval units
-        if (isSeaZone) return def.isSea;
+
+        // Sea zones can accept naval units, plus fighters on carriers, land units on transports
+        if (isSeaZone) {
+          // Naval units can always be placed
+          if (def.isSea) return true;
+
+          // Check for carriers/transports in this sea zone
+          const seaUnits = this.gameState.getUnitsAt(this.selectedTerritory.name);
+
+          // Air units can be placed if there's a carrier with capacity
+          if (def.isAir) {
+            const carriers = seaUnits.filter(c => c.type === 'carrier' && c.owner === player.id);
+            const carrierDef = this.unitDefs.carrier;
+            if (carrierDef && carrierDef.canCarry?.includes(u.type)) {
+              for (const carrier of carriers) {
+                const currentAircraft = carrier.aircraft || [];
+                if (currentAircraft.length < (carrierDef.aircraftCapacity || 2)) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          }
+
+          // Land units can be placed if there's a transport with capacity
+          if (def.isLand && !def.isBuilding) {
+            const transports = seaUnits.filter(t => t.type === 'transport' && t.owner === player.id);
+            const transportDef = this.unitDefs.transport;
+            if (transportDef && transportDef.canCarry?.includes(u.type)) {
+              for (const transport of transports) {
+                const currentCargo = transport.cargo || [];
+                if (this._canLoadOnTransport(currentCargo, u.type)) {
+                  return true;
+                }
+              }
+            }
+            return false;
+          }
+
+          return false;
+        }
         // Land territories accept land, air, and buildings
         return def.isLand || def.isAir || def.isBuilding;
       });
@@ -187,7 +226,10 @@ export class PlacementUI {
         }
         html += `</div>`;
       } else {
-        html += `<div class="pl-no-units">No ${isSeaZone ? 'naval' : 'land'} units available to place</div>`;
+        const seaZoneMsg = isSeaZone
+          ? 'No units to place here. Naval units, fighters on carriers, and troops on transports are allowed.'
+          : 'No land units available to place';
+        html += `<div class="pl-no-units">${seaZoneMsg}</div>`;
       }
     } else {
       html += `
@@ -302,5 +344,18 @@ export class PlacementUI {
   clearSelection() {
     this.selectedTerritory = null;
     this._render();
+  }
+
+  // Check if a unit can be loaded onto a transport given current cargo
+  _canLoadOnTransport(cargo, unitType) {
+    // Transport capacity: 2 infantry OR 1 infantry + 1 other OR 1 non-infantry
+    const infantryCount = cargo.filter(c => c.type === 'infantry').length;
+    const otherCount = cargo.filter(c => c.type !== 'infantry').length;
+
+    if (unitType === 'infantry') {
+      return cargo.length < 2 && otherCount === 0;
+    } else {
+      return cargo.length === 0 || (infantryCount === 1 && otherCount === 0);
+    }
   }
 }

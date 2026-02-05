@@ -189,7 +189,115 @@ export class PurchasePopup {
     }
 
     this._recalculateCartCost();
-    this._render();
+    // Update display without full re-render to avoid UI jumping
+    this._updateDisplay(unitType);
+  }
+
+  // Update only the changed elements without full re-render
+  _updateDisplay(changedUnitType) {
+    const player = this.gameState.currentPlayer;
+    const ipcs = this.gameState.getIPCs(player.id);
+    const remaining = ipcs - this.cartCost;
+
+    // Update budget display
+    const budgetValue = this.el.querySelector('.budget-value');
+    if (budgetValue) {
+      budgetValue.textContent = `$${remaining}`;
+      budgetValue.classList.toggle('low', remaining < 5);
+    }
+
+    // Update all unit quantities and button states
+    this.el.querySelectorAll('.purchase-item').forEach(item => {
+      const addBtn = item.querySelector('[data-action="add"]');
+      const removeBtn = item.querySelector('[data-action="remove"]');
+      const qtyDisplay = item.querySelector('.qty-display');
+
+      if (!addBtn) return;
+      const unitType = addBtn.dataset.unit;
+      const def = this.unitDefs[unitType];
+      const qty = this.purchaseCart[unitType] || 0;
+
+      // Update quantity display
+      if (qtyDisplay) qtyDisplay.textContent = qty;
+
+      // Update button states
+      const canAdd = remaining >= def.cost;
+      const canRemove = qty > 0;
+
+      addBtn.classList.toggle('disabled', !canAdd);
+      removeBtn?.classList.toggle('disabled', !canRemove);
+      item.classList.toggle('has-qty', qty > 0);
+    });
+
+    // Update summary section (need to rebuild this part)
+    this._updateSummary();
+  }
+
+  _updateSummary() {
+    const existingSummary = this.el.querySelector('.purchase-summary');
+    const actionsContainer = this.el.querySelector('.purchase-actions');
+
+    // Build new summary HTML
+    let summaryHtml = '';
+    if (this.cartCost > 0) {
+      summaryHtml = `
+        <div class="purchase-summary">
+          <span class="summary-items">
+            ${Object.entries(this.purchaseCart).map(([type, qty]) => {
+              const def = this.unitDefs[type];
+              return `${qty}× ${type} ($${qty * def.cost})`;
+            }).join(', ')}
+          </span>
+          <span class="summary-total">Total: $${this.cartCost}</span>
+        </div>
+      `;
+    }
+
+    // Replace or add summary
+    if (existingSummary) {
+      if (this.cartCost > 0) {
+        existingSummary.outerHTML = summaryHtml;
+      } else {
+        existingSummary.remove();
+      }
+    } else if (this.cartCost > 0 && actionsContainer) {
+      actionsContainer.insertAdjacentHTML('beforebegin', summaryHtml);
+    }
+
+    // Update action buttons
+    if (actionsContainer) {
+      if (this.cartCost > 0) {
+        actionsContainer.innerHTML = `
+          <button class="purchase-btn clear" data-action="clear">Clear</button>
+          <button class="purchase-btn confirm" data-action="confirm">Place Units</button>
+        `;
+      } else {
+        actionsContainer.innerHTML = `
+          <button class="purchase-btn skip" data-action="skip">Skip</button>
+        `;
+      }
+      // Rebind action buttons
+      this._bindActionButtons();
+    }
+  }
+
+  _bindActionButtons() {
+    this.el.querySelectorAll('.purchase-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+
+        if (action === 'clear') {
+          this._clearCart();
+        } else if (action === 'confirm') {
+          this._commitPurchase();
+        } else if (action === 'skip') {
+          this.hide();
+          if (this.onPurchaseComplete) {
+            this.onPurchaseComplete();
+          }
+        }
+      });
+    });
   }
 
   _clearCart() {

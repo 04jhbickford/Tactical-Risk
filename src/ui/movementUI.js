@@ -160,9 +160,10 @@ export class MovementUI {
     const toOwner = this.gameState.getOwner(territory.name);
     const isEnemy = toOwner && toOwner !== player.id &&
       !this.gameState.areAllies(player.id, toOwner);
+    const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
 
     // Non-combat move cannot enter enemy territory
-    if (this.gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE && isEnemy) {
+    if (!isCombatMove && isEnemy) {
       return false;
     }
 
@@ -182,37 +183,113 @@ export class MovementUI {
       return def && def.isAir && this.selectedUnits[type] > 0;
     });
 
-    // Get air unit max movement range
+    // Get max movement ranges
     const airMovementRange = this._getMaxAirMovementRange();
+    const landMovementRange = this._getMaxLandMovementRange();
 
     // Check adjacency - use getConnections() to include land bridges
     const connections = this.gameState.getConnections(this.selectedFrom.name);
     const isAdjacent = connections.includes(territory.name);
 
-    // Check for land bridge connection
-    const isLandBridge = this.gameState.hasLandBridge?.(this.selectedFrom.name, territory.name);
-
     // Air units can fly anywhere within their movement range
     if (hasAirSelected && !hasLandSelected && !hasSeaSelected) {
-      // Pure air movement - use multi-hop pathfinding
-      return this.gameState.canAirUnitReach(this.selectedFrom.name, territory.name, airMovementRange);
+      const canReach = this.gameState.canAirUnitReach(this.selectedFrom.name, territory.name, airMovementRange);
+      if (!canReach) return false;
+
+      // Air units can land on water only if there's a carrier with capacity
+      if (territory.isWater) {
+        const seaUnits = this.gameState.getUnitsAt(territory.name);
+        const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        const carrierDef = this.unitDefs.carrier;
+        if (!carrierDef) return false;
+
+        // Calculate total capacity
+        let capacity = 0;
+        for (const carrier of carriers) {
+          const currentAircraft = carrier.aircraft || [];
+          capacity += Math.max(0, (carrierDef.aircraftCapacity || 2) - currentAircraft.length);
+        }
+
+        // Check if selected air units fit on carriers
+        const selectedAirCount = Object.entries(this.selectedUnits)
+          .filter(([type, qty]) => qty > 0 && this.unitDefs[type]?.isAir && carrierDef.canCarry?.includes(type))
+          .reduce((sum, [_, qty]) => sum + qty, 0);
+
+        return capacity >= selectedAirCount;
+      }
+      return true;
     }
 
-    // Mixed movement (air + land/sea) - land/sea units require adjacency
+    // Land units with movement > 1 can blitz through friendly territory
+    if (hasLandSelected && !hasSeaSelected && landMovementRange > 1) {
+      // Allow water destination during non-combat if there's a transport
+      if (territory.isWater) {
+        if (!isCombatMove && isAdjacent) {
+          return this._canLoadOntoTransport(territory.name, player.id);
+        }
+        return false;
+      }
+      return this.gameState.canLandUnitReach(
+        this.selectedFrom.name,
+        territory.name,
+        landMovementRange,
+        player.id,
+        isCombatMove
+      );
+    }
+
+    // For basic movement (movement=1 or mixed), require adjacency
     if (!isAdjacent) {
       return false;
     }
 
-    // Land bridges allow land units to cross
-    if (isLandBridge && hasLandSelected && !territory.isWater) {
-      return true;
+    // Land units entering water during non-combat can load onto transports
+    if (hasLandSelected && territory.isWater) {
+      if (!isCombatMove) {
+        return this._canLoadOntoTransport(territory.name, player.id);
+      }
+      return false;
     }
 
-    // Normal terrain checks
-    if (hasLandSelected && territory.isWater) return false;
     if (hasSeaSelected && !territory.isWater) return false;
 
     return true;
+  }
+
+  // Check if selected land units can load onto transports in a sea zone
+  _canLoadOntoTransport(seaZoneName, playerId) {
+    const seaUnits = this.gameState.getUnitsAt(seaZoneName);
+    const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === playerId);
+    const transportDef = this.unitDefs.transport;
+    if (!transportDef) return false;
+
+    // Calculate total capacity
+    let capacity = 0;
+    for (const transport of transports) {
+      const currentCargo = transport.cargo || [];
+      // Transport can hold 2 infantry or 1 infantry + 1 other or 1 non-infantry
+      const infantryCount = currentCargo.filter(c => c.type === 'infantry').length;
+      const otherCount = currentCargo.filter(c => c.type !== 'infantry').length;
+      if (otherCount === 0 && infantryCount < 2) {
+        capacity += 2 - infantryCount;
+      } else if (infantryCount === 1 && otherCount === 0) {
+        capacity += 1;
+      }
+    }
+
+    // Check if any selected land units can be carried
+    const selectedLandTypes = Object.entries(this.selectedUnits)
+      .filter(([type, qty]) => qty > 0 && this.unitDefs[type]?.isLand)
+      .map(([type, qty]) => ({ type, qty }));
+
+    if (selectedLandTypes.length === 0) return false;
+
+    // At least one transport must be able to carry the unit types
+    const canCarryAny = selectedLandTypes.some(({ type }) =>
+      transportDef.canCarry?.includes(type)
+    );
+
+    return canCarryAny && capacity > 0;
   }
 
   // Get the maximum movement range of selected air units
@@ -225,46 +302,117 @@ export class MovementUI {
         maxRange = def.movement;
       }
     }
-    return maxRange || 4; // Default to 4 if not found
+    return maxRange || 4;
+  }
+
+  // Get the maximum movement range of selected land units
+  _getMaxLandMovementRange() {
+    let maxRange = 0;
+    for (const [type, qty] of Object.entries(this.selectedUnits)) {
+      if (qty <= 0) continue;
+      const def = this.unitDefs[type];
+      if (def?.isLand && def.movement > maxRange) {
+        maxRange = def.movement;
+      }
+    }
+    return maxRange || 1;
   }
 
   getValidDestinations() {
     if (!this.selectedFrom || !this.gameState) return [];
 
-    // Check if only air units are selected
+    const player = this.gameState.currentPlayer;
+    const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+    const isNonCombat = !isCombatMove;
+
+    // Check unit types selected
     const hasOnlyAirSelected = Object.entries(this.selectedUnits).every(([type, qty]) => {
       if (qty <= 0) return true;
-      const def = this.unitDefs[type];
-      return def?.isAir;
+      return this.unitDefs[type]?.isAir;
     }) && Object.values(this.selectedUnits).some(q => q > 0);
 
+    const hasLandSelected = Object.entries(this.selectedUnits).some(([type, qty]) => {
+      return qty > 0 && this.unitDefs[type]?.isLand;
+    });
+
+    const hasSeaSelected = Object.entries(this.selectedUnits).some(([type, qty]) => {
+      return qty > 0 && this.unitDefs[type]?.isSea;
+    });
+
+    // Pure air movement - show all reachable territories (don't list, highlight on map)
     if (hasOnlyAirSelected) {
-      // For air units, use multi-hop pathfinding
       const airMovementRange = this._getMaxAirMovementRange();
       const reachable = this.gameState.getReachableTerritoriesForAir(
         this.selectedFrom.name,
         airMovementRange,
-        this.gameState.currentPlayer?.id,
-        this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE
+        player?.id,
+        isCombatMove
       );
-
-      // Filter based on combat/non-combat rules
-      const player = this.gameState.currentPlayer;
-      const isNonCombat = this.gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
 
       return Array.from(reachable.keys()).filter(destName => {
         const toOwner = this.gameState.getOwner(destName);
         const isEnemy = toOwner && toOwner !== player.id &&
           !this.gameState.areAllies(player.id, toOwner);
-
-        // Non-combat move cannot enter enemy territory
         if (isNonCombat && isEnemy) return false;
 
+        // Check if water - needs carrier with capacity
+        const territory = this.territoryByName[destName];
+        if (territory?.isWater) {
+          const seaUnits = this.gameState.getUnitsAt(destName);
+          const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+          const carrierDef = this.unitDefs.carrier;
+          if (!carrierDef || carriers.length === 0) return false;
+
+          // Calculate capacity
+          let capacity = 0;
+          for (const carrier of carriers) {
+            const currentAircraft = carrier.aircraft || [];
+            capacity += Math.max(0, (carrierDef.aircraftCapacity || 2) - currentAircraft.length);
+          }
+
+          const selectedAirCount = Object.entries(this.selectedUnits)
+            .filter(([type, qty]) => qty > 0 && this.unitDefs[type]?.isAir && carrierDef.canCarry?.includes(type))
+            .reduce((sum, [_, qty]) => sum + qty, 0);
+
+          return capacity >= selectedAirCount;
+        }
         return true;
       });
     }
 
-    // For land/sea units, use adjacent connections
+    // Land units with movement > 1 (like tanks) - use blitzing pathfinding
+    const landMovementRange = this._getMaxLandMovementRange();
+    if (hasLandSelected && !hasSeaSelected && landMovementRange > 1) {
+      const reachable = this.gameState.getReachableTerritoriesForLand(
+        this.selectedFrom.name,
+        landMovementRange,
+        player?.id,
+        isCombatMove
+      );
+
+      const landDestinations = Array.from(reachable.keys()).filter(destName => {
+        const toOwner = this.gameState.getOwner(destName);
+        const isEnemy = toOwner && toOwner !== player.id &&
+          !this.gameState.areAllies(player.id, toOwner);
+        if (isNonCombat && isEnemy) return false;
+        return true;
+      });
+
+      // During non-combat, also include adjacent sea zones with transports
+      if (isNonCombat) {
+        const connections = this.gameState.getConnections(this.selectedFrom.name);
+        for (const connName of connections) {
+          const t = this.territoryByName[connName];
+          if (t?.isWater && this._canLoadOntoTransport(connName, player.id)) {
+            landDestinations.push(connName);
+          }
+        }
+      }
+
+      return landDestinations;
+    }
+
+    // For basic movement (movement=1 or sea units), use adjacent connections
     const connections = this.gameState.getConnections(this.selectedFrom.name);
 
     return connections.filter(connName => {
@@ -542,5 +690,46 @@ export class MovementUI {
     }
 
     return parts.join(' | ');
+  }
+
+  // Get air movement visualization data for rendering on map
+  getAirMovementVisualization() {
+    if (!this.selectedFrom || !this.gameState) return null;
+
+    // Check if only air units are selected
+    const hasOnlyAirSelected = Object.entries(this.selectedUnits).every(([type, qty]) => {
+      if (qty <= 0) return true;
+      return this.unitDefs[type]?.isAir;
+    }) && Object.values(this.selectedUnits).some(q => q > 0);
+
+    if (!hasOnlyAirSelected) return null;
+
+    const player = this.gameState.currentPlayer;
+    const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+    const airMovementRange = this._getMaxAirMovementRange();
+
+    const reachable = this.gameState.getReachableTerritoriesForAir(
+      this.selectedFrom.name,
+      airMovementRange,
+      player?.id,
+      isCombatMove
+    );
+
+    // Filter out enemy territories in non-combat
+    const isNonCombat = !isCombatMove;
+    const filteredReachable = new Map();
+    for (const [destName, pathData] of reachable) {
+      const toOwner = this.gameState.getOwner(destName);
+      const isEnemy = toOwner && toOwner !== player.id &&
+        !this.gameState.areAllies(player.id, toOwner);
+      if (!isNonCombat || !isEnemy) {
+        filteredReachable.set(destName, pathData);
+      }
+    }
+
+    return {
+      source: this.selectedFrom.name,
+      reachable: filteredReachable
+    };
   }
 }

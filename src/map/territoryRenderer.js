@@ -56,6 +56,10 @@ export class TerritoryRenderer {
     this.movementArrowFrom = null;
     this.movementArrowTo = null;
 
+    // Air movement path visualization (multi-hop)
+    this.airMovementPath = null; // Array of territory names forming the flight path
+    this.airMovementReachable = null; // Set of reachable territory names
+
     // Cache for external edges (computed once since polygons never change)
     this._externalEdgesCache = {};
     this._territoryCenterCache = {};
@@ -84,6 +88,20 @@ export class TerritoryRenderer {
     this.movementArrowFrom = null;
     this.movementArrowTo = null;
     this.movementArrowIsCombat = false;
+  }
+
+  /** Set air movement visualization - shows flight path and reachable territories */
+  setAirMovementVisualization(sourceName, reachableTerritories, flightPath = null) {
+    this.airMovementSource = sourceName;
+    this.airMovementReachable = reachableTerritories; // Map or Set of territory names
+    this.airMovementPath = flightPath; // Array of territory names for specific path
+  }
+
+  /** Clear air movement visualization */
+  clearAirMovementVisualization() {
+    this.airMovementSource = null;
+    this.airMovementReachable = null;
+    this.airMovementPath = null;
   }
 
   /** Pre-compute expensive calculations that don't change during gameplay */
@@ -1142,6 +1160,112 @@ export class TerritoryRenderer {
     ctx.fill();
 
     ctx.restore();
+  }
+
+  /** Render air movement visualization - shows flight range circle and path arrows */
+  renderAirMovementVisualization(ctx) {
+    // Render reachable territories highlight
+    if (this.airMovementReachable && this.airMovementReachable.size > 0) {
+      ctx.save();
+
+      // Draw faint highlight on all reachable territories
+      const reachableArray = this.airMovementReachable instanceof Map
+        ? Array.from(this.airMovementReachable.keys())
+        : Array.from(this.airMovementReachable);
+
+      for (const territoryName of reachableArray) {
+        const t = this.territoryByName[territoryName];
+        if (!t) continue;
+
+        // Light blue highlight for reachable
+        ctx.fillStyle = 'rgba(100, 200, 255, 0.15)';
+        for (const poly of t.polygons) {
+          if (!poly || poly.length < 3) continue;
+          this._fillPoly(ctx, poly);
+        }
+
+        // Dashed border
+        ctx.strokeStyle = 'rgba(100, 200, 255, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        if (t.polygons.length === 1) {
+          this._strokePoly(ctx, t.polygons[0]);
+        } else {
+          const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+          this._strokeEdges(ctx, externalEdges);
+        }
+        ctx.setLineDash([]);
+      }
+
+      ctx.restore();
+    }
+
+    // Render flight path arrows
+    if (this.airMovementPath && this.airMovementPath.length > 1) {
+      ctx.save();
+
+      // Draw arrows between each territory in the path
+      for (let i = 0; i < this.airMovementPath.length - 1; i++) {
+        const fromName = this.airMovementPath[i];
+        const toName = this.airMovementPath[i + 1];
+
+        const t1 = this.territoryByName[fromName];
+        const t2 = this.territoryByName[toName];
+        if (!t1 || !t2) continue;
+
+        const [x1, y1] = this._getTerritoryCenter(t1);
+        const [x2, y2] = this._getTerritoryCenter(t2);
+        if (x1 === null || x2 === null) continue;
+
+        // Calculate arrow properties
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const angle = Math.atan2(dy, dx);
+
+        // Shorten arrows
+        const shortenBy = 25;
+        const startX = x1 + Math.cos(angle) * shortenBy;
+        const startY = y1 + Math.sin(angle) * shortenBy;
+        const endX = x2 - Math.cos(angle) * shortenBy;
+        const endY = y2 - Math.sin(angle) * shortenBy;
+
+        // Cyan color for air movement
+        const arrowColor = '#00ccff';
+
+        ctx.shadowColor = arrowColor;
+        ctx.shadowBlur = 8;
+
+        // Draw dashed arrow line
+        ctx.strokeStyle = arrowColor;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Draw arrowhead
+        const headLength = 12;
+        const headAngle = Math.PI / 6;
+
+        ctx.fillStyle = arrowColor;
+        ctx.beginPath();
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(
+          endX - headLength * Math.cos(angle - headAngle),
+          endY - headLength * Math.sin(angle - headAngle)
+        );
+        ctx.lineTo(
+          endX - headLength * Math.cos(angle + headAngle),
+          endY - headLength * Math.sin(angle + headAngle)
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
   }
 
   /** Draw territory labels */

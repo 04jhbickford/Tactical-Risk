@@ -418,6 +418,82 @@ export class GameState {
     return info ? info.path : null;
   }
 
+  // Get all territories reachable by land unit within movement range
+  // Land units can only move through friendly/allied land territories (blitzing)
+  // In combat move, can pass through friendly to reach enemy
+  // In non-combat move, can only enter friendly/allied
+  getReachableTerritoriesForLand(fromTerritory, movementRange, playerId, isCombatMove = false) {
+    const reachable = new Map(); // territory -> { distance, path }
+    const visited = new Set();
+    const queue = [{ territory: fromTerritory, distance: 0, path: [fromTerritory] }];
+
+    while (queue.length > 0) {
+      const { territory, distance, path } = queue.shift();
+
+      if (visited.has(territory)) continue;
+      visited.add(territory);
+
+      const t = this.territoryByName[territory];
+      if (!t) continue;
+
+      // Can't pass through water (land units)
+      if (territory !== fromTerritory && t.isWater) continue;
+
+      // Check ownership for passability
+      const owner = this.getOwner(territory);
+      const isFriendly = owner === playerId;
+      const isAllied = owner && this.areAllies(playerId, owner);
+      const isEnemy = owner && owner !== playerId && !isAllied;
+
+      // Don't add starting territory to results
+      if (territory !== fromTerritory) {
+        // In combat move: can reach enemy territories as final destination
+        // In non-combat move: can only reach friendly/allied
+        if (isCombatMove || isFriendly || isAllied || !owner) {
+          reachable.set(territory, { distance, path });
+        }
+      }
+
+      // Stop if we've reached max movement
+      if (distance >= movementRange) continue;
+
+      // Can only continue through friendly/allied territories (not enemy)
+      if (territory !== fromTerritory && isEnemy) continue;
+
+      // Get all connections (including land bridges)
+      const connections = this.getConnections(territory);
+
+      for (const conn of connections) {
+        if (visited.has(conn)) continue;
+
+        const connT = this.territoryByName[conn];
+        // Skip water territories
+        if (connT?.isWater) continue;
+
+        queue.push({
+          territory: conn,
+          distance: distance + 1,
+          path: [...path, conn]
+        });
+      }
+    }
+
+    return reachable;
+  }
+
+  // Check if land unit can reach destination within movement range
+  canLandUnitReach(fromTerritory, toTerritory, movementRange, playerId, isCombatMove) {
+    const reachable = this.getReachableTerritoriesForLand(fromTerritory, movementRange, playerId, isCombatMove);
+    return reachable.has(toTerritory);
+  }
+
+  // Get land unit path for validation and display
+  getLandUnitPath(fromTerritory, toTerritory, movementRange, playerId, isCombatMove) {
+    const reachable = this.getReachableTerritoriesForLand(fromTerritory, movementRange, playerId, isCombatMove);
+    const info = reachable.get(toTerritory);
+    return info ? info.path : null;
+  }
+
   // Check if two territories are connected by land bridge
   hasLandBridge(t1Name, t2Name) {
     for (const [a, b] of LAND_BRIDGES) {
@@ -571,14 +647,87 @@ export class GameState {
         return { success: false, error: 'Naval units must be placed on sea zones adjacent to your coastal territories' };
       }
     } else {
-      // Land/air units: must be placed on owned territory
+      // Land/air units: check if can be placed
       const owner = this.getOwner(territoryName);
-      if (owner !== player.id) {
+      const t = this.territoryByName[territoryName];
+
+      // Check if placing on a sea zone with carrier (for fighters) or transport (for ground)
+      if (t && t.isWater) {
+        const seaUnits = this.units[territoryName] || [];
+
+        if (unitDef.isAir) {
+          // Fighters can be placed on carriers
+          const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+          const carrierDef = unitDefs.carrier;
+          // Find carrier with capacity
+          let placed = false;
+          for (const carrier of carriers) {
+            const currentAircraft = carrier.aircraft || [];
+            if (carrierDef && currentAircraft.length < (carrierDef.aircraftCapacity || 2)) {
+              if (carrierDef.canCarry?.includes(unitType)) {
+                // Place on carrier
+                unitEntry.quantity--;
+                carrier.aircraft = carrier.aircraft || [];
+                carrier.aircraft.push({ type: unitType, owner: player.id });
+                placed = true;
+                break;
+              }
+            }
+          }
+          if (!placed) {
+            return { success: false, error: 'No carrier with capacity to hold this aircraft' };
+          }
+          // Track placement for undo (special carrier placement)
+          this.placementHistory.push({
+            territory: territoryName,
+            unitType,
+            owner: player.id,
+            onCarrier: true,
+          });
+          this.unitsPlacedThisRound++;
+          this._notify();
+          return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
+        } else if (unitDef.isLand) {
+          // Ground units can be placed on transports
+          const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+          const transportDef = unitDefs.transport;
+          // Find transport with capacity
+          let placed = false;
+          for (const transport of transports) {
+            const currentCargo = transport.cargo || [];
+            if (transportDef && this._canLoadOnTransport(currentCargo, unitType)) {
+              if (transportDef.canCarry?.includes(unitType)) {
+                // Place on transport
+                unitEntry.quantity--;
+                transport.cargo = transport.cargo || [];
+                transport.cargo.push({ type: unitType, owner: player.id });
+                placed = true;
+                break;
+              }
+            }
+          }
+          if (!placed) {
+            return { success: false, error: 'No transport with capacity to hold this unit' };
+          }
+          // Track placement for undo (special transport placement)
+          this.placementHistory.push({
+            territory: territoryName,
+            unitType,
+            owner: player.id,
+            onTransport: true,
+          });
+          this.unitsPlacedThisRound++;
+          this._notify();
+          return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
+        } else {
+          return { success: false, error: 'Cannot place this unit type on water' };
+        }
+      } else if (owner !== player.id) {
         return { success: false, error: 'Must place on your own territory' };
       }
     }
 
-    // Place the unit
+    // Place the unit on land territory
     unitEntry.quantity--;
     const units = this.units[territoryName] || [];
     const existing = units.find(u => u.type === unitType && u.owner === player.id);
@@ -616,14 +765,40 @@ export class GameState {
       return false;
     }
 
-    // Remove unit from territory
-    const units = this.units[lastPlacement.territory] || [];
-    const unitEntry = units.find(u => u.type === lastPlacement.unitType && u.owner === player.id);
-    if (unitEntry) {
-      unitEntry.quantity--;
-      if (unitEntry.quantity <= 0) {
-        const idx = units.indexOf(unitEntry);
-        units.splice(idx, 1);
+    // Handle carrier placement undo
+    if (lastPlacement.onCarrier) {
+      const seaUnits = this.units[lastPlacement.territory] || [];
+      const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+      for (const carrier of carriers) {
+        const aircraft = carrier.aircraft || [];
+        const idx = aircraft.findIndex(a => a.type === lastPlacement.unitType && a.owner === player.id);
+        if (idx >= 0) {
+          aircraft.splice(idx, 1);
+          break;
+        }
+      }
+    // Handle transport placement undo
+    } else if (lastPlacement.onTransport) {
+      const seaUnits = this.units[lastPlacement.territory] || [];
+      const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+      for (const transport of transports) {
+        const cargo = transport.cargo || [];
+        const idx = cargo.findIndex(c => c.type === lastPlacement.unitType && c.owner === player.id);
+        if (idx >= 0) {
+          cargo.splice(idx, 1);
+          break;
+        }
+      }
+    } else {
+      // Remove unit from territory (normal placement)
+      const units = this.units[lastPlacement.territory] || [];
+      const unitEntry = units.find(u => u.type === lastPlacement.unitType && u.owner === player.id);
+      if (unitEntry) {
+        unitEntry.quantity--;
+        if (unitEntry.quantity <= 0) {
+          const idx = units.indexOf(unitEntry);
+          units.splice(idx, 1);
+        }
       }
     }
 
@@ -893,16 +1068,74 @@ export class GameState {
     // Validate and move each unit
     const fromUnits = this.units[fromTerritory] || [];
 
-    // Separate air units from land/sea units for different validation
+    // Separate units by type for different validation
     const airUnits = unitsToMove.filter(u => unitDefs[u.type]?.isAir);
-    const nonAirUnits = unitsToMove.filter(u => !unitDefs[u.type]?.isAir);
+    const landUnits = unitsToMove.filter(u => unitDefs[u.type]?.isLand);
+    const seaUnits = unitsToMove.filter(u => unitDefs[u.type]?.isSea);
 
-    // For non-air units, require adjacent connection
-    if (nonAirUnits.length > 0 && !isAdjacent) {
-      return { success: false, error: 'Territories not connected for land/sea units' };
+    // For sea units, require adjacent water connection
+    if (seaUnits.length > 0) {
+      if (!isAdjacent) {
+        return { success: false, error: 'Sea zones not connected for naval units' };
+      }
+      if (!toT?.isWater) {
+        return { success: false, error: 'Naval units can only move to sea zones' };
+      }
+    }
+
+    // For land units, check if destination is reachable (multi-hop for tanks with movement > 1)
+    // Also check if loading onto transport is allowed during non-combat
+    let loadingOntoTransport = false;
+    for (const landUnit of landUnits) {
+      const unitDef = unitDefs[landUnit.type];
+      if (!unitDef) continue;
+
+      const movementRange = unitDef.movement || 1;
+
+      // Check terrain - allow loading onto transport during non-combat
+      if (toT?.isWater) {
+        if (isNonCombatMove && isAdjacent) {
+          // Check if there's a transport with capacity
+          const seaUnits = this.units[toTerritory] || [];
+          const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+          const transportDef = unitDefs.transport;
+
+          if (transportDef && transportDef.canCarry?.includes(landUnit.type)) {
+            // Calculate total capacity available
+            let availableCapacity = 0;
+            for (const transport of transports) {
+              const currentCargo = transport.cargo || [];
+              if (this._canLoadOnTransport(currentCargo, landUnit.type)) {
+                availableCapacity++;
+              }
+            }
+            if (availableCapacity >= landUnit.quantity) {
+              loadingOntoTransport = true;
+            } else {
+              return { success: false, error: 'Not enough transport capacity' };
+            }
+          } else {
+            return { success: false, error: 'Land units cannot enter water without transport' };
+          }
+        } else {
+          return { success: false, error: 'Land units cannot enter water without transport' };
+        }
+      } else if (movementRange > 1) {
+        // Units with movement > 1 (like tanks) can blitz through friendly territory
+        if (!this.canLandUnitReach(fromTerritory, toTerritory, movementRange, player.id, isCombatMove)) {
+          return { success: false, error: `${landUnit.type} cannot reach ${toTerritory} (movement: ${movementRange})` };
+        }
+      } else {
+        // Movement 1 units require adjacency
+        if (!isAdjacent) {
+          return { success: false, error: `${landUnit.type} can only move to adjacent territories` };
+        }
+      }
     }
 
     // For air units, check if destination is within movement range
+    // Also check if landing on carrier is allowed during non-combat
+    let landingOnCarrier = false;
     for (const airUnit of airUnits) {
       const unitDef = unitDefs[airUnit.type];
       if (!unitDef) continue;
@@ -912,6 +1145,30 @@ export class GameState {
       // Check if destination is reachable within air unit's movement range
       if (!this.canAirUnitReach(fromTerritory, toTerritory, movementRange)) {
         return { success: false, error: `${airUnit.type} cannot reach ${toTerritory} (movement: ${movementRange})` };
+      }
+
+      // Check if landing on water (needs carrier)
+      if (toT?.isWater) {
+        const seaUnits = this.units[toTerritory] || [];
+        const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        const carrierDef = unitDefs.carrier;
+
+        if (carrierDef && carrierDef.canCarry?.includes(airUnit.type)) {
+          // Calculate total capacity available
+          let availableCapacity = 0;
+          for (const carrier of carriers) {
+            const currentAircraft = carrier.aircraft || [];
+            const capacity = carrierDef.aircraftCapacity || 2;
+            availableCapacity += Math.max(0, capacity - currentAircraft.length);
+          }
+          if (availableCapacity >= airUnit.quantity) {
+            landingOnCarrier = true;
+          } else {
+            return { success: false, error: 'Not enough carrier capacity for aircraft' };
+          }
+        } else {
+          return { success: false, error: 'Aircraft cannot land on water without a carrier' };
+        }
       }
     }
 
@@ -934,7 +1191,7 @@ export class GameState {
       // Air units can fly over any terrain (land or water) - already validated above
       if (unitDef.isAir) {
         // Air units validated above for multi-hop movement
-        // They can land on water only if there's a carrier (handled elsewhere)
+        // They can land on water if there's a carrier (handled below)
       } else if (isLandBridge) {
         // Land bridges allow land units to cross without naval transport
         if (unitDef.isSea) {
@@ -942,7 +1199,8 @@ export class GameState {
         }
       } else {
         // Normal movement rules for land and sea units
-        if (unitDef.isLand && toT?.isWater) {
+        // Allow land units to water if loading onto transport (validated above)
+        if (unitDef.isLand && toT?.isWater && !loadingOntoTransport) {
           return { success: false, error: 'Land units cannot enter water' };
         }
         if (unitDef.isSea && !toT?.isWater) {
@@ -957,27 +1215,71 @@ export class GameState {
         fromUnits.splice(idx, 1);
       }
 
-      // Add to destination
+      // Handle special loading onto carriers/transports
       const toUnits = this.units[toTerritory] || [];
-      const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id);
-      if (destUnit) {
-        destUnit.quantity += moveUnit.quantity;
-        destUnit.moved = true;
+
+      if (unitDef.isAir && landingOnCarrier && toT?.isWater) {
+        // Load onto carrier
+        const carriers = toUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        const carrierDef = unitDefs.carrier;
+        let remaining = moveUnit.quantity;
+
+        for (const carrier of carriers) {
+          if (remaining <= 0) break;
+          carrier.aircraft = carrier.aircraft || [];
+          const capacity = carrierDef?.aircraftCapacity || 2;
+          const available = capacity - carrier.aircraft.length;
+          const toLoad = Math.min(remaining, available);
+
+          for (let i = 0; i < toLoad; i++) {
+            carrier.aircraft.push({ type: moveUnit.type, owner: player.id });
+          }
+          remaining -= toLoad;
+        }
+      } else if (unitDef.isLand && loadingOntoTransport && toT?.isWater) {
+        // Load onto transport
+        const transports = toUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+        let remaining = moveUnit.quantity;
+
+        for (const transport of transports) {
+          if (remaining <= 0) break;
+          transport.cargo = transport.cargo || [];
+
+          while (remaining > 0 && this._canLoadOnTransport(transport.cargo, moveUnit.type)) {
+            transport.cargo.push({ type: moveUnit.type, owner: player.id });
+            remaining--;
+          }
+        }
       } else {
-        toUnits.push({
-          type: moveUnit.type,
-          quantity: moveUnit.quantity,
-          owner: player.id,
-          moved: true
-        });
+        // Normal movement - add to destination
+        const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id);
+        if (destUnit) {
+          destUnit.quantity += moveUnit.quantity;
+          destUnit.moved = true;
+        } else {
+          toUnits.push({
+            type: moveUnit.type,
+            quantity: moveUnit.quantity,
+            owner: player.id,
+            moved: true
+          });
+        }
       }
       this.units[toTerritory] = toUnits;
     }
 
     // Check if we captured an empty enemy territory (land only, not water)
+    // Per A&A rules: Only LAND units can capture territory - air units cannot hold ground
     let captured = false;
     let cardAwarded = null;
-    if (!toT?.isWater && isEnemy) {
+
+    // Check if we moved any land units (only land units can capture)
+    const movedLandUnits = unitsToMove.some(u => {
+      const def = unitDefs[u.type];
+      return def && def.isLand;
+    });
+
+    if (!toT?.isWater && isEnemy && movedLandUnits) {
       // Check if there are any enemy units remaining
       const enemyUnits = this.units[toTerritory]?.filter(u =>
         u.owner !== player.id && !this.areAllies(player.id, u.owner)

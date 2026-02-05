@@ -530,6 +530,16 @@ async function init() {
         if (movementUI.isMovementPhase() && movementUI.hasUnitsSelected()) {
           const { destinations, isEnemy } = movementUI.getDestinationsWithEnemyFlags();
           territoryRenderer.renderValidMoveDestinations(ctx, destinations, isEnemy);
+
+          // Air movement visualization (flight paths and reachable territories)
+          const airViz = movementUI.getAirMovementVisualization();
+          if (airViz) {
+            territoryRenderer.setAirMovementVisualization(airViz.source, airViz.reachable);
+          } else {
+            territoryRenderer.clearAirMovementVisualization();
+          }
+        } else {
+          territoryRenderer.clearAirMovementVisualization();
         }
 
         // Hover + selection
@@ -550,6 +560,9 @@ async function init() {
 
         // Movement arrow for action log
         territoryRenderer.renderMovementArrow(ctx);
+
+        // Air movement visualization (flight paths)
+        territoryRenderer.renderAirMovementVisualization(ctx);
 
         // Labels
         territoryRenderer.renderLabels(ctx, camera.zoom);

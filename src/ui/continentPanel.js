@@ -5,6 +5,11 @@ export class ContinentPanel {
     this.continents = continents;
     this.gameState = null;
     this.el = null;
+    // Persist collapsed state across renders
+    this.collapsedSections = {
+      'player-stats': false,
+      'continent-bonuses': false
+    };
     this._create();
   }
 
@@ -56,12 +61,13 @@ export class ContinentPanel {
 
   _renderPlayerStats() {
     const players = this.gameState.players || [];
+    const isCollapsed = this.collapsedSections['player-stats'];
 
     let html = `
-      <div class="info-section player-stats-section">
+      <div class="info-section player-stats-section ${isCollapsed ? 'collapsed' : ''}">
         <div class="info-section-header" data-toggle="player-stats">
           <span class="info-section-title">Player Stats</span>
-          <span class="info-section-toggle">▼</span>
+          <span class="info-section-toggle">${isCollapsed ? '▶' : '▼'}</span>
         </div>
         <div class="info-section-content" id="player-stats-content">
           <div class="player-stats-grid">
@@ -115,11 +121,13 @@ export class ContinentPanel {
   }
 
   _renderContinentBonuses() {
+    const isCollapsed = this.collapsedSections['continent-bonuses'];
+
     let html = `
-      <div class="info-section continent-bonuses-section">
+      <div class="info-section continent-bonuses-section ${isCollapsed ? 'collapsed' : ''}">
         <div class="info-section-header" data-toggle="continent-bonuses">
           <span class="info-section-title">Continent Bonuses</span>
-          <span class="info-section-toggle">▼</span>
+          <span class="info-section-toggle">${isCollapsed ? '▶' : '▼'}</span>
         </div>
         <div class="info-section-content" id="continent-bonuses-content">
           <div class="continent-list">
@@ -159,10 +167,19 @@ export class ContinentPanel {
     this.el.querySelectorAll('.info-section-header').forEach(header => {
       header.addEventListener('click', () => {
         const section = header.closest('.info-section');
+        const sectionId = header.dataset.toggle;
+
         section.classList.toggle('collapsed');
+        const isCollapsed = section.classList.contains('collapsed');
+
+        // Persist the collapsed state
+        if (sectionId) {
+          this.collapsedSections[sectionId] = isCollapsed;
+        }
+
         const toggle = header.querySelector('.info-section-toggle');
         if (toggle) {
-          toggle.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+          toggle.textContent = isCollapsed ? '▶' : '▼';
         }
       });
     });

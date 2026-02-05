@@ -4,7 +4,7 @@
       "id": "classic",
       "name": "Classic WW2",
       "description": "Historical 1942 Axis vs Allies setup",
-      "enabled": true,
+      "enabled": false,
       "useHistoricalSetup": true,
       "alliancesEnabled": true
     },
