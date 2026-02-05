@@ -148,6 +148,8 @@ export class GameState {
     this.riskCards = {};
     // Track how many times each player has traded cards (for escalating values)
     this.cardTradeCount = {};
+    // Track if player has conquered a territory this turn (for Risk card award - one per turn)
+    this.conqueredThisTurn = {};
 
     // Placement history for undo: [{ territory, unitType, owner }]
     this.placementHistory = [];
@@ -702,6 +704,11 @@ export class GameState {
     this.combatQueue = [];
     this.moveHistory = [];
     this.placementHistory = [];
+    // Reset conquered flag for Risk card (one card per turn)
+    const player = this.currentPlayer;
+    if (player) {
+      this.conqueredThisTurn[player.id] = false;
+    }
     this._clearMovedFlags();
     this._notify();
     this.autoSave(); // Auto-save after each turn
@@ -897,6 +904,7 @@ export class GameState {
 
     // Check if we captured an empty enemy territory (land only, not water)
     let captured = false;
+    let cardAwarded = null;
     if (!toT?.isWater && isEnemy) {
       // Check if there are any enemy units remaining
       const enemyUnits = this.units[toTerritory]?.filter(u =>
@@ -906,6 +914,12 @@ export class GameState {
         // Capture the territory immediately
         this.territoryState[toTerritory].owner = player.id;
         captured = true;
+
+        // Award Risk card for conquering (one per turn per Risk rules)
+        if (!this.conqueredThisTurn[player.id]) {
+          this.conqueredThisTurn[player.id] = true;
+          cardAwarded = this.awardRiskCard(player.id);
+        }
       }
     }
 
@@ -926,6 +940,7 @@ export class GameState {
       to: toTerritory,
       units: unitsToMove,
       captured,
+      cardAwarded,
       isAttack: isCombatMove && isEnemy && !captured,
     };
   }
@@ -1079,6 +1094,13 @@ export class GameState {
       if (!isNavalBattle) {
         const defender = defenders[0]?.owner;
         this.territoryState[territory].owner = player.id;
+
+        // Award Risk card for conquering (one per turn per Risk rules)
+        if (!this.conqueredThisTurn[player.id]) {
+          this.conqueredThisTurn[player.id] = true;
+          const cardType = this.awardRiskCard(player.id);
+          result.cardAwarded = cardType;
+        }
       }
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);
@@ -1087,6 +1109,7 @@ export class GameState {
       if (this._combatRoundsTracker) delete this._combatRoundsTracker[territory];
       result.resolved = true;
       result.winner = 'attacker';
+      result.conquered = true;
     } else if (remainingAttackers.length === 0) {
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);

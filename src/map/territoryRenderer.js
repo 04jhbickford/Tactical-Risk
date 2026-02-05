@@ -875,37 +875,44 @@ export class TerritoryRenderer {
 
     ctx.save();
 
-    // Draw star BEHIND the flag (before drawing the flag) - significantly bigger than flag
-    // Make star very prominent so capitals are always easy to identify
-    const starSize = isZoomedOut ? 70 : 55;
+    // Draw a BIG 5-pointed star as the capital marker
+    const starSize = isZoomedOut ? 90 : 70;
     this._drawCapitalStar(ctx, x, y, starSize, '#ffd700', isZoomedOut);
 
-    // Draw colored background/border - more prominent when zoomed out
-    const padding = isZoomedOut ? 5 : 3;
-    ctx.fillStyle = color;
-    ctx.strokeStyle = isZoomedOut ? '#fff' : '#000';
-    ctx.lineWidth = isZoomedOut ? 4 : 2;
-    ctx.shadowColor = 'rgba(0,0,0,0.7)';
-    ctx.shadowBlur = isZoomedOut ? 12 : 6;
-    ctx.shadowOffsetY = isZoomedOut ? 4 : 2;
+    // Draw circular flag in the center of the star
+    const circleRadius = isZoomedOut ? 22 : 18;
 
+    // Draw circle border/background
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 4;
     ctx.beginPath();
-    ctx.roundRect(x - width / 2 - padding, y - height / 2 - padding, width + padding * 2, height + padding * 2, isZoomedOut ? 6 : 4);
+    ctx.arc(x, y, circleRadius + 3, 0, Math.PI * 2);
+    ctx.fillStyle = color;
     ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
     ctx.stroke();
-
     ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
 
-    // Draw flag image
+    // Clip to circle and draw flag
     if (img && img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, x - width / 2, y - height / 2, width, height);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
+      ctx.clip();
+
+      // Draw flag image centered and covering the circle
+      const imgSize = circleRadius * 2.2;
+      ctx.drawImage(img, x - imgSize / 2, y - imgSize / 2, imgSize, imgSize);
+      ctx.restore();
     }
 
-    // Draw border around flag - white for visibility when zoomed out
-    ctx.strokeStyle = isZoomedOut ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = isZoomedOut ? 2 : 1;
-    ctx.strokeRect(x - width / 2, y - height / 2, width, height);
+    // Draw circle border on top
+    ctx.beginPath();
+    ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
     ctx.restore();
   }

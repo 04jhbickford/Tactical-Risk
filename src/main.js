@@ -157,6 +157,7 @@ async function init() {
         if (gameState.canTradeRiskCards(gameState.currentPlayer.id)) {
           const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
           if (result.success) {
+            actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);
             camera.dirty = true;
           }
         }
@@ -290,6 +291,10 @@ async function init() {
           actionLog.logAttack(moveInfo.from, moveInfo.to, player, null);
         } else if (moveInfo.captured) {
           actionLog.logCapture(moveInfo.to, player);
+          // Log Risk card earned (one per turn for conquering)
+          if (moveInfo.cardAwarded) {
+            actionLog.logCardEarned(player, moveInfo.cardAwarded);
+          }
         } else {
           actionLog.logMove(moveInfo.from, moveInfo.to, moveInfo.units, player);
         }
@@ -298,6 +303,7 @@ async function init() {
 
     // Combat UI
     combatUI.setGameState(gameState);
+    combatUI.setActionLog(actionLog);
     combatUI.setOnComplete(() => {
       camera.dirty = true;
     });

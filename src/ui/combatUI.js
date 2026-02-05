@@ -6,12 +6,14 @@ export class CombatUI {
   constructor() {
     this.gameState = null;
     this.unitDefs = null;
+    this.actionLog = null;
     this.onCombatComplete = null;
 
     this.currentTerritory = null;
     this.combatState = null; // { attackers, defenders, phase, pendingCasualties }
     this.diceAnimation = null;
     this.lastRolls = null;
+    this.cardAwarded = null;
 
     this._create();
   }
@@ -33,6 +35,10 @@ export class CombatUI {
 
   setOnComplete(callback) {
     this.onCombatComplete = callback;
+  }
+
+  setActionLog(actionLog) {
+    this.actionLog = actionLog;
   }
 
   hasCombats() {
@@ -416,6 +422,17 @@ export class CombatUI {
     // Update territory ownership if attacker won
     if (this.combatState.winner === 'attacker') {
       this.gameState.territoryState[this.currentTerritory].owner = player.id;
+
+      // Award Risk card for conquering (one per turn per Risk rules)
+      if (!this.gameState.conqueredThisTurn[player.id]) {
+        this.gameState.conqueredThisTurn[player.id] = true;
+        const cardType = this.gameState.awardRiskCard(player.id);
+        this.cardAwarded = cardType;
+        // Log the card earned
+        if (this.actionLog && cardType) {
+          this.actionLog.logCardEarned(player, cardType);
+        }
+      }
 
       // Handle capital capture (IPC transfer, victory check)
       this.gameState.handleCapitalCapture(this.currentTerritory, player.id, previousOwner);

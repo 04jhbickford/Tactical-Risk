@@ -208,6 +208,14 @@ export class ActionLog {
     });
   }
 
+  logCardEarned(player, cardType) {
+    this.log('card-earned', {
+      message: `${player.name} earned a Risk card: ${cardType}`,
+      cardType,
+      color: player.color
+    });
+  }
+
   logIncome(player, amount) {
     this.log('income', {
       message: `${player.name} collected ${amount} IPCs`,
@@ -227,18 +235,36 @@ export class ActionLog {
 
     const colorStyle = entry.data.color ? `border-left: 3px solid ${entry.data.color}` : '';
 
-    // Check if entry has detail line (for combat summaries)
-    const detailHtml = entry.data.detail
-      ? `<div class="log-detail">${entry.data.detail}</div>`
-      : '';
-
-    // Build tooltip with more details
-    const tooltipText = this._buildTooltip(entry);
+    // Build summary (max 2 lines) and full details
+    const summary = this._buildSummary(entry);
+    const details = this._buildDetails(entry);
+    const hasDetails = details.length > 0;
 
     div.innerHTML = `
       <span class="log-time">${time}</span>
-      <span class="log-message" style="${colorStyle}" title="${tooltipText}">${entry.data.message}${detailHtml}</span>
+      <span class="log-message" style="${colorStyle}">
+        <span class="log-summary">${summary}</span>
+        ${hasDetails ? `<span class="log-details hidden">${details}</span>` : ''}
+      </span>
+      ${hasDetails ? '<span class="log-expand-icon">▶</span>' : ''}
     `;
+
+    // Toggle expand/collapse on click
+    if (hasDetails) {
+      div.classList.add('expandable');
+      div.addEventListener('click', (e) => {
+        e.stopPropagation();
+        div.classList.toggle('expanded');
+        const detailsEl = div.querySelector('.log-details');
+        const iconEl = div.querySelector('.log-expand-icon');
+        if (detailsEl) {
+          detailsEl.classList.toggle('hidden');
+        }
+        if (iconEl) {
+          iconEl.textContent = div.classList.contains('expanded') ? '▼' : '▶';
+        }
+      });
+    }
 
     // Extract territory names and movement info for hover highlighting
     const territories = this._extractTerritories(entry);
@@ -256,6 +282,12 @@ export class ActionLog {
         if (hasMovement && this.onHighlightMovement) {
           this.onHighlightMovement(entry.data.from, entry.data.to, true, isCombat);
         }
+        // Auto-expand on hover
+        if (hasDetails && !div.classList.contains('expanded')) {
+          div.classList.add('hover-expanded');
+          const detailsEl = div.querySelector('.log-details');
+          if (detailsEl) detailsEl.classList.remove('hidden');
+        }
       });
 
       div.addEventListener('mouseleave', () => {
@@ -263,58 +295,89 @@ export class ActionLog {
         if (hasMovement && this.onHighlightMovement) {
           this.onHighlightMovement(entry.data.from, entry.data.to, false, isCombat);
         }
+        // Collapse on mouse leave (unless permanently expanded)
+        if (div.classList.contains('hover-expanded') && !div.classList.contains('expanded')) {
+          div.classList.remove('hover-expanded');
+          const detailsEl = div.querySelector('.log-details');
+          if (detailsEl) detailsEl.classList.add('hidden');
+        }
       });
     }
 
     this.contentEl.appendChild(div);
   }
 
-  // Build detailed tooltip for log entry
-  _buildTooltip(entry) {
-    const parts = [`Round ${entry.round}`];
+  // Build short summary (max ~50 chars)
+  _buildSummary(entry) {
     const data = entry.data;
+    switch (entry.type) {
+      case 'move':
+        return `Moved to ${data.to}`;
+      case 'attack':
+        return `Attacking ${data.to}`;
+      case 'combat-summary':
+        return `⚔️ ${data.territory}: ${data.winner} wins`;
+      case 'capture':
+        return `Captured ${data.territory}`;
+      case 'purchase':
+        const total = data.units?.reduce((sum, u) => sum + u.quantity, 0) || 0;
+        return `Purchased ${total} units`;
+      case 'capital':
+        return `Capital: ${data.territory}`;
+      case 'income':
+        return `+${data.amount} IPCs`;
+      case 'tech':
+        return data.tech ? `Tech: ${data.tech}` : 'Research failed';
+      case 'turn':
+        return data.message;
+      case 'phase':
+        return data.message;
+      case 'cards':
+        return `Traded cards: +${data.value} IPCs`;
+      case 'card-earned':
+        return `Earned Risk card: ${data.cardType}`;
+      default:
+        return data.message || entry.type;
+    }
+  }
+
+  // Build expanded details
+  _buildDetails(entry) {
+    const data = entry.data;
+    const parts = [];
 
     switch (entry.type) {
       case 'move':
-        parts.push(`Movement: ${data.from} → ${data.to}`);
+        parts.push(`From: ${data.from}`);
+        parts.push(`To: ${data.to}`);
         if (data.units) {
           parts.push(`Units: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
         }
         break;
       case 'attack':
-        parts.push(`Combat Move: ${data.from} → ${data.to}`);
-        parts.push('Battle pending');
+        parts.push(`From: ${data.from}`);
+        parts.push(`Target: ${data.to}`);
+        parts.push('Combat pending...');
         break;
       case 'combat-summary':
-        parts.push(`Battle at ${data.territory}`);
         parts.push(`${data.attacker} vs ${data.defender}`);
-        parts.push(`Winner: ${data.winner}`);
-        break;
-      case 'capture':
-        parts.push(`Territory captured: ${data.territory}`);
+        if (data.detail) parts.push(data.detail);
+        parts.push(`Result: ${data.conquered ? 'Territory conquered' : 'Attack repelled'}`);
         break;
       case 'purchase':
         if (data.units) {
-          parts.push(`Purchased: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
+          data.units.forEach(u => parts.push(`${u.quantity}x ${u.type}`));
         }
-        break;
-      case 'capital':
-        parts.push(`Capital placed at: ${data.territory}`);
         break;
       case 'income':
-        parts.push(`Income collected: ${data.amount} IPCs`);
-        break;
-      case 'tech':
-        if (data.tech) {
-          parts.push(`Technology: ${data.tech}`);
-        }
+        parts.push(`Round ${entry.round} income`);
         break;
       default:
-        // Generic tooltip
+        // No extra details
         break;
     }
 
-    return parts.join('\\n');
+    return parts.join('<br>');
   }
 
   // Extract territory names from entry data

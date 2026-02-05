@@ -4490,6 +4490,49 @@ html, body {
   margin-top: 2px;
 }
 
+/* Expandable log entries */
+.log-entry.expandable {
+  cursor: pointer;
+}
+
+.log-expand-icon {
+  color: #666;
+  font-size: 8px;
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.log-entry.expanded .log-expand-icon,
+.log-entry.hover-expanded .log-expand-icon {
+  transform: rotate(90deg);
+}
+
+.log-summary {
+  display: block;
+}
+
+.log-details {
+  display: block;
+  font-size: 10px;
+  color: #999;
+  margin-top: 4px;
+  padding-left: 4px;
+  border-left: 2px solid rgba(255,255,255,0.1);
+  line-height: 1.5;
+}
+
+.log-details.hidden {
+  display: none;
+}
+
+.log-entry.expanded,
+.log-entry.hover-expanded {
+  background: rgba(255,255,255,0.05);
+}
+
+.log-card-earned .log-message { color: #ffd700; }
+.log-card-earned .log-summary::before { content: '🃏 '; }
+
 /* Scrollbar for log */
 .action-log-content::-webkit-scrollbar {
   width: 6px;
