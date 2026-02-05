@@ -132,6 +132,10 @@ export class GameState {
     // Movement history for current turn: [{ from, to, units }]
     this.moveHistory = [];
 
+    // Air unit origins: { territory: { unitType: { origin: territoryName, distance: n } } }
+    // Tracks where air units came from and how far they traveled for post-combat landing
+    this.airUnitOrigins = {};
+
     // Victory state
     this.gameOver = false;
     this.winner = null; // 'Allies', 'Axis', or player name
@@ -408,6 +412,99 @@ export class GameState {
   canAirUnitReach(fromTerritory, toTerritory, movementRange) {
     const reachable = this.getReachableTerritoriesForAir(fromTerritory, movementRange, null, false);
     return reachable.has(toTerritory);
+  }
+
+  // Calculate distance between two territories for air units (BFS shortest path)
+  _calculateAirDistance(fromTerritory, toTerritory) {
+    if (fromTerritory === toTerritory) return 0;
+
+    const visited = new Set([fromTerritory]);
+    const queue = [{ territory: fromTerritory, distance: 0 }];
+
+    while (queue.length > 0) {
+      const { territory, distance } = queue.shift();
+      const t = this.territoryByName[territory];
+      if (!t) continue;
+
+      for (const conn of t.connections || []) {
+        if (conn === toTerritory) return distance + 1;
+        if (!visited.has(conn)) {
+          visited.add(conn);
+          queue.push({ territory: conn, distance: distance + 1 });
+        }
+      }
+    }
+
+    return 999; // Unreachable
+  }
+
+  // Get valid landing territories for air unit after combat
+  getAirLandingOptions(territory, unitType, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return [];
+
+    const unitDef = unitDefs[unitType];
+    if (!unitDef?.isAir) return [];
+
+    // Get origin tracking info
+    const originInfo = this.airUnitOrigins[territory]?.[unitType];
+    const distanceTraveled = originInfo?.distance || 0;
+    const totalMovement = unitDef.movement || 4;
+    const remainingMovement = totalMovement - distanceTraveled;
+
+    if (remainingMovement <= 0) {
+      // No movement left - can only stay if territory is friendly
+      const owner = this.getOwner(territory);
+      const t = this.territoryByName[territory];
+      if (owner === player.id && !t?.isWater) {
+        return [territory];
+      }
+      return []; // Crash
+    }
+
+    // Get all territories within remaining movement
+    const reachable = this.getReachableTerritoriesForAir(territory, remainingMovement, player.id, false);
+    const validLandings = [];
+
+    for (const [destName, info] of reachable) {
+      const destT = this.territoryByName[destName];
+      const destOwner = this.getOwner(destName);
+      const isFriendly = destOwner === player.id || this.areAllies(player.id, destOwner);
+
+      if (destT?.isWater) {
+        // Can only land on carriers in friendly fleet
+        if (isFriendly) {
+          const seaUnits = this.units[destName] || [];
+          const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+          const carrierDef = unitDefs.carrier;
+
+          if (carrierDef && carriers.length > 0) {
+            // Check for capacity
+            let capacity = 0;
+            for (const carrier of carriers) {
+              const aircraft = carrier.aircraft || [];
+              capacity += Math.max(0, (carrierDef.aircraftCapacity || 2) - aircraft.length);
+            }
+            if (capacity > 0 && carrierDef.canCarry?.includes(unitType)) {
+              validLandings.push({ territory: destName, distance: info.distance, isCarrier: true });
+            }
+          }
+        }
+      } else if (isFriendly) {
+        // Can land on friendly land territory
+        validLandings.push({ territory: destName, distance: info.distance, isCarrier: false });
+      }
+    }
+
+    // Sort by distance (closest first)
+    validLandings.sort((a, b) => a.distance - b.distance);
+
+    return validLandings;
+  }
+
+  // Clear air unit origins for a territory (after landing resolution)
+  clearAirUnitOrigins(territory) {
+    delete this.airUnitOrigins[territory];
   }
 
   // Get flight path for air unit (for validation and display)
@@ -1098,6 +1195,7 @@ export class GameState {
     this.combatQueue = [];
     this.moveHistory = [];
     this.placementHistory = [];
+    this.airUnitOrigins = {}; // Reset air unit tracking for new turn
     // Reset conquered flag for Risk card (one card per turn)
     const player = this.currentPlayer;
     if (player) {
@@ -1479,6 +1577,42 @@ export class GameState {
       captured, // Track if territory was captured for undo
       previousOwner: isEnemy ? toOwner : null,
     });
+
+    // Track air unit origins for post-combat landing (combat move only)
+    if (isCombatMove) {
+      for (const moveUnit of unitsToMove) {
+        const def = unitDefs[moveUnit.type];
+        if (def?.isAir) {
+          // Calculate distance traveled
+          const distance = this._calculateAirDistance(fromTerritory, toTerritory);
+
+          // Store origin info for this territory
+          if (!this.airUnitOrigins[toTerritory]) {
+            this.airUnitOrigins[toTerritory] = {};
+          }
+
+          // Track origin - if moving again, keep original origin
+          const existingOrigin = this.airUnitOrigins[fromTerritory]?.[moveUnit.type];
+          if (existingOrigin) {
+            // Already moved once, update destination but keep original origin
+            this.airUnitOrigins[toTerritory][moveUnit.type] = {
+              origin: existingOrigin.origin,
+              distance: existingOrigin.distance + distance,
+              movement: def.movement,
+            };
+            // Remove from old location tracking
+            delete this.airUnitOrigins[fromTerritory][moveUnit.type];
+          } else {
+            // First move - record origin
+            this.airUnitOrigins[toTerritory][moveUnit.type] = {
+              origin: fromTerritory,
+              distance: distance,
+              movement: def.movement,
+            };
+          }
+        }
+      }
+    }
 
     this._notify();
     return {
@@ -2368,6 +2502,57 @@ export class GameState {
 
     // Clear transport cargo
     transport.cargo = [];
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Unload a single unit from transport to coastal territory
+  unloadSingleUnit(seaZone, transportIndex, unitType, coastalTerritory) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const seaUnits = this.units[seaZone] || [];
+    const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+    if (transportIndex >= transports.length) {
+      return { success: false, error: 'Invalid transport' };
+    }
+
+    const transport = transports[transportIndex];
+    if (!transport.cargo || transport.cargo.length === 0) {
+      return { success: false, error: 'Transport has no cargo' };
+    }
+
+    // Find the unit in cargo
+    const cargoIdx = transport.cargo.findIndex(c => c.type === unitType && c.owner === player.id);
+    if (cargoIdx < 0) {
+      return { success: false, error: `No ${unitType} in transport` };
+    }
+
+    // Check adjacency
+    const seaT = this.territoryByName[seaZone];
+    if (!seaT || !seaT.connections.includes(coastalTerritory)) {
+      return { success: false, error: 'Territory not adjacent to sea zone' };
+    }
+
+    const coastalT = this.territoryByName[coastalTerritory];
+    if (coastalT?.isWater) {
+      return { success: false, error: 'Cannot unload to water' };
+    }
+
+    // Remove from transport cargo
+    transport.cargo.splice(cargoIdx, 1);
+
+    // Add to coastal territory
+    const coastalUnits = this.units[coastalTerritory] || [];
+    const existing = coastalUnits.find(u => u.type === unitType && u.owner === player.id);
+    if (existing) {
+      existing.quantity++;
+      existing.moved = true;
+    } else {
+      coastalUnits.push({ type: unitType, quantity: 1, owner: player.id, moved: true });
+    }
+    this.units[coastalTerritory] = coastalUnits;
 
     this._notify();
     return { success: true };

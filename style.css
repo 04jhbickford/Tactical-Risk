@@ -2408,6 +2408,105 @@ html, body {
   border-color: rgba(220, 20, 60, 0.6);
 }
 
+/* Cargo Unload UI (Amphibious Assault) */
+.mp-cargo-section {
+  margin-bottom: 12px;
+}
+
+.mp-cargo-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #64b5f6;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(100, 181, 246, 0.3);
+}
+
+.mp-transport {
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.mp-transport-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #90caf9;
+  margin-bottom: 6px;
+}
+
+.mp-cargo-unit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.mp-cargo-btn {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  color: #e0e0e0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.mp-cargo-btn:hover {
+  background: rgba(65, 105, 225, 0.3);
+  border-color: rgba(65, 105, 225, 0.5);
+}
+
+.mp-cargo-all-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  border-radius: 4px;
+  background: rgba(76, 175, 80, 0.2);
+  color: #81c784;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+.mp-cargo-all-btn:hover {
+  background: rgba(76, 175, 80, 0.3);
+}
+
+.mp-mode-switch {
+  margin: 12px 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.mp-switch-btn {
+  width: 100%;
+  padding: 8px;
+  font-size: 11px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.05);
+  color: #aaa;
+  cursor: pointer;
+}
+
+.mp-switch-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.mp-no-dest {
+  padding: 8px;
+  text-align: center;
+  color: #888;
+  font-size: 12px;
+  font-style: italic;
+}
+
 .mp-actions {
   display: flex;
   justify-content: flex-end;
@@ -3384,6 +3483,94 @@ html, body {
   color: #64b5f6;
   margin-bottom: 6px;
   text-align: center;
+}
+
+/* Air Landing Phase */
+.air-landing-section {
+  background: rgba(156, 39, 176, 0.15);
+  border: 1px solid rgba(156, 39, 176, 0.3);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.air-landing-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.air-landing-icon {
+  font-size: 18px;
+}
+
+.air-landing-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ce93d8;
+}
+
+.air-landing-desc {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 12px;
+}
+
+.air-landing-unit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+
+.air-landing-unit.no-options {
+  background: rgba(244, 67, 54, 0.15);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+.air-landing-unit-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.air-landing-unit-info img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.air-landing-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.air-landing-select {
+  padding: 6px 10px;
+  font-size: 11px;
+  border: 1px solid rgba(156, 39, 176, 0.4);
+  border-radius: 4px;
+  background: rgba(156, 39, 176, 0.2);
+  color: #e0e0e0;
+  cursor: pointer;
+  max-width: 180px;
+}
+
+.air-landing-select:focus {
+  outline: none;
+  border-color: rgba(156, 39, 176, 0.6);
+}
+
+.air-landing-crash {
+  font-size: 11px;
+  font-weight: 600;
+  color: #f44336;
+  text-transform: uppercase;
 }
 
 /* Victory Overlay */

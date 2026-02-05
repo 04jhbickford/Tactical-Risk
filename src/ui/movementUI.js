@@ -13,6 +13,8 @@ export class MovementUI {
     // Movement state
     this.selectedFrom = null;
     this.selectedUnits = {}; // { unitType: quantity }
+    this.selectedCargoUnits = {}; // { transportIndex: { unitType: quantity } } for unloading
+    this.unloadMode = false; // True when unloading cargo from transports
 
     // Drag state
     this.isDragging = false;
@@ -138,7 +140,18 @@ export class MovementUI {
   _hasMovableUnits(territory) {
     const player = this.gameState.currentPlayer;
     const units = this.gameState.getUnitsAt(territory.name);
-    return units.some(u => u.owner === player.id && !u.moved && this._canUnitMove(u.type));
+
+    // Check for movable units
+    const hasMovable = units.some(u => u.owner === player.id && !u.moved && this._canUnitMove(u.type));
+    if (hasMovable) return true;
+
+    // Also check for transports with cargo to unload (for amphibious assaults)
+    if (territory.isWater) {
+      const transportCargo = this.gameState.getTransportCargo(territory.name, player.id);
+      return transportCargo.some(t => t.cargo.length > 0);
+    }
+
+    return false;
   }
 
   _canUnitMove(unitType) {
@@ -149,6 +162,19 @@ export class MovementUI {
   selectSource(territory) {
     this.selectedFrom = territory;
     this.selectedUnits = {};
+    this.selectedCargoUnits = {};
+    this.unloadMode = false;
+
+    // Check if this is a sea zone with transports carrying cargo
+    if (territory.isWater) {
+      const player = this.gameState.currentPlayer;
+      const transportCargo = this.gameState.getTransportCargo(territory.name, player.id);
+      const hasCargoToUnload = transportCargo.some(t => t.cargo.length > 0);
+      if (hasCargoToUnload) {
+        this.unloadMode = true;
+      }
+    }
+
     this._render();
     this.el.classList.remove('hidden');
   }
@@ -483,7 +509,268 @@ export class MovementUI {
   cancel() {
     this.selectedFrom = null;
     this.selectedUnits = {};
+    this.selectedCargoUnits = {};
+    this.unloadMode = false;
     this.el.classList.add('hidden');
+  }
+
+  // Render cargo unload UI for amphibious assaults
+  _renderCargoUnloadUI(player, isCombatMove, canUndo) {
+    const transportCargo = this.gameState.getTransportCargo(this.selectedFrom.name, player.id);
+    const phaseLabel = isCombatMove ? 'Amphibious Assault' : 'Unload Units';
+
+    let html = `
+      <div class="mp-drag-handle"></div>
+      <div class="mp-header">
+        <div class="mp-title">${phaseLabel}</div>
+        <div class="mp-phase">${isCombatMove ? 'Combat Movement' : 'Non-Combat Movement'}</div>
+      </div>
+
+      <div class="mp-from">
+        <span class="mp-label">From:</span>
+        <span class="mp-territory">${this.selectedFrom.name}</span>
+      </div>
+
+      <div class="mp-cargo-section">
+        <div class="mp-cargo-header">Transport Cargo</div>
+    `;
+
+    // Show each transport and its cargo
+    let totalCargoSelected = 0;
+    for (const transport of transportCargo) {
+      if (transport.cargo.length === 0) continue;
+
+      html += `<div class="mp-transport" data-transport="${transport.index}">`;
+      html += `<div class="mp-transport-label">Transport ${transport.index + 1}</div>`;
+
+      // Group cargo by type
+      const cargoByType = {};
+      for (const c of transport.cargo) {
+        cargoByType[c.type] = (cargoByType[c.type] || 0) + 1;
+      }
+
+      for (const [unitType, qty] of Object.entries(cargoByType)) {
+        const def = this.unitDefs[unitType];
+        const imageSrc = player ? getUnitIconPath(unitType, player.id) : null;
+        const selected = this.selectedCargoUnits[transport.index]?.[unitType] || 0;
+        totalCargoSelected += selected;
+
+        html += `
+          <div class="mp-cargo-unit">
+            <div class="mp-unit-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="mp-unit-icon" alt="${unitType}">` : ''}
+              <span class="mp-unit-name">${unitType}</span>
+              <span class="mp-unit-avail">(${qty})</span>
+            </div>
+            <div class="mp-unit-select">
+              <button class="mp-cargo-btn" data-transport="${transport.index}" data-unit="${unitType}" data-delta="-1">−</button>
+              <span class="mp-qty">${selected}</span>
+              <button class="mp-cargo-btn" data-transport="${transport.index}" data-unit="${unitType}" data-delta="1">+</button>
+              <button class="mp-cargo-all-btn" data-transport="${transport.index}" data-unit="${unitType}" data-qty="${qty}">All</button>
+            </div>
+          </div>
+        `;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+
+    // Show valid coastal destinations
+    const coastalDestinations = this._getCoastalDestinations(isCombatMove);
+
+    if (totalCargoSelected > 0 && coastalDestinations.length > 0) {
+      html += `
+        <div class="mp-destinations">
+          <span class="mp-label">${isCombatMove ? 'Assault:' : 'Unload to:'}</span>
+          <div class="mp-dest-list">
+            ${coastalDestinations.map(dest => {
+              const owner = this.gameState.getOwner(dest);
+              const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+              const cls = isEnemy ? 'enemy' : '';
+              return `<button class="mp-dest-btn ${cls}" data-dest="${dest}" data-action="unload">${dest}${isEnemy ? ' ⚔️' : ''}</button>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    } else if (totalCargoSelected > 0) {
+      html += `<div class="mp-no-dest">No valid destinations</div>`;
+    }
+
+    // Switch to normal movement if there are also movable ships
+    const units = this.gameState.getUnitsAt(this.selectedFrom.name);
+    const movableShips = units.filter(u =>
+      u.owner === player.id && !u.moved && this._canUnitMove(u.type) && this.unitDefs[u.type]?.isSea
+    );
+
+    if (movableShips.length > 0) {
+      html += `
+        <div class="mp-mode-switch">
+          <button class="mp-switch-btn" data-action="switch-to-move">Move Ships Instead</button>
+        </div>
+      `;
+    }
+
+    html += `
+      <div class="mp-actions">
+        ${canUndo ? `<button class="mp-undo-btn">Undo Last Move</button>` : ''}
+        <button class="mp-cancel-btn">Cancel</button>
+      </div>
+    `;
+
+    this.el.innerHTML = html;
+    this._bindCargoEvents();
+  }
+
+  // Get valid coastal territories for unloading
+  _getCoastalDestinations(isCombatMove) {
+    const player = this.gameState.currentPlayer;
+    const connections = this.gameState.getConnections(this.selectedFrom.name);
+
+    return connections.filter(connName => {
+      const t = this.territoryByName[connName];
+      if (!t || t.isWater) return false; // Must be land
+
+      const owner = this.gameState.getOwner(connName);
+      const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+
+      // During non-combat, can only unload to friendly territory
+      if (!isCombatMove && isEnemy) return false;
+
+      return true;
+    });
+  }
+
+  _bindCargoEvents() {
+    // Cargo quantity buttons
+    this.el.querySelectorAll('.mp-cargo-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const transportIdx = parseInt(btn.dataset.transport);
+        const unitType = btn.dataset.unit;
+        const delta = parseInt(btn.dataset.delta);
+        this._updateCargoSelection(transportIdx, unitType, delta);
+      });
+    });
+
+    // Cargo all buttons
+    this.el.querySelectorAll('.mp-cargo-all-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const transportIdx = parseInt(btn.dataset.transport);
+        const unitType = btn.dataset.unit;
+        const qty = parseInt(btn.dataset.qty);
+        if (!this.selectedCargoUnits[transportIdx]) {
+          this.selectedCargoUnits[transportIdx] = {};
+        }
+        this.selectedCargoUnits[transportIdx][unitType] = qty;
+        this._render();
+      });
+    });
+
+    // Unload destination buttons
+    this.el.querySelectorAll('[data-action="unload"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const destName = btn.dataset.dest;
+        this._executeUnload(destName);
+      });
+    });
+
+    // Switch to move mode
+    this.el.querySelector('[data-action="switch-to-move"]')?.addEventListener('click', () => {
+      this.unloadMode = false;
+      this._render();
+    });
+
+    // Cancel
+    this.el.querySelector('.mp-cancel-btn')?.addEventListener('click', () => {
+      this.cancel();
+    });
+
+    // Undo
+    this.el.querySelector('.mp-undo-btn')?.addEventListener('click', () => {
+      const result = this.gameState.undoLastMove();
+      if (result.success && this.onMoveComplete) {
+        this.onMoveComplete();
+      }
+      this._render();
+    });
+  }
+
+  _updateCargoSelection(transportIdx, unitType, delta) {
+    const player = this.gameState.currentPlayer;
+    const transportCargo = this.gameState.getTransportCargo(this.selectedFrom.name, player.id);
+    const transport = transportCargo.find(t => t.index === transportIdx);
+    if (!transport) return;
+
+    // Count available of this type
+    const available = transport.cargo.filter(c => c.type === unitType).length;
+
+    if (!this.selectedCargoUnits[transportIdx]) {
+      this.selectedCargoUnits[transportIdx] = {};
+    }
+
+    const current = this.selectedCargoUnits[transportIdx][unitType] || 0;
+    const newValue = Math.max(0, Math.min(available, current + delta));
+    this.selectedCargoUnits[transportIdx][unitType] = newValue;
+
+    this._render();
+  }
+
+  _executeUnload(destName) {
+    const player = this.gameState.currentPlayer;
+    const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+
+    // Unload selected cargo from each transport
+    const unloadedUnits = [];
+
+    for (const [transportIdxStr, unitSelections] of Object.entries(this.selectedCargoUnits)) {
+      const transportIdx = parseInt(transportIdxStr);
+
+      for (const [unitType, qty] of Object.entries(unitSelections)) {
+        if (qty <= 0) continue;
+
+        // Unload this many units of this type from this transport
+        for (let i = 0; i < qty; i++) {
+          const result = this.gameState.unloadSingleUnit(
+            this.selectedFrom.name,
+            transportIdx,
+            unitType,
+            destName
+          );
+          if (result.success) {
+            unloadedUnits.push({ type: unitType, quantity: 1 });
+          } else {
+            console.warn('Unload failed:', result.error);
+            break;
+          }
+        }
+      }
+    }
+
+    if (unloadedUnits.length > 0) {
+      // Check if this is an enemy territory (amphibious assault)
+      const owner = this.gameState.getOwner(destName);
+      const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+
+      if (isCombatMove && isEnemy) {
+        // Add to combat queue
+        if (!this.gameState.combatQueue.includes(destName)) {
+          this.gameState.combatQueue.push(destName);
+        }
+      }
+
+      const moveInfo = {
+        from: this.selectedFrom.name,
+        to: destName,
+        units: unloadedUnits,
+        isAmphibious: isCombatMove && isEnemy,
+        isAttack: isCombatMove && isEnemy,
+      };
+
+      this.cancel();
+      if (this.onMoveComplete) {
+        this.onMoveComplete(moveInfo);
+      }
+    }
   }
 
   _render() {
@@ -493,16 +780,22 @@ export class MovementUI {
     }
 
     const player = this.gameState.currentPlayer;
+    const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+    const phaseLabel = isCombatMove ? 'Combat Movement' : 'Non-Combat Movement';
+    const canUndo = isCombatMove && this.gameState.moveHistory && this.gameState.moveHistory.length > 0;
+
+    // Check if we should show cargo unload UI
+    if (this.unloadMode && this.selectedFrom.isWater) {
+      this._renderCargoUnloadUI(player, isCombatMove, canUndo);
+      return;
+    }
+
     const units = this.gameState.getUnitsAt(this.selectedFrom.name);
     const movableUnits = units.filter(u =>
       u.owner === player.id &&
       !u.moved &&
       this._canUnitMove(u.type)
     );
-
-    const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
-    const phaseLabel = isCombatMove ? 'Combat Movement' : 'Non-Combat Movement';
-    const canUndo = isCombatMove && this.gameState.moveHistory && this.gameState.moveHistory.length > 0;
 
     let html = `
       <div class="mp-drag-handle"></div>

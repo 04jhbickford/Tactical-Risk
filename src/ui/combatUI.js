@@ -103,6 +103,9 @@ export class CombatUI {
       bombardmentHits: bombardmentResult.hits,
       bombardmentFired: false,
       hasAA: aaGuns.length > 0 && attackingAir.length > 0,
+      // Air landing tracking
+      airUnitsToLand: [], // { type, quantity, landingOptions }
+      selectedLandings: {}, // { unitType: territoryName }
     };
 
     this.lastRolls = null;
@@ -430,6 +433,129 @@ export class CombatUI {
     return Object.values(selected).reduce((sum, n) => sum + n, 0);
   }
 
+  _confirmAirLandings() {
+    const player = this.gameState.currentPlayer;
+    const { airUnitsToLand, selectedLandings, attackers } = this.combatState;
+
+    // Process each air unit landing
+    for (const airUnit of airUnitsToLand) {
+      const destination = selectedLandings[airUnit.type];
+
+      if (!destination && airUnit.landingOptions.length > 0) {
+        // No selection made but has options - shouldn't happen due to button disabled
+        continue;
+      }
+
+      // Find the unit in attackers
+      const attackerUnit = attackers.find(u => u.type === airUnit.type);
+      if (!attackerUnit || attackerUnit.quantity <= 0) continue;
+
+      if (airUnit.landingOptions.length === 0) {
+        // No valid landing - unit crashes (remove from attackers)
+        attackerUnit.quantity = 0;
+        console.log(`${airUnit.type} crashed - no valid landing location`);
+      } else if (destination && destination !== this.currentTerritory) {
+        // Move air units to destination
+        // First remove from attackers (will be added to destination)
+        const quantityToMove = attackerUnit.quantity;
+        attackerUnit.quantity = 0;
+
+        // Add to destination territory
+        const destUnits = this.gameState.units[destination] || [];
+        const existing = destUnits.find(u => u.type === airUnit.type && u.owner === player.id);
+        if (existing) {
+          existing.quantity += quantityToMove;
+          existing.moved = true;
+        } else {
+          destUnits.push({
+            type: airUnit.type,
+            quantity: quantityToMove,
+            owner: player.id,
+            moved: true
+          });
+        }
+        this.gameState.units[destination] = destUnits;
+
+        // Check if landing on carrier
+        const destT = this.gameState.territoryByName[destination];
+        if (destT?.isWater) {
+          // Land on carrier
+          const seaUnits = this.gameState.units[destination] || [];
+          const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+          const carrierDef = this.unitDefs.carrier;
+
+          // Add to carrier's aircraft array
+          for (const carrier of carriers) {
+            carrier.aircraft = carrier.aircraft || [];
+            const capacity = (carrierDef?.aircraftCapacity || 2) - carrier.aircraft.length;
+            const toAdd = Math.min(quantityToMove, capacity);
+            for (let i = 0; i < toAdd; i++) {
+              carrier.aircraft.push({ type: airUnit.type, owner: player.id });
+            }
+            if (carrier.aircraft.length >= (carrierDef?.aircraftCapacity || 2)) break;
+          }
+        }
+      }
+    }
+
+    // Clean up attackers list
+    this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+
+    // Clear air unit origins for this territory
+    this.gameState.clearAirUnitOrigins(this.currentTerritory);
+
+    // Move to resolved phase
+    this.combatState.phase = 'resolved';
+    this._render();
+  }
+
+  _checkAirLanding() {
+    const player = this.gameState.currentPlayer;
+    const { attackers, winner } = this.combatState;
+
+    // Find surviving air units that need to land
+    const airUnitsToLand = [];
+    const territory = this.currentTerritory;
+    const territoryOwner = winner === 'attacker' ? player.id : this.gameState.getOwner(territory);
+    const isFriendlyTerritory = territoryOwner === player.id;
+    const t = this.gameState.territoryByName[territory];
+
+    for (const unit of attackers) {
+      const def = this.unitDefs[unit.type];
+      if (!def?.isAir || unit.quantity <= 0) continue;
+
+      // Get landing options for this air unit
+      const landingOptions = this.gameState.getAirLandingOptions(territory, unit.type, this.unitDefs);
+
+      // Check if can stay in current territory (friendly land, not water)
+      const canStayHere = isFriendlyTerritory && !t?.isWater;
+
+      if (!canStayHere || landingOptions.length === 0) {
+        // Must choose a landing location
+        airUnitsToLand.push({
+          type: unit.type,
+          quantity: unit.quantity,
+          landingOptions: landingOptions,
+          canStayHere: canStayHere,
+        });
+      } else if (landingOptions.length > 0) {
+        // Can stay but may want to land elsewhere - only require selection if can't stay
+        // For now, allow staying if it's a valid option
+      }
+    }
+
+    // Filter out units that can stay here - they don't need landing selection
+    const mustLand = airUnitsToLand.filter(u => !u.canStayHere);
+
+    if (mustLand.length > 0) {
+      this.combatState.airUnitsToLand = mustLand;
+      this.combatState.selectedLandings = {};
+      this.combatState.phase = 'airLanding';
+    } else {
+      this.combatState.phase = 'resolved';
+    }
+  }
+
   _applyCasualties() {
     const { attackers, defenders, selectedAttackerCasualties, selectedDefenderCasualties } = this.combatState;
 
@@ -451,11 +577,11 @@ export class CombatUI {
 
     // Check for resolution
     if (this.combatState.defenders.length === 0) {
-      this.combatState.phase = 'resolved';
       this.combatState.winner = 'attacker';
+      this._checkAirLanding();
     } else if (this.combatState.attackers.length === 0) {
-      this.combatState.phase = 'resolved';
       this.combatState.winner = 'defender';
+      this._checkAirLanding();
     } else {
       // Continue combat
       this.combatState.phase = 'ready';
@@ -540,7 +666,11 @@ export class CombatUI {
 
   async _autoBattle() {
     // Run combat to completion automatically
-    while (this.combatState.phase !== 'resolved') {
+    while (this.combatState.phase !== 'resolved' && this.combatState.phase !== 'airLanding') {
+      if (this.combatState.phase === 'bombardment') {
+        this._fireBombardment();
+        await new Promise(r => setTimeout(r, 150));
+      }
       if (this.combatState.phase === 'aaFire') {
         this._rollAAFire();
         await new Promise(r => setTimeout(r, 150));
@@ -553,6 +683,18 @@ export class CombatUI {
         this._applyCasualties();
         await new Promise(r => setTimeout(r, 150));
       }
+    }
+
+    // Handle air landing phase - auto-select closest valid landing for each air unit
+    if (this.combatState.phase === 'airLanding') {
+      const { airUnitsToLand } = this.combatState;
+      for (const airUnit of airUnitsToLand) {
+        if (airUnit.landingOptions.length > 0) {
+          // Select the closest landing option
+          this.combatState.selectedLandings[airUnit.type] = airUnit.landingOptions[0].territory;
+        }
+      }
+      this._confirmAirLandings();
     }
   }
 
@@ -697,6 +839,49 @@ export class CombatUI {
       `;
     }
 
+    // Air Landing phase - select where air units will land
+    if (phase === 'airLanding') {
+      const { airUnitsToLand, selectedLandings } = this.combatState;
+      html += `
+        <div class="air-landing-section">
+          <div class="air-landing-header">
+            <span class="air-landing-icon">✈️</span>
+            <span class="air-landing-title">Air Unit Landing</span>
+          </div>
+          <div class="air-landing-desc">Select landing locations for your air units</div>
+      `;
+
+      for (const airUnit of airUnitsToLand) {
+        const def = this.unitDefs[airUnit.type];
+        const imageSrc = player ? getUnitIconPath(airUnit.type, player.id) : null;
+        const selectedDest = selectedLandings[airUnit.type];
+        const hasOptions = airUnit.landingOptions.length > 0;
+
+        html += `
+          <div class="air-landing-unit ${!hasOptions ? 'no-options' : ''}">
+            <div class="air-landing-unit-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="air-landing-icon" alt="${airUnit.type}">` : ''}
+              <span class="air-landing-name">${airUnit.quantity}× ${airUnit.type}</span>
+            </div>
+            ${hasOptions ? `
+              <select class="air-landing-select" data-unit="${airUnit.type}">
+                <option value="">-- Select Landing --</option>
+                ${airUnit.landingOptions.map(opt =>
+                  `<option value="${opt.territory}" ${selectedDest === opt.territory ? 'selected' : ''}>
+                    ${opt.territory} ${opt.isCarrier ? '(Carrier)' : ''} (${opt.distance} spaces)
+                  </option>`
+                ).join('')}
+              </select>
+            ` : `
+              <span class="air-landing-crash">No valid landing - CRASH!</span>
+            `}
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+    }
+
     // Actions
     html += `<div class="combat-actions">`;
 
@@ -726,6 +911,16 @@ export class CombatUI {
       html += `
         <button class="combat-btn confirm" data-action="confirm-casualties">
           Confirm Casualties
+        </button>
+      `;
+    } else if (phase === 'airLanding') {
+      const { airUnitsToLand, selectedLandings } = this.combatState;
+      const allSelected = airUnitsToLand.every(u =>
+        u.landingOptions.length === 0 || selectedLandings[u.type]
+      );
+      html += `
+        <button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>
+          Confirm Landings
         </button>
       `;
     } else if (phase === 'resolved') {
@@ -950,11 +1145,24 @@ export class CombatUI {
           case 'confirm-casualties':
             this._applyCasualties();
             break;
+          case 'confirm-landing':
+            this._confirmAirLandings();
+            break;
           case 'next':
             this._finalizeCombat();
             this._nextCombat();
             break;
         }
+      });
+    });
+
+    // Air landing select dropdowns
+    this.el.querySelectorAll('.air-landing-select').forEach(select => {
+      select.addEventListener('change', () => {
+        const unitType = select.dataset.unit;
+        const destination = select.value;
+        this.combatState.selectedLandings[unitType] = destination;
+        this._render();
       });
     });
 
