@@ -136,6 +136,9 @@ export class GameState {
     // Tracks where air units came from and how far they traveled for post-combat landing
     this.airUnitOrigins = {};
 
+    // Territories friendly at turn start (for air landing - can only land in these)
+    this.friendlyTerritoriesAtTurnStart = new Set();
+
     // Victory state
     this.gameOver = false;
     this.winner = null; // 'Allies', 'Axis', or player name
@@ -439,6 +442,7 @@ export class GameState {
   }
 
   // Get valid landing territories for air unit after combat
+  // IMPORTANT: Air units can ONLY land in territories that were friendly at the START of the turn
   getAirLandingOptions(territory, unitType, unitDefs) {
     const player = this.currentPlayer;
     if (!player) return [];
@@ -446,52 +450,47 @@ export class GameState {
     const unitDef = unitDefs[unitType];
     if (!unitDef?.isAir) return [];
 
-    // Get origin tracking info
+    // Get origin tracking info - if no origin tracked, assume unit started here
     const originInfo = this.airUnitOrigins[territory]?.[unitType];
     const distanceTraveled = originInfo?.distance || 0;
     const totalMovement = unitDef.movement || 4;
-    const remainingMovement = totalMovement - distanceTraveled;
+    const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
-    if (remainingMovement <= 0) {
-      // No movement left - can only stay if territory is friendly
-      const owner = this.getOwner(territory);
-      const t = this.territoryByName[territory];
-      if (owner === player.id && !t?.isWater) {
-        return [territory];
-      }
-      return []; // Crash
-    }
-
-    // Get all territories within remaining movement
-    const reachable = this.getReachableTerritoriesForAir(territory, remainingMovement, player.id, false);
+    // Get all territories within remaining movement (use full movement if starting from friendly territory)
+    const searchRange = remainingMovement > 0 ? remainingMovement : totalMovement;
+    const reachable = this.getReachableTerritoriesForAir(territory, searchRange, player.id, false);
     const validLandings = [];
 
+    // Get territories that were friendly at turn start
+    const friendlyAtStart = this.friendlyTerritoriesAtTurnStart || new Set();
+
     for (const [destName, info] of reachable) {
+      // CRITICAL: Only allow landing in territories that were friendly at the START of the turn
+      // Newly captured territories are NOT valid landing spots
+      const wasFriendlyAtStart = friendlyAtStart.has(destName);
+
+      // Skip if not friendly at turn start (unless it's a carrier which moves with the fleet)
       const destT = this.territoryByName[destName];
-      const destOwner = this.getOwner(destName);
-      const isFriendly = destOwner === player.id || this.areAllies(player.id, destOwner);
 
       if (destT?.isWater) {
-        // Can only land on carriers in friendly fleet
-        if (isFriendly) {
-          const seaUnits = this.units[destName] || [];
-          const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
-          const carrierDef = unitDefs.carrier;
+        // Carriers: check if there's a friendly carrier with capacity
+        const seaUnits = this.units[destName] || [];
+        const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        const carrierDef = unitDefs.carrier;
 
-          if (carrierDef && carriers.length > 0) {
-            // Check for capacity
-            let capacity = 0;
-            for (const carrier of carriers) {
-              const aircraft = carrier.aircraft || [];
-              capacity += Math.max(0, (carrierDef.aircraftCapacity || 2) - aircraft.length);
-            }
-            if (capacity > 0 && carrierDef.canCarry?.includes(unitType)) {
-              validLandings.push({ territory: destName, distance: info.distance, isCarrier: true });
-            }
+        if (carrierDef && carriers.length > 0) {
+          // Check for capacity
+          let capacity = 0;
+          for (const carrier of carriers) {
+            const aircraft = carrier.aircraft || [];
+            capacity += Math.max(0, (carrierDef.aircraftCapacity || 2) - aircraft.length);
+          }
+          if (capacity > 0 && carrierDef.canCarry?.includes(unitType)) {
+            validLandings.push({ territory: destName, distance: info.distance, isCarrier: true });
           }
         }
-      } else if (isFriendly) {
-        // Can land on friendly land territory
+      } else if (wasFriendlyAtStart) {
+        // Land territory - must have been friendly at turn start
         validLandings.push({ territory: destName, distance: info.distance, isCarrier: false });
       }
     }
@@ -1196,8 +1195,20 @@ export class GameState {
     this.moveHistory = [];
     this.placementHistory = [];
     this.airUnitOrigins = {}; // Reset air unit tracking for new turn
-    // Reset conquered flag for Risk card (one card per turn)
+
+    // Track territories that are friendly at the START of this turn (for air landing)
+    // Air units can ONLY land in territories that were friendly at turn start
     const player = this.currentPlayer;
+    this.friendlyTerritoriesAtTurnStart = new Set();
+    if (player) {
+      for (const [terrName, state] of Object.entries(this.territoryState)) {
+        if (state.owner === player.id || this.areAllies(player.id, state.owner)) {
+          this.friendlyTerritoriesAtTurnStart.add(terrName);
+        }
+      }
+    }
+
+    // Reset conquered flag for Risk card (one card per turn)
     if (player) {
       this.conqueredThisTurn[player.id] = false;
     }

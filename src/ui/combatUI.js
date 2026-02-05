@@ -511,44 +511,30 @@ export class CombatUI {
 
   _checkAirLanding() {
     const player = this.gameState.currentPlayer;
-    const { attackers, winner } = this.combatState;
+    const { attackers } = this.combatState;
 
-    // Find surviving air units that need to land
+    // Find ALL surviving air units - they MUST select a landing location
+    // Air units can ONLY land in territories that were friendly at the START of the turn
     const airUnitsToLand = [];
     const territory = this.currentTerritory;
-    const territoryOwner = winner === 'attacker' ? player.id : this.gameState.getOwner(territory);
-    const isFriendlyTerritory = territoryOwner === player.id;
-    const t = this.gameState.territoryByName[territory];
 
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
       if (!def?.isAir || unit.quantity <= 0) continue;
 
-      // Get landing options for this air unit
+      // Get valid landing options (only territories friendly at turn start)
       const landingOptions = this.gameState.getAirLandingOptions(territory, unit.type, this.unitDefs);
 
-      // Check if can stay in current territory (friendly land, not water)
-      const canStayHere = isFriendlyTerritory && !t?.isWater;
-
-      if (!canStayHere || landingOptions.length === 0) {
-        // Must choose a landing location
-        airUnitsToLand.push({
-          type: unit.type,
-          quantity: unit.quantity,
-          landingOptions: landingOptions,
-          canStayHere: canStayHere,
-        });
-      } else if (landingOptions.length > 0) {
-        // Can stay but may want to land elsewhere - only require selection if can't stay
-        // For now, allow staying if it's a valid option
-      }
+      // ALL air units must choose a landing location after combat
+      airUnitsToLand.push({
+        type: unit.type,
+        quantity: unit.quantity,
+        landingOptions: landingOptions,
+      });
     }
 
-    // Filter out units that can stay here - they don't need landing selection
-    const mustLand = airUnitsToLand.filter(u => !u.canStayHere);
-
-    if (mustLand.length > 0) {
-      this.combatState.airUnitsToLand = mustLand;
+    if (airUnitsToLand.length > 0) {
+      this.combatState.airUnitsToLand = airUnitsToLand;
       this.combatState.selectedLandings = {};
       this.combatState.phase = 'airLanding';
     } else {
@@ -846,9 +832,12 @@ export class CombatUI {
         <div class="air-landing-section">
           <div class="air-landing-header">
             <span class="air-landing-icon">✈️</span>
-            <span class="air-landing-title">Air Unit Landing</span>
+            <span class="air-landing-title">Air Unit Landing Required</span>
           </div>
-          <div class="air-landing-desc">Select landing locations for your air units</div>
+          <div class="air-landing-desc">
+            Air units must land in a territory that was <strong>friendly at the start of your turn</strong>.
+            Newly captured territories are NOT valid landing locations.
+          </div>
       `;
 
       for (const airUnit of airUnitsToLand) {
@@ -857,23 +846,35 @@ export class CombatUI {
         const selectedDest = selectedLandings[airUnit.type];
         const hasOptions = airUnit.landingOptions.length > 0;
 
+        // Get movement info for this unit
+        const originInfo = this.gameState.airUnitOrigins[this.currentTerritory]?.[airUnit.type];
+        const totalMovement = def?.movement || 4;
+        const distanceTraveled = originInfo?.distance || 0;
+        const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
+
         html += `
           <div class="air-landing-unit ${!hasOptions ? 'no-options' : ''}">
             <div class="air-landing-unit-info">
               ${imageSrc ? `<img src="${imageSrc}" class="air-landing-icon" alt="${airUnit.type}">` : ''}
-              <span class="air-landing-name">${airUnit.quantity}× ${airUnit.type}</span>
+              <div class="air-landing-unit-details">
+                <span class="air-landing-name">${airUnit.quantity}× ${airUnit.type}</span>
+                <span class="air-landing-movement">Movement: ${remainingMovement}/${totalMovement} remaining</span>
+              </div>
             </div>
             ${hasOptions ? `
               <select class="air-landing-select" data-unit="${airUnit.type}">
                 <option value="">-- Select Landing --</option>
                 ${airUnit.landingOptions.map(opt =>
                   `<option value="${opt.territory}" ${selectedDest === opt.territory ? 'selected' : ''}>
-                    ${opt.territory} ${opt.isCarrier ? '(Carrier)' : ''} (${opt.distance} spaces)
+                    ${opt.territory} ${opt.isCarrier ? '🚢' : ''} (${opt.distance} away)
                   </option>`
                 ).join('')}
               </select>
             ` : `
-              <span class="air-landing-crash">No valid landing - CRASH!</span>
+              <div class="air-landing-crash">
+                <span class="crash-icon">💥</span>
+                <span class="crash-text">No valid landing - Unit will CRASH!</span>
+              </div>
             `}
           </div>
         `;
