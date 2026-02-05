@@ -84,10 +84,14 @@ export class CombatUI {
       return def && def.isAir;
     });
 
+    // Calculate shore bombardment for amphibious assaults
+    const bombardmentResult = this._calculateBombardment();
+
     this.combatState = {
       attackers,
       defenders,
-      phase: aaGuns.length > 0 && attackingAir.length > 0 ? 'aaFire' : 'ready',
+      phase: bombardmentResult.rolls.length > 0 ? 'bombardment' :
+             (aaGuns.length > 0 && attackingAir.length > 0 ? 'aaFire' : 'ready'),
       pendingAttackerCasualties: 0,
       pendingDefenderCasualties: 0,
       selectedAttackerCasualties: {},
@@ -95,9 +99,80 @@ export class CombatUI {
       winner: null,
       aaFired: false,
       aaResults: null,
+      bombardmentRolls: bombardmentResult.rolls,
+      bombardmentHits: bombardmentResult.hits,
+      bombardmentFired: false,
+      hasAA: aaGuns.length > 0 && attackingAir.length > 0,
     };
 
     this.lastRolls = null;
+  }
+
+  _calculateBombardment() {
+    // Calculate shore bombardment from ships in adjacent sea zones
+    const player = this.gameState.currentPlayer;
+    const territory = this.currentTerritory;
+    const hits = [];
+    const rolls = [];
+
+    // Check if this is a land territory
+    const t = this.gameState.territoryByName[territory];
+    if (!t || t.isWater) return { hits: 0, rolls: [] };
+
+    // Find adjacent sea zones with friendly ships
+    const connections = t.connections || [];
+    for (const connName of connections) {
+      const connT = this.gameState.territoryByName[connName];
+      if (!connT?.isWater) continue;
+
+      // Check for friendly ships that can bombard
+      const seaUnits = this.gameState.units[connName] || [];
+      for (const unit of seaUnits) {
+        if (unit.owner !== player.id) continue;
+
+        const def = this.unitDefs[unit.type];
+        if (!def?.isSea) continue;
+
+        // Ships that can bombard: battleships (attack 4) and cruisers (attack 3)
+        if (unit.type === 'battleship' || unit.type === 'cruiser') {
+          for (let i = 0; i < unit.quantity; i++) {
+            rolls.push({
+              unit: unit.type,
+              source: connName,
+              attackValue: def.attack,
+              roll: null,  // Will be set when fired
+              hit: null
+            });
+          }
+        }
+      }
+    }
+
+    return { hits: 0, rolls };
+  }
+
+  _fireBombardment() {
+    const { bombardmentRolls } = this.combatState;
+    let hits = 0;
+
+    // Roll for each bombarding ship
+    for (const roll of bombardmentRolls) {
+      roll.roll = Math.floor(Math.random() * 6) + 1;
+      roll.hit = roll.roll <= roll.attackValue;
+      if (roll.hit) hits++;
+    }
+
+    this.combatState.bombardmentHits = hits;
+    this.combatState.bombardmentFired = true;
+
+    // Move to next phase (AA fire or ready)
+    if (this.combatState.hasAA) {
+      this.combatState.phase = 'aaFire';
+    } else {
+      this.combatState.phase = 'ready';
+    }
+
+    this._render();
   }
 
   _rollAAFire() {
@@ -255,8 +330,8 @@ export class CombatUI {
     this.combatState.phase = 'rolling';
     this._render();
 
-    // Animate dice for 1 second
-    const duration = 1000;
+    // Animate dice for 0.5 seconds (faster animation)
+    const duration = 500;
     const startTime = Date.now();
 
     return new Promise(resolve => {
@@ -269,7 +344,15 @@ export class CombatUI {
         } else {
           // Final roll
           const result = this._rollDice();
-          this.combatState.pendingDefenderCasualties = result.attackHits;
+
+          // Add bombardment hits to first round only
+          let bombardmentBonus = 0;
+          if (this.combatState.bombardmentFired && !this.combatState.bombardmentApplied) {
+            bombardmentBonus = this.combatState.bombardmentHits;
+            this.combatState.bombardmentApplied = true;
+          }
+
+          this.combatState.pendingDefenderCasualties = result.attackHits + bombardmentBonus;
           this.combatState.pendingAttackerCasualties = result.defenseHits;
           this.combatState.phase = 'selectCasualties';
           this._autoSelectCasualties();
@@ -419,23 +502,35 @@ export class CombatUI {
       defenderSurvivors: this._getTotalUnits(this.combatState.defenders),
     });
 
-    // Update territory ownership if attacker won
+    // Update territory ownership if attacker won AND has land units
+    // Air units cannot capture territory - only land units can
     if (this.combatState.winner === 'attacker') {
-      this.gameState.territoryState[this.currentTerritory].owner = player.id;
+      const hasLandUnit = this.combatState.attackers.some(u => {
+        const def = this.unitDefs[u.type];
+        return def && def.isLand && u.quantity > 0;
+      });
 
-      // Award Risk card for conquering (one per turn per Risk rules)
-      if (!this.gameState.conqueredThisTurn[player.id]) {
-        this.gameState.conqueredThisTurn[player.id] = true;
-        const cardType = this.gameState.awardRiskCard(player.id);
-        this.cardAwarded = cardType;
-        // Log the card earned
-        if (this.actionLog && cardType) {
-          this.actionLog.logCardEarned(player, cardType);
+      if (hasLandUnit) {
+        this.gameState.territoryState[this.currentTerritory].owner = player.id;
+
+        // Award Risk card for conquering (one per turn per Risk rules)
+        if (!this.gameState.conqueredThisTurn[player.id]) {
+          this.gameState.conqueredThisTurn[player.id] = true;
+          const cardType = this.gameState.awardRiskCard(player.id);
+          this.cardAwarded = cardType;
+          // Log the card earned
+          if (this.actionLog && cardType) {
+            this.actionLog.logCardEarned(player, cardType);
+          }
         }
-      }
 
-      // Handle capital capture (IPC transfer, victory check)
-      this.gameState.handleCapitalCapture(this.currentTerritory, player.id, previousOwner);
+        // Handle capital capture (IPC transfer, victory check)
+        this.gameState.handleCapitalCapture(this.currentTerritory, player.id, previousOwner);
+      } else {
+        // Air units killed defenders but cannot capture - territory remains with original owner
+        // Air units will need to land elsewhere
+        console.log('Air units cannot capture territory - territory remains contested');
+      }
     }
 
     // Remove from combat queue
@@ -508,6 +603,42 @@ export class CombatUI {
         </div>
     `;
 
+    // Shore Bombardment section
+    if (this.combatState.bombardmentRolls.length > 0) {
+      if (phase === 'bombardment') {
+        // Show bombardment ready to fire
+        const shipCounts = {};
+        for (const roll of this.combatState.bombardmentRolls) {
+          shipCounts[roll.unit] = (shipCounts[roll.unit] || 0) + 1;
+        }
+        html += `
+          <div class="bombardment-section">
+            <div class="bombardment-title">⚓ Shore Bombardment</div>
+            <div class="bombardment-desc">Naval support from adjacent sea zones</div>
+            <div class="bombardment-ships">
+              ${Object.entries(shipCounts).map(([unit, count]) =>
+                `<span class="bombardment-ship">${count}× ${unit}</span>`
+              ).join(', ')}
+            </div>
+          </div>
+        `;
+      } else if (this.combatState.bombardmentFired) {
+        // Show bombardment results
+        const { bombardmentRolls, bombardmentHits } = this.combatState;
+        html += `
+          <div class="bombardment-results">
+            <div class="bombardment-result-header">⚓ Shore Bombardment: ${bombardmentHits} hit(s)</div>
+            <div class="dice-display">
+              ${bombardmentRolls.slice(0, 12).map(r =>
+                `<div class="die ${r.hit ? 'hit' : 'miss'}" title="${r.unit} from ${r.source}">${r.roll}</div>`
+              ).join('')}
+              ${bombardmentRolls.length > 12 ? `<span class="dice-more">+${bombardmentRolls.length - 12}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }
+    }
+
     // AA Fire phase
     if (phase === 'aaFire') {
       html += `
@@ -569,7 +700,13 @@ export class CombatUI {
     // Actions
     html += `<div class="combat-actions">`;
 
-    if (phase === 'aaFire') {
+    if (phase === 'bombardment') {
+      html += `
+        <button class="combat-btn roll" data-action="fire-bombardment">
+          <span class="btn-icon">⚓</span> Fire Shore Bombardment
+        </button>
+      `;
+    } else if (phase === 'aaFire') {
       html += `
         <button class="combat-btn roll" data-action="aa-fire">
           <span class="btn-icon">🎯</span> Fire AA Guns
@@ -795,6 +932,9 @@ export class CombatUI {
         const action = btn.dataset.action;
 
         switch (action) {
+          case 'fire-bombardment':
+            this._fireBombardment();
+            break;
           case 'aa-fire':
             this._rollAAFire();
             break;

@@ -133,11 +133,21 @@ export class MobilizeUI {
       });
 
       if (availableUnits.length > 0) {
+        const totalAvailable = availableUnits.reduce((sum, u) => sum + u.quantity, 0);
         html += `<div class="mob-units">`;
         for (const unit of availableUnits) {
           html += this._renderUnitButton(unit);
         }
         html += `</div>`;
+
+        // Add "Place All" button if multiple units
+        if (totalAvailable > 1) {
+          html += `
+            <div class="mob-place-all">
+              <button class="mob-btn secondary" data-action="place-all">Place All (${totalAvailable})</button>
+            </div>
+          `;
+        }
       } else {
         html += `<div class="mob-no-units">No ${isSeaZone ? 'naval' : 'land/air'} units to place here</div>`;
       }
@@ -189,25 +199,43 @@ export class MobilizeUI {
     const imageSrc = player ? getUnitIconPath(unit.type, player.id) : (def?.image ? `assets/units/${def.image}` : null);
 
     return `
-      <button class="mob-unit-btn" data-unit="${unit.type}">
-        <div class="mob-unit-icon-wrapper">
-          ${imageSrc ? `<img src="${imageSrc}" class="mob-unit-icon" alt="${unit.type}">` : ''}
-        </div>
-        <div class="mob-unit-info">
-          <span class="mob-unit-name">${unit.type}</span>
-          <span class="mob-unit-qty">×${unit.quantity}</span>
-        </div>
-      </button>
+      <div class="mob-unit-row">
+        <button class="mob-unit-btn" data-unit="${unit.type}" data-action="place-one">
+          <div class="mob-unit-icon-wrapper">
+            ${imageSrc ? `<img src="${imageSrc}" class="mob-unit-icon" alt="${unit.type}">` : ''}
+          </div>
+          <div class="mob-unit-info">
+            <span class="mob-unit-name">${unit.type}</span>
+            <span class="mob-unit-qty">×${unit.quantity}</span>
+          </div>
+        </button>
+        ${unit.quantity > 1 ? `
+          <button class="mob-max-btn" data-unit="${unit.type}" data-action="place-type-all" title="Place all ${unit.type}">All</button>
+        ` : ''}
+      </div>
     `;
   }
 
   _bindEvents() {
-    // Unit buttons
-    this.el.querySelectorAll('.mob-unit-btn').forEach(btn => {
+    // Unit buttons - place one
+    this.el.querySelectorAll('[data-action="place-one"]').forEach(btn => {
       btn.addEventListener('click', () => {
         const unitType = btn.dataset.unit;
         this._placeUnit(unitType);
       });
+    });
+
+    // Max button for single unit type
+    this.el.querySelectorAll('[data-action="place-type-all"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unitType = btn.dataset.unit;
+        this._placeAllOfType(unitType);
+      });
+    });
+
+    // Place all button (all units)
+    this.el.querySelector('[data-action="place-all"]')?.addEventListener('click', () => {
+      this._placeAllUnits();
     });
 
     // Deselect
@@ -247,6 +275,71 @@ export class MobilizeUI {
     } else {
       console.warn('Mobilize failed:', result.error);
     }
+  }
+
+  _placeAllOfType(unitType) {
+    if (!this.selectedTerritory || !this.isActive()) return;
+
+    const pending = this.gameState.getPendingPurchases();
+    const unit = pending.find(u => u.type === unitType);
+    if (!unit) return;
+
+    // Place all units of this type
+    for (let i = 0; i < unit.quantity; i++) {
+      const result = this.gameState.mobilizeUnit(
+        unitType,
+        this.selectedTerritory.name,
+        this.unitDefs
+      );
+      if (!result.success) break;
+    }
+
+    // Check if all units placed
+    const remaining = this.gameState.getPendingPurchases();
+    if (remaining.length === 0) {
+      this.selectedTerritory = null;
+      if (this.onMobilizeComplete) {
+        this.onMobilizeComplete();
+      }
+    }
+    this._render();
+  }
+
+  _placeAllUnits() {
+    if (!this.selectedTerritory || !this.isActive()) return;
+
+    const isSeaZone = this.selectedTerritory.isWater;
+
+    // Filter units that can be placed here
+    const pending = this.gameState.getPendingPurchases();
+    const availableUnits = pending.filter(u => {
+      const def = this.unitDefs[u.type];
+      if (!def) return false;
+      if (isSeaZone) return def.isSea;
+      return def.isLand || def.isAir;
+    });
+
+    // Place all available units
+    for (const unit of availableUnits) {
+      for (let i = 0; i < unit.quantity; i++) {
+        const result = this.gameState.mobilizeUnit(
+          unit.type,
+          this.selectedTerritory.name,
+          this.unitDefs
+        );
+        if (!result.success) break;
+      }
+    }
+
+    // Check if all units placed
+    const remaining = this.gameState.getPendingPurchases();
+    if (remaining.length === 0) {
+      this.selectedTerritory = null;
+      if (this.onMobilizeComplete) {
+        this.onMobilizeComplete();
+      }
+    }
+    this._render();
   }
 
   getSelectedTerritory() {

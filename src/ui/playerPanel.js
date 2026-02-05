@@ -150,9 +150,16 @@ export class PlayerPanel {
                   <span>Trade value:</span>
                   <span class="pp-trade-value">${nextValue} IPCs</span>
                 </div>
-                <button class="pp-trade-btn" data-action="trade-cards">
-                  Cash In Cards
-                </button>
+                ${turnPhase === TURN_PHASES.PURCHASE ? `
+                  <button class="pp-trade-btn" data-action="trade-cards">
+                    Cash In Cards
+                  </button>
+                ` : `
+                  <button class="pp-trade-btn disabled" disabled title="Trade only during Purchase phase">
+                    Cash In Cards
+                  </button>
+                  <div class="pp-cards-note">Trade during Purchase phase</div>
+                `}
               </div>
             ` : cards.length >= 5 ? `
               <div class="pp-cards-note">Must trade when you have 5+ cards</div>

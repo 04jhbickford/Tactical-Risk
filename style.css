@@ -3335,6 +3335,57 @@ html, body {
   text-align: center;
 }
 
+/* Shore Bombardment */
+.bombardment-section {
+  background: rgba(33, 150, 243, 0.15);
+  border: 1px solid rgba(33, 150, 243, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.bombardment-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64b5f6;
+  margin-bottom: 4px;
+}
+
+.bombardment-desc {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 6px;
+}
+
+.bombardment-ships {
+  font-size: 12px;
+  color: #90caf9;
+}
+
+.bombardment-ship {
+  display: inline-block;
+  margin: 0 4px;
+  padding: 2px 6px;
+  background: rgba(33, 150, 243, 0.2);
+  border-radius: 3px;
+}
+
+.bombardment-results {
+  background: rgba(33, 150, 243, 0.1);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.bombardment-result-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64b5f6;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
 /* Victory Overlay */
 .victory-overlay {
   position: fixed;
@@ -5032,6 +5083,51 @@ html, body {
   color: #888;
 }
 
+.mob-unit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mob-unit-row .mob-unit-btn {
+  flex: 1;
+}
+
+.mob-max-btn {
+  padding: 6px 10px;
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  border-radius: 6px;
+  color: #81c784;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mob-max-btn:hover {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: rgba(76, 175, 80, 0.6);
+}
+
+.mob-place-all {
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-top: 8px;
+}
+
+.mob-btn.secondary {
+  width: 100%;
+  background: rgba(33, 150, 243, 0.2);
+  border-color: rgba(33, 150, 243, 0.4);
+  color: #64b5f6;
+}
+
+.mob-btn.secondary:hover {
+  background: rgba(33, 150, 243, 0.3);
+  border-color: rgba(33, 150, 243, 0.6);
+}
+
 .mob-pending {
   padding: 10px;
   background: rgba(0,0,0,0.2);
@@ -5280,7 +5376,7 @@ html, body {
 /* Rules button in HUD */
 .hud-rules-btn {
   position: fixed;
-  top: 10px;
+  bottom: 10px;
   left: 10px;
   padding: 8px 12px;
   background: rgba(25, 25, 50, 0.9);

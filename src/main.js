@@ -171,6 +171,11 @@ async function init() {
         break;
 
       case 'trade-cards':
+        // Risk cards can only be traded during the PURCHASE phase
+        if (gameState.turnPhase !== TURN_PHASES.PURCHASE) {
+          console.log('Risk cards can only be traded during the Purchase phase');
+          break;
+        }
         if (gameState.canTradeRiskCards(gameState.currentPlayer.id)) {
           const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
           if (result.success) {

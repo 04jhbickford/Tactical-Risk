@@ -77,8 +77,9 @@ export class PurchasePopup {
             const player = this.gameState?.currentPlayer;
             const imageSrc = player ? getUnitIconPath(unitType, player.id) : (def.image ? `assets/units/${def.image}` : null);
 
+            const maxAffordable = Math.floor(remaining / def.cost) + qty;
             return `
-              <div class="purchase-item ${qty > 0 ? 'has-qty' : ''}">
+              <div class="purchase-item ${qty > 0 ? 'has-qty' : ''}" data-unit="${unitType}">
                 <div class="item-row">
                   <div class="item-visual">
                     ${imageSrc ? `<img src="${imageSrc}" class="item-icon" alt="${unitType}">` : `<div class="item-placeholder">${unitType[0].toUpperCase()}</div>`}
@@ -90,9 +91,10 @@ export class PurchasePopup {
                   <div class="item-cost">$${def.cost}</div>
                 </div>
                 <div class="item-controls">
-                  <button class="qty-btn minus ${canRemove ? '' : 'disabled'}" data-action="remove" data-unit="${unitType}">−</button>
+                  <button class="qty-btn minus" data-action="remove" data-unit="${unitType}">−</button>
                   <span class="qty-display">${qty}</span>
-                  <button class="qty-btn plus ${canAdd ? '' : 'disabled'}" data-action="add" data-unit="${unitType}">+</button>
+                  <button class="qty-btn plus" data-action="add" data-unit="${unitType}">+</button>
+                  <button class="qty-btn max" data-action="max" data-unit="${unitType}" data-max="${maxAffordable}">Max</button>
                 </div>
               </div>`;
           }).join('')}
@@ -127,19 +129,22 @@ export class PurchasePopup {
   }
 
   _bindEvents() {
-    // Quantity buttons
-    this.el.querySelectorAll('.qty-btn:not(.disabled)').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const action = btn.dataset.action;
-        const unitType = btn.dataset.unit;
+    // Quantity buttons - use event delegation for stable binding
+    this.el.querySelector('.purchase-grid')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.qty-btn');
+      if (!btn) return;
 
-        if (action === 'add') {
-          this._updateCart(unitType, 1);
-        } else if (action === 'remove') {
-          this._updateCart(unitType, -1);
-        }
-      });
+      e.stopPropagation();
+      const action = btn.dataset.action;
+      const unitType = btn.dataset.unit;
+
+      if (action === 'add') {
+        this._updateCart(unitType, 1);
+      } else if (action === 'remove') {
+        this._updateCart(unitType, -1);
+      } else if (action === 'max') {
+        this._setMax(unitType);
+      }
     });
 
     // Close button
@@ -191,11 +196,32 @@ export class PurchasePopup {
 
     this._recalculateCartCost();
     // Update display without full re-render to avoid UI jumping
-    this._updateDisplay(unitType);
+    this._updateDisplay();
+  }
+
+  _setMax(unitType) {
+    const def = this.unitDefs?.[unitType];
+    if (!def) return;
+
+    const player = this.gameState.currentPlayer;
+    const ipcs = this.gameState.getIPCs(player.id);
+    const remaining = ipcs - this.cartCost;
+    const currentQty = this.purchaseCart[unitType] || 0;
+
+    // Calculate max we can afford
+    const additionalAffordable = Math.floor(remaining / def.cost);
+    const newQty = currentQty + additionalAffordable;
+
+    if (newQty > 0) {
+      this.purchaseCart[unitType] = newQty;
+    }
+
+    this._recalculateCartCost();
+    this._updateDisplay();
   }
 
   // Update only the changed elements without full re-render
-  _updateDisplay(changedUnitType) {
+  _updateDisplay() {
     const player = this.gameState.currentPlayer;
     const ipcs = this.gameState.getIPCs(player.id);
     const remaining = ipcs - this.cartCost;
@@ -209,14 +235,17 @@ export class PurchasePopup {
 
     // Update all unit quantities and button states
     this.el.querySelectorAll('.purchase-item').forEach(item => {
+      const unitType = item.dataset.unit;
+      if (!unitType) return;
+
+      const def = this.unitDefs[unitType];
+      if (!def) return;
+
+      const qty = this.purchaseCart[unitType] || 0;
+      const qtyDisplay = item.querySelector('.qty-display');
       const addBtn = item.querySelector('[data-action="add"]');
       const removeBtn = item.querySelector('[data-action="remove"]');
-      const qtyDisplay = item.querySelector('.qty-display');
-
-      if (!addBtn) return;
-      const unitType = addBtn.dataset.unit;
-      const def = this.unitDefs[unitType];
-      const qty = this.purchaseCart[unitType] || 0;
+      const maxBtn = item.querySelector('[data-action="max"]');
 
       // Update quantity display
       if (qtyDisplay) qtyDisplay.textContent = qty;
@@ -224,13 +253,18 @@ export class PurchasePopup {
       // Update button states
       const canAdd = remaining >= def.cost;
       const canRemove = qty > 0;
+      const maxAffordable = Math.floor(remaining / def.cost) + qty;
 
-      addBtn.classList.toggle('disabled', !canAdd);
-      removeBtn?.classList.toggle('disabled', !canRemove);
+      if (addBtn) addBtn.classList.toggle('disabled', !canAdd);
+      if (removeBtn) removeBtn.classList.toggle('disabled', !canRemove);
+      if (maxBtn) {
+        maxBtn.dataset.max = maxAffordable;
+        maxBtn.classList.toggle('disabled', remaining < def.cost);
+      }
       item.classList.toggle('has-qty', qty > 0);
     });
 
-    // Update summary section (need to rebuild this part)
+    // Update summary section
     this._updateSummary();
   }
 

@@ -59,8 +59,7 @@ export const LAND_BRIDGES = [
   ['East US', 'Cuba'],
   ['Eire', 'United Kingdom'],
   ['United Kingdom', 'Finland Norway'],
-  ['Spain', 'Algeria'],
-  ['South Europe', 'Algeria'],
+  ['United Kingdom', 'West Europe'],  // Channel crossing
   ['South Europe', 'Anglo Sudan Egypt'],
   ['Syria Jordan', 'Anglo Sudan Egypt'],
   ['Kwangtung', 'East Indies'],
