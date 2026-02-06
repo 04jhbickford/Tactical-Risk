@@ -936,6 +936,8 @@ export class GameState {
         // All units placed, move to playing phase
         this.phase = GAME_PHASES.PLAYING;
         this.turnPhase = TURN_PHASES.DEVELOP_TECH;
+        // Initialize friendly territories for first turn
+        this._initFriendlyTerritoriesAtTurnStart();
       }
     }
 
@@ -1176,6 +1178,8 @@ export class GameState {
     if (this.currentPlayerIndex >= this.players.length) {
       this.currentPlayerIndex = 0;
       this.phase = GAME_PHASES.PLAYING;
+      // Initialize friendly territories for first turn
+      this._initFriendlyTerritoriesAtTurnStart();
     }
     this._notify();
   }
@@ -1197,7 +1201,20 @@ export class GameState {
     this.airUnitOrigins = {}; // Reset air unit tracking for new turn
 
     // Track territories that are friendly at the START of this turn (for air landing)
-    // Air units can ONLY land in territories that were friendly at turn start
+    this._initFriendlyTerritoriesAtTurnStart();
+
+    // Reset conquered flag for Risk card (one card per turn)
+    const player = this.currentPlayer;
+    if (player) {
+      this.conqueredThisTurn[player.id] = false;
+    }
+    this._clearMovedFlags();
+    this._notify();
+    this.autoSave(); // Auto-save after each turn
+  }
+
+  // Helper: populate friendly territories at turn start (for air landing validation)
+  _initFriendlyTerritoriesAtTurnStart() {
     const player = this.currentPlayer;
     this.friendlyTerritoriesAtTurnStart = new Set();
     if (player) {
@@ -1207,14 +1224,6 @@ export class GameState {
         }
       }
     }
-
-    // Reset conquered flag for Risk card (one card per turn)
-    if (player) {
-      this.conqueredThisTurn[player.id] = false;
-    }
-    this._clearMovedFlags();
-    this._notify();
-    this.autoSave(); // Auto-save after each turn
   }
 
   // Check if a phase should be skipped (nothing to do)

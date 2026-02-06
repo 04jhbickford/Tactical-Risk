@@ -504,9 +504,17 @@ export class CombatUI {
     // Clear air unit origins for this territory
     this.gameState.clearAirUnitOrigins(this.currentTerritory);
 
-    // Move to resolved phase
-    this.combatState.phase = 'resolved';
-    this._render();
+    // Check if this was a retreat - if so, skip to next combat
+    if (this.combatState.isRetreating) {
+      // Remove from combat queue and proceed to next combat
+      this.gameState.combatQueue = this.gameState.combatQueue.filter(t => t !== this.currentTerritory);
+      this.gameState._notify();
+      this._nextCombat();
+    } else {
+      // Move to resolved phase (normal combat resolution)
+      this.combatState.phase = 'resolved';
+      this._render();
+    }
   }
 
   _checkAirLanding() {
@@ -827,15 +835,15 @@ export class CombatUI {
 
     // Air Landing phase - select where air units will land
     if (phase === 'airLanding') {
-      const { airUnitsToLand, selectedLandings } = this.combatState;
+      const { airUnitsToLand, selectedLandings, isRetreating } = this.combatState;
       html += `
         <div class="air-landing-section">
           <div class="air-landing-header">
             <span class="air-landing-icon">✈️</span>
-            <span class="air-landing-title">Air Unit Landing Required</span>
+            <span class="air-landing-title">${isRetreating ? 'Retreat - ' : ''}Air Unit Landing Required</span>
           </div>
           <div class="air-landing-desc">
-            Air units must land in a territory that was <strong>friendly at the start of your turn</strong>.
+            ${isRetreating ? 'Your forces are retreating. ' : ''}Air units must land in a territory that was <strong>friendly at the start of your turn</strong>.
             Newly captured territories are NOT valid landing locations.
           </div>
       `;
@@ -1208,10 +1216,23 @@ export class CombatUI {
   }
 
   _retreat() {
-    // Remove from combat queue without resolving
-    this.gameState.combatQueue = this.gameState.combatQueue.filter(t => t !== this.currentTerritory);
-    this.gameState._notify();
-    this._nextCombat();
+    // Retreating attacker - air units still need to select landing locations
+    // Set retreat flag so air landing knows not to finalize combat
+    this.combatState.isRetreating = true;
+
+    // Check for air landing BEFORE removing from queue
+    this._checkAirLanding();
+
+    // If air landing is required, render and wait for confirmation
+    if (this.combatState.phase === 'airLanding') {
+      // Don't remove from queue yet - will be done after air landing confirmed
+      this._render();
+    } else {
+      // No air units to land - remove from combat queue and proceed
+      this.gameState.combatQueue = this.gameState.combatQueue.filter(t => t !== this.currentTerritory);
+      this.gameState._notify();
+      this._nextCombat();
+    }
   }
 
   _nextCombat() {
