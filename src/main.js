@@ -363,11 +363,13 @@ async function init() {
       camera.dirty = true;
     });
     combatUI.setOnAirLandingRequired((data) => {
+      console.log('[Main] onAirLandingRequired callback triggered:', data);
       // Show the external air landing UI
       airLandingUI.setAirUnits(data.airUnitsToLand, data.combatTerritory, data.isRetreating);
       // Highlight valid destinations on map
       territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
       camera.dirty = true;
+      console.log('[Main] Air landing UI should now be visible');
     });
 
     // Tech UI

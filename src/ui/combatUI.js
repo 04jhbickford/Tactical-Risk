@@ -528,6 +528,9 @@ export class CombatUI {
     const player = this.gameState.currentPlayer;
     const { attackers } = this.combatState;
 
+    console.log('[AirLanding] _checkAirLanding called');
+    console.log('[AirLanding] Attackers:', attackers);
+
     // Find ALL surviving air units - they MUST select a landing location
     // Air units can ONLY land in territories that were friendly at the START of the turn
     const airUnitsToLand = [];
@@ -535,10 +538,12 @@ export class CombatUI {
 
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
+      console.log('[AirLanding] Unit:', unit.type, 'isAir:', def?.isAir, 'qty:', unit.quantity);
       if (!def?.isAir || unit.quantity <= 0) continue;
 
       // Get valid landing options (only territories friendly at turn start)
       const landingOptions = this.gameState.getAirLandingOptions(territory, unit.type, this.unitDefs);
+      console.log('[AirLanding] Options for', unit.type, ':', landingOptions);
 
       // ALL air units must choose a landing location after combat
       airUnitsToLand.push({
@@ -548,23 +553,31 @@ export class CombatUI {
       });
     }
 
+    console.log('[AirLanding] airUnitsToLand:', airUnitsToLand);
+
     if (airUnitsToLand.length > 0) {
       this.combatState.airUnitsToLand = airUnitsToLand;
       this.combatState.selectedLandings = {};
       this.combatState.phase = 'airLanding';
+
+      console.log('[AirLanding] Has callback:', !!this.onAirLandingRequired);
 
       // If external air landing UI is connected, delegate to it and hide combat popup
       if (this.onAirLandingRequired) {
         // Hide combat popup - only show the air landing panel
         this.el.classList.add('hidden');
 
+        console.log('[AirLanding] Calling onAirLandingRequired callback');
         this.onAirLandingRequired({
           airUnitsToLand,
           combatTerritory: this.currentTerritory,
           isRetreating: this.combatState.isRetreating || false,
         });
+      } else {
+        console.log('[AirLanding] ERROR: No callback set!');
       }
     } else {
+      console.log('[AirLanding] No air units to land');
       this.combatState.phase = 'resolved';
     }
   }
