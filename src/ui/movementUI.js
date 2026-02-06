@@ -9,6 +9,7 @@ export class MovementUI {
     this.unitDefs = null;
     this.territoryByName = null;
     this.onMoveComplete = null;
+    this.onHighlightTerritory = null; // Callback for hover highlighting
 
     // Movement state
     this.selectedFrom = null;
@@ -21,6 +22,10 @@ export class MovementUI {
     this.dragOffset = { x: 0, y: 0 };
 
     this._create();
+  }
+
+  setOnHighlightTerritory(callback) {
+    this.onHighlightTerritory = callback;
   }
 
   _create() {
@@ -264,6 +269,24 @@ export class MovementUI {
       );
     }
 
+    // Sea units with movement > 1 - use multi-hop pathfinding
+    const hasOnlySeaSelected = Object.entries(this.selectedUnits).every(([type, qty]) => {
+      if (qty <= 0) return true;
+      return this.unitDefs[type]?.isSea;
+    }) && Object.values(this.selectedUnits).some(q => q > 0);
+
+    if (hasOnlySeaSelected) {
+      const seaMovementRange = this._getMaxSeaMovementRange();
+      if (!territory.isWater) return false;
+      return this.gameState.canSeaUnitReach(
+        this.selectedFrom.name,
+        territory.name,
+        seaMovementRange,
+        player.id,
+        isCombatMove
+      );
+    }
+
     // For basic movement (movement=1 or mixed), require adjacency
     if (!isAdjacent) {
       return false;
@@ -342,6 +365,19 @@ export class MovementUI {
       }
     }
     return maxRange || 1;
+  }
+
+  // Get the maximum movement range of selected sea units
+  _getMaxSeaMovementRange() {
+    let maxRange = 0;
+    for (const [type, qty] of Object.entries(this.selectedUnits)) {
+      if (qty <= 0) continue;
+      const def = this.unitDefs[type];
+      if (def?.isSea && def.movement > maxRange) {
+        maxRange = def.movement;
+      }
+    }
+    return maxRange || 2;
   }
 
   getValidDestinations() {
@@ -438,7 +474,23 @@ export class MovementUI {
       return landDestinations;
     }
 
-    // For basic movement (movement=1 or sea units), use adjacent connections
+    // Sea units with movement > 1 - use multi-hop pathfinding
+    const seaMovementRange = this._getMaxSeaMovementRange();
+    if (hasSeaSelected && !hasLandSelected && seaMovementRange > 1) {
+      const reachable = this.gameState.getReachableTerritoriesForSea(
+        this.selectedFrom.name,
+        seaMovementRange,
+        player?.id,
+        isCombatMove
+      );
+
+      return Array.from(reachable.keys()).filter(destName => {
+        const t = this.territoryByName[destName];
+        return t?.isWater; // Sea units can only move to water
+      });
+    }
+
+    // For basic movement (movement=1 or mixed units), use adjacent connections
     const connections = this.gameState.getConnections(this.selectedFrom.name);
 
     return connections.filter(connName => {
@@ -583,14 +635,14 @@ export class MovementUI {
       html += `
         <div class="mp-destinations">
           <span class="mp-label">${isCombatMove ? 'Assault:' : 'Unload to:'}</span>
-          <div class="mp-dest-list">
+          <select class="mp-dest-select" data-action="unload-dest">
+            <option value="">-- Select destination --</option>
             ${coastalDestinations.map(dest => {
               const owner = this.gameState.getOwner(dest);
               const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
-              const cls = isEnemy ? 'enemy' : '';
-              return `<button class="mp-dest-btn ${cls}" data-dest="${dest}" data-action="unload">${dest}${isEnemy ? ' ⚔️' : ''}</button>`;
+              return `<option value="${dest}" data-territory="${dest}" class="${isEnemy ? 'enemy' : ''}">${dest}${isEnemy ? ' (Enemy)' : ''}</option>`;
             }).join('')}
-          </div>
+          </select>
         </div>
       `;
     } else if (totalCargoSelected > 0) {
@@ -666,13 +718,31 @@ export class MovementUI {
       });
     });
 
-    // Unload destination buttons
-    this.el.querySelectorAll('[data-action="unload"]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const destName = btn.dataset.dest;
-        this._executeUnload(destName);
+    // Unload destination dropdown
+    const unloadSelect = this.el.querySelector('[data-action="unload-dest"]');
+    if (unloadSelect) {
+      unloadSelect.addEventListener('change', () => {
+        const destName = unloadSelect.value;
+        if (destName) {
+          this._executeUnload(destName);
+        }
       });
-    });
+
+      // Hover events for highlighting
+      unloadSelect.addEventListener('mouseover', (e) => {
+        if (e.target.tagName === 'OPTION' && e.target.value) {
+          if (this.onHighlightTerritory) {
+            this.onHighlightTerritory(e.target.value, true);
+          }
+        }
+      });
+
+      unloadSelect.addEventListener('mouseout', () => {
+        if (this.onHighlightTerritory) {
+          this.onHighlightTerritory(null, false);
+        }
+      });
+    }
 
     // Switch to move mode
     this.el.querySelector('[data-action="switch-to-move"]')?.addEventListener('click', () => {
@@ -873,14 +943,14 @@ export class MovementUI {
       html += `
         <div class="mp-destinations">
           <span class="mp-label">Move to:</span>
-          <div class="mp-dest-list">
+          <select class="mp-dest-select" data-action="move-dest">
+            <option value="">-- Select destination or click map --</option>
             ${validDests.map(dest => {
               const owner = this.gameState.getOwner(dest);
               const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
-              const cls = isEnemy ? 'enemy' : '';
-              return `<button class="mp-dest-btn ${cls}" data-dest="${dest}">${dest}${isEnemy ? ' ⚔️' : ''}</button>`;
+              return `<option value="${dest}" data-territory="${dest}" class="${isEnemy ? 'enemy' : ''}">${dest}${isEnemy ? ' (Enemy)' : ''}</option>`;
             }).join('')}
-          </div>
+          </select>
         </div>
       `;
     }
@@ -935,16 +1005,49 @@ export class MovementUI {
       this._render();
     });
 
-    // Destination buttons
-    this.el.querySelectorAll('.mp-dest-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const destName = btn.dataset.dest;
-        const dest = this.territoryByName[destName];
-        if (dest) {
-          this._showMoveConfirm(dest);
+    // Destination dropdown
+    const destSelect = this.el.querySelector('.mp-dest-select');
+    if (destSelect) {
+      // Change event - execute move
+      destSelect.addEventListener('change', () => {
+        const destName = destSelect.value;
+        if (destName) {
+          const dest = this.territoryByName[destName];
+          if (dest) {
+            this._showMoveConfirm(dest);
+          }
         }
       });
-    });
+
+      // Hover events for highlighting
+      destSelect.addEventListener('mouseover', (e) => {
+        if (e.target.tagName === 'OPTION' && e.target.value) {
+          if (this.onHighlightTerritory) {
+            this.onHighlightTerritory(e.target.value, true);
+          }
+        }
+      });
+
+      destSelect.addEventListener('mouseout', () => {
+        if (this.onHighlightTerritory) {
+          this.onHighlightTerritory(null, false);
+        }
+      });
+
+      // Focus on selected option change (keyboard nav)
+      destSelect.addEventListener('focus', () => {
+        const value = destSelect.value;
+        if (value && this.onHighlightTerritory) {
+          this.onHighlightTerritory(value, true);
+        }
+      });
+
+      destSelect.addEventListener('blur', () => {
+        if (this.onHighlightTerritory) {
+          this.onHighlightTerritory(null, false);
+        }
+      });
+    }
 
     // Cancel
     this.el.querySelector('.mp-cancel-btn')?.addEventListener('click', () => {

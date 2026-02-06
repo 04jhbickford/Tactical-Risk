@@ -513,6 +513,79 @@ export class GameState {
     return info ? info.path : null;
   }
 
+  // Get all territories reachable by sea unit within movement range
+  // Sea units can only move through water territories
+  getReachableTerritoriesForSea(fromTerritory, movementRange, playerId, isCombatMove = false) {
+    const reachable = new Map(); // territory -> { distance, path }
+    const visited = new Set();
+    const queue = [{ territory: fromTerritory, distance: 0, path: [fromTerritory] }];
+
+    while (queue.length > 0) {
+      const { territory, distance, path } = queue.shift();
+
+      if (visited.has(territory)) continue;
+      visited.add(territory);
+
+      const t = this.territoryByName[territory];
+      if (!t) continue;
+
+      // Can only move through water
+      if (territory !== fromTerritory && !t.isWater) continue;
+
+      // Check for enemy units blocking movement (hostile sea zone)
+      const owner = this.getOwner(territory);
+      const units = this.units[territory] || [];
+      const hasEnemyFleet = units.some(u => {
+        if (u.owner === playerId || this.areAllies(playerId, u.owner)) return false;
+        const def = this.territoryByName[territory]?.isWater && u.type;
+        // Enemy combat ships block passage
+        return u.type !== 'transport'; // Transports don't block
+      });
+
+      // Don't add starting territory to results
+      if (territory !== fromTerritory) {
+        // In non-combat move, can't enter hostile sea zones
+        if (!isCombatMove && hasEnemyFleet) {
+          // Can't enter this zone, but don't stop search
+        } else {
+          reachable.set(territory, { distance, path });
+        }
+      }
+
+      // Stop if we've reached max movement
+      if (distance >= movementRange) continue;
+
+      // In combat move: can move through hostile zones
+      // In non-combat move: hostile zones block further movement
+      if (!isCombatMove && hasEnemyFleet && territory !== fromTerritory) continue;
+
+      // Get all connections
+      const connections = this.getConnections(territory);
+
+      for (const conn of connections) {
+        if (visited.has(conn)) continue;
+
+        const connT = this.territoryByName[conn];
+        // Only move to water territories
+        if (!connT?.isWater) continue;
+
+        queue.push({
+          territory: conn,
+          distance: distance + 1,
+          path: [...path, conn]
+        });
+      }
+    }
+
+    return reachable;
+  }
+
+  // Check if sea unit can reach destination within movement range
+  canSeaUnitReach(fromTerritory, toTerritory, movementRange, playerId, isCombatMove) {
+    const reachable = this.getReachableTerritoriesForSea(fromTerritory, movementRange, playerId, isCombatMove);
+    return reachable.has(toTerritory);
+  }
+
   // Get all territories reachable by land unit within movement range
   // Land units can only move through friendly/allied land territories (blitzing)
   // In combat move, can pass through friendly to reach enemy
@@ -1364,13 +1437,26 @@ export class GameState {
     const landUnits = unitsToMove.filter(u => unitDefs[u.type]?.isLand);
     const seaUnits = unitsToMove.filter(u => unitDefs[u.type]?.isSea);
 
-    // For sea units, require adjacent water connection
+    // For sea units, check if destination is reachable within movement range
     if (seaUnits.length > 0) {
-      if (!isAdjacent) {
-        return { success: false, error: 'Sea zones not connected for naval units' };
-      }
       if (!toT?.isWater) {
         return { success: false, error: 'Naval units can only move to sea zones' };
+      }
+      // Get max sea movement range of units being moved
+      let maxSeaMovement = 0;
+      for (const seaUnit of seaUnits) {
+        const def = unitDefs[seaUnit.type];
+        if (def?.movement > maxSeaMovement) {
+          maxSeaMovement = def.movement;
+        }
+      }
+      // Check if destination is reachable within movement range
+      if (!isAdjacent && maxSeaMovement > 1) {
+        if (!this.canSeaUnitReach(fromTerritory, toTerritory, maxSeaMovement, player.id, isCombatMove)) {
+          return { success: false, error: 'Sea zone not reachable within movement range' };
+        }
+      } else if (!isAdjacent) {
+        return { success: false, error: 'Sea zones not connected for naval units' };
       }
     }
 

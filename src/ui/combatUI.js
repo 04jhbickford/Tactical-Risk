@@ -8,6 +8,7 @@ export class CombatUI {
     this.unitDefs = null;
     this.actionLog = null;
     this.onCombatComplete = null;
+    this.onAirLandingRequired = null; // Callback when air landing phase starts
 
     this.currentTerritory = null;
     this.combatState = null; // { attackers, defenders, phase, pendingCasualties }
@@ -16,6 +17,10 @@ export class CombatUI {
     this.cardAwarded = null;
 
     this._create();
+  }
+
+  setOnAirLandingRequired(callback) {
+    this.onAirLandingRequired = callback;
   }
 
   _create() {
@@ -545,9 +550,27 @@ export class CombatUI {
       this.combatState.airUnitsToLand = airUnitsToLand;
       this.combatState.selectedLandings = {};
       this.combatState.phase = 'airLanding';
+
+      // If external air landing UI is connected, delegate to it
+      if (this.onAirLandingRequired) {
+        this.onAirLandingRequired({
+          airUnitsToLand,
+          combatTerritory: this.currentTerritory,
+          isRetreating: this.combatState.isRetreating || false,
+        });
+      }
     } else {
       this.combatState.phase = 'resolved';
     }
+  }
+
+  // Called from external AirLandingUI when landing selection is complete
+  handleAirLandingComplete(result) {
+    if (!this.combatState) return;
+
+    // Apply landings from the external UI
+    this.combatState.selectedLandings = result.landings || {};
+    this._confirmAirLandings();
   }
 
   _applyCasualties() {

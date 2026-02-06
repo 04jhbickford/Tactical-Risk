@@ -6,8 +6,13 @@ export class HUD {
   constructor() {
     this.gameState = null;
     this.onNextPhase = null;
+    this.onBugReport = null;
     this.el = document.getElementById('hud');
     this._render();
+  }
+
+  setOnBugReport(callback) {
+    this.onBugReport = callback;
   }
 
   setGameState(gameState) {
@@ -100,7 +105,20 @@ export class HUD {
     }
     html += `</div>`;
 
+    // Bug report button
+    html += `<button class="hud-btn bug-btn" data-action="bug-report" title="Report a Bug">Report Bug</button>`;
+
     this.el.innerHTML = html;
+    this._bindEvents();
+  }
+
+  _bindEvents() {
+    const bugBtn = this.el.querySelector('[data-action="bug-report"]');
+    bugBtn?.addEventListener('click', () => {
+      if (this.onBugReport) {
+        this.onBugReport();
+      }
+    });
   }
 
   _getPhaseName(phase) {

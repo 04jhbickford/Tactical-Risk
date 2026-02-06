@@ -2408,6 +2408,36 @@ html, body {
   border-color: rgba(220, 20, 60, 0.6);
 }
 
+/* Movement destination dropdown */
+.mp-dest-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(65, 105, 225, 0.4);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 8px;
+}
+
+.mp-dest-select:focus {
+  outline: none;
+  border-color: rgba(65, 105, 225, 0.7);
+  box-shadow: 0 0 8px rgba(65, 105, 225, 0.3);
+}
+
+.mp-dest-select option {
+  background: #1a2030;
+  color: #fff;
+  padding: 8px;
+}
+
+.mp-dest-select option.enemy {
+  color: #ff6060;
+}
+
 /* Cargo Unload UI (Amphibious Assault) */
 .mp-cargo-section {
   margin-bottom: 12px;
@@ -5608,4 +5638,444 @@ html, body {
 .hud-rules-btn:hover {
   background: rgba(50, 50, 80, 0.95);
   border-color: rgba(255,255,255,0.3);
+}
+
+/* --- Bug Report Button in HUD --- */
+.hud-btn.bug-btn {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: rgba(120, 80, 50, 0.8);
+  border: 1px solid rgba(255, 150, 100, 0.4);
+  border-radius: 4px;
+  color: #ffd0a0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.hud-btn.bug-btn:hover {
+  background: rgba(150, 100, 60, 0.9);
+  border-color: rgba(255, 180, 120, 0.6);
+}
+
+/* --- Bug Tracker Modal --- */
+.bug-tracker-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bug-tracker-modal.hidden {
+  display: none;
+}
+
+.bug-tracker-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.bug-tracker-content {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  background: linear-gradient(180deg, #2a2a45 0%, #1a1a30 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.bug-tracker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bug-tracker-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.bug-close-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 100, 100, 0.2);
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  border-radius: 50%;
+  color: #ff8080;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bug-close-btn:hover {
+  background: rgba(255, 100, 100, 0.4);
+  color: #fff;
+}
+
+.bug-form {
+  padding: 20px;
+}
+
+.bug-form.hidden {
+  display: none;
+}
+
+.bug-form-group {
+  margin-bottom: 16px;
+}
+
+.bug-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #a0a0c0;
+}
+
+.bug-form-group textarea,
+.bug-form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.bug-form-group textarea:focus,
+.bug-form-group select:focus {
+  outline: none;
+  border-color: rgba(100, 150, 255, 0.5);
+}
+
+.bug-form-group textarea::placeholder {
+  color: #606080;
+}
+
+.bug-context {
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.bug-context-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #707090;
+  margin-bottom: 8px;
+}
+
+.bug-context-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.bug-context-label {
+  color: #808090;
+}
+
+.bug-context-value {
+  color: #c0c0d0;
+}
+
+.bug-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.bug-btn {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bug-btn.secondary {
+  background: rgba(60, 60, 80, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #a0a0b0;
+}
+
+.bug-btn.secondary:hover {
+  background: rgba(80, 80, 100, 0.9);
+  color: #fff;
+}
+
+.bug-btn.primary {
+  background: linear-gradient(180deg, #4a7fcf 0%, #3a5f9f 100%);
+  border: 1px solid rgba(100, 150, 255, 0.3);
+  color: #fff;
+}
+
+.bug-btn.primary:hover {
+  background: linear-gradient(180deg, #5a8fdf 0%, #4a6faf 100%);
+}
+
+.bug-saved-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 40px 20px;
+  color: #80ff80;
+  font-size: 16px;
+}
+
+.bug-saved-notice.hidden {
+  display: none;
+}
+
+.bug-saved-icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(100, 255, 100, 0.2);
+  border: 2px solid rgba(100, 255, 100, 0.4);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+/* --- Air Landing Panel --- */
+.air-landing-panel {
+  position: fixed;
+  top: 80px;
+  left: 16px;
+  width: 320px;
+  max-height: calc(100vh - 160px);
+  background: linear-gradient(180deg, rgba(25, 35, 55, 0.97) 0%, rgba(15, 20, 35, 0.97) 100%);
+  border: 1px solid rgba(64, 196, 255, 0.3);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(64, 196, 255, 0.1);
+  overflow: hidden;
+  z-index: 500;
+}
+
+.air-landing-panel.hidden {
+  display: none;
+}
+
+.alp-header {
+  padding: 14px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.alp-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.alp-icon {
+  font-size: 18px;
+}
+
+.alp-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #8090a0;
+}
+
+.alp-instructions {
+  padding: 12px 16px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #a0b0c0;
+  background: rgba(64, 196, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alp-instructions strong {
+  color: #40c4ff;
+}
+
+.alp-progress {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #607080;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.alp-unit {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: all 0.15s ease;
+}
+
+.alp-unit.current {
+  background: rgba(64, 196, 255, 0.08);
+  border-left: 3px solid #40c4ff;
+}
+
+.alp-unit.selected {
+  background: rgba(100, 200, 100, 0.08);
+}
+
+.alp-unit.no-options {
+  background: rgba(255, 80, 80, 0.08);
+}
+
+.alp-unit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.alp-unit-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.alp-unit-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.alp-unit-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.alp-unit-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.alp-unit-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e0e8f0;
+}
+
+.alp-unit-movement {
+  font-size: 11px;
+  color: #708090;
+}
+
+.alp-unit-check {
+  width: 24px;
+  height: 24px;
+  background: rgba(100, 200, 100, 0.2);
+  border: 1px solid rgba(100, 200, 100, 0.4);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #80ff80;
+}
+
+.alp-unit-content {
+  padding: 0 16px 12px 16px;
+}
+
+.alp-dest-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(64, 196, 255, 0.3);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.alp-dest-select:focus {
+  outline: none;
+  border-color: #40c4ff;
+  box-shadow: 0 0 8px rgba(64, 196, 255, 0.3);
+}
+
+.alp-dest-select option {
+  background: #1a2030;
+  color: #fff;
+  padding: 8px;
+}
+
+.alp-crash-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 80, 80, 0.15);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #ff8080;
+}
+
+.alp-crash-icon {
+  font-size: 16px;
+}
+
+.alp-actions {
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.alp-btn {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.alp-btn.primary {
+  background: linear-gradient(180deg, #40c4ff 0%, #2090d0 100%);
+  border: 1px solid rgba(64, 196, 255, 0.5);
+  color: #fff;
+}
+
+.alp-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #60d4ff 0%, #30a0e0 100%);
+  box-shadow: 0 4px 12px rgba(64, 196, 255, 0.3);
+}
+
+.alp-btn.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

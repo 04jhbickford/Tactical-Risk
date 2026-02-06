@@ -1502,4 +1502,89 @@ export class TerritoryRenderer {
   static getLandBridges() {
     return LAND_BRIDGES;
   }
+
+  // Air landing destinations - show valid territories where air units can land
+  airLandingDestinations = [];
+
+  setAirLandingDestinations(destinations) {
+    this.airLandingDestinations = destinations || [];
+  }
+
+  clearAirLandingDestinations() {
+    this.airLandingDestinations = [];
+  }
+
+  /** Render air landing destination highlights */
+  renderAirLandingDestinations(ctx) {
+    if (!this.airLandingDestinations || this.airLandingDestinations.length === 0) return;
+
+    ctx.save();
+
+    for (const destName of this.airLandingDestinations) {
+      const t = this.territoryByName[destName];
+      if (!t) continue;
+
+      // Blue/cyan for air landing destinations
+      ctx.fillStyle = 'rgba(64, 196, 255, 0.25)';
+      for (const poly of t.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
+
+      // Solid blue border with glow
+      ctx.shadowColor = '#40c4ff';
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = 'rgba(64, 196, 255, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 4]);
+      if (t.polygons.length === 1) {
+        this._strokePoly(ctx, t.polygons[0]);
+      } else {
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+        this._strokeEdges(ctx, externalEdges);
+      }
+      ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+  }
+
+  // Manual hover highlight (from dropdown hover)
+  manualHoverTerritory = null;
+
+  setHoverHighlight(territoryName, highlight) {
+    this.manualHoverTerritory = highlight ? territoryName : null;
+  }
+
+  /** Render programmatic hover highlight */
+  renderHoverHighlight(ctx) {
+    if (!this.manualHoverTerritory) return;
+
+    const t = this.territoryByName[this.manualHoverTerritory];
+    if (!t) return;
+
+    ctx.save();
+
+    // Bright yellow highlight for hover
+    ctx.shadowColor = '#ffeb3b';
+    ctx.shadowBlur = 15;
+
+    ctx.fillStyle = 'rgba(255, 235, 59, 0.35)';
+    for (const poly of t.polygons) {
+      if (!poly || poly.length < 3) continue;
+      this._fillPoly(ctx, poly);
+    }
+
+    ctx.strokeStyle = '#ffeb3b';
+    ctx.lineWidth = 3;
+    if (t.polygons.length === 1) {
+      this._strokePoly(ctx, t.polygons[0]);
+    } else {
+      const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+      this._strokeEdges(ctx, externalEdges);
+    }
+
+    ctx.restore();
+  }
 }

@@ -39,6 +39,8 @@ import { GameState, GAME_PHASES, TURN_PHASES } from './state/gameState.js';
 import { VictoryScreen } from './ui/victoryScreen.js';
 import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
+import { BugTracker } from './ui/bugTracker.js';
+import { AirLandingUI } from './ui/airLandingUI.js';
 
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
@@ -126,6 +128,9 @@ async function init() {
 
   // Rules Panel
   const rulesPanel = new RulesPanel();
+
+  // Bug Tracker
+  const bugTracker = new BugTracker();
 
   // Rules button (fixed position)
   const rulesBtn = document.createElement('button');
@@ -290,6 +295,13 @@ async function init() {
       gameState.nextPhase();
       camera.dirty = true;
     });
+    hud.setOnBugReport(() => {
+      bugTracker.show();
+    });
+
+    // Bug tracker
+    bugTracker.setGameState(gameState);
+    bugTracker.setActionLog(actionLog);
     playerPanel.setGameState(gameState);
     tooltip.setGameState(gameState);
     territoryRenderer.setGameState(gameState);
@@ -304,6 +316,10 @@ async function init() {
 
     // Movement UI
     movementUI.setGameState(gameState);
+    movementUI.setOnHighlightTerritory((territory, highlight) => {
+      territoryRenderer.setHoverHighlight(territory, highlight);
+      camera.dirty = true;
+    });
     movementUI.setOnMoveComplete((moveInfo) => {
       camera.dirty = true;
       // Log the movement/attack
@@ -323,10 +339,32 @@ async function init() {
       }
     });
 
+    // Air Landing UI
+    const airLandingUI = new AirLandingUI();
+    airLandingUI.setGameState(gameState);
+    airLandingUI.setUnitDefs(unitDefs);
+    airLandingUI.setTerritories(territories);
+    airLandingUI.setOnComplete((result) => {
+      // Pass result back to combatUI
+      combatUI.handleAirLandingComplete(result);
+      camera.dirty = true;
+    });
+    airLandingUI.setOnHighlightTerritory((territory, highlight) => {
+      territoryRenderer.setHoverHighlight(territory, highlight);
+      camera.dirty = true;
+    });
+
     // Combat UI
     combatUI.setGameState(gameState);
     combatUI.setActionLog(actionLog);
     combatUI.setOnComplete(() => {
+      camera.dirty = true;
+    });
+    combatUI.setOnAirLandingRequired((data) => {
+      // Show the external air landing UI
+      airLandingUI.setAirUnits(data.airUnitsToLand, data.combatTerritory, data.isRetreating);
+      // Highlight valid destinations on map
+      territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
       camera.dirty = true;
     });
 
@@ -445,6 +483,15 @@ async function init() {
       // Check if we're in mobilize phase
       if (hit && gameState && mobilizeUI.isActive()) {
         const handled = mobilizeUI.handleTerritoryClick(hit);
+        if (handled) {
+          camera.dirty = true;
+          return;
+        }
+      }
+
+      // Check if we're in air landing phase
+      if (hit && gameState && airLandingUI.isActive()) {
+        const handled = airLandingUI.handleTerritoryClick(hit);
         if (handled) {
           camera.dirty = true;
           return;
@@ -600,6 +647,12 @@ async function init() {
 
         // Air movement visualization (flight paths)
         territoryRenderer.renderAirMovementVisualization(ctx);
+
+        // Air landing destination highlights
+        territoryRenderer.renderAirLandingDestinations(ctx);
+
+        // Programmatic hover highlight (from dropdown)
+        territoryRenderer.renderHoverHighlight(ctx);
 
         // Labels
         territoryRenderer.renderLabels(ctx, camera.zoom);
