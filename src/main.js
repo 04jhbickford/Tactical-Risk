@@ -132,6 +132,11 @@ async function init() {
   // Bug Tracker
   const bugTracker = new BugTracker();
 
+  // Air Landing UI (for placing air units after combat)
+  const airLandingUI = new AirLandingUI();
+  airLandingUI.setUnitDefs(unitDefs);
+  airLandingUI.setTerritories(territories);
+
   // Rules button (fixed position)
   const rulesBtn = document.createElement('button');
   rulesBtn.className = 'hud-rules-btn';
@@ -340,10 +345,7 @@ async function init() {
     });
 
     // Air Landing UI
-    const airLandingUI = new AirLandingUI();
     airLandingUI.setGameState(gameState);
-    airLandingUI.setUnitDefs(unitDefs);
-    airLandingUI.setTerritories(territories);
     airLandingUI.setOnComplete((result) => {
       // Pass result back to combatUI
       combatUI.handleAirLandingComplete(result);
