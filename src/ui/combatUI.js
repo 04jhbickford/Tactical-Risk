@@ -516,18 +516,17 @@ export class CombatUI {
       this.gameState._notify();
       this._nextCombat();
     } else {
-      // Move to resolved phase (normal combat resolution)
-      this.combatState.phase = 'resolved';
-      this._render();
+      // Finalize combat (apply territory capture, etc.) then move to next
+      this._finalizeCombat();
+      this.gameState.combatQueue = this.gameState.combatQueue.filter(t => t !== this.currentTerritory);
+      this.gameState._notify();
+      this._nextCombat();
     }
   }
 
   _checkAirLanding() {
     const player = this.gameState.currentPlayer;
     const { attackers } = this.combatState;
-
-    console.log('[AirLanding] Checking air landing for territory:', this.currentTerritory);
-    console.log('[AirLanding] Attackers:', JSON.stringify(attackers));
 
     // Find ALL surviving air units - they MUST select a landing location
     // Air units can ONLY land in territories that were friendly at the START of the turn
@@ -536,12 +535,10 @@ export class CombatUI {
 
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
-      console.log('[AirLanding] Checking unit:', unit.type, 'isAir:', def?.isAir, 'qty:', unit.quantity);
       if (!def?.isAir || unit.quantity <= 0) continue;
 
       // Get valid landing options (only territories friendly at turn start)
       const landingOptions = this.gameState.getAirLandingOptions(territory, unit.type, this.unitDefs);
-      console.log('[AirLanding] Landing options for', unit.type, ':', landingOptions);
 
       // ALL air units must choose a landing location after combat
       airUnitsToLand.push({
@@ -551,16 +548,16 @@ export class CombatUI {
       });
     }
 
-    console.log('[AirLanding] Air units to land:', airUnitsToLand.length);
-
     if (airUnitsToLand.length > 0) {
       this.combatState.airUnitsToLand = airUnitsToLand;
       this.combatState.selectedLandings = {};
       this.combatState.phase = 'airLanding';
-      console.log('[AirLanding] Phase set to airLanding, callback exists:', !!this.onAirLandingRequired);
 
-      // If external air landing UI is connected, delegate to it
+      // If external air landing UI is connected, delegate to it and hide combat popup
       if (this.onAirLandingRequired) {
+        // Hide combat popup - only show the air landing panel
+        this.el.classList.add('hidden');
+
         this.onAirLandingRequired({
           airUnitsToLand,
           combatTerritory: this.currentTerritory,
@@ -568,7 +565,6 @@ export class CombatUI {
         });
       }
     } else {
-      console.log('[AirLanding] No air units to land, setting phase to resolved');
       this.combatState.phase = 'resolved';
     }
   }
@@ -1272,6 +1268,8 @@ export class CombatUI {
       this.currentTerritory = this.gameState.combatQueue[0];
       this._initCombatState();
       this._render();
+      // Make sure popup is visible for next combat
+      this.el.classList.remove('hidden');
     } else {
       this.hide();
       if (this.onCombatComplete) {
