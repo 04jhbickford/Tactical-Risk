@@ -720,16 +720,26 @@ export class CombatUI {
       }
     }
 
-    // Handle air landing phase - auto-select closest valid landing for each air unit
+    // Handle air landing phase
+    // If external UI is connected, let the user select landings manually
+    // Otherwise auto-select closest valid landing for each air unit
     if (this.combatState.phase === 'airLanding') {
-      const { airUnitsToLand } = this.combatState;
-      for (const airUnit of airUnitsToLand) {
-        if (airUnit.landingOptions.length > 0) {
-          // Select the closest landing option
-          this.combatState.selectedLandings[airUnit.type] = airUnit.landingOptions[0].territory;
+      if (this.onAirLandingRequired) {
+        // External UI will handle this - don't auto-select
+        // The callback was already called in _checkAirLanding
+        console.log('[AutoBattle] Air landing required - waiting for user selection via external UI');
+        return; // Exit auto-battle, let user interact with landing UI
+      } else {
+        // No external UI - auto-select landings
+        const { airUnitsToLand } = this.combatState;
+        for (const airUnit of airUnitsToLand) {
+          if (airUnit.landingOptions.length > 0) {
+            // Select the closest landing option
+            this.combatState.selectedLandings[airUnit.type] = airUnit.landingOptions[0].territory;
+          }
         }
+        this._confirmAirLandings();
       }
-      this._confirmAirLandings();
     }
   }
 
