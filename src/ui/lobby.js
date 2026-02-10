@@ -1,5 +1,7 @@
 // Lobby UI for game mode and player selection
 
+export const GAME_VERSION = 'V0.78';
+
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
   { id: 'human', name: 'Human', desc: 'Local player' },
@@ -53,9 +55,27 @@ export class Lobby {
     const autoSaveTime = localStorage.getItem('tacticalRisk_autoSave_time');
     const autoSaveDisplay = autoSaveTime ? new Date(autoSaveTime).toLocaleString() : '';
 
+    // Default to risk mode, get factions
+    if (!this.selectedMode) this.selectedMode = 'risk';
+    const isClassic = this.selectedMode === 'classic';
+    const factions = isClassic ? this.setup.classic.factions : this.setup.risk.factions;
+    const alliances = this.setup.alliances;
+
+    // Initialize colors and AI for factions if not already
+    factions.forEach((p, i) => {
+      const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
+      if (!this.playerColors[p.id]) {
+        this.playerColors[p.id] = { color: p.color || defaultColor.color, lightColor: p.lightColor || defaultColor.light };
+      }
+      if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
+    });
+
     let html = `
-      <div class="lobby-content">
-        <h1 class="lobby-title">Tactical Risk</h1>
+      <div class="lobby-content unified">
+        <div class="lobby-header-main">
+          <h1 class="lobby-title">Tactical Risk</h1>
+          <span class="lobby-version">${GAME_VERSION}</span>
+        </div>
         <p class="lobby-subtitle">World War II Strategy</p>
 
         ${hasAutoSave ? `
@@ -72,32 +92,220 @@ export class Lobby {
 
         <div class="lobby-section">
           <h2>New Game</h2>
-          <div class="mode-grid">
-            ${modes.map(mode => `
-              <div class="mode-card ${mode.enabled ? '' : 'disabled'}" data-mode="${mode.id}">
-                <div class="mode-name">${mode.name}</div>
-                <div class="mode-desc">${mode.description}</div>
-                ${!mode.enabled ? '<div class="mode-coming">Coming Soon</div>' : ''}
-              </div>
-            `).join('')}
+
+          <div class="mode-select-row">
+            <label class="mode-label">Game Mode:</label>
+            <div class="mode-tabs">
+              ${modes.map(mode => `
+                <button class="mode-tab ${mode.id === this.selectedMode ? 'selected' : ''} ${mode.enabled ? '' : 'disabled'}"
+                        data-mode="${mode.id}" ${mode.enabled ? '' : 'disabled'}>
+                  ${mode.name}
+                  ${!mode.enabled ? '<span class="mode-soon">Soon</span>' : ''}
+                </button>
+              `).join('')}
+            </div>
           </div>
+
+          <div class="faction-section">
+            <h3>${isClassic ? 'Factions' : 'Select Factions (2-5 players)'}</h3>
+            ${!isClassic ? '<p class="lobby-hint">Click factions to add/remove players</p>' : ''}
+
+            <div class="player-grid ${isClassic ? 'classic' : ''}">
+              ${factions.map((p, i) => {
+                const isSelected = isClassic || this.selectedPlayers.includes(p.id);
+                const currentColor = this.playerColors[p.id];
+                const currentAI = this.playerAI[p.id] || 'human';
+                return `
+                <div class="player-card ${isSelected ? 'selected' : ''}" data-player="${p.id}" data-alliance="${p.alliance}">
+                  <div class="alliance-badge ${p.alliance.toLowerCase()}">${p.alliance}</div>
+                  <img src="assets/flags/${p.flag}" alt="${p.name}" class="player-flag">
+                  <input type="text" class="player-name-input"
+                         data-player="${p.id}"
+                         placeholder="${p.name}"
+                         value="${this.playerNames[p.id] || (isSelected ? p.name : '')}"
+                         maxlength="15"
+                         ${isSelected ? '' : 'disabled'}>
+                  <div class="player-controls-row">
+                    <div class="player-color-select" data-player="${p.id}">
+                      <div class="color-current" style="background:${currentColor?.color || p.color}" data-color="${FACTION_COLORS[i % FACTION_COLORS.length].id}"></div>
+                      <div class="color-dropdown hidden">
+                        ${FACTION_COLORS.map(c => `
+                          <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
+                        `).join('')}
+                      </div>
+                    </div>
+                    <select class="player-ai-select" data-player="${p.id}" ${isSelected ? '' : 'disabled'}>
+                      ${AI_DIFFICULTIES.map(d => `
+                        <option value="${d.id}" ${currentAI === d.id ? 'selected' : ''}>${d.name}</option>
+                      `).join('')}
+                    </select>
+                  </div>
+                  ${!isClassic ? '<div class="player-check"></div>' : ''}
+                  ${isClassic && p.startingPUs ? `<div class="player-pus">${p.startingPUs} PUs</div>` : ''}
+                </div>
+              `}).join('')}
+            </div>
+          </div>
+
+          ${!isClassic ? `
+            <div class="lobby-options">
+              <div class="option-item">
+                <label class="option-label">Starting IPCs</label>
+                <select id="startingIPCsSelect" class="starting-ipcs-select">
+                  <option value="30" ${this.startingIPCs === 30 ? 'selected' : ''}>30 IPCs</option>
+                  <option value="50" ${this.startingIPCs === 50 ? 'selected' : ''}>50 IPCs</option>
+                  <option value="80" ${this.startingIPCs === 80 || !this.startingIPCs ? 'selected' : ''}>80 IPCs</option>
+                  <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100 IPCs</option>
+                  <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150 IPCs</option>
+                </select>
+              </div>
+              <div class="option-info">
+                <span>Random territories</span>
+                <span>|</span>
+                <span>1 infantry per territory</span>
+              </div>
+            </div>
+          ` : `
+            <div class="lobby-alliances-info">
+              <div class="alliance-info axis">
+                <span class="alliance-label">Axis:</span>
+                <span class="alliance-members">${alliances.Axis.members.join(', ')}</span>
+              </div>
+              <div class="alliance-info allies">
+                <span class="alliance-label">Allies:</span>
+                <span class="alliance-members">${alliances.Allies.members.join(', ')}</span>
+              </div>
+            </div>
+          `}
         </div>
+
+        <button class="lobby-start-btn" ${this._canStart(isClassic) ? '' : 'disabled'}>
+          ${this._getStartButtonText(isClassic)}
+        </button>
       </div>
     `;
 
     this.el.innerHTML = html;
+    this._bindUnifiedEvents(isClassic, factions);
+  }
 
-    // Bind mode selection
-    this.el.querySelectorAll('.mode-card:not(.disabled)').forEach(card => {
-      card.addEventListener('click', () => {
-        this.selectedMode = card.dataset.mode;
-        this._renderPlayerSelect();
+  _canStart(isClassic) {
+    return isClassic || this.selectedPlayers.length >= 2;
+  }
+
+  _getStartButtonText(isClassic) {
+    if (isClassic) return 'Start Game';
+    const count = this.selectedPlayers.length;
+    if (count < 2) return 'Select at least 2 factions';
+    return `Start Game (${count} factions)`;
+  }
+
+  _bindUnifiedEvents(isClassic, factions) {
+    // Mode tabs
+    this.el.querySelectorAll('.mode-tab:not(.disabled)').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const newMode = tab.dataset.mode;
+        if (newMode !== this.selectedMode) {
+          this.selectedMode = newMode;
+          this.selectedPlayers = [];
+          // For classic mode, auto-select all factions
+          if (newMode === 'classic') {
+            const classicFactions = this.setup.classic.factions;
+            this.selectedPlayers = classicFactions.map(p => p.id);
+            classicFactions.forEach(p => {
+              this.playerNames[p.id] = p.name;
+              this.playerColors[p.id] = { color: p.color, lightColor: p.lightColor };
+            });
+          }
+          this._renderModeSelect();
+        }
       });
+    });
+
+    // Player cards (for Risk mode selection)
+    if (!isClassic) {
+      this.el.querySelectorAll('.player-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+          if (e.target.classList.contains('player-name-input')) return;
+          if (e.target.classList.contains('player-ai-select')) return;
+          if (e.target.closest('.player-color-select')) return;
+          this._togglePlayer(card.dataset.player);
+        });
+      });
+
+      // Starting IPCs selector
+      this.el.querySelector('#startingIPCsSelect')?.addEventListener('change', (e) => {
+        this.startingIPCs = parseInt(e.target.value, 10);
+      });
+
+      this.alliancesEnabled = false;
+    } else {
+      // Classic mode: all factions are selected
+      this.selectedPlayers = factions.map(p => p.id);
+      factions.forEach(p => {
+        if (!this.playerNames[p.id]) this.playerNames[p.id] = p.name;
+      });
+      this.alliancesEnabled = true;
+    }
+
+    // Color selectors
+    this.el.querySelectorAll('.player-color-select').forEach(colorSelect => {
+      const playerId = colorSelect.dataset.player;
+      const currentEl = colorSelect.querySelector('.color-current');
+      const dropdown = colorSelect.querySelector('.color-dropdown');
+
+      currentEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.el.querySelectorAll('.color-dropdown').forEach(d => {
+          if (d !== dropdown) d.classList.add('hidden');
+        });
+        dropdown.classList.toggle('hidden');
+      });
+
+      dropdown.querySelectorAll('.color-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const colorId = opt.dataset.colorId;
+          const colorDef = FACTION_COLORS.find(c => c.id === colorId);
+          if (colorDef) {
+            this.playerColors[playerId] = { color: colorDef.color, lightColor: colorDef.light };
+            currentEl.style.background = colorDef.color;
+            dropdown.classList.add('hidden');
+          }
+        });
+      });
+    });
+
+    document.addEventListener('click', () => {
+      this.el.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+    });
+
+    // Name inputs
+    this.el.querySelectorAll('.player-name-input').forEach(input => {
+      input.addEventListener('input', (e) => {
+        this.playerNames[e.target.dataset.player] = e.target.value;
+      });
+      input.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // AI select
+    this.el.querySelectorAll('.player-ai-select').forEach(select => {
+      select.addEventListener('change', (e) => {
+        this.playerAI[e.target.dataset.player] = e.target.value;
+      });
+      select.addEventListener('click', (e) => e.stopPropagation());
     });
 
     // Continue game button
     this.el.querySelector('.continue-game-btn')?.addEventListener('click', () => {
       this._continueGame();
+    });
+
+    // Start button
+    this.el.querySelector('.lobby-start-btn').addEventListener('click', () => {
+      if (this._canStart(isClassic)) {
+        this._startGame();
+      }
     });
   }
 
@@ -116,233 +324,26 @@ export class Lobby {
     }
   }
 
-  _renderPlayerSelect() {
-    const mode = this.selectedMode;
-    const isClassic = mode === 'classic';
-    const factions = isClassic ? this.setup.classic.factions : this.setup.risk.factions;
-    const modeData = this.setup.gameModes.find(m => m.id === mode);
-    const alliances = this.setup.alliances;
-
-    let html = `
-      <div class="lobby-content">
-        <div class="lobby-header">
-          <button class="lobby-back-btn">&larr; Back</button>
-          <h1 class="lobby-title-small">${modeData.name}</h1>
-        </div>
-
-        <div class="lobby-section">
-          <h2>${isClassic ? 'Factions' : 'Select Factions (2-5)'}</h2>
-          ${!isClassic ? '<p class="lobby-hint">Click factions to add/remove players</p>' : ''}
-
-          <div class="player-grid classic">
-            ${factions.map((p, i) => {
-              const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
-              const currentAI = this.playerAI[p.id] || 'human';
-              return `
-              <div class="player-card ${isClassic ? 'selected' : ''}" data-player="${p.id}" data-alliance="${p.alliance}">
-                <div class="alliance-badge ${p.alliance.toLowerCase()}">${p.alliance}</div>
-                <img src="assets/flags/${p.flag}" alt="${p.name}" class="player-flag">
-                <input type="text" class="player-name-input"
-                       data-player="${p.id}"
-                       placeholder="${p.name}"
-                       value="${isClassic ? p.name : ''}"
-                       maxlength="15"
-                       ${isClassic ? '' : 'disabled'}>
-                <div class="player-controls-row">
-                  <div class="player-color-select" data-player="${p.id}">
-                    <div class="color-current" style="background:${p.color}" data-color="${defaultColor.id}"></div>
-                    <div class="color-dropdown hidden">
-                      ${FACTION_COLORS.map(c => `
-                        <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
-                      `).join('')}
-                    </div>
-                  </div>
-                  <select class="player-ai-select" data-player="${p.id}" ${isClassic ? '' : 'disabled'}>
-                    ${AI_DIFFICULTIES.map(d => `
-                      <option value="${d.id}" ${currentAI === d.id ? 'selected' : ''}>${d.name}</option>
-                    `).join('')}
-                  </select>
-                </div>
-                ${!isClassic ? '<div class="player-check"></div>' : ''}
-                ${isClassic && p.startingPUs ? `<div class="player-pus">${p.startingPUs} PUs</div>` : ''}
-              </div>
-            `}).join('')}
-          </div>
-        </div>
-
-        ${!isClassic ? `
-          <div class="lobby-section">
-            <div class="lobby-info risk-options">
-              <div class="info-item">
-                <span class="info-label">Starting IPCs</span>
-                <select id="startingIPCsSelect" class="starting-ipcs-select">
-                  <option value="30" ${this.startingIPCs === 30 ? 'selected' : ''}>30 IPCs</option>
-                  <option value="50" ${this.startingIPCs === 50 ? 'selected' : ''}>50 IPCs</option>
-                  <option value="80" ${this.startingIPCs === 80 || !this.startingIPCs ? 'selected' : ''}>80 IPCs</option>
-                  <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100 IPCs</option>
-                  <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150 IPCs</option>
-                </select>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Mode</span>
-                <span class="info-value">Free-for-All</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Setup</span>
-                <span class="info-value">Random territories + 1 infantry each</span>
-              </div>
-            </div>
-          </div>
-        ` : `
-          <div class="lobby-info">
-            <div class="info-item alliance-info axis">
-              <span class="info-label">Axis Powers</span>
-              <span class="info-value">${alliances.Axis.members.join(', ')}</span>
-            </div>
-            <div class="info-item alliance-info allies">
-              <span class="info-label">Allied Forces</span>
-              <span class="info-value">${alliances.Allies.members.join(', ')}</span>
-            </div>
-          </div>
-        `}
-
-        <button class="lobby-start-btn" ${isClassic ? '' : 'disabled'}>
-          ${isClassic ? 'Start Game' : 'Select at least 2 factions'}
-        </button>
-      </div>
-    `;
-
-    this.el.innerHTML = html;
-
-    // Initialize for classic mode
-    if (isClassic) {
-      this.selectedPlayers = factions.map(p => p.id);
-      factions.forEach((p, i) => {
-        this.playerNames[p.id] = p.name;
-        // Use faction's default color
-        this.playerColors[p.id] = { color: p.color, lightColor: p.lightColor };
-        // Default to human
-        if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
-      });
-    } else {
-      this.selectedPlayers = [];
-      // Initialize colors and AI for risk mode
-      factions.forEach((p, i) => {
-        const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
-        this.playerColors[p.id] = { color: defaultColor.color, lightColor: defaultColor.light };
-        if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
-      });
-    }
-
-    this._bindPlayerEvents(isClassic, factions);
-  }
-
-  _bindPlayerEvents(isClassic, factions) {
-    // Back button
-    this.el.querySelector('.lobby-back-btn')?.addEventListener('click', () => {
-      this.selectedMode = null;
-      this.selectedPlayers = [];
-      this.playerNames = {};
-      this.playerColors = {};
-      this._renderModeSelect();
-    });
-
-    // Player cards (for Risk mode)
-    if (!isClassic) {
-      this.el.querySelectorAll('.player-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-          if (e.target.classList.contains('player-name-input')) return;
-          if (e.target.closest('.player-color-select')) return; // Don't toggle when clicking color
-          this._togglePlayer(card.dataset.player);
-        });
-      });
-
-      // Starting IPCs selector
-      this.el.querySelector('#startingIPCsSelect')?.addEventListener('change', (e) => {
-        this.startingIPCs = parseInt(e.target.value, 10);
-      });
-
-      // Risk mode is always free-for-all (no alliances)
-      this.alliancesEnabled = false;
-    } else {
-      // Classic mode always has alliances enabled
-      this.alliancesEnabled = true;
-    }
-
-    // Color selectors
-    this.el.querySelectorAll('.player-color-select').forEach(colorSelect => {
-      const playerId = colorSelect.dataset.player;
-      const currentEl = colorSelect.querySelector('.color-current');
-      const dropdown = colorSelect.querySelector('.color-dropdown');
-
-      // Toggle dropdown
-      currentEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        // Close other dropdowns
-        this.el.querySelectorAll('.color-dropdown').forEach(d => {
-          if (d !== dropdown) d.classList.add('hidden');
-        });
-        dropdown.classList.toggle('hidden');
-      });
-
-      // Select color
-      dropdown.querySelectorAll('.color-option').forEach(opt => {
-        opt.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const colorId = opt.dataset.colorId;
-          const colorDef = FACTION_COLORS.find(c => c.id === colorId);
-          if (colorDef) {
-            this.playerColors[playerId] = { color: colorDef.color, lightColor: colorDef.light };
-            currentEl.style.background = colorDef.color;
-            dropdown.classList.add('hidden');
-          }
-        });
-      });
-    });
-
-    // Close dropdowns when clicking elsewhere
-    document.addEventListener('click', () => {
-      this.el.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-    });
-
-    // Name inputs
-    this.el.querySelectorAll('.player-name-input').forEach(input => {
-      input.addEventListener('input', (e) => {
-        this.playerNames[e.target.dataset.player] = e.target.value;
-      });
-    });
-
-    // AI select
-    this.el.querySelectorAll('.player-ai-select').forEach(select => {
-      select.addEventListener('change', (e) => {
-        this.playerAI[e.target.dataset.player] = e.target.value;
-      });
-      select.addEventListener('click', (e) => e.stopPropagation());
-    });
-
-    // Start button
-    this.el.querySelector('.lobby-start-btn').addEventListener('click', () => {
-      if (isClassic || this.selectedPlayers.length >= 2) {
-        this._startGame();
-      }
-    });
-  }
-
   _togglePlayer(playerId) {
     const card = this.el.querySelector(`.player-card[data-player="${playerId}"]`);
     const input = card.querySelector('.player-name-input');
     const aiSelect = card.querySelector('.player-ai-select');
+    const factions = this.setup.risk.factions;
+    const faction = factions.find(p => p.id === playerId);
     const idx = this.selectedPlayers.indexOf(playerId);
 
     if (idx >= 0) {
       this.selectedPlayers.splice(idx, 1);
       card.classList.remove('selected');
       input.disabled = true;
+      input.value = '';
       if (aiSelect) aiSelect.disabled = true;
     } else {
       this.selectedPlayers.push(playerId);
       card.classList.add('selected');
       input.disabled = false;
+      input.value = faction?.name || '';
+      this.playerNames[playerId] = faction?.name || '';
       if (aiSelect) aiSelect.disabled = false;
       input.focus();
     }
@@ -352,15 +353,11 @@ export class Lobby {
 
   _updateStartButton() {
     const btn = this.el.querySelector('.lobby-start-btn');
+    const isClassic = this.selectedMode === 'classic';
     const count = this.selectedPlayers.length;
 
-    if (count < 2) {
-      btn.disabled = true;
-      btn.textContent = 'Select at least 2 factions';
-    } else {
-      btn.disabled = false;
-      btn.textContent = `Start Game (${count} factions)`;
-    }
+    btn.disabled = !this._canStart(isClassic);
+    btn.textContent = this._getStartButtonText(isClassic);
   }
 
   _startGame() {

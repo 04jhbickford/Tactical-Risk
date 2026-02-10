@@ -4,13 +4,24 @@ export class ContinentPanel {
   constructor(continents) {
     this.continents = continents;
     this.gameState = null;
+    this.unitDefs = null;
+    this.onTradeCards = null;
     this.el = null;
-    // Persist collapsed state across renders
+    // Persist collapsed state across renders - start all sections minimized
     this.collapsedSections = {
-      'player-stats': false,
-      'continent-bonuses': false
+      'player-stats': true,
+      'continent-bonuses': true,
+      'risk-cards': true
     };
     this._create();
+  }
+
+  setUnitDefs(unitDefs) {
+    this.unitDefs = unitDefs;
+  }
+
+  setOnTradeCards(callback) {
+    this.onTradeCards = callback;
   }
 
   _create() {
@@ -54,6 +65,11 @@ export class ContinentPanel {
 
     // Continent Bonuses Section
     html += this._renderContinentBonuses();
+
+    // Risk Cards Section (only in Risk mode)
+    if (this.gameState.gameMode === 'risk') {
+      html += this._renderRiskCards();
+    }
 
     this.el.innerHTML = html;
     this._bindEvents();
@@ -162,6 +178,73 @@ export class ContinentPanel {
     return html;
   }
 
+  _renderRiskCards() {
+    const player = this.gameState.currentPlayer;
+    if (!player) return '';
+
+    const isCollapsed = this.collapsedSections['risk-cards'];
+    const cards = this.gameState.riskCards?.[player.id] || [];
+    const canTrade = this.gameState.canTradeRiskCards?.(player.id);
+    const nextValue = this.gameState.getNextRiskCardValue?.(player.id) || 12;
+    const turnPhase = this.gameState.turnPhase;
+
+    const cardIcons = {
+      infantry: '🚶',
+      cavalry: '🐎',
+      artillery: '💣',
+      wild: '⭐'
+    };
+
+    // Count cards by type
+    const cardCounts = {};
+    cards.forEach(c => {
+      cardCounts[c] = (cardCounts[c] || 0) + 1;
+    });
+
+    let html = `
+      <div class="info-section risk-cards-section ${isCollapsed ? 'collapsed' : ''}">
+        <div class="info-section-header" data-toggle="risk-cards">
+          <span class="info-section-title">🃏 Risk Cards (${cards.length})</span>
+          <span class="info-section-toggle">${isCollapsed ? '▶' : '▼'}</span>
+        </div>
+        <div class="info-section-content" id="risk-cards-content">
+    `;
+
+    if (cards.length === 0) {
+      html += `<div class="rc-empty">No cards. Conquer territories to earn cards!</div>`;
+    } else {
+      // Show card summary
+      html += `<div class="rc-summary">`;
+      for (const [type, count] of Object.entries(cardCounts)) {
+        html += `<span class="rc-summary-item">${cardIcons[type] || '?'} ${type}: ${count}</span>`;
+      }
+      html += `</div>`;
+
+      // Trade section
+      if (canTrade) {
+        html += `
+          <div class="rc-trade">
+            <span class="rc-trade-value">Trade value: <strong>${nextValue} IPCs</strong></span>
+            ${turnPhase === 'purchase' ? `
+              <button class="rc-trade-btn" data-action="trade-cards">Cash In</button>
+            ` : `
+              <span class="rc-trade-note">(Available in Purchase phase)</span>
+            `}
+          </div>
+        `;
+      } else if (cards.length >= 5) {
+        html += `<div class="rc-warning">⚠️ Must trade when you have 5+ cards!</div>`;
+      }
+    }
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
   _bindEvents() {
     // Toggle sections
     this.el.querySelectorAll('.info-section-header').forEach(header => {
@@ -182,6 +265,13 @@ export class ContinentPanel {
           toggle.textContent = isCollapsed ? '▶' : '▼';
         }
       });
+    });
+
+    // Trade cards button
+    this.el.querySelector('[data-action="trade-cards"]')?.addEventListener('click', () => {
+      if (this.onTradeCards) {
+        this.onTradeCards();
+      }
     });
   }
 

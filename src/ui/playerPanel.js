@@ -4,7 +4,7 @@ import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES } from '../state/gameState.j
 
 const PHASE_DESCRIPTIONS = {
   [GAME_PHASES.CAPITAL_PLACEMENT]: 'Click on one of your territories to place your capital city.',
-  [GAME_PHASES.UNIT_PLACEMENT]: 'Purchase units to place at your capital or adjacent sea zones.',
+  [GAME_PHASES.UNIT_PLACEMENT]: 'Place your starting units on territories you own or adjacent sea zones.',
   [TURN_PHASES.DEVELOP_TECH]: 'Spend IPCs on research dice to unlock new technologies.',
   [TURN_PHASES.PURCHASE]: 'Purchase new units. They will be placed during the Mobilize phase.',
   [TURN_PHASES.COMBAT_MOVE]: 'Move units into enemy territories to initiate combat.',
@@ -236,9 +236,22 @@ export class PlayerPanel {
       }
     }
 
-    // Unit placement phase
+    // Unit placement phase - PlacementUI handles the unit selection, just show done button
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      html += this._renderUnitPurchase(player);
+      const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+      const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
+      const canFinish = placedThisRound >= 6 || totalRemaining === 0;
+      const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
+
+      html += `<div class="pp-placement">`;
+      html += `<p class="pp-hint">Click a territory, then select units from the placement panel.</p>`;
+      if (canUndo) {
+        html += `<button class="pp-action-btn secondary" data-action="undo-placement">Undo Last</button>`;
+      }
+      if (canFinish) {
+        html += `<button class="pp-action-btn" data-action="finish-placement">Done - Next Player</button>`;
+      }
+      html += `</div>`;
     }
 
     // Playing phase

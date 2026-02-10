@@ -41,7 +41,6 @@ import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
 import { BugTracker } from './ui/bugTracker.js';
 import { AirLandingUI } from './ui/airLandingUI.js';
-import { RiskCardsDropdown } from './ui/riskCardsDropdown.js';
 
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
@@ -98,6 +97,7 @@ async function init() {
   // Purchase popup overlay
   const purchasePopup = new PurchasePopup();
   purchasePopup.setUnitDefs(unitDefs);
+  purchasePopup.setTerritories(territories);
 
   // Movement UI
   const movementUI = new MovementUI();
@@ -137,9 +137,6 @@ async function init() {
   const airLandingUI = new AirLandingUI();
   airLandingUI.setUnitDefs(unitDefs);
   airLandingUI.setTerritories(territories);
-
-  // Risk Cards Dropdown (right side, for Risk mode)
-  const riskCardsDropdown = new RiskCardsDropdown();
 
   // Rules button (fixed position)
   const rulesBtn = document.createElement('button');
@@ -420,17 +417,17 @@ async function init() {
     actionLog.show();
     actionLog.logTurnStart(gameState.currentPlayer, gameState.round);
 
-    // Risk Cards Dropdown
-    riskCardsDropdown.setGameState(gameState);
-    riskCardsDropdown.setOnTradeCards(() => {
+    // Continent Panel (includes Risk cards)
+    continentPanel.setUnitDefs(unitDefs);
+    continentPanel.setOnTradeCards(() => {
       if (gameState.turnPhase === TURN_PHASES.PURCHASE) {
         const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
         if (result.success) {
-          actionLog.log(`Traded cards for ${result.ipcsGained} IPCs`, 'trade');
+          actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);
+          camera.dirty = true;
         }
       }
     });
-    riskCardsDropdown.show();
 
     // Show panels
     continentPanel.show();

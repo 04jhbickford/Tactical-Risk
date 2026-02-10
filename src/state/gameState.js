@@ -66,6 +66,7 @@ export const LAND_BRIDGES = [
   ['East Indies', 'Australia'],
   ['Australia', 'New Zealand'],
   ['Kenya-Rhodesia', 'Madagascar'],
+  ['Spain', 'Algeria'],  // Strait of Gibraltar
 ];
 
 // Starting IPCs by player count for Risk mode
@@ -79,10 +80,11 @@ export const STARTING_IPCS_BY_PLAYER_COUNT = {
 };
 
 // Starting units for Risk mode (per player)
+// Note: Fighters and carriers are placed independently - no auto-assignment
 export const RISK_STARTING_UNITS = {
   land: [
     { type: 'bomber', quantity: 1 },
-    { type: 'fighter', quantity: 1 },
+    { type: 'fighter', quantity: 2 }, // Both fighters are in land, placed independently
     { type: 'tacticalBomber', quantity: 1 },
     { type: 'armour', quantity: 3 },
     { type: 'artillery', quantity: 3 },
@@ -92,7 +94,6 @@ export const RISK_STARTING_UNITS = {
   naval: [
     { type: 'battleship', quantity: 1 },
     { type: 'carrier', quantity: 1 },
-    { type: 'fighter', quantity: 1 }, // On carrier
     { type: 'cruiser', quantity: 1 },
     { type: 'destroyer', quantity: 1 },
     { type: 'submarine', quantity: 1 },
@@ -828,10 +829,18 @@ export class GameState {
     this.playerState[player.id].hasPlacedCapital = true;
     this.playerState[player.id].capitalTerritory = territoryName;
 
-    // Factory is now part of starting units, but add AA gun for capital defense
+    // Auto-place AA gun and factory on capital
     const units = this.units[territoryName] || [];
     units.push({ type: 'aaGun', quantity: 1, owner: player.id });
+    units.push({ type: 'factory', quantity: 1, owner: player.id });
     this.units[territoryName] = units;
+
+    // Remove factory from units to place (it's been auto-placed on capital)
+    const unitsToPlace = this.unitsToPlace[player.id] || [];
+    const factoryEntry = unitsToPlace.find(u => u.type === 'factory');
+    if (factoryEntry) {
+      factoryEntry.quantity = Math.max(0, factoryEntry.quantity - 1);
+    }
 
     this.currentPlayerIndex++;
     if (this.currentPlayerIndex >= this.players.length) {
@@ -905,6 +914,15 @@ export class GameState {
       }
       if (!validSeaZones.has(territoryName)) {
         return { success: false, error: 'Naval units must be placed on sea zones adjacent to your coastal territories' };
+      }
+
+      // During setup: prevent placing naval units in sea zones occupied by other players
+      if (this.phase === GAME_PHASES.UNIT_PLACEMENT) {
+        const existingUnits = this.units[territoryName] || [];
+        const enemyUnits = existingUnits.filter(u => u.owner !== player.id);
+        if (enemyUnits.length > 0) {
+          return { success: false, error: 'Cannot place naval units in a sea zone occupied by another faction during setup' };
+        }
       }
     } else {
       // Land/air units: check if can be placed
@@ -1110,7 +1128,8 @@ export class GameState {
   }
 
   // Add unit to pending purchases (PURCHASE phase) - units placed during MOBILIZE
-  addToPendingPurchases(unitType, unitDefs) {
+  // territory parameter specifies where the unit will be placed during mobilize
+  addToPendingPurchases(unitType, unitDefs, territory = null) {
     const player = this.currentPlayer;
     if (!player) return { success: false, error: 'No current player' };
 
@@ -1125,12 +1144,14 @@ export class GameState {
     // Deduct IPCs
     this.playerState[player.id].ipcs -= cost;
 
-    // Add to pending purchases
-    const existing = this.pendingPurchases.find(p => p.type === unitType && p.owner === player.id);
+    // Add to pending purchases - track territory if specified
+    const existing = this.pendingPurchases.find(p =>
+      p.type === unitType && p.owner === player.id && p.territory === territory
+    );
     if (existing) {
       existing.quantity++;
     } else {
-      this.pendingPurchases.push({ type: unitType, quantity: 1, owner: player.id, cost });
+      this.pendingPurchases.push({ type: unitType, quantity: 1, owner: player.id, cost, territory });
     }
 
     this._notify();

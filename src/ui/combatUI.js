@@ -78,8 +78,9 @@ export class CombatUI {
       .filter(u => u.owner === player.id)
       .map(u => ({ ...u }));
 
+    // Exclude factories from combat - they are captured, not destroyed
     const defenders = units
-      .filter(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner))
+      .filter(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner) && u.type !== 'factory')
       .map(u => ({ ...u }));
 
     // Check for AA guns and attacking aircraft
@@ -124,6 +125,7 @@ export class CombatUI {
 
   _calculateBombardment() {
     // Calculate shore bombardment from ships in adjacent sea zones
+    // A&A Anniversary Rule: Shore bombardment ONLY occurs when there are no defending naval units
     const player = this.gameState.currentPlayer;
     const territory = this.currentTerritory;
     const hits = [];
@@ -133,11 +135,18 @@ export class CombatUI {
     const t = this.gameState.territoryByName[territory];
     if (!t || t.isWater) return { hits: 0, rolls: [] };
 
-    // Find adjacent sea zones with friendly ships
+    // Find adjacent sea zones with friendly ships that can bombard
     const connections = t.connections || [];
     for (const connName of connections) {
       const connT = this.gameState.territoryByName[connName];
       if (!connT?.isWater) continue;
+
+      // A&A Anniversary Rule: Check if sea zone is cleared (no enemy naval units)
+      // Shore bombardment only allowed from sea zones where naval battle was already won
+      // or there were no enemy naval units to begin with
+      if (!this.gameState.isSeaZoneClearedForBombardment(connName)) {
+        continue; // Cannot bombard from contested sea zones
+      }
 
       // Check for friendly ships that can bombard
       const seaUnits = this.gameState.units[connName] || [];
@@ -470,8 +479,11 @@ export class CombatUI {
   }
 
   _selectCheapestCasualties(units, count) {
+    // A&A Anniversary Rule: Transports are defenseless and cannot be taken as casualties
+    // They are automatically destroyed when all other combat units are eliminated
+    // Factories are captured, not destroyed - exclude from casualties
     const sorted = [...units]
-      .filter(u => u.quantity > 0)
+      .filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory')
       .sort((a, b) => {
         const costA = this.unitDefs[a.type]?.cost || 999;
         const costB = this.unitDefs[b.type]?.cost || 999;
@@ -662,6 +674,27 @@ export class CombatUI {
     // Remove dead units
     this.combatState.attackers = attackers.filter(u => u.quantity > 0);
     this.combatState.defenders = defenders.filter(u => u.quantity > 0);
+
+    // A&A Anniversary Rule: Transports are defenseless
+    // Check if all non-transport units are destroyed - transports are then auto-destroyed
+    const attackerCombatUnits = this.combatState.attackers.filter(u => u.type !== 'transport');
+    const defenderCombatUnits = this.combatState.defenders.filter(u => u.type !== 'transport');
+
+    // Auto-destroy transports if no combat units remain
+    if (attackerCombatUnits.length === 0 && this.combatState.attackers.length > 0) {
+      // Attacker only has transports left - they are destroyed
+      for (const transport of this.combatState.attackers.filter(u => u.type === 'transport')) {
+        totalAttackerLosses['transport'] = (totalAttackerLosses['transport'] || 0) + transport.quantity;
+      }
+      this.combatState.attackers = [];
+    }
+    if (defenderCombatUnits.length === 0 && this.combatState.defenders.length > 0) {
+      // Defender only has transports left - they are destroyed
+      for (const transport of this.combatState.defenders.filter(u => u.type === 'transport')) {
+        totalDefenderLosses['transport'] = (totalDefenderLosses['transport'] || 0) + transport.quantity;
+      }
+      this.combatState.defenders = [];
+    }
 
     // Check for resolution
     if (this.combatState.defenders.length === 0) {
@@ -933,16 +966,20 @@ export class CombatUI {
 
     // Select Bombardment Casualties phase
     if (phase === 'selectBombardmentCasualties') {
-      const { pendingBombardmentCasualties, selectedBombardmentCasualties } = this.combatState;
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties, defenders } = this.combatState;
       const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+      const maxAvailable = this._getTotalUnits(defenders);
+      const effectiveCasualties = Math.min(pendingBombardmentCasualties, maxAvailable);
+      const isComplete = selectedTotal === pendingBombardmentCasualties || selectedTotal === maxAvailable;
       html += `
         <div class="bombardment-casualty-selection">
           <div class="casualty-group defender">
             <div class="casualty-header">
-              <span class="casualty-title">Select ${pendingBombardmentCasualties} Defender Casualties (Shore Bombardment)</span>
-              <span class="casualty-count ${selectedTotal === pendingBombardmentCasualties ? 'complete' : 'incomplete'}">
-                ${selectedTotal}/${pendingBombardmentCasualties}
+              <span class="casualty-title">Select ${effectiveCasualties} Defender Casualties (Shore Bombardment)</span>
+              <span class="casualty-count ${isComplete ? 'complete' : 'incomplete'}">
+                ${selectedTotal}/${effectiveCasualties}
               </span>
+              ${pendingBombardmentCasualties > maxAvailable ? `<span class="casualty-overflow">(${pendingBombardmentCasualties - maxAvailable} wasted)</span>` : ''}
             </div>
             <div class="casualty-units">
               ${this._renderBombardmentCasualtyUnits()}
@@ -1075,9 +1112,11 @@ export class CombatUI {
         </button>
       `;
     } else if (phase === 'selectBombardmentCasualties') {
-      const { pendingBombardmentCasualties, selectedBombardmentCasualties } = this.combatState;
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties, defenders } = this.combatState;
       const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
-      const canConfirm = selectedTotal === pendingBombardmentCasualties;
+      const maxAvailable = this._getTotalUnits(defenders);
+      // Can confirm if all casualties selected OR if all defenders are selected (when hits > defenders)
+      const canConfirm = selectedTotal === pendingBombardmentCasualties || selectedTotal === maxAvailable;
       html += `
         <button class="combat-btn confirm" data-action="confirm-bombardment-casualties" ${!canConfirm ? 'disabled' : ''}>
           Confirm Bombardment Casualties
@@ -1332,7 +1371,9 @@ export class CombatUI {
   }
 
   _renderCasualtyUnits(units, selected, side, readonly = false) {
-    return units.filter(u => u.quantity > 0).map(u => {
+    // A&A Anniversary: Transports are defenseless and cannot be selected as casualties
+    // Factories are captured, not destroyed - exclude from casualties
+    return units.filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory').map(u => {
       const def = this.unitDefs[u.type];
       // Use faction-specific icon
       const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
@@ -1394,7 +1435,9 @@ export class CombatUI {
   _renderBombardmentCasualtyUnits() {
     const { defenders, selectedBombardmentCasualties } = this.combatState;
 
-    return defenders.filter(u => u.quantity > 0).map(u => {
+    // A&A Anniversary: Transports are defenseless and cannot be selected as casualties
+    // Factories are captured, not destroyed - exclude from casualties
+    return defenders.filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory').map(u => {
       const def = this.unitDefs[u.type];
       const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
       const selectedCount = selectedBombardmentCasualties[u.type] || 0;

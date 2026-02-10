@@ -9,7 +9,7 @@ export class ActionLog {
     this._unsubscribe = null;
     this.onHighlightTerritory = null; // Callback for territory highlighting
     this.onHighlightMovement = null; // Callback for movement arrow highlighting
-    this.isCollapsed = false; // Persist collapsed state
+    this.isCollapsed = true; // Start collapsed
 
     this._create();
   }
@@ -27,11 +27,11 @@ export class ActionLog {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'actionLog';
-    this.el.className = 'action-log-integrated hidden';
+    this.el.className = 'action-log-integrated hidden collapsed'; // Start collapsed
     this.el.innerHTML = `
       <div class="action-log-header">
         <span class="action-log-title">Game Log</span>
-        <button class="action-log-toggle" title="Toggle Log">▼</button>
+        <button class="action-log-toggle" title="Toggle Log">▶</button>
       </div>
       <div class="action-log-content"></div>
     `;
