@@ -53,7 +53,6 @@ export class AirLandingUI {
 
   // Initialize with air units needing landing after combat
   setAirUnits(airUnitsToLand, combatTerritory, isRetreating = false) {
-    console.log('[AirLandingUI] setAirUnits called with:', airUnitsToLand);
     this.airUnitsToLand = airUnitsToLand;
     this.combatTerritory = combatTerritory;
     this.isRetreating = isRetreating;
@@ -61,7 +60,6 @@ export class AirLandingUI {
     this.currentUnitIndex = 0;
     this._render();
     this.el.classList.remove('hidden');
-    console.log('[AirLandingUI] Panel should now be visible, hidden class:', this.el.classList.contains('hidden'));
   }
 
   hide() {

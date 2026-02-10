@@ -6,6 +6,7 @@ export class BugTracker {
     this.gameState = null;
     this.actionLog = null;
     this.isOpen = false;
+    this.viewMode = 'report'; // 'report' or 'view'
     this._create();
   }
 
@@ -40,15 +41,22 @@ export class BugTracker {
     const player = this.gameState?.currentPlayer;
     const phase = this.gameState?.turnPhase || 'unknown';
     const round = this.gameState?.round || 0;
+    const reports = BugTracker.getBugReports();
 
     this.el.innerHTML = `
       <div class="bug-tracker-overlay" data-action="close"></div>
       <div class="bug-tracker-content">
         <div class="bug-tracker-header">
-          <h2>Report a Bug</h2>
+          <h2>Bug Tracker</h2>
           <button class="bug-close-btn" data-action="close">&times;</button>
         </div>
 
+        <div class="bug-tabs">
+          <button class="bug-tab ${this.viewMode === 'report' ? 'active' : ''}" data-tab="report">Report Bug</button>
+          <button class="bug-tab ${this.viewMode === 'view' ? 'active' : ''}" data-tab="view">View Reports (${reports.length})</button>
+        </div>
+
+        ${this.viewMode === 'report' ? `
         <form class="bug-form" data-action="submit">
           <div class="bug-form-group">
             <label for="bug-description">What went wrong?</label>
@@ -95,6 +103,32 @@ export class BugTracker {
             <button type="submit" class="bug-btn primary">Submit Report</button>
           </div>
         </form>
+        ` : `
+        <div class="bug-reports-view">
+          ${reports.length === 0 ? `
+            <div class="bug-no-reports">No bug reports yet.</div>
+          ` : `
+            <div class="bug-reports-list">
+              ${reports.map((r, i) => `
+                <div class="bug-report-item ${r.severity}">
+                  <div class="bug-report-header">
+                    <span class="bug-report-severity ${r.severity}">${r.severity.toUpperCase()}</span>
+                    <span class="bug-report-date">${new Date(r.timestamp).toLocaleString()}</span>
+                  </div>
+                  <div class="bug-report-desc">${this._escapeHtml(r.description)}</div>
+                  <div class="bug-report-context">
+                    Phase: ${r.gamePhase || 'N/A'} | Player: ${r.currentPlayer || 'N/A'} | Round: ${r.round || 'N/A'}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+            <div class="bug-reports-actions">
+              <button class="bug-btn secondary" data-action="export">Export to File</button>
+              <button class="bug-btn danger" data-action="clear">Clear All</button>
+            </div>
+          `}
+        </div>
+        `}
 
         <div class="bug-saved-notice hidden">
           <span class="bug-saved-icon">✓</span>
@@ -106,10 +140,24 @@ export class BugTracker {
     this._bindEvents();
   }
 
+  _escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
   _bindEvents() {
     // Close buttons and overlay
     this.el.querySelectorAll('[data-action="close"]').forEach(btn => {
       btn.addEventListener('click', () => this.hide());
+    });
+
+    // Tab switching
+    this.el.querySelectorAll('.bug-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        this.viewMode = tab.dataset.tab;
+        this._render();
+      });
     });
 
     // Form submission
@@ -117,6 +165,21 @@ export class BugTracker {
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
       this._submitBug();
+    });
+
+    // Export button
+    const exportBtn = this.el.querySelector('[data-action="export"]');
+    exportBtn?.addEventListener('click', () => {
+      BugTracker.exportBugReports();
+    });
+
+    // Clear button
+    const clearBtn = this.el.querySelector('[data-action="clear"]');
+    clearBtn?.addEventListener('click', () => {
+      if (confirm('Are you sure you want to clear all bug reports?')) {
+        BugTracker.clearBugReports();
+        this._render();
+      }
     });
 
     // Close on Escape
@@ -153,7 +216,7 @@ export class BugTracker {
   }
 
   _generateId() {
-    return 'bug-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    return 'bug-' + Date.now() + '-' + Math.random().toString(36).substring(2, 11);
   }
 
   _getRecentActions() {

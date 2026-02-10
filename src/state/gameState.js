@@ -2078,14 +2078,44 @@ export class GameState {
     if (!player) return null;
 
     const attackers = units.filter(u => u.owner === player.id);
-    const defenders = units.filter(u => u.owner !== player.id && !this.areAllies(player.id, u.owner));
+    // All enemy units in territory (for rolling dice - AA guns still roll at aircraft)
+    const allDefenders = units.filter(u => u.owner !== player.id && !this.areAllies(player.id, u.owner));
+    // Combat defenders - units that can actually stop an attack (exclude factories and 0/0 units)
+    const combatDefenders = allDefenders.filter(u => {
+      // Factories are captured, not combat units
+      if (u.type === 'factory') return false;
+      // Units with 0 attack and 0 defense can't stop an attack
+      const def = unitDefs[u.type];
+      if (def && def.defense === 0 && def.attack === 0) return false;
+      return true;
+    });
 
-    if (attackers.length === 0 || defenders.length === 0) {
+    if (attackers.length === 0 || combatDefenders.length === 0) {
+      // Attacker wins if there are no combat defenders (factories/AA captured)
+      if (attackers.length > 0 && allDefenders.length > 0) {
+        // Capture territory and transfer factory ownership
+        const t = this.territoryByName[territory];
+        if (!t?.isWater) {
+          this.territoryState[territory].owner = player.id;
+          // Transfer factory ownership
+          for (const unit of units) {
+            if (unit.type === 'factory') {
+              unit.owner = player.id;
+            }
+          }
+          // Award Risk card for conquering
+          if (!this.conqueredThisTurn[player.id]) {
+            this.conqueredThisTurn[player.id] = true;
+            this.awardRiskCard(player.id);
+          }
+        }
+      }
       // Repair damaged ships at end of combat
       this._repairDamagedShips(units, unitDefs);
       // Remove from combat queue
       this.combatQueue = this.combatQueue.filter(t => t !== territory);
-      return { resolved: true, winner: attackers.length > 0 ? 'attacker' : 'defender' };
+      this._notify();
+      return { resolved: true, winner: attackers.length > 0 ? 'attacker' : 'defender', conquered: attackers.length > 0 };
     }
 
     const t = this.territoryByName[territory];
@@ -2103,26 +2133,34 @@ export class GameState {
     if (!this._combatRoundsTracker) this._combatRoundsTracker = {};
     this._combatRoundsTracker[territory] = (this._combatRoundsTracker[territory] || 0) + 1;
 
-    // Roll dice for combat
+    // Roll dice for combat (allDefenders includes AA guns which can fire at aircraft)
     const { hits: attackHits, rolls: attackRolls } = this._rollCombatWithRolls(attackers, 'attack', unitDefs);
-    const { hits: defenseHits, rolls: defenseRolls } = this._rollCombatWithRolls(defenders, 'defense', unitDefs);
+    const { hits: defenseHits, rolls: defenseRolls } = this._rollCombatWithRolls(allDefenders, 'defense', unitDefs);
 
     // Add bombardment hits to attack hits
     const totalAttackHits = attackHits + bombardmentHits;
 
     // Apply casualties (handles multi-hit ships)
     // Defenders take hits from attacks + bombardment
-    const attackerCasualties = this._applyCasualtiesWithDamage(defenders, totalAttackHits, unitDefs, isNavalBattle);
+    const attackerCasualties = this._applyCasualtiesWithDamage(allDefenders, totalAttackHits, unitDefs, isNavalBattle);
     const defenderCasualties = this._applyCasualtiesWithDamage(attackers, defenseHits, unitDefs, isNavalBattle);
 
     // Clean up destroyed units (quantity <= 0)
     this.units[territory] = units.filter(u => u.quantity > 0);
 
     // Check if combat is over
+    // Note: Factories are captured (not destroyed) and AA guns have 0 combat value
+    // Only count units that can actually fight as "remaining"
     const remainingAttackers = this.units[territory].filter(u => u.owner === player.id);
-    const remainingDefenders = this.units[territory].filter(u =>
-      u.owner !== player.id && !this.areAllies(player.id, u.owner)
-    );
+    const remainingDefenders = this.units[territory].filter(u => {
+      if (u.owner === player.id || this.areAllies(player.id, u.owner)) return false;
+      // Factories are captured, not combat units - don't count them as defenders
+      if (u.type === 'factory') return false;
+      // AA guns with 0 defense can't stop an attack - they're captured with the territory
+      const def = unitDefs[u.type];
+      if (def && def.defense === 0 && def.attack === 0) return false;
+      return true;
+    });
 
     const result = {
       attackHits,
@@ -2144,7 +2182,7 @@ export class GameState {
         this.markSeaZoneCleared(territory);
       } else {
         // Land battle won - capture territory
-        const defender = defenders[0]?.owner;
+        const defender = allDefenders[0]?.owner;
         this.territoryState[territory].owner = player.id;
 
         // Transfer factory ownership to the winner (factories are captured, not destroyed)
