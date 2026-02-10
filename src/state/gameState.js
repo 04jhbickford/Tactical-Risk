@@ -183,6 +183,98 @@ export class GameState {
     }
 
     this._listeners = [];
+
+    // Individual ship tracking (for carriers/transports with cargo)
+    this._shipIdCounter = 0;
+  }
+
+  // Generate unique ID for individual ship tracking
+  _generateShipId(type) {
+    this._shipIdCounter++;
+    return `${type}_${this._shipIdCounter}`;
+  }
+
+  // Split a grouped ship into an individual ship with unique ID
+  // Used when loading cargo onto a ship - that ship becomes individually tracked
+  _individualizeShip(territory, shipType, playerId) {
+    const units = this.units[territory] || [];
+
+    // Find a grouped ship (no id, quantity > 0)
+    const grouped = units.find(u =>
+      u.type === shipType && u.owner === playerId && !u.id && u.quantity > 0
+    );
+
+    if (!grouped) return null;
+
+    // Split off one ship with unique ID
+    grouped.quantity--;
+    const individual = {
+      type: shipType,
+      quantity: 1,
+      owner: playerId,
+      id: this._generateShipId(shipType),
+      aircraft: [],
+      cargo: [],
+      moved: grouped.moved || false
+    };
+    units.push(individual);
+
+    // Clean up empty group
+    if (grouped.quantity <= 0) {
+      const idx = units.indexOf(grouped);
+      units.splice(idx, 1);
+    }
+
+    return individual;
+  }
+
+  // Get all individual ships (carriers/transports with cargo) in a territory
+  getIndividualShips(territory, playerId, shipType = null) {
+    const units = this.units[territory] || [];
+    return units.filter(u => {
+      if (u.owner !== playerId) return false;
+      if (shipType && u.type !== shipType) return false;
+      if (!u.id) return false; // Only individualized ships have IDs
+      if (u.type !== 'carrier' && u.type !== 'transport') return false;
+      return true;
+    });
+  }
+
+  // Get all ships (including grouped) with cargo info for UI
+  getShipsWithCargo(territory, playerId, shipType = null) {
+    const units = this.units[territory] || [];
+    const result = [];
+
+    for (const u of units) {
+      if (u.owner !== playerId) continue;
+      if (shipType && u.type !== shipType) continue;
+      if (u.type !== 'carrier' && u.type !== 'transport') continue;
+
+      if (u.id) {
+        // Individual ship - add directly
+        result.push({
+          id: u.id,
+          type: u.type,
+          cargo: u.cargo || [],
+          aircraft: u.aircraft || [],
+          moved: u.moved || false
+        });
+      } else {
+        // Grouped ships - expand to individual entries (without IDs)
+        for (let i = 0; i < u.quantity; i++) {
+          result.push({
+            id: null,
+            type: u.type,
+            cargo: i === 0 ? (u.cargo || []) : [], // Only first gets shared cargo
+            aircraft: i === 0 ? (u.aircraft || []) : [], // Only first gets shared aircraft
+            moved: u.moved || false,
+            groupIndex: i
+          });
+        }
+      }
+    }
+
+    return result;
   }
 
   get currentPlayer() {
@@ -1120,6 +1212,22 @@ export class GameState {
       if (!validSeaZones.has(territoryName)) {
         return { success: false, error: 'Naval units must be placed on sea zones adjacent to territories with factories' };
       }
+    } else if (unitDef.isBuilding) {
+      // Factories: placed on owned land territories without a factory
+      const owner = this.getOwner(territoryName);
+      if (owner !== player.id) {
+        return { success: false, error: 'Factories must be placed on your own territories' };
+      }
+      const t = this.territoryByName[territoryName];
+      if (t?.isWater) {
+        return { success: false, error: 'Factories cannot be placed on water' };
+      }
+      // Check if territory already has a factory
+      const units = this.units[territoryName] || [];
+      const hasFactory = units.some(u => u.type === 'factory');
+      if (hasFactory) {
+        return { success: false, error: 'Territory already has a factory' };
+      }
     } else {
       // Land/air units: placed on territories with factories (capital always has one)
       const factoryTerritories = this._getFactoryTerritories(player.id);
@@ -1394,7 +1502,9 @@ export class GameState {
   }
 
   // Move units (during COMBAT_MOVE or NON_COMBAT_MOVE phase)
-  moveUnits(fromTerritory, toTerritory, unitsToMove, unitDefs) {
+  // options.shipIds: array of specific ship IDs to move (for carriers/transports with cargo)
+  // options.targetShipId: specific ship to load cargo onto
+  moveUnits(fromTerritory, toTerritory, unitsToMove, unitDefs, options = {}) {
     const isCombatMove = this.turnPhase === TURN_PHASES.COMBAT_MOVE;
     const isNonCombatMove = this.turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
 
@@ -1469,9 +1579,10 @@ export class GameState {
 
       const movementRange = unitDef.movement || 1;
 
-      // Check terrain - allow loading onto transport during non-combat
+      // Check terrain - allow loading onto transport during movement phases
+      // Combat move loading allowed for amphibious assaults (per A&A rules)
       if (toT?.isWater) {
-        if (isNonCombatMove && isAdjacent) {
+        if ((isNonCombatMove || isCombatMove) && isAdjacent) {
           // Check if there's a transport with capacity
           const seaUnits = this.units[toTerritory] || [];
           const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
@@ -1549,16 +1660,70 @@ export class GameState {
       }
     }
 
+    // Handle moving specific ships by ID (carriers/transports with cargo)
+    if (options.shipIds && options.shipIds.length > 0) {
+      const toUnits = this.units[toTerritory] || [];
+
+      for (const shipId of options.shipIds) {
+        const shipIdx = fromUnits.findIndex(u => u.id === shipId && u.owner === player.id);
+        if (shipIdx < 0) {
+          return { success: false, error: `Ship ${shipId} not found` };
+        }
+
+        const ship = fromUnits[shipIdx];
+        if (ship.moved) {
+          return { success: false, error: `Ship ${shipId} has already moved` };
+        }
+
+        // Remove from source
+        fromUnits.splice(shipIdx, 1);
+
+        // Add to destination with moved flag
+        ship.moved = true;
+        toUnits.push(ship);
+      }
+
+      this.units[toTerritory] = toUnits;
+
+      // Record move
+      this.moveHistory.push({
+        from: fromTerritory,
+        to: toTerritory,
+        shipIds: options.shipIds,
+        player: player.id,
+      });
+
+      this._notify();
+      return {
+        success: true,
+        from: fromTerritory,
+        to: toTerritory,
+        shipIds: options.shipIds,
+        isAttack: isCombatMove && isEnemy,
+      };
+    }
+
     for (const moveUnit of unitsToMove) {
       const unitDef = unitDefs[moveUnit.type];
       if (!unitDef) continue;
 
-      // Find the unit in source territory
-      const sourceUnit = fromUnits.find(u =>
+      // Find the unit in source territory - prefer grouped units over individual ships
+      // Individual ships (with IDs) should be moved using options.shipIds
+      let sourceUnit = fromUnits.find(u =>
         u.type === moveUnit.type &&
         u.owner === player.id &&
-        !u.moved
+        !u.moved &&
+        !u.id // Prefer grouped units
       );
+
+      // Fall back to individual ships if no grouped units
+      if (!sourceUnit) {
+        sourceUnit = fromUnits.find(u =>
+          u.type === moveUnit.type &&
+          u.owner === player.id &&
+          !u.moved
+        );
+      }
 
       if (!sourceUnit || sourceUnit.quantity < moveUnit.quantity) {
         return { success: false, error: `Not enough ${moveUnit.type} to move` };
@@ -1596,12 +1761,16 @@ export class GameState {
       const toUnits = this.units[toTerritory] || [];
 
       if (unitDef.isAir && landingOnCarrier && toT?.isWater) {
-        // Load onto carrier
-        const carriers = toUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        // Load onto carrier - individualize ship when loading aircraft
         const carrierDef = unitDefs.carrier;
         let remaining = moveUnit.quantity;
 
-        for (const carrier of carriers) {
+        // First try individual carriers (already have IDs)
+        const individualCarriers = toUnits.filter(u =>
+          u.type === 'carrier' && u.owner === player.id && u.id
+        );
+
+        for (const carrier of individualCarriers) {
           if (remaining <= 0) break;
           carrier.aircraft = carrier.aircraft || [];
           const capacity = carrierDef?.aircraftCapacity || 2;
@@ -1613,17 +1782,48 @@ export class GameState {
           }
           remaining -= toLoad;
         }
+
+        // Then use grouped carriers - individualize each one used
+        while (remaining > 0) {
+          const newCarrier = this._individualizeShip(toTerritory, 'carrier', player.id);
+          if (!newCarrier) break;
+
+          newCarrier.aircraft = newCarrier.aircraft || [];
+          const capacity = carrierDef?.aircraftCapacity || 2;
+          const available = capacity - newCarrier.aircraft.length;
+          const toLoad = Math.min(remaining, available);
+
+          for (let i = 0; i < toLoad; i++) {
+            newCarrier.aircraft.push({ type: moveUnit.type, owner: player.id });
+          }
+          remaining -= toLoad;
+        }
       } else if (unitDef.isLand && loadingOntoTransport && toT?.isWater) {
-        // Load onto transport
-        const transports = toUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+        // Load onto transport - individualize ship when loading cargo
         let remaining = moveUnit.quantity;
 
-        for (const transport of transports) {
+        // First try individual transports (already have IDs)
+        const individualTransports = toUnits.filter(u =>
+          u.type === 'transport' && u.owner === player.id && u.id
+        );
+
+        for (const transport of individualTransports) {
           if (remaining <= 0) break;
           transport.cargo = transport.cargo || [];
 
           while (remaining > 0 && this._canLoadOnTransport(transport.cargo, moveUnit.type)) {
             transport.cargo.push({ type: moveUnit.type, owner: player.id });
+            remaining--;
+          }
+        }
+
+        // Then use grouped transports - individualize each one used
+        while (remaining > 0) {
+          const newTransport = this._individualizeShip(toTerritory, 'transport', player.id);
+          if (!newTransport) break;
+
+          while (remaining > 0 && this._canLoadOnTransport(newTransport.cargo, moveUnit.type)) {
+            newTransport.cargo.push({ type: moveUnit.type, owner: player.id });
             remaining--;
           }
         }
@@ -1793,10 +1993,15 @@ export class GameState {
   }
 
   // Detect territories where combat should occur
+  // Per A&A rules: Naval battles are resolved before land battles (amphibious assaults)
   _detectCombats() {
     this.combatQueue = [];
+    this.clearedSeaZones = new Set(); // Track sea zones cleared for shore bombardment
     const player = this.currentPlayer;
     if (!player) return;
+
+    const navalCombats = [];
+    const landCombats = [];
 
     for (const [territory, units] of Object.entries(this.units)) {
       const hasPlayerUnits = units.some(u => u.owner === player.id);
@@ -1805,9 +2010,44 @@ export class GameState {
       );
 
       if (hasPlayerUnits && hasEnemyUnits) {
-        this.combatQueue.push(territory);
+        const t = this.territoryByName[territory];
+        if (t?.isWater) {
+          navalCombats.push(territory);
+        } else {
+          landCombats.push(territory);
+        }
       }
     }
+
+    // Naval battles first, then land battles
+    this.combatQueue = [...navalCombats, ...landCombats];
+  }
+
+  // Mark a sea zone as cleared for shore bombardment (after winning naval battle)
+  markSeaZoneCleared(seaZone) {
+    if (!this.clearedSeaZones) this.clearedSeaZones = new Set();
+    this.clearedSeaZones.add(seaZone);
+  }
+
+  // Check if a sea zone is clear for shore bombardment
+  isSeaZoneClearedForBombardment(seaZone) {
+    // A sea zone is cleared if:
+    // 1. It has no enemy combat units, OR
+    // 2. We won the naval battle there (marked as cleared)
+    const units = this.units[seaZone] || [];
+    const player = this.currentPlayer;
+    if (!player) return false;
+
+    // Check for enemy combat units (anything that isn't ours or an ally's)
+    const hasEnemyCombatUnits = units.some(u => {
+      if (u.owner === player.id) return false;
+      if (this.areAllies(player.id, u.owner)) return false;
+      // Any enemy unit in sea zone blocks bombardment
+      return true;
+    });
+
+    if (!hasEnemyCombatUnits) return true;
+    return this.clearedSeaZones?.has(seaZone) || false;
   }
 
   // Resolve combat in a territory (dice combat with naval rules)
@@ -1877,10 +2117,22 @@ export class GameState {
     };
 
     if (remainingDefenders.length === 0) {
-      // Attacker wins - capture territory (if land)
-      if (!isNavalBattle) {
+      // Attacker wins
+      if (isNavalBattle) {
+        // Naval battle won - mark sea zone as cleared for shore bombardment
+        this.markSeaZoneCleared(territory);
+      } else {
+        // Land battle won - capture territory
         const defender = defenders[0]?.owner;
         this.territoryState[territory].owner = player.id;
+
+        // Transfer factory ownership to the winner (factories are captured, not destroyed)
+        const territoryUnits = this.units[territory] || [];
+        for (const unit of territoryUnits) {
+          if (unit.type === 'factory') {
+            unit.owner = player.id;
+          }
+        }
 
         // Award Risk card for conquering (one per turn per Risk rules)
         if (!this.conqueredThisTurn[player.id]) {
@@ -1896,7 +2148,7 @@ export class GameState {
       if (this._combatRoundsTracker) delete this._combatRoundsTracker[territory];
       result.resolved = true;
       result.winner = 'attacker';
-      result.conquered = true;
+      result.conquered = !isNavalBattle; // Only land territories are "conquered"
     } else if (remainingAttackers.length === 0) {
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);
@@ -1948,6 +2200,13 @@ export class GameState {
     for (const connName of connections) {
       const connT = this.territoryByName[connName];
       if (!connT?.isWater) continue;
+
+      // Per A&A rules: Shore bombardment only allowed from sea zones where:
+      // 1. There are no enemy ships, OR
+      // 2. The naval battle was already won (sea zone cleared)
+      if (!this.isSeaZoneClearedForBombardment(connName)) {
+        continue; // Skip - naval battle not yet resolved
+      }
 
       // Check for friendly ships that can bombard
       const seaUnits = this.units[connName] || [];
@@ -2014,6 +2273,8 @@ export class GameState {
     // Apply remaining hits to cheapest units first
     const sorted = [...units].filter(u => {
       const def = unitDefs[u.type];
+      // Skip factories - they are captured, not destroyed
+      if (u.type === 'factory') return false;
       // Skip multi-hit ships that are only damaged (not destroyed)
       return !(def?.hp > 1 && u.damaged && !u.destroyed);
     }).sort((a, b) => {

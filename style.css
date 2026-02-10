@@ -2611,6 +2611,177 @@ html, body {
   border-color: rgba(255, 100, 100, 0.5);
 }
 
+/* Ship Selection UI (for carriers/transports with cargo) */
+.mp-ship-selection {
+  margin: 12px 0;
+  padding: 10px;
+  background: rgba(65, 105, 225, 0.1);
+  border: 1px solid rgba(65, 105, 225, 0.3);
+  border-radius: 8px;
+}
+
+.mp-ship-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64b5f6;
+  margin-bottom: 4px;
+}
+
+.mp-ship-desc {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.mp-ship-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mp-ship-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mp-ship-option:hover:not(.disabled) {
+  background: rgba(65, 105, 225, 0.2);
+  border-color: rgba(65, 105, 225, 0.4);
+}
+
+.mp-ship-option.selected {
+  background: rgba(65, 105, 225, 0.25);
+  border-color: rgba(65, 105, 225, 0.6);
+}
+
+.mp-ship-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mp-ship-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-ship-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.mp-ship-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.mp-ship-cargo {
+  font-size: 10px;
+  color: #888;
+  flex: 1;
+  text-align: center;
+}
+
+.mp-ship-cargo.has-cargo {
+  color: #81c784;
+}
+
+.mp-ship-cb {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.mp-ship-moved {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Loading Target Selection UI */
+.mp-loading-target {
+  margin: 12px 0;
+  padding: 10px;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+}
+
+.mp-loading-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #81c784;
+  margin-bottom: 8px;
+}
+
+.mp-loading-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mp-loading-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mp-loading-option:hover {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+.mp-loading-option.selected {
+  background: rgba(76, 175, 80, 0.25);
+  border-color: rgba(76, 175, 80, 0.6);
+}
+
+.mp-loading-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-loading-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.mp-loading-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e0e0e0;
+}
+
+.mp-loading-capacity {
+  font-size: 10px;
+  color: #64b5f6;
+  padding: 2px 6px;
+  background: rgba(65, 105, 225, 0.2);
+  border-radius: 4px;
+}
+
+.mp-loading-cargo {
+  font-size: 10px;
+  color: #888;
+}
+
 /* --- Combat Popup --- */
 .combat-popup {
   position: fixed;
@@ -3425,6 +3596,96 @@ html, body {
   font-size: 15px;
   font-weight: 600;
   color: #e0e0e0;
+}
+
+/* Battle Summary */
+.battle-summary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.battle-summary-header {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.battle-summary-content {
+  display: flex;
+  gap: 16px;
+}
+
+.battle-summary-side {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.summary-side-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.summary-no-losses {
+  font-size: 11px;
+  color: #4caf50;
+  text-align: center;
+  padding: 8px;
+}
+
+.summary-losses {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-loss-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(255, 80, 80, 0.1);
+  border-radius: 4px;
+}
+
+.summary-loss-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.summary-loss-count {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff6b6b;
+  min-width: 24px;
+}
+
+.summary-loss-type {
+  font-size: 11px;
+  color: #ccc;
+  text-transform: capitalize;
+}
+
+.summary-total-ipc {
+  font-size: 11px;
+  color: #ff8a65;
+  text-align: center;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* AA Fire */
@@ -6078,4 +6339,197 @@ html, body {
 .alp-btn.primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* --- Risk Cards Dropdown (Right Side) --- */
+.risk-cards-dropdown {
+  position: fixed;
+  top: 60px;
+  right: 10px;
+  width: 200px;
+  background: rgba(20, 25, 35, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.risk-cards-dropdown.hidden {
+  display: none;
+}
+
+.rcd-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px 8px 0 0;
+  transition: background 0.15s ease;
+}
+
+.rcd-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rcd-icon {
+  font-size: 18px;
+}
+
+.rcd-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0e0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rcd-count {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rcd-arrow {
+  font-size: 10px;
+  color: #888;
+  transition: transform 0.2s ease;
+}
+
+.rcd-arrow.expanded {
+  transform: rotate(180deg);
+}
+
+.rcd-content {
+  padding: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rcd-empty {
+  font-size: 11px;
+  color: #888;
+  text-align: center;
+  padding: 12px;
+}
+
+.rcd-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rcd-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  border-left: 3px solid #888;
+}
+
+.rcd-card.infantry {
+  border-left-color: #4fc3f7;
+}
+
+.rcd-card.cavalry {
+  border-left-color: #81c784;
+}
+
+.rcd-card.artillery {
+  border-left-color: #ff8a65;
+}
+
+.rcd-card.wild {
+  border-left-color: #ffd54f;
+}
+
+.rcd-card-icon {
+  font-size: 16px;
+}
+
+.rcd-card-name {
+  font-size: 12px;
+  color: #e0e0e0;
+  text-transform: capitalize;
+}
+
+.rcd-summary {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.rcd-summary-item {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.rcd-trade {
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rcd-trade-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.rcd-trade-info strong {
+  color: #4fc3f7;
+}
+
+.rcd-trade-btn {
+  width: 100%;
+  padding: 10px;
+  background: linear-gradient(180deg, #4fc3f7 0%, #2196f3 100%);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.rcd-trade-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #6dd4ff 0%, #42a5f5 100%);
+  box-shadow: 0 4px 12px rgba(79, 195, 247, 0.3);
+}
+
+.rcd-trade-btn.disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: #666;
+  cursor: not-allowed;
+}
+
+.rcd-trade-note {
+  font-size: 10px;
+  color: #666;
+  text-align: center;
+  margin-top: 6px;
+}
+
+.rcd-warning {
+  padding: 8px;
+  background: rgba(255, 80, 80, 0.15);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  color: #ff8080;
+  text-align: center;
 }

@@ -129,7 +129,8 @@ export class MobilizeUI {
         const def = this.unitDefs[u.type];
         if (!def) return false;
         if (isSeaZone) return def.isSea;
-        return def.isLand || def.isAir;
+        // Land territories can have land units, air units, and buildings (factories)
+        return def.isLand || def.isAir || def.isBuilding;
       });
 
       if (availableUnits.length > 0) {
@@ -162,7 +163,7 @@ export class MobilizeUI {
 
       const landUnits = pendingUnits.filter(u => {
         const def = this.unitDefs[u.type];
-        return def && (def.isLand || def.isAir);
+        return def && (def.isLand || def.isAir || def.isBuilding);
       });
       const navalUnits = pendingUnits.filter(u => {
         const def = this.unitDefs[u.type];
@@ -316,7 +317,7 @@ export class MobilizeUI {
       const def = this.unitDefs[u.type];
       if (!def) return false;
       if (isSeaZone) return def.isSea;
-      return def.isLand || def.isAir;
+      return def.isLand || def.isAir || def.isBuilding;
     });
 
     // Place all available units

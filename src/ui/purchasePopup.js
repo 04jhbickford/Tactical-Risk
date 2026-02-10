@@ -53,9 +53,22 @@ export class PurchasePopup {
     const ipcs = this.gameState.getIPCs(player.id);
     const remaining = ipcs - this.cartCost;
 
-    // Filter to land/air combat units only
+    // Include all purchasable units: land, air, sea, and factories
+    // Check how many factories player can still build (max 1 per owned territory at turn start)
+    const ownedTerritories = this.gameState.getPlayerTerritories(player.id);
+    const territoriesWithFactory = ownedTerritories.filter(tName => {
+      const units = this.gameState.units[tName] || [];
+      return units.some(u => u.type === 'factory');
+    });
+    const maxFactories = ownedTerritories.length - territoriesWithFactory.length;
+    const factoriesInCart = this.purchaseCart['factory'] || 0;
+
     const units = Object.entries(this.unitDefs)
-      .filter(([_, u]) => (u.isLand || u.isAir) && !u.isBuilding);
+      .filter(([type, u]) => {
+        // Exclude AA guns from purchase (only for capitals/special)
+        if (type === 'aaGun') return false;
+        return true;
+      });
 
     let html = `
       <div class="purchase-popup-content">
@@ -188,6 +201,19 @@ export class PurchasePopup {
       return; // Can't afford
     }
 
+    // Factory limit: max 1 per territory without a factory
+    if (unitType === 'factory' && delta > 0) {
+      const ownedTerritories = this.gameState.getPlayerTerritories(player.id);
+      const territoriesWithFactory = ownedTerritories.filter(tName => {
+        const units = this.gameState.units[tName] || [];
+        return units.some(u => u.type === 'factory');
+      });
+      const maxFactories = ownedTerritories.length - territoriesWithFactory.length;
+      if (newQty > maxFactories) {
+        return; // Can't build more factories than eligible territories
+      }
+    }
+
     if (newQty === 0) {
       delete this.purchaseCart[unitType];
     } else {
@@ -209,7 +235,19 @@ export class PurchasePopup {
     const currentQty = this.purchaseCart[unitType] || 0;
 
     // Calculate max we can afford
-    const additionalAffordable = Math.floor(remaining / def.cost);
+    let additionalAffordable = Math.floor(remaining / def.cost);
+
+    // Factory limit: max 1 per territory without a factory
+    if (unitType === 'factory') {
+      const ownedTerritories = this.gameState.getPlayerTerritories(player.id);
+      const territoriesWithFactory = ownedTerritories.filter(tName => {
+        const units = this.gameState.units[tName] || [];
+        return units.some(u => u.type === 'factory');
+      });
+      const maxFactories = ownedTerritories.length - territoriesWithFactory.length;
+      additionalAffordable = Math.min(additionalAffordable, maxFactories - currentQty);
+    }
+
     const newQty = currentQty + additionalAffordable;
 
     if (newQty > 0) {

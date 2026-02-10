@@ -15,7 +15,10 @@ export class MovementUI {
     this.selectedFrom = null;
     this.selectedUnits = {}; // { unitType: quantity }
     this.selectedCargoUnits = {}; // { transportIndex: { unitType: quantity } } for unloading
+    this.selectedShipIds = new Set(); // Track which specific ships are selected to move
     this.unloadMode = false; // True when unloading cargo from transports
+    this.shipSelectionMode = false; // True when selecting individual ships to move
+    this.loadingTargetShipId = null; // Ship selected to load cargo onto
 
     // Drag state
     this.isDragging = false;
@@ -253,9 +256,9 @@ export class MovementUI {
 
     // Land units with movement > 1 can blitz through friendly territory
     if (hasLandSelected && !hasSeaSelected && landMovementRange > 1) {
-      // Allow water destination during non-combat if there's a transport
+      // Allow water destination if there's a transport (for amphibious assault or non-combat)
       if (territory.isWater) {
-        if (!isCombatMove && isAdjacent) {
+        if (isAdjacent) {
           return this._canLoadOntoTransport(territory.name, player.id);
         }
         return false;
@@ -292,12 +295,10 @@ export class MovementUI {
       return false;
     }
 
-    // Land units entering water during non-combat can load onto transports
+    // Land units entering water can load onto transports (both combat and non-combat)
+    // Combat move loading is for amphibious assaults
     if (hasLandSelected && territory.isWater) {
-      if (!isCombatMove) {
-        return this._canLoadOntoTransport(territory.name, player.id);
-      }
-      return false;
+      return this._canLoadOntoTransport(territory.name, player.id);
     }
 
     if (hasSeaSelected && !territory.isWater) return false;
@@ -387,6 +388,26 @@ export class MovementUI {
     const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
     const isNonCombat = !isCombatMove;
 
+    // Check if specific ships are selected (carriers/transports with cargo)
+    const hasShipsSelected = this.selectedShipIds.size > 0;
+
+    // If ships are selected via ID, get destinations for those ships
+    if (hasShipsSelected) {
+      // Get the max movement of selected ships
+      let maxSeaMovement = 2; // Default transport/carrier movement
+      const reachable = this.gameState.getReachableTerritoriesForSea(
+        this.selectedFrom.name,
+        maxSeaMovement,
+        player?.id,
+        isCombatMove
+      );
+
+      return Array.from(reachable.keys()).filter(destName => {
+        const t = this.territoryByName[destName];
+        return t?.isWater; // Ships can only move to water
+      });
+    }
+
     // Check unit types selected
     const hasOnlyAirSelected = Object.entries(this.selectedUnits).every(([type, qty]) => {
       if (qty <= 0) return true;
@@ -460,12 +481,12 @@ export class MovementUI {
         return true;
       });
 
-      // During non-combat, also include adjacent sea zones with transports
-      if (isNonCombat) {
-        const connections = this.gameState.getConnections(this.selectedFrom.name);
-        for (const connName of connections) {
-          const t = this.territoryByName[connName];
-          if (t?.isWater && this._canLoadOntoTransport(connName, player.id)) {
+      // Include adjacent sea zones with transports (for amphibious assault or non-combat)
+      const connections = this.gameState.getConnections(this.selectedFrom.name);
+      for (const connName of connections) {
+        const t = this.territoryByName[connName];
+        if (t?.isWater && this._canLoadOntoTransport(connName, player.id)) {
+          if (!landDestinations.includes(connName)) {
             landDestinations.push(connName);
           }
         }
@@ -516,7 +537,8 @@ export class MovementUI {
   }
 
   hasUnitsSelected() {
-    return Object.values(this.selectedUnits).some(q => q > 0);
+    return Object.values(this.selectedUnits).some(q => q > 0) ||
+           this.selectedShipIds.size > 0;
   }
 
   getSelectedSource() {
@@ -529,7 +551,21 @@ export class MovementUI {
       .filter(([_, qty]) => qty > 0)
       .map(([type, quantity]) => ({ type, quantity }));
 
-    if (unitsToMove.length === 0) {
+    // Build options for move
+    const options = {};
+
+    // If specific ships are selected, pass their IDs
+    if (this.selectedShipIds.size > 0) {
+      options.shipIds = Array.from(this.selectedShipIds);
+    }
+
+    // If a loading target ship is specified
+    if (this.loadingTargetShipId) {
+      options.targetShipId = this.loadingTargetShipId;
+    }
+
+    // Must have either units or ships selected
+    if (unitsToMove.length === 0 && (!options.shipIds || options.shipIds.length === 0)) {
       return;
     }
 
@@ -537,7 +573,8 @@ export class MovementUI {
       this.selectedFrom.name,
       destination.name,
       unitsToMove,
-      this.unitDefs
+      this.unitDefs,
+      options
     );
 
     if (result.success) {
@@ -545,6 +582,7 @@ export class MovementUI {
         from: this.selectedFrom.name,
         to: destination.name,
         units: unitsToMove,
+        shipIds: options.shipIds,
         captured: result.captured,
         isAttack: result.isAttack,
       };
@@ -562,8 +600,186 @@ export class MovementUI {
     this.selectedFrom = null;
     this.selectedUnits = {};
     this.selectedCargoUnits = {};
+    this.selectedShipIds = new Set();
     this.unloadMode = false;
+    this.shipSelectionMode = false;
+    this.loadingTargetShipId = null;
     this.el.classList.add('hidden');
+  }
+
+  // Get ships that need individual selection (carriers/transports with cargo)
+  _getShipsWithCargo(territory, playerId) {
+    if (!this.gameState) return [];
+    return this.gameState.getShipsWithCargo(territory, playerId);
+  }
+
+  // Check if we need to show ship selection UI
+  _needsShipSelection(territory, playerId) {
+    const ships = this._getShipsWithCargo(territory, playerId);
+    // Need selection if there are multiple ships with cargo
+    const shipsWithCargo = ships.filter(s =>
+      (s.cargo && s.cargo.length > 0) || (s.aircraft && s.aircraft.length > 0)
+    );
+    return shipsWithCargo.length > 1;
+  }
+
+  // Render ship selection panel
+  _renderShipSelection(ships, player) {
+    let html = `
+      <div class="mp-ship-selection">
+        <div class="mp-ship-header">Select Ships to Move</div>
+        <div class="mp-ship-desc">Ships with cargo must be selected individually</div>
+        <div class="mp-ship-list">
+    `;
+
+    ships.forEach((ship, idx) => {
+      const imageSrc = getUnitIconPath(ship.type, player.id);
+      const isSelected = ship.id ? this.selectedShipIds.has(ship.id) : false;
+
+      // Build cargo description
+      let cargoDesc = 'Empty';
+      if (ship.type === 'carrier' && ship.aircraft && ship.aircraft.length > 0) {
+        const aircraftByType = {};
+        ship.aircraft.forEach(a => {
+          aircraftByType[a.type] = (aircraftByType[a.type] || 0) + 1;
+        });
+        cargoDesc = Object.entries(aircraftByType)
+          .map(([type, qty]) => `${qty}x ${type}`)
+          .join(', ');
+      } else if (ship.type === 'transport' && ship.cargo && ship.cargo.length > 0) {
+        const cargoByType = {};
+        ship.cargo.forEach(c => {
+          cargoByType[c.type] = (cargoByType[c.type] || 0) + 1;
+        });
+        cargoDesc = Object.entries(cargoByType)
+          .map(([type, qty]) => `${qty}x ${type}`)
+          .join(', ');
+      }
+
+      const hasCargo = cargoDesc !== 'Empty';
+      const canSelect = ship.id && !ship.moved;
+
+      html += `
+        <div class="mp-ship-option ${isSelected ? 'selected' : ''} ${!canSelect ? 'disabled' : ''}"
+             data-ship-id="${ship.id || ''}"
+             data-ship-type="${ship.type}">
+          <div class="mp-ship-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="mp-ship-icon" alt="${ship.type}">` : ''}
+            <span class="mp-ship-name">${ship.type} #${idx + 1}</span>
+          </div>
+          <div class="mp-ship-cargo ${hasCargo ? 'has-cargo' : ''}">
+            ${cargoDesc}
+          </div>
+          ${canSelect ? `
+            <input type="checkbox" class="mp-ship-cb"
+                   data-ship-id="${ship.id}"
+                   ${isSelected ? 'checked' : ''}>
+          ` : `
+            <span class="mp-ship-moved">${ship.moved ? 'Moved' : 'Group'}</span>
+          `}
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
+  // Render loading target selection (choose which ship to load cargo onto)
+  _renderLoadingTargetSelection(destination, unitType, unitQty, player) {
+    const ships = this.gameState.getShipsWithCargo(destination, player.id);
+
+    // Calculate capacity for each ship
+    const availableShips = ships.map((ship, idx) => {
+      let remainingCapacity = 0;
+      let cargoDesc = 'Empty';
+
+      if (ship.type === 'transport') {
+        const cargo = ship.cargo || [];
+        // Transport capacity: 2 slots, infantry=1, others=2
+        const used = cargo.reduce((sum, c) => {
+          return sum + (c.type === 'infantry' ? 1 : 2);
+        }, 0);
+        remainingCapacity = 2 - used;
+
+        if (cargo.length > 0) {
+          const cargoByType = {};
+          cargo.forEach(c => {
+            cargoByType[c.type] = (cargoByType[c.type] || 0) + 1;
+          });
+          cargoDesc = Object.entries(cargoByType)
+            .map(([type, qty]) => `${qty}x ${type}`)
+            .join(', ');
+        }
+      } else if (ship.type === 'carrier') {
+        const aircraft = ship.aircraft || [];
+        remainingCapacity = 2 - aircraft.length;
+
+        if (aircraft.length > 0) {
+          const byType = {};
+          aircraft.forEach(a => {
+            byType[a.type] = (byType[a.type] || 0) + 1;
+          });
+          cargoDesc = Object.entries(byType)
+            .map(([type, qty]) => `${qty}x ${type}`)
+            .join(', ');
+        }
+      }
+
+      return {
+        ...ship,
+        index: idx,
+        remainingCapacity,
+        cargoDesc
+      };
+    }).filter(ship =>
+      ship.remainingCapacity > 0 &&
+      ((ship.type === 'transport' && this.unitDefs[unitType]?.isLand) ||
+       (ship.type === 'carrier' && this.unitDefs[unitType]?.isAir))
+    );
+
+    if (availableShips.length <= 1) {
+      return ''; // No selection needed, only one option
+    }
+
+    let html = `
+      <div class="mp-loading-target">
+        <div class="mp-loading-header">Load ${unitQty}x ${unitType} onto:</div>
+        <div class="mp-loading-list">
+    `;
+
+    availableShips.forEach((ship, idx) => {
+      const imageSrc = getUnitIconPath(ship.type, player.id);
+      const isSelected = this.loadingTargetShipId === ship.id;
+
+      html += `
+        <div class="mp-loading-option ${isSelected ? 'selected' : ''}"
+             data-ship-id="${ship.id || ''}"
+             data-ship-type="${ship.type}">
+          <div class="mp-loading-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="mp-loading-icon" alt="${ship.type}">` : ''}
+            <span class="mp-loading-name">${ship.type} #${idx + 1}</span>
+          </div>
+          <div class="mp-loading-capacity">
+            Capacity: ${ship.remainingCapacity}
+          </div>
+          <div class="mp-loading-cargo">
+            ${ship.cargoDesc}
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
   }
 
   // Render cargo unload UI for amphibious assaults
@@ -867,6 +1083,12 @@ export class MovementUI {
       this._canUnitMove(u.type)
     );
 
+    // Check for ships with cargo that need individual selection
+    const shipsWithCargo = this._getShipsWithCargo(this.selectedFrom.name, player.id);
+    const hasMultipleShipsWithCargo = shipsWithCargo.filter(s =>
+      (s.cargo && s.cargo.length > 0) || (s.aircraft && s.aircraft.length > 0)
+    ).length > 1;
+
     let html = `
       <div class="mp-drag-handle"></div>
       <div class="mp-header">
@@ -920,6 +1142,11 @@ export class MovementUI {
 
     html += `</div>`;
 
+    // Show ship selection for ships with cargo (if in water territory)
+    if (this.selectedFrom.isWater && shipsWithCargo.length > 0) {
+      html += this._renderShipSelection(shipsWithCargo, player);
+    }
+
     // Move All button
     const totalMovable = movableUnits.reduce((sum, u) => sum + u.quantity, 0);
     const totalSelected = Object.values(this.selectedUnits).reduce((sum, q) => sum + q, 0);
@@ -938,8 +1165,9 @@ export class MovementUI {
     // Show valid destinations
     const validDests = this.getValidDestinations();
     const hasUnitsSelected = Object.values(this.selectedUnits).some(q => q > 0);
+    const hasShipsSelected = this.selectedShipIds.size > 0;
 
-    if (hasUnitsSelected && validDests.length > 0) {
+    if ((hasUnitsSelected || hasShipsSelected) && validDests.length > 0) {
       html += `
         <div class="mp-destinations">
           <span class="mp-label">Move to:</span>
@@ -982,6 +1210,37 @@ export class MovementUI {
         const unit = btn.dataset.unit;
         const qty = parseInt(btn.dataset.qty);
         this.selectedUnits[unit] = qty;
+        this._render();
+      });
+    });
+
+    // Ship selection checkboxes
+    this.el.querySelectorAll('.mp-ship-cb').forEach(cb => {
+      cb.addEventListener('change', () => {
+        const shipId = cb.dataset.shipId;
+        if (cb.checked) {
+          this.selectedShipIds.add(shipId);
+        } else {
+          this.selectedShipIds.delete(shipId);
+        }
+        this._render();
+      });
+    });
+
+    // Ship option click (for selecting)
+    this.el.querySelectorAll('.mp-ship-option:not(.disabled)').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        // Don't trigger if clicking on checkbox directly
+        if (e.target.classList.contains('mp-ship-cb')) return;
+
+        const shipId = opt.dataset.shipId;
+        if (!shipId) return;
+
+        if (this.selectedShipIds.has(shipId)) {
+          this.selectedShipIds.delete(shipId);
+        } else {
+          this.selectedShipIds.add(shipId);
+        }
         this._render();
       });
     });

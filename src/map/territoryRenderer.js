@@ -13,9 +13,9 @@ const LAND_BRIDGES = [
   // UK connections
   ['Eire', 'United Kingdom'],
   ['United Kingdom', 'Finland Norway'],
+  ['United Kingdom', 'West Europe'],
   // Mediterranean
   ['Spain', 'Algeria'],
-  ['South Europe', 'Algeria'],
   ['South Europe', 'Anglo Sudan Egypt'],
   // Pacific / Asian connections
   ['Kwangtung', 'East Indies'],

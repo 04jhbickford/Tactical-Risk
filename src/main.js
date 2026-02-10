@@ -41,6 +41,7 @@ import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
 import { BugTracker } from './ui/bugTracker.js';
 import { AirLandingUI } from './ui/airLandingUI.js';
+import { RiskCardsDropdown } from './ui/riskCardsDropdown.js';
 
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
@@ -136,6 +137,9 @@ async function init() {
   const airLandingUI = new AirLandingUI();
   airLandingUI.setUnitDefs(unitDefs);
   airLandingUI.setTerritories(territories);
+
+  // Risk Cards Dropdown (right side, for Risk mode)
+  const riskCardsDropdown = new RiskCardsDropdown();
 
   // Rules button (fixed position)
   const rulesBtn = document.createElement('button');
@@ -363,13 +367,11 @@ async function init() {
       camera.dirty = true;
     });
     combatUI.setOnAirLandingRequired((data) => {
-      console.log('[Main] onAirLandingRequired callback triggered:', data);
       // Show the external air landing UI
       airLandingUI.setAirUnits(data.airUnitsToLand, data.combatTerritory, data.isRetreating);
       // Highlight valid destinations on map
       territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
       camera.dirty = true;
-      console.log('[Main] Air landing UI should now be visible');
     });
 
     // Tech UI
@@ -417,6 +419,18 @@ async function init() {
     });
     actionLog.show();
     actionLog.logTurnStart(gameState.currentPlayer, gameState.round);
+
+    // Risk Cards Dropdown
+    riskCardsDropdown.setGameState(gameState);
+    riskCardsDropdown.setOnTradeCards(() => {
+      if (gameState.turnPhase === TURN_PHASES.PURCHASE) {
+        const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
+        if (result.success) {
+          actionLog.log(`Traded cards for ${result.ipcsGained} IPCs`, 'trade');
+        }
+      }
+    });
+    riskCardsDropdown.show();
 
     // Show panels
     continentPanel.show();

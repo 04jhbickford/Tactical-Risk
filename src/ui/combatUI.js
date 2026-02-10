@@ -111,6 +111,12 @@ export class CombatUI {
       // Air landing tracking
       airUnitsToLand: [], // { type, quantity, landingOptions }
       selectedLandings: {}, // { unitType: territoryName }
+      // Battle summary tracking - accumulate losses throughout battle
+      totalAttackerLosses: {}, // { unitType: count }
+      totalDefenderLosses: {}, // { unitType: count }
+      // Store initial forces for summary
+      initialAttackers: attackers.map(u => ({ type: u.type, quantity: u.quantity })),
+      initialDefenders: defenders.map(u => ({ type: u.type, quantity: u.quantity })),
     };
 
     this.lastRolls = null;
@@ -173,14 +179,51 @@ export class CombatUI {
     this.combatState.bombardmentHits = hits;
     this.combatState.bombardmentFired = true;
 
+    // If there are hits, let the defender choose casualties before combat
+    if (hits > 0) {
+      this.combatState.pendingBombardmentCasualties = hits;
+      this.combatState.selectedBombardmentCasualties = {};
+      // Pre-select cheapest as default suggestion
+      this.combatState.selectedBombardmentCasualties = this._selectCheapestCasualties(
+        this.combatState.defenders, hits
+      );
+      this.combatState.phase = 'selectBombardmentCasualties';
+    } else {
+      // No hits - move to next phase
+      this._proceedAfterBombardment();
+    }
+
+    this._render();
+  }
+
+  _applyBombardmentCasualties() {
+    const { defenders, selectedBombardmentCasualties, totalDefenderLosses } = this.combatState;
+
+    // Apply selected bombardment casualties and track for summary
+    for (const [type, count] of Object.entries(selectedBombardmentCasualties)) {
+      const unit = defenders.find(u => u.type === type);
+      if (unit) {
+        unit.quantity -= count;
+        // Track total losses for battle summary
+        totalDefenderLosses[type] = (totalDefenderLosses[type] || 0) + count;
+      }
+    }
+
+    // Remove dead units
+    this.combatState.defenders = defenders.filter(u => u.quantity > 0);
+    this.combatState.bombardmentApplied = true;
+
+    this._proceedAfterBombardment();
+    this._render();
+  }
+
+  _proceedAfterBombardment() {
     // Move to next phase (AA fire or ready)
     if (this.combatState.hasAA) {
       this.combatState.phase = 'aaFire';
     } else {
       this.combatState.phase = 'ready';
     }
-
-    this._render();
   }
 
   _rollAAFire() {
@@ -207,20 +250,42 @@ export class CombatUI {
     this.combatState.aaResults = { rolls, hits };
     this.combatState.aaFired = true;
 
-    // Auto-select aircraft casualties (cheapest first)
+    // If there are hits, let the attacker choose which aircraft to lose
     if (hits > 0) {
-      const airCasualties = this._selectCheapestAircraftCasualties(attackers, hits);
-
-      // Apply AA casualties immediately
-      for (const [type, count] of Object.entries(airCasualties)) {
-        const unit = attackers.find(u => u.type === type);
-        if (unit) unit.quantity -= count;
-      }
-
-      // Remove dead units
-      this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+      this.combatState.pendingAACasualties = hits;
+      this.combatState.selectedAACasualties = {};
+      // Pre-select cheapest as default suggestion
+      this.combatState.selectedAACasualties = this._selectCheapestAircraftCasualties(attackers, hits);
+      this.combatState.phase = 'selectAACasualties';
+    } else {
+      // No hits - move to combat
+      this._proceedAfterAAFire();
     }
 
+    this._render();
+  }
+
+  _applyAACasualties() {
+    const { attackers, selectedAACasualties, totalAttackerLosses } = this.combatState;
+
+    // Apply selected AA casualties and track for summary
+    for (const [type, count] of Object.entries(selectedAACasualties)) {
+      const unit = attackers.find(u => u.type === type);
+      if (unit) {
+        unit.quantity -= count;
+        // Track total losses for battle summary
+        totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
+      }
+    }
+
+    // Remove dead units
+    this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+
+    this._proceedAfterAAFire();
+    this._render();
+  }
+
+  _proceedAfterAAFire() {
     // Move to ready phase if there are still attackers
     if (this._getTotalUnits(this.combatState.attackers) > 0 &&
         this._getTotalUnits(this.combatState.defenders.filter(u => u.type !== 'aaGun')) > 0) {
@@ -233,8 +298,6 @@ export class CombatUI {
       this.combatState.phase = 'resolved';
       this.combatState.winner = 'attacker';
     }
-
-    this._render();
   }
 
   _selectCheapestAircraftCasualties(units, count) {
@@ -353,14 +416,8 @@ export class CombatUI {
           // Final roll
           const result = this._rollDice();
 
-          // Add bombardment hits to first round only
-          let bombardmentBonus = 0;
-          if (this.combatState.bombardmentFired && !this.combatState.bombardmentApplied) {
-            bombardmentBonus = this.combatState.bombardmentHits;
-            this.combatState.bombardmentApplied = true;
-          }
-
-          this.combatState.pendingDefenderCasualties = result.attackHits + bombardmentBonus;
+          // Bombardment casualties are now applied separately before combat
+          this.combatState.pendingDefenderCasualties = result.attackHits;
           this.combatState.pendingAttackerCasualties = result.defenseHits;
           this.combatState.phase = 'selectCasualties';
           this._autoSelectCasualties();
@@ -528,9 +585,6 @@ export class CombatUI {
     const player = this.gameState.currentPlayer;
     const { attackers } = this.combatState;
 
-    console.log('[AirLanding] _checkAirLanding called');
-    console.log('[AirLanding] Attackers:', attackers);
-
     // Find ALL surviving air units - they MUST select a landing location
     // Air units can ONLY land in territories that were friendly at the START of the turn
     const airUnitsToLand = [];
@@ -538,12 +592,10 @@ export class CombatUI {
 
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
-      console.log('[AirLanding] Unit:', unit.type, 'isAir:', def?.isAir, 'qty:', unit.quantity);
       if (!def?.isAir || unit.quantity <= 0) continue;
 
       // Get valid landing options (only territories friendly at turn start)
       const landingOptions = this.gameState.getAirLandingOptions(territory, unit.type, this.unitDefs);
-      console.log('[AirLanding] Options for', unit.type, ':', landingOptions);
 
       // ALL air units must choose a landing location after combat
       airUnitsToLand.push({
@@ -553,31 +605,23 @@ export class CombatUI {
       });
     }
 
-    console.log('[AirLanding] airUnitsToLand:', airUnitsToLand);
-
     if (airUnitsToLand.length > 0) {
       this.combatState.airUnitsToLand = airUnitsToLand;
       this.combatState.selectedLandings = {};
       this.combatState.phase = 'airLanding';
-
-      console.log('[AirLanding] Has callback:', !!this.onAirLandingRequired);
 
       // If external air landing UI is connected, delegate to it and hide combat popup
       if (this.onAirLandingRequired) {
         // Hide combat popup - only show the air landing panel
         this.el.classList.add('hidden');
 
-        console.log('[AirLanding] Calling onAirLandingRequired callback');
         this.onAirLandingRequired({
           airUnitsToLand,
           combatTerritory: this.currentTerritory,
           isRetreating: this.combatState.isRetreating || false,
         });
-      } else {
-        console.log('[AirLanding] ERROR: No callback set!');
       }
     } else {
-      console.log('[AirLanding] No air units to land');
       this.combatState.phase = 'resolved';
     }
   }
@@ -592,18 +636,27 @@ export class CombatUI {
   }
 
   _applyCasualties() {
-    const { attackers, defenders, selectedAttackerCasualties, selectedDefenderCasualties } = this.combatState;
+    const { attackers, defenders, selectedAttackerCasualties, selectedDefenderCasualties,
+            totalAttackerLosses, totalDefenderLosses } = this.combatState;
 
-    // Apply attacker casualties
+    // Apply attacker casualties and track total losses
     for (const [type, count] of Object.entries(selectedAttackerCasualties)) {
       const unit = attackers.find(u => u.type === type);
-      if (unit) unit.quantity -= count;
+      if (unit) {
+        unit.quantity -= count;
+        // Track total losses for battle summary
+        totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
+      }
     }
 
-    // Apply defender casualties
+    // Apply defender casualties and track total losses
     for (const [type, count] of Object.entries(selectedDefenderCasualties)) {
       const unit = defenders.find(u => u.type === type);
-      if (unit) unit.quantity -= count;
+      if (unit) {
+        unit.quantity -= count;
+        // Track total losses for battle summary
+        totalDefenderLosses[type] = (totalDefenderLosses[type] || 0) + count;
+      }
     }
 
     // Remove dead units
@@ -706,8 +759,16 @@ export class CombatUI {
         this._fireBombardment();
         await new Promise(r => setTimeout(r, 150));
       }
+      if (this.combatState.phase === 'selectBombardmentCasualties') {
+        this._applyBombardmentCasualties();
+        await new Promise(r => setTimeout(r, 150));
+      }
       if (this.combatState.phase === 'aaFire') {
         this._rollAAFire();
+        await new Promise(r => setTimeout(r, 150));
+      }
+      if (this.combatState.phase === 'selectAACasualties') {
+        this._applyAACasualties();
         await new Promise(r => setTimeout(r, 150));
       }
       if (this.combatState.phase === 'ready') {
@@ -727,7 +788,6 @@ export class CombatUI {
       if (this.onAirLandingRequired) {
         // External UI will handle this - don't auto-select
         // The callback was already called in _checkAirLanding
-        console.log('[AutoBattle] Air landing required - waiting for user selection via external UI');
         return; // Exit auto-battle, let user interact with landing UI
       } else {
         // No external UI - auto-select landings
@@ -850,6 +910,48 @@ export class CombatUI {
       `;
     }
 
+    // Select AA Casualties phase
+    if (phase === 'selectAACasualties') {
+      const { pendingAACasualties, selectedAACasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedAACasualties);
+      html += `
+        <div class="aa-casualty-selection">
+          <div class="casualty-group attacker">
+            <div class="casualty-header">
+              <span class="casualty-title">Select ${pendingAACasualties} Aircraft to Lose (AA Fire)</span>
+              <span class="casualty-count ${selectedTotal === pendingAACasualties ? 'complete' : 'incomplete'}">
+                ${selectedTotal}/${pendingAACasualties}
+              </span>
+            </div>
+            <div class="casualty-units">
+              ${this._renderAACasualtyUnits()}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Select Bombardment Casualties phase
+    if (phase === 'selectBombardmentCasualties') {
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+      html += `
+        <div class="bombardment-casualty-selection">
+          <div class="casualty-group defender">
+            <div class="casualty-header">
+              <span class="casualty-title">Select ${pendingBombardmentCasualties} Defender Casualties (Shore Bombardment)</span>
+              <span class="casualty-count ${selectedTotal === pendingBombardmentCasualties ? 'complete' : 'incomplete'}">
+                ${selectedTotal}/${pendingBombardmentCasualties}
+              </span>
+            </div>
+            <div class="casualty-units">
+              ${this._renderBombardmentCasualtyUnits()}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     // Dice animation area
     if (phase === 'rolling') {
       html += `
@@ -870,8 +972,11 @@ export class CombatUI {
       html += this._renderCasualtySelection();
     }
 
-    // Victory/defeat message
+    // Victory/defeat message with battle summary
     if (phase === 'resolved') {
+      const { totalAttackerLosses, totalDefenderLosses,
+              initialAttackers, initialDefenders } = this.combatState;
+
       html += `
         <div class="combat-result ${winner}">
           <div class="result-message">
@@ -879,6 +984,24 @@ export class CombatUI {
               ? `<span style="color: ${player.color}">${player.name}</span> captures ${this.currentTerritory}!`
               : `<span style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Defender'}</span> holds ${this.currentTerritory}!`
             }
+          </div>
+        </div>
+
+        <div class="battle-summary">
+          <div class="battle-summary-header">Battle Summary</div>
+          <div class="battle-summary-content">
+            <div class="battle-summary-side attacker">
+              <div class="summary-side-header" style="color: ${player.color}">
+                ${player.name} Losses
+              </div>
+              ${this._renderLossSummary(totalAttackerLosses, initialAttackers, player.id)}
+            </div>
+            <div class="battle-summary-side defender">
+              <div class="summary-side-header" style="color: ${defenderPlayer?.color || '#888'}">
+                ${defenderPlayer?.name || 'Defender'} Losses
+              </div>
+              ${this._renderLossSummary(totalDefenderLosses, initialDefenders, defenderPlayer?.id)}
+            </div>
           </div>
         </div>
       `;
@@ -951,10 +1074,28 @@ export class CombatUI {
           <span class="btn-icon">⚓</span> Fire Shore Bombardment
         </button>
       `;
+    } else if (phase === 'selectBombardmentCasualties') {
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+      const canConfirm = selectedTotal === pendingBombardmentCasualties;
+      html += `
+        <button class="combat-btn confirm" data-action="confirm-bombardment-casualties" ${!canConfirm ? 'disabled' : ''}>
+          Confirm Bombardment Casualties
+        </button>
+      `;
     } else if (phase === 'aaFire') {
       html += `
         <button class="combat-btn roll" data-action="aa-fire">
           <span class="btn-icon">🎯</span> Fire AA Guns
+        </button>
+      `;
+    } else if (phase === 'selectAACasualties') {
+      const { pendingAACasualties, selectedAACasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedAACasualties);
+      const canConfirm = selectedTotal === pendingAACasualties;
+      html += `
+        <button class="combat-btn confirm" data-action="confirm-aa-casualties" ${!canConfirm ? 'disabled' : ''}>
+          Confirm AA Casualties
         </button>
       `;
     } else if (phase === 'ready') {
@@ -1052,6 +1193,46 @@ export class CombatUI {
         </div>
       `;
     }).join('');
+  }
+
+  // Render loss summary for battle end display
+  _renderLossSummary(losses, initialForces, playerId) {
+    const lossEntries = Object.entries(losses || {});
+
+    if (lossEntries.length === 0) {
+      return '<div class="summary-no-losses">No losses</div>';
+    }
+
+    // Sort by unit cost (most expensive first)
+    lossEntries.sort((a, b) => {
+      const costA = this.unitDefs[a[0]]?.cost || 0;
+      const costB = this.unitDefs[b[0]]?.cost || 0;
+      return costB - costA;
+    });
+
+    // Calculate total IPC value lost
+    const totalIpcLost = lossEntries.reduce((sum, [type, count]) => {
+      const cost = this.unitDefs[type]?.cost || 0;
+      return sum + (cost * count);
+    }, 0);
+
+    let html = '<div class="summary-losses">';
+    for (const [type, count] of lossEntries) {
+      const imageSrc = playerId ? getUnitIconPath(type, playerId) : null;
+      const initial = initialForces?.find(u => u.type === type)?.quantity || 0;
+
+      html += `
+        <div class="summary-loss-item">
+          ${imageSrc ? `<img src="${imageSrc}" class="summary-loss-icon" alt="${type}">` : ''}
+          <span class="summary-loss-count">-${count}</span>
+          <span class="summary-loss-type">${type}</span>
+        </div>
+      `;
+    }
+    html += '</div>';
+    html += `<div class="summary-total-ipc">Total IPC lost: ${totalIpcLost}</div>`;
+
+    return html;
   }
 
   _renderForceUnits(units, side) {
@@ -1180,6 +1361,61 @@ export class CombatUI {
     }).join('');
   }
 
+  _renderAACasualtyUnits() {
+    const { attackers, selectedAACasualties } = this.combatState;
+    // Only show aircraft for AA casualties
+    const airUnits = attackers.filter(u => {
+      const def = this.unitDefs[u.type];
+      return def && def.isAir && u.quantity > 0;
+    });
+
+    return airUnits.map(u => {
+      const def = this.unitDefs[u.type];
+      const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
+      const selectedCount = selectedAACasualties[u.type] || 0;
+
+      return `
+        <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
+          <div class="casualty-unit-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : ''}
+            <span class="casualty-name">${u.type}</span>
+            <span class="casualty-avail">(${u.quantity})</span>
+          </div>
+          <div class="casualty-controls">
+            <button class="casualty-btn minus" data-casualty-type="aa" data-unit="${u.type}" ${selectedCount <= 0 ? 'disabled' : ''}>−</button>
+            <span class="casualty-selected">${selectedCount}</span>
+            <button class="casualty-btn plus" data-casualty-type="aa" data-unit="${u.type}" ${selectedCount >= u.quantity ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  _renderBombardmentCasualtyUnits() {
+    const { defenders, selectedBombardmentCasualties } = this.combatState;
+
+    return defenders.filter(u => u.quantity > 0).map(u => {
+      const def = this.unitDefs[u.type];
+      const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
+      const selectedCount = selectedBombardmentCasualties[u.type] || 0;
+
+      return `
+        <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
+          <div class="casualty-unit-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : ''}
+            <span class="casualty-name">${u.type}</span>
+            <span class="casualty-avail">(${u.quantity})</span>
+          </div>
+          <div class="casualty-controls">
+            <button class="casualty-btn minus" data-casualty-type="bombardment" data-unit="${u.type}" ${selectedCount <= 0 ? 'disabled' : ''}>−</button>
+            <span class="casualty-selected">${selectedCount}</span>
+            <button class="casualty-btn plus" data-casualty-type="bombardment" data-unit="${u.type}" ${selectedCount >= u.quantity ? 'disabled' : ''}>+</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
   _bindEvents() {
     // Action buttons
     this.el.querySelectorAll('.combat-btn').forEach(btn => {
@@ -1190,8 +1426,14 @@ export class CombatUI {
           case 'fire-bombardment':
             this._fireBombardment();
             break;
+          case 'confirm-bombardment-casualties':
+            this._applyBombardmentCasualties();
+            break;
           case 'aa-fire':
             this._rollAAFire();
+            break;
+          case 'confirm-aa-casualties':
+            this._applyAACasualties();
             break;
           case 'roll':
             await this._animateDiceRoll();
@@ -1230,12 +1472,58 @@ export class CombatUI {
     this.el.querySelectorAll('.casualty-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const side = btn.dataset.side;
+        const casualtyType = btn.dataset.casualtyType;
         const unitType = btn.dataset.unit;
         const delta = btn.classList.contains('plus') ? 1 : -1;
 
-        this._adjustCasualty(side, unitType, delta);
+        if (casualtyType === 'aa') {
+          this._adjustAACasualty(unitType, delta);
+        } else if (casualtyType === 'bombardment') {
+          this._adjustBombardmentCasualty(unitType, delta);
+        } else {
+          this._adjustCasualty(side, unitType, delta);
+        }
       });
     });
+  }
+
+  _adjustAACasualty(unitType, delta) {
+    const { attackers, pendingAACasualties, selectedAACasualties } = this.combatState;
+
+    // Only aircraft can be AA casualties
+    const unit = attackers.find(u => u.type === unitType);
+    if (!unit) return;
+
+    const current = selectedAACasualties[unitType] || 0;
+    const newValue = Math.max(0, Math.min(unit.quantity, current + delta));
+
+    // Check we don't exceed required casualties
+    const currentTotal = this._getTotalSelectedCasualties(selectedAACasualties);
+    const newTotal = currentTotal - current + newValue;
+
+    if (newTotal <= pendingAACasualties) {
+      selectedAACasualties[unitType] = newValue;
+      this._render();
+    }
+  }
+
+  _adjustBombardmentCasualty(unitType, delta) {
+    const { defenders, pendingBombardmentCasualties, selectedBombardmentCasualties } = this.combatState;
+
+    const unit = defenders.find(u => u.type === unitType);
+    if (!unit) return;
+
+    const current = selectedBombardmentCasualties[unitType] || 0;
+    const newValue = Math.max(0, Math.min(unit.quantity, current + delta));
+
+    // Check we don't exceed required casualties
+    const currentTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+    const newTotal = currentTotal - current + newValue;
+
+    if (newTotal <= pendingBombardmentCasualties) {
+      selectedBombardmentCasualties[unitType] = newValue;
+      this._render();
+    }
   }
 
   _adjustCasualty(side, unitType, delta) {
