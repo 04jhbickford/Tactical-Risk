@@ -174,10 +174,16 @@ async function init() {
         break;
 
       case 'open-purchase':
+        // Close other modals first
+        techUI.hide();
+        combatUI.hide();
         purchasePopup.show();
         break;
 
       case 'open-tech':
+        // Close other modals first
+        purchasePopup.hide();
+        combatUI.hide();
         techUI.show();
         break;
 
@@ -211,7 +217,9 @@ async function init() {
 
       case 'open-combat':
         if (combatUI.hasCombats()) {
-          purchasePopup.hide(); // Close purchase panel when opening combat
+          // Close other modals first
+          purchasePopup.hide();
+          techUI.hide();
           combatUI.showNextCombat();
         }
         break;
@@ -245,14 +253,13 @@ async function init() {
           actionLog.logPhaseChange(gameState.getTurnPhaseName(), gameState.currentPlayer);
         }
 
+        // Close all modals on phase change
+        purchasePopup.hide();
+        techUI.hide();
+
         // If entering combat phase, show combat UI
         if (gameState.turnPhase === TURN_PHASES.COMBAT && combatUI.hasCombats()) {
-          purchasePopup.hide(); // Close purchase panel when entering combat
           combatUI.showNextCombat();
-        }
-        // Close purchase panel when leaving purchase phase
-        if (gameState.turnPhase !== TURN_PHASES.PURCHASE) {
-          purchasePopup.hide();
         }
         // Cancel any movement selection when phase changes
         movementUI.cancel();

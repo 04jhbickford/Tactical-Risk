@@ -1,6 +1,6 @@
 // Lobby UI for game mode and player selection
 
-export const GAME_VERSION = 'V0.85';
+export const GAME_VERSION = 'V0.86';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
