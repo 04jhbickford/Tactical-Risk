@@ -231,7 +231,21 @@ export class MovementUI {
       if (!canReach) return false;
 
       // Air units can land on water only if there's a carrier with capacity
+      // EXCEPTION: During combat move, air can attack enemy sea zones (landing resolved after combat)
       if (territory.isWater) {
+        // During combat move, check if there are enemy units to attack
+        if (isCombatMove) {
+          const seaUnits = this.gameState.getUnitsAt(territory.name);
+          const hasEnemy = seaUnits.some(u => {
+            if (u.owner === player.id) return false;
+            if (this.gameState.areAllies(player.id, u.owner)) return false;
+            return true;
+          });
+          // Can attack enemy sea zones - landing will be resolved after combat
+          if (hasEnemy) return true;
+        }
+
+        // Non-combat move or no enemies: need a carrier with capacity
         const seaUnits = this.gameState.getUnitsAt(territory.name);
         const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
         const carrierDef = this.unitDefs.carrier;
@@ -438,9 +452,21 @@ export class MovementUI {
           !this.gameState.areAllies(player.id, toOwner);
         if (isNonCombat && isEnemy) return false;
 
-        // Check if water - needs carrier with capacity
+        // Check if water - needs carrier with capacity (unless combat move attacking enemies)
         const territory = this.territoryByName[destName];
         if (territory?.isWater) {
+          // During combat move, allow attacking enemy sea zones (landing resolved after combat)
+          if (isCombatMove) {
+            const seaUnits = this.gameState.getUnitsAt(destName);
+            const hasEnemyUnits = seaUnits.some(u => {
+              if (u.owner === player.id) return false;
+              if (this.gameState.areAllies(player.id, u.owner)) return false;
+              return true;
+            });
+            if (hasEnemyUnits) return true;
+          }
+
+          // Non-combat or no enemies: need carrier with capacity
           const seaUnits = this.gameState.getUnitsAt(destName);
           const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
           const carrierDef = this.unitDefs.carrier;

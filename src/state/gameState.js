@@ -552,17 +552,35 @@ export class GameState {
     const totalMovement = unitDef.movement || 4;
     const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
-    // Get all territories within remaining movement (use full movement if starting from friendly territory)
+    // Get all territories within remaining movement
+    // If no movement tracked (unit didn't move in combat phase), use full movement
     const searchRange = remainingMovement > 0 ? remainingMovement : totalMovement;
     const reachable = this.getReachableTerritoriesForAir(territory, searchRange, player.id, false);
     const validLandings = [];
 
+    // Debug logging for air landing issues
+    if (reachable.size === 0) {
+      console.warn(`Air landing: No reachable territories from ${territory} with range ${searchRange}`);
+    }
+
     // Get territories that were friendly at turn start
-    const friendlyAtStart = this.friendlyTerritoriesAtTurnStart || new Set();
+    let friendlyAtStart = this.friendlyTerritoriesAtTurnStart || new Set();
+
+    // Fallback: if friendlyTerritoriesAtTurnStart is empty, use current ownership
+    // This can happen with older saves or if initialization failed
+    if (friendlyAtStart.size === 0) {
+      console.warn('Air landing: friendlyTerritoriesAtTurnStart is empty, using current ownership as fallback');
+      friendlyAtStart = new Set();
+      for (const [terrName, state] of Object.entries(this.territoryState)) {
+        if (state.owner === player.id || this.areAllies(player.id, state.owner)) {
+          friendlyAtStart.add(terrName);
+        }
+      }
+    }
 
     for (const [destName, info] of reachable) {
       // CRITICAL: Only allow landing in territories that were friendly at the START of the turn
-      // Newly captured territories are NOT valid landing spots
+      // Newly captured territories are NOT valid landing spots (unless using fallback)
       const wasFriendlyAtStart = friendlyAtStart.has(destName);
 
       // Skip if not friendly at turn start (unless it's a carrier which moves with the fleet)

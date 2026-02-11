@@ -20,6 +20,7 @@ export class PlayerPanel {
     this.unitDefs = null;
     this.onAction = null;
     this.selectedTerritory = null;
+    this.cardsCollapsed = false; // Track collapsed state for RISK cards section
 
     // Create panel element (replaces sidebar)
     this.el = document.getElementById('sidebar');
@@ -130,12 +131,16 @@ export class PlayerPanel {
           wild: '⭐'
         };
 
+        const collapsedClass = this.cardsCollapsed ? ' collapsed' : '';
+        const toggleIcon = this.cardsCollapsed ? '▶' : '▼';
         html += `
-          <div class="pp-risk-cards">
-            <div class="pp-cards-header">
+          <div class="pp-risk-cards${collapsedClass}">
+            <div class="pp-cards-header" data-action="toggle-cards">
+              <span class="pp-cards-toggle">${toggleIcon}</span>
               <span class="pp-cards-label">RISK Cards</span>
               <span class="pp-cards-count">${cards.length}/5</span>
             </div>
+            ${!this.cardsCollapsed ? `
             <div class="pp-cards-list">
               ${cards.map(c => `
                 <div class="pp-card ${c}">
@@ -163,6 +168,7 @@ export class PlayerPanel {
               </div>
             ` : cards.length >= 5 ? `
               <div class="pp-cards-note">Must trade when you have 5+ cards</div>
+            ` : ''}
             ` : ''}
           </div>
         `;
@@ -346,7 +352,14 @@ export class PlayerPanel {
         const action = btn.dataset.action;
         const territory = btn.dataset.territory;
 
-        // Pass all actions to callback
+        // Handle internal actions
+        if (action === 'toggle-cards') {
+          this.cardsCollapsed = !this.cardsCollapsed;
+          this._render();
+          return;
+        }
+
+        // Pass all other actions to callback
         if (this.onAction) {
           this.onAction(action, { territory });
         }

@@ -5047,6 +5047,30 @@ html, body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  cursor: pointer;
+  padding: 4px;
+  margin: -4px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.pp-cards-header:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.pp-cards-toggle {
+  font-size: 10px;
+  color: #666;
+  margin-right: 6px;
+  transition: transform 0.2s;
+}
+
+.pp-risk-cards.collapsed .pp-cards-header {
+  margin-bottom: 0;
+}
+
+.pp-risk-cards.collapsed {
+  padding: 8px 12px;
 }
 
 .pp-cards-label {
