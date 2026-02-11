@@ -544,6 +544,7 @@ async function init() {
       }
 
       if (hit) {
+        console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
       } else {

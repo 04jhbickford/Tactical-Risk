@@ -229,13 +229,14 @@ export class PlayerPanel {
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
       if (this.selectedTerritory && !this.selectedTerritory.isWater) {
         const owner = this.gameState.getOwner(this.selectedTerritory.name);
+        console.log('[Capital Placement] Selected:', this.selectedTerritory.name, 'Owner:', owner, 'Current player:', player.id);
         if (owner === player.id) {
           html += `
             <button class="pp-action-btn" data-action="place-capital" data-territory="${this.selectedTerritory.name}">
               Place Capital in ${this.selectedTerritory.name}
             </button>`;
         } else {
-          html += `<p class="pp-hint">Select one of your own territories</p>`;
+          html += `<p class="pp-hint">Select one of your own territories (${this.selectedTerritory.name} is owned by ${owner})</p>`;
         }
       } else {
         html += `<p class="pp-hint">Click on your territory to select capital location</p>`;
