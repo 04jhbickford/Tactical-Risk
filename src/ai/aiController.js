@@ -237,7 +237,7 @@ export class AIController {
     const maxThisRound = Math.min(limit, totalRemaining);
 
     while (placedThisRound < maxThisRound) {
-      // Find a unit type to place
+      // Find a unit type that can actually be placed
       let unitType = null;
       let isNaval = false;
 
@@ -245,6 +245,10 @@ export class AIController {
         if (unit.quantity > 0) {
           const def = this.unitDefs?.[unit.type];
           if (def) {
+            // Skip naval units if no valid sea zones
+            if (def.isSea && ownedSeas.length === 0) continue;
+            // Skip land units if no owned land (shouldn't happen)
+            if (def.isLand && ownedLand.length === 0) continue;
             unitType = unit.type;
             isNaval = def.isSea;
             break;
@@ -252,7 +256,7 @@ export class AIController {
         }
       }
 
-      if (!unitType) break;
+      if (!unitType) break; // No placeable units remaining
 
       // Pick territory based on unit type and difficulty
       let territory;

@@ -892,6 +892,55 @@ export class GameState {
     return units.reduce((sum, u) => sum + u.quantity, 0);
   }
 
+  // Check if player has any units that can actually be placed (have valid locations)
+  hasPlaceableUnits(playerId, unitDefs) {
+    const units = this.unitsToPlace[playerId] || [];
+    if (!units.some(u => u.quantity > 0)) return false;
+
+    // Get player's owned territories and valid sea zones
+    const ownedTerritories = this.getPlayerTerritories(playerId);
+    if (ownedTerritories.length === 0) return false;
+
+    // Find valid sea zones (adjacent to owned coastal territories, not occupied by enemies)
+    const validSeaZones = new Set();
+    for (const tName of ownedTerritories) {
+      const t = this.territoryByName[tName];
+      if (!t || t.isWater) continue;
+      for (const conn of t.connections) {
+        const ct = this.territoryByName[conn];
+        if (ct && ct.isWater) {
+          // Check not occupied by enemy during setup
+          const existingUnits = this.units[conn] || [];
+          const enemyUnits = existingUnits.filter(u => u.owner !== playerId);
+          if (enemyUnits.length === 0) {
+            validSeaZones.add(conn);
+          }
+        }
+      }
+    }
+
+    // Check each unit type
+    for (const unitEntry of units) {
+      if (unitEntry.quantity <= 0) continue;
+      const def = unitDefs?.[unitEntry.type];
+      if (!def) continue;
+
+      // Land units: can place on owned territories
+      if (def.isLand) return true;
+
+      // Naval units: can place on valid sea zones
+      if (def.isSea && validSeaZones.size > 0) return true;
+
+      // Air units: can place on owned territories OR on carriers in valid sea zones
+      if (def.isAir) {
+        // Can always place on owned land
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   // Check if this is the final placement round (all players have ≤ 7 units remaining)
   isFinalPlacementRound() {
     if (!this.players) return false;

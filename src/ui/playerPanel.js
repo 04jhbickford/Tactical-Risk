@@ -249,8 +249,10 @@ export class PlayerPanel {
       const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
       const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
       const isFinalRound = this.gameState.isFinalPlacementRound?.() || false;
-      // Can finish when placed the limit OR no units left
-      const canFinish = placedThisRound >= limit || totalRemaining === 0;
+      // Check if player has any units that can actually be placed
+      const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
+      // Can finish when: placed the limit, OR no units left, OR no placeable units remain
+      const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
       const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
 
       html += `<div class="pp-placement">`;
