@@ -162,8 +162,10 @@ export class UnitRenderer {
       grouped[key].total += p.quantity;
 
       // Include cargo from carriers (aircraft)
-      if (includeCargo && p.type === 'carrier' && p.aircraft) {
+      if (includeCargo && p.type === 'carrier' && p.aircraft && p.aircraft.length > 0) {
         for (const aircraft of p.aircraft) {
+          // Skip invalid aircraft entries (no type or owner)
+          if (!aircraft || !aircraft.type || !aircraft.owner) continue;
           const cargoKey = `${aircraft.type}_${aircraft.owner}_carrier`;
           if (!grouped[cargoKey]) {
             grouped[cargoKey] = { total: 0, owner: aircraft.owner, type: aircraft.type, isOnCarrier: true };
@@ -173,8 +175,10 @@ export class UnitRenderer {
       }
 
       // Include cargo from transports
-      if (includeCargo && p.type === 'transport' && p.cargo) {
+      if (includeCargo && p.type === 'transport' && p.cargo && p.cargo.length > 0) {
         for (const cargo of p.cargo) {
+          // Skip invalid cargo entries (no type or owner)
+          if (!cargo || !cargo.type || !cargo.owner) continue;
           const cargoKey = `${cargo.type}_${cargo.owner}_transport`;
           if (!grouped[cargoKey]) {
             grouped[cargoKey] = { total: 0, owner: cargo.owner, type: cargo.type, isOnTransport: true };

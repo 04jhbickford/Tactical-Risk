@@ -2108,15 +2108,15 @@ export class GameState {
     if (attackers.length === 0 || combatDefenders.length === 0) {
       // Attacker wins if there are no combat defenders (factories/AA captured)
       if (attackers.length > 0 && allDefenders.length > 0) {
-        // Capture territory and transfer factory ownership
+        // Capture territory and transfer factory/AA gun ownership
         const t = this.territoryByName[territory];
         if (!t?.isWater) {
           this.territoryState[territory].owner = player.id;
-          // Transfer factory ownership (factories are captured, not destroyed)
+          // Transfer factory and AA gun ownership (captured, not destroyed - A&A Anniversary rules)
           for (const unit of units) {
-            if (unit.type === 'factory') {
+            if (unit.type === 'factory' || unit.type === 'aaGun') {
               unit.owner = player.id;
-              // Ensure factory has quantity (safeguard)
+              // Ensure unit has quantity (safeguard)
               if (!unit.quantity || unit.quantity < 1) {
                 unit.quantity = 1;
               }
@@ -2205,12 +2205,12 @@ export class GameState {
         const defender = allDefenders[0]?.owner;
         this.territoryState[territory].owner = player.id;
 
-        // Transfer factory ownership to the winner (factories are captured, not destroyed)
+        // Transfer factory and AA gun ownership to the winner (captured, not destroyed - A&A Anniversary rules)
         const territoryUnits = this.units[territory] || [];
         for (const unit of territoryUnits) {
-          if (unit.type === 'factory') {
+          if (unit.type === 'factory' || unit.type === 'aaGun') {
             unit.owner = player.id;
-            // Ensure factory has quantity (safeguard)
+            // Ensure unit has quantity (safeguard)
             if (!unit.quantity || unit.quantity < 1) {
               unit.quantity = 1;
             }
@@ -3134,7 +3134,7 @@ export class GameState {
 
   toJSON() {
     return {
-      version: 7,
+      version: 8,
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
       players: this.players,
@@ -3155,6 +3155,9 @@ export class GameState {
       cardTradeCount: this.cardTradeCount,
       unitsToPlace: this.unitsToPlace,
       placementRound: this.placementRound,
+      // v8: Save air unit origin tracking for proper landing calculation after load
+      airUnitOrigins: this.airUnitOrigins,
+      friendlyTerritoriesAtTurnStart: Array.from(this.friendlyTerritoriesAtTurnStart || []),
     };
   }
 
@@ -3180,6 +3183,17 @@ export class GameState {
     this.cardTradeCount = data.cardTradeCount || {};
     this.unitsToPlace = data.unitsToPlace || {};
     this.placementRound = data.placementRound || 0;
+
+    // v8: Restore air unit tracking for proper landing calculation
+    this.airUnitOrigins = data.airUnitOrigins || {};
+    if (data.friendlyTerritoriesAtTurnStart) {
+      this.friendlyTerritoriesAtTurnStart = new Set(data.friendlyTerritoriesAtTurnStart);
+    } else {
+      // Older saves (v7 and below): Re-initialize friendly territories
+      // This is approximate but better than empty - includes all currently owned territories
+      this._initFriendlyTerritoriesAtTurnStart();
+    }
+
     this._notify();
   }
 

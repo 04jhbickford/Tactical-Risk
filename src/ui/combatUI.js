@@ -90,6 +90,16 @@ export class CombatUI {
       return def && def.isAir;
     });
 
+    // A&A Submarine Rules: Check for submarines and destroyers
+    const attackerSubs = attackers.filter(u => u.type === 'submarine');
+    const defenderSubs = defenders.filter(u => u.type === 'submarine');
+    const attackerHasDestroyer = attackers.some(u => u.type === 'destroyer');
+    const defenderHasDestroyer = defenders.some(u => u.type === 'destroyer');
+    // Submarines have first strike if opposing side has no destroyer
+    const attackerSubsHaveFirstStrike = attackerSubs.length > 0 && !defenderHasDestroyer;
+    const defenderSubsHaveFirstStrike = defenderSubs.length > 0 && !attackerHasDestroyer;
+    const hasSubmarineFirstStrike = attackerSubsHaveFirstStrike || defenderSubsHaveFirstStrike;
+
     // Calculate shore bombardment for amphibious assaults
     const bombardmentResult = this._calculateBombardment();
 
@@ -109,6 +119,11 @@ export class CombatUI {
       bombardmentHits: bombardmentResult.hits,
       bombardmentFired: false,
       hasAA: aaGuns.length > 0 && attackingAir.length > 0,
+      // A&A Submarine rules tracking
+      attackerSubsHaveFirstStrike,
+      defenderSubsHaveFirstStrike,
+      hasSubmarineFirstStrike,
+      submarineFirstStrikeFired: false,
       // Air landing tracking
       airUnitsToLand: [], // { type, quantity, landingOptions }
       selectedLandings: {}, // { unitType: territoryName }
@@ -206,30 +221,31 @@ export class CombatUI {
   }
 
   _applyBombardmentCasualties() {
-    const { defenders, selectedBombardmentCasualties, totalDefenderLosses } = this.combatState;
+    const { selectedBombardmentCasualties, totalDefenderLosses } = this.combatState;
 
-    // Apply selected bombardment casualties and track for summary
+    // A&A Anniversary Rule: Bombardment casualties fire back in the first combat round
+    // Store the selected casualties but don't remove them yet - they will be removed
+    // after the first round of combat along with regular combat casualties
+    this.combatState.pendingBombardmentLosses = { ...selectedBombardmentCasualties };
+
+    // Track total losses for battle summary (they will definitely die)
     for (const [type, count] of Object.entries(selectedBombardmentCasualties)) {
-      const unit = defenders.find(u => u.type === type);
-      if (unit) {
-        unit.quantity -= count;
-        // Track total losses for battle summary
-        totalDefenderLosses[type] = (totalDefenderLosses[type] || 0) + count;
-      }
+      totalDefenderLosses[type] = (totalDefenderLosses[type] || 0) + count;
     }
 
-    // Remove dead units
-    this.combatState.defenders = defenders.filter(u => u.quantity > 0);
     this.combatState.bombardmentApplied = true;
+    // Units are NOT removed here - they will fire back in combat and be removed after first round
 
     this._proceedAfterBombardment();
     this._render();
   }
 
   _proceedAfterBombardment() {
-    // Move to next phase (AA fire or ready)
+    // Move to next phase (AA fire, submarine first strike, or ready)
     if (this.combatState.hasAA) {
       this.combatState.phase = 'aaFire';
+    } else if (this.combatState.hasSubmarineFirstStrike && !this.combatState.submarineFirstStrikeFired) {
+      this.combatState.phase = 'submarineFirstStrike';
     } else {
       this.combatState.phase = 'ready';
     }
@@ -298,7 +314,12 @@ export class CombatUI {
     // Move to ready phase if there are still attackers
     if (this._getTotalUnits(this.combatState.attackers) > 0 &&
         this._getTotalUnits(this.combatState.defenders.filter(u => u.type !== 'aaGun')) > 0) {
-      this.combatState.phase = 'ready';
+      // A&A Submarine Rules: Check for submarine first strike before regular combat
+      if (this.combatState.hasSubmarineFirstStrike && !this.combatState.submarineFirstStrikeFired) {
+        this.combatState.phase = 'submarineFirstStrike';
+      } else {
+        this.combatState.phase = 'ready';
+      }
     } else if (this._getTotalUnits(this.combatState.attackers) === 0) {
       this.combatState.phase = 'resolved';
       this.combatState.winner = 'defender';
@@ -307,6 +328,108 @@ export class CombatUI {
       this.combatState.phase = 'resolved';
       this.combatState.winner = 'attacker';
     }
+  }
+
+  // A&A Submarine Rules: Roll submarine first strike
+  _rollSubmarineFirstStrike() {
+    const { attackers, defenders, attackerSubsHaveFirstStrike, defenderSubsHaveFirstStrike,
+            totalAttackerLosses, totalDefenderLosses } = this.combatState;
+
+    const subFirstStrikeRolls = [];
+    let attackerSubHits = 0;
+    let defenderSubHits = 0;
+
+    // Attacking submarines roll first strike (if defender has no destroyer)
+    if (attackerSubsHaveFirstStrike) {
+      const attackerSubs = attackers.filter(u => u.type === 'submarine');
+      for (const sub of attackerSubs) {
+        const def = this.unitDefs[sub.type];
+        for (let i = 0; i < sub.quantity; i++) {
+          const roll = Math.floor(Math.random() * 6) + 1;
+          const hit = roll <= def.attack;
+          subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'attacker' });
+          if (hit) attackerSubHits++;
+        }
+      }
+    }
+
+    // Defending submarines roll first strike (if attacker has no destroyer)
+    if (defenderSubsHaveFirstStrike) {
+      const defenderSubs = defenders.filter(u => u.type === 'submarine');
+      for (const sub of defenderSubs) {
+        const def = this.unitDefs[sub.type];
+        for (let i = 0; i < sub.quantity; i++) {
+          const roll = Math.floor(Math.random() * 6) + 1;
+          const hit = roll <= def.defense;
+          subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'defender' });
+          if (hit) defenderSubHits++;
+        }
+      }
+    }
+
+    this.combatState.subFirstStrikeRolls = subFirstStrikeRolls;
+    this.combatState.pendingSubFirstStrikeAttackerCasualties = defenderSubHits; // Attacker takes hits from defender subs
+    this.combatState.pendingSubFirstStrikeDefenderCasualties = attackerSubHits; // Defender takes hits from attacker subs
+    this.combatState.submarineFirstStrikeFired = true;
+
+    // If there are casualties to select, go to casualty selection
+    if (attackerSubHits > 0 || defenderSubHits > 0) {
+      // First strike casualties don't fire back - apply immediately with auto-selection
+      this._applySubmarineFirstStrikeCasualties();
+    } else {
+      this.combatState.phase = 'ready';
+    }
+
+    this._render();
+  }
+
+  // Apply submarine first strike casualties (they don't fire back)
+  _applySubmarineFirstStrikeCasualties() {
+    const { attackers, defenders, pendingSubFirstStrikeAttackerCasualties,
+            pendingSubFirstStrikeDefenderCasualties, totalAttackerLosses, totalDefenderLosses } = this.combatState;
+
+    // Apply attacker casualties from defender submarines (non-sub, non-air units only)
+    if (pendingSubFirstStrikeAttackerCasualties > 0) {
+      const nonSubAttackers = attackers.filter(u => u.type !== 'submarine' && !this.unitDefs[u.type]?.isAir);
+      const selected = this._selectCheapestCasualties(nonSubAttackers, pendingSubFirstStrikeAttackerCasualties);
+      for (const [type, count] of Object.entries(selected)) {
+        const unit = attackers.find(u => u.type === type);
+        if (unit) {
+          unit.quantity -= count;
+          totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
+        }
+      }
+    }
+
+    // Apply defender casualties from attacker submarines (non-sub, non-air units only)
+    if (pendingSubFirstStrikeDefenderCasualties > 0) {
+      const nonSubDefenders = defenders.filter(u => u.type !== 'submarine' && !this.unitDefs[u.type]?.isAir);
+      const selected = this._selectCheapestCasualties(nonSubDefenders, pendingSubFirstStrikeDefenderCasualties);
+      for (const [type, count] of Object.entries(selected)) {
+        const unit = defenders.find(u => u.type === type);
+        if (unit) {
+          unit.quantity -= count;
+          totalDefenderLosses[type] = (totalDefenderLosses[type] || 0) + count;
+        }
+      }
+    }
+
+    // Remove dead units
+    this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+    this.combatState.defenders = defenders.filter(u => u.quantity > 0);
+
+    // Check if combat should continue
+    if (this._getTotalUnits(this.combatState.attackers) === 0) {
+      this.combatState.phase = 'resolved';
+      this.combatState.winner = 'defender';
+    } else if (this._getTotalUnits(this.combatState.defenders.filter(u => u.type !== 'aaGun')) === 0) {
+      this.combatState.phase = 'resolved';
+      this.combatState.winner = 'attacker';
+    } else {
+      this.combatState.phase = 'ready';
+    }
+
+    this._render();
   }
 
   _selectCheapestAircraftCasualties(units, count) {
@@ -649,7 +772,7 @@ export class CombatUI {
 
   _applyCasualties() {
     const { attackers, defenders, selectedAttackerCasualties, selectedDefenderCasualties,
-            totalAttackerLosses, totalDefenderLosses } = this.combatState;
+            totalAttackerLosses, totalDefenderLosses, pendingBombardmentLosses } = this.combatState;
 
     // Apply attacker casualties and track total losses
     for (const [type, count] of Object.entries(selectedAttackerCasualties)) {
@@ -669,6 +792,20 @@ export class CombatUI {
         // Track total losses for battle summary
         totalDefenderLosses[type] = (totalDefenderLosses[type] || 0) + count;
       }
+    }
+
+    // A&A Anniversary Rule: Apply pending bombardment casualties after first round
+    // Bombardment casualties fired back in combat, now they die (losses already tracked)
+    if (pendingBombardmentLosses) {
+      for (const [type, count] of Object.entries(pendingBombardmentLosses)) {
+        const unit = defenders.find(u => u.type === type);
+        if (unit) {
+          unit.quantity -= count;
+          // Losses were already tracked when bombardment was applied
+        }
+      }
+      // Clear pending bombardment losses - only applied once (first round)
+      this.combatState.pendingBombardmentLosses = null;
     }
 
     // Remove dead units
@@ -802,6 +939,11 @@ export class CombatUI {
       }
       if (this.combatState.phase === 'selectAACasualties') {
         this._applyAACasualties();
+        await new Promise(r => setTimeout(r, 150));
+      }
+      // A&A Submarine Rules: Handle submarine first strike phase
+      if (this.combatState.phase === 'submarineFirstStrike') {
+        this._rollSubmarineFirstStrike();
         await new Promise(r => setTimeout(r, 150));
       }
       if (this.combatState.phase === 'ready') {
@@ -1135,6 +1277,20 @@ export class CombatUI {
       html += `
         <button class="combat-btn confirm" data-action="confirm-aa-casualties" ${!canConfirm ? 'disabled' : ''}>
           Confirm AA Casualties
+        </button>
+      `;
+    } else if (phase === 'submarineFirstStrike') {
+      // A&A Submarine Rules: Submarine First Strike
+      const { attackerSubsHaveFirstStrike, defenderSubsHaveFirstStrike } = this.combatState;
+      const subDesc = [];
+      if (attackerSubsHaveFirstStrike) subDesc.push('Attacking subs');
+      if (defenderSubsHaveFirstStrike) subDesc.push('Defending subs');
+      html += `
+        <div class="submarine-info" style="text-align: center; margin-bottom: 10px; color: #aaa; font-size: 12px;">
+          🚢 ${subDesc.join(' and ')} have first strike (enemy has no destroyer)
+        </div>
+        <button class="combat-btn roll" data-action="submarine-first-strike">
+          <span class="btn-icon">🚢</span> Fire Submarine First Strike
         </button>
       `;
     } else if (phase === 'ready') {
@@ -1477,6 +1633,9 @@ export class CombatUI {
             break;
           case 'confirm-aa-casualties':
             this._applyAACasualties();
+            break;
+          case 'submarine-first-strike':
+            this._rollSubmarineFirstStrike();
             break;
           case 'roll':
             await this._animateDiceRoll();
