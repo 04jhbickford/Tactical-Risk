@@ -1183,7 +1183,8 @@ export class GameState {
   }
 
   // Finish current player's placement round (6 units max, or all remaining)
-  finishPlacementRound() {
+  // unitDefs is optional but needed for accurate placeable check
+  finishPlacementRound(unitDefs = null) {
     const player = this.currentPlayer;
     if (!player) return;
 
@@ -1195,16 +1196,25 @@ export class GameState {
     if (this.currentPlayerIndex >= this.players.length) {
       this.currentPlayerIndex = 0;
       this.placementRound++;
+    }
 
-      // Check if all players have finished placing all units
-      const anyPlayerHasUnits = this.players.some(p => this.hasUnitsToPlace(p.id));
-      if (!anyPlayerHasUnits) {
-        // All units placed, move to playing phase
-        this.phase = GAME_PHASES.PLAYING;
-        this.turnPhase = TURN_PHASES.DEVELOP_TECH;
-        // Initialize friendly territories for first turn
-        this._initFriendlyTerritoriesAtTurnStart();
+    // Check if all players have finished placing - either no units left OR no placeable units
+    const anyPlayerCanPlace = this.players.some(p => {
+      const hasUnits = this.hasUnitsToPlace(p.id);
+      if (!hasUnits) return false;
+      // If unitDefs provided, check if units are actually placeable
+      if (unitDefs) {
+        return this.hasPlaceableUnits(p.id, unitDefs);
       }
+      return hasUnits;
+    });
+
+    if (!anyPlayerCanPlace) {
+      // All units placed (or unplaceable), move to playing phase
+      this.phase = GAME_PHASES.PLAYING;
+      this.turnPhase = TURN_PHASES.DEVELOP_TECH;
+      // Initialize friendly territories for first turn
+      this._initFriendlyTerritoriesAtTurnStart();
     }
 
     this._notify();

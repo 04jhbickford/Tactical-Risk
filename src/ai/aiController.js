@@ -218,7 +218,7 @@ export class AIController {
 
     if (totalRemaining === 0) {
       // No units left, finish placement round
-      this.gameState.finishPlacementRound();
+      this.gameState.finishPlacementRound(this.unitDefs);
       this._notifyAction('finishPlacement', {});
       return;
     }
@@ -279,9 +279,9 @@ export class AIController {
       }
     }
 
-    // Finish placement round after placing 6 units
+    // Finish placement round after placing units
     await this._delay(300);
-    this.gameState.finishPlacementRound();
+    this.gameState.finishPlacementRound(this.unitDefs);
     this._notifyAction('finishPlacement', {});
   }
 

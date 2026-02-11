@@ -216,7 +216,7 @@ async function init() {
         break;
 
       case 'finish-placement':
-        gameState.finishPlacement();
+        gameState.finishPlacementRound(unitDefs);
         camera.dirty = true;
         // Move to next player's capital if in placement phase
         const nextPlayer = gameState.currentPlayer;

@@ -341,7 +341,7 @@ export class PlacementUI {
     });
 
     this.el.querySelector('[data-action="finish"]')?.addEventListener('click', () => {
-      this.gameState.finishPlacementRound();
+      this.gameState.finishPlacementRound(this.unitDefs);
       this.selectedTerritory = null;
       if (this.onPlacementComplete) this.onPlacementComplete();
     });
