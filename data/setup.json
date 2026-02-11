@@ -3,20 +3,24 @@
     {
       "id": "classic",
       "name": "Classic WW2",
-      "description": "Historical 1942 Axis vs Allies setup",
-      "enabled": false,
-      "useHistoricalSetup": true,
-      "alliancesEnabled": true
+      "description": "Historical 1942 setup with 5 factions",
+      "enabled": true,
+      "useHistoricalSetup": true
     },
     {
       "id": "risk",
       "name": "Risk Style",
-      "description": "Free-for-all with random territories",
+      "description": "Random territories, WW2 factions, 80 IPCs each",
       "enabled": true,
       "useHistoricalSetup": false,
       "startingIPCs": 80,
-      "startingInfantryPerTerritory": 1,
-      "alliancesEnabled": false
+      "startingInfantryPerTerritory": 1
+    },
+    {
+      "id": "draft",
+      "name": "Territory Draft",
+      "description": "Players take turns drafting territories",
+      "enabled": false
     }
   ],
   "factions": [
@@ -147,7 +151,7 @@
       "Evenki National Okrug": "Russians",
       "Finland Norway": "Germans",
       "French Equatorial Africa": "British",
-      "Kwangtung": "Japanese",
+      "French Indo China": "Japanese",
       "French West Africa": "British",
       "Germany": "Germans",
       "Spain": "British",
@@ -158,6 +162,7 @@
       "Karelia S.S.R.": "Russians",
       "Kazakh S.S.R.": "Russians",
       "Kenya-Rhodesia": "British",
+      "Kwangtung": "Japanese",
       "Libya": "Germans",
       "Madagascar": "British",
       "Manchuria": "Japanese",
@@ -338,10 +343,10 @@
           "owner": "Germans"
         }
       ],
-      "Kwangtung": [
+      "French Indo China": [
         {
           "type": "infantry",
-          "quantity": 4,
+          "quantity": 2,
           "owner": "Japanese"
         },
         {
@@ -458,6 +463,13 @@
           "type": "aaGun",
           "quantity": 1,
           "owner": "Russians"
+        }
+      ],
+      "Kwangtung": [
+        {
+          "type": "infantry",
+          "quantity": 2,
+          "owner": "Japanese"
         }
       ],
       "Libya": [

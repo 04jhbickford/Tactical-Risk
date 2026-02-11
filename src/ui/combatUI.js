@@ -15,6 +15,7 @@ export class CombatUI {
     this.diceAnimation = null;
     this.lastRolls = null;
     this.cardAwarded = null;
+    this.isMinimized = false;
 
     this._create();
   }
@@ -993,7 +994,7 @@ export class CombatUI {
       <div class="combat-content">
         <div class="combat-header">
           <div class="combat-title">Battle for ${this.currentTerritory}</div>
-          <div class="combat-remaining">${this.gameState.combatQueue.length} battle(s) remaining</div>
+          <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
         </div>
 
         <!-- Probability Bar -->
@@ -1616,6 +1617,13 @@ export class CombatUI {
   }
 
   _bindEvents() {
+    // Minimize toggle
+    this.el.querySelector('[data-action="toggle-minimize"]')?.addEventListener('click', () => {
+      this.isMinimized = !this.isMinimized;
+      this.el.classList.toggle('minimized', this.isMinimized);
+      this._render();
+    });
+
     // Action buttons
     this.el.querySelectorAll('.combat-btn').forEach(btn => {
       btn.addEventListener('click', async () => {

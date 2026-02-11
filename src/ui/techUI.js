@@ -9,6 +9,7 @@ export class TechUI {
     this.diceCount = 0;
     this.lastRolls = null;
     this.breakthrough = false;
+    this.isMinimized = false;
 
     this._create();
   }
@@ -55,7 +56,7 @@ export class TechUI {
       <div class="tech-content">
         <div class="tech-header">
           <div class="tech-title">Technology Research</div>
-          <div class="tech-player" style="color: ${player.color}">${player.name}</div>
+          <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
         </div>
 
         <div class="tech-budget">
@@ -156,6 +157,13 @@ export class TechUI {
   }
 
   _bindEvents() {
+    // Minimize toggle
+    this.el.querySelector('[data-action="toggle-minimize"]')?.addEventListener('click', () => {
+      this.isMinimized = !this.isMinimized;
+      this.el.classList.toggle('minimized', this.isMinimized);
+      this._render();
+    });
+
     // Dice controls
     this.el.querySelector('.tech-dice-btn.minus')?.addEventListener('click', () => {
       if (this.diceCount > 0) {

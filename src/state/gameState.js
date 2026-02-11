@@ -216,7 +216,8 @@ export class GameState {
       id: this._generateShipId(shipType),
       aircraft: [],
       cargo: [],
-      moved: grouped.moved || false
+      moved: grouped.moved || false,
+      movementUsed: grouped.movementUsed || 0
     };
     units.push(individual);
 
@@ -1725,15 +1726,20 @@ export class GameState {
         }
 
         const ship = fromUnits[shipIdx];
-        if (ship.moved) {
-          return { success: false, error: `Ship ${shipId} has already moved` };
+        const shipDef = unitDefs[ship.type];
+        const maxMove = shipDef?.movement || 2;
+        const movementUsed = ship.movementUsed || 0;
+
+        if (movementUsed >= maxMove) {
+          return { success: false, error: `Ship ${shipId} has no movement remaining` };
         }
 
         // Remove from source
         fromUnits.splice(shipIdx, 1);
 
-        // Add to destination with moved flag
-        ship.moved = true;
+        // Add to destination with movement tracked
+        ship.movementUsed = movementUsed + 1;
+        ship.moved = ship.movementUsed >= maxMove; // Mark fully moved when out of movement
         toUnits.push(ship);
       }
 
@@ -2525,6 +2531,7 @@ export class GameState {
     for (const units of Object.values(this.units)) {
       for (const unit of units) {
         delete unit.moved;
+        delete unit.movementUsed;
       }
     }
   }

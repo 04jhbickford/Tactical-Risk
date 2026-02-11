@@ -69,11 +69,11 @@
       "Italian East Africa",
       "Madagascar"
     ],
-    "color": "#8B0000"
+    "color": "#D2691E"
   },
   {
     "name": "Asia",
-    "bonus": 30,
+    "bonus": 33,
     "territories": [
       "Russia",
       "Karelia S.S.R.",
@@ -84,7 +84,8 @@
       "Mongolia",
       "Manchuria",
       "China",
-      "Kwangtung"
+      "Kwangtung",
+      "French Indo China"
     ],
     "color": "#6B8E23"
   },

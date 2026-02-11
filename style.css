@@ -2207,12 +2207,28 @@ html, body {
   color: #fff;
 }
 
+/* --- Left-Side Modal Base Styles --- */
+.left-modal-minimize-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: auto;
+  transition: color 0.2s;
+}
+
+.left-modal-minimize-btn:hover {
+  color: #ffd700;
+}
+
 /* --- Purchase Panel (Map-Based) --- */
 .purchase-panel {
   position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
   background: rgba(25, 25, 50, 0.98);
   border: 1px solid rgba(255, 215, 0, 0.3);
   border-radius: 12px;
@@ -2223,6 +2239,23 @@ html, body {
   overflow-y: auto;
   z-index: 150;
   box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
+}
+
+.purchase-panel.minimized {
+  min-width: auto;
+  max-height: none;
+  padding: 8px 16px;
+  overflow: hidden;
+}
+
+.purchase-panel.minimized .pp-body,
+.purchase-panel.minimized .pp-budget,
+.purchase-panel.minimized .pp-territory-section,
+.purchase-panel.minimized .pp-cart,
+.purchase-panel.minimized .pp-unit-grid,
+.purchase-panel.minimized .pp-actions {
+  display: none;
 }
 
 .purchase-panel.hidden {
@@ -3327,15 +3360,18 @@ html, body {
 /* --- Combat Popup --- */
 .combat-popup {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
+  background: rgba(25, 25, 50, 0.98);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 12px;
   z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
   backdrop-filter: blur(4px);
 }
 
@@ -3343,20 +3379,27 @@ html, body {
   display: none;
 }
 
+.combat-popup.minimized {
+  max-height: none;
+  overflow: hidden;
+}
+
+.combat-popup.minimized .combat-forces,
+.combat-popup.minimized .combat-results,
+.combat-popup.minimized .combat-actions,
+.combat-popup.minimized .combat-casualty-select,
+.combat-popup.minimized .combat-remaining {
+  display: none;
+}
+
 .combat-content {
-  background: rgba(25, 25, 50, 0.98);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 10px;
   padding: 16px;
-  width: 90%;
-  max-width: 560px;
-  max-height: 85vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 
 .combat-header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 10px;
 }
 
@@ -4624,36 +4667,46 @@ html, body {
 /* --- Tech Research Popup --- */
 .tech-popup {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  top: 50%;
+  left: 20px;
+  transform: translateY(-50%);
+  background: rgba(25, 25, 50, 0.98);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 12px;
   z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
+  max-width: 420px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
 }
 
 .tech-popup.hidden {
   display: none;
 }
 
+.tech-popup.minimized {
+  max-height: none;
+  overflow: hidden;
+}
+
+.tech-popup.minimized .tech-budget,
+.tech-popup.minimized .tech-dice-row,
+.tech-popup.minimized .tech-results,
+.tech-popup.minimized .tech-breakthrough,
+.tech-popup.minimized .tech-actions,
+.tech-popup.minimized .tech-unlocked {
+  display: none;
+}
+
 .tech-content {
-  background: rgba(25, 25, 50, 0.98);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px;
   padding: 24px;
-  width: 90%;
-  max-width: 420px;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
 }
 
 .tech-header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(255,255,255,0.1);

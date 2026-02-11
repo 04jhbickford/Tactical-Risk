@@ -150,7 +150,7 @@ export class MovementUI {
     const units = this.gameState.getUnitsAt(territory.name);
 
     // Check for movable units
-    const hasMovable = units.some(u => u.owner === player.id && !u.moved && this._canUnitMove(u.type));
+    const hasMovable = units.some(u => u.owner === player.id && this._hasRemainingMovement(u) && this._canUnitMove(u.type));
     if (hasMovable) return true;
 
     // Also check for transports with cargo to unload (for amphibious assaults)
@@ -165,6 +165,22 @@ export class MovementUI {
   _canUnitMove(unitType) {
     const def = this.unitDefs?.[unitType];
     return def && def.movement > 0 && !def.isBuilding;
+  }
+
+  // Check if a unit has remaining movement this turn
+  _hasRemainingMovement(unit) {
+    const def = this.unitDefs?.[unit.type];
+    if (!def) return false;
+
+    // For individual ships (with IDs), check movementUsed
+    if (unit.id) {
+      const maxMove = def.movement || 2;
+      const used = unit.movementUsed || 0;
+      return used < maxMove;
+    }
+
+    // For grouped units, use the moved flag
+    return !unit.moved;
   }
 
   selectSource(territory) {
@@ -407,8 +423,25 @@ export class MovementUI {
 
     // If ships are selected via ID, get destinations for those ships
     if (hasShipsSelected) {
-      // Get the max movement of selected ships
-      let maxSeaMovement = 2; // Default transport/carrier movement
+      // Get the minimum remaining movement of selected ships
+      const fromUnits = this.gameState.getUnitsAt(this.selectedFrom.name);
+      let minRemainingMove = Infinity;
+
+      for (const shipId of this.selectedShipIds) {
+        const ship = fromUnits.find(u => u.id === shipId);
+        if (ship) {
+          const shipDef = this.unitDefs[ship.type];
+          const maxMove = shipDef?.movement || 2;
+          const movementUsed = ship.movementUsed || 0;
+          const remaining = maxMove - movementUsed;
+          minRemainingMove = Math.min(minRemainingMove, remaining);
+        }
+      }
+
+      // Use the minimum remaining movement (all ships must be able to reach destination)
+      const maxSeaMovement = minRemainingMove === Infinity ? 2 : minRemainingMove;
+      if (maxSeaMovement <= 0) return []; // No movement remaining
+
       const reachable = this.gameState.getReachableTerritoriesForSea(
         this.selectedFrom.name,
         maxSeaMovement,
@@ -683,7 +716,13 @@ export class MovementUI {
       }
 
       const hasCargo = cargoDesc !== 'Empty';
-      const canSelect = ship.id && !ship.moved;
+      // Check remaining movement for ships
+      const shipDef = this.unitDefs[ship.type];
+      const maxMove = shipDef?.movement || 2;
+      const movementUsed = ship.movementUsed || 0;
+      const remainingMove = maxMove - movementUsed;
+      const canSelect = ship.id && remainingMove > 0;
+      const moveStatus = !ship.id ? 'Group' : (remainingMove <= 0 ? 'Moved' : `${remainingMove}/${maxMove} MP`);
 
       html += `
         <div class="mp-ship-option ${isSelected ? 'selected' : ''} ${!canSelect ? 'disabled' : ''}"
@@ -701,7 +740,7 @@ export class MovementUI {
                    data-ship-id="${ship.id}"
                    ${isSelected ? 'checked' : ''}>
           ` : `
-            <span class="mp-ship-moved">${ship.moved ? 'Moved' : 'Group'}</span>
+            <span class="mp-ship-moved">${moveStatus}</span>
           `}
         </div>
       `;
@@ -973,7 +1012,7 @@ export class MovementUI {
     // Switch to normal movement if there are also movable ships
     const units = this.gameState.getUnitsAt(this.selectedFrom.name);
     const movableShips = units.filter(u =>
-      u.owner === player.id && !u.moved && this._canUnitMove(u.type) && this.unitDefs[u.type]?.isSea
+      u.owner === player.id && this._hasRemainingMovement(u) && this._canUnitMove(u.type) && this.unitDefs[u.type]?.isSea
     );
 
     if (movableShips.length > 0) {
@@ -1184,7 +1223,7 @@ export class MovementUI {
     const units = this.gameState.getUnitsAt(this.selectedFrom.name);
     const movableUnits = units.filter(u =>
       u.owner === player.id &&
-      !u.moved &&
+      this._hasRemainingMovement(u) &&
       this._canUnitMove(u.type)
     );
 
@@ -1364,7 +1403,7 @@ export class MovementUI {
       const player = this.gameState.currentPlayer;
       const units = this.gameState.getUnitsAt(this.selectedFrom.name);
       const movableUnits = units.filter(u =>
-        u.owner === player.id && !u.moved && this._canUnitMove(u.type)
+        u.owner === player.id && this._hasRemainingMovement(u) && this._canUnitMove(u.type)
       );
       for (const unit of movableUnits) {
         this.selectedUnits[unit.type] = unit.quantity;

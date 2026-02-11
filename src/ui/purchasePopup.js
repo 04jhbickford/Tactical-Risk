@@ -17,6 +17,7 @@ export class PurchasePopup {
 
     // Drag state
     this.isDragging = false;
+    this.isMinimized = false;
 
     this._create();
   }
@@ -187,7 +188,7 @@ export class PurchasePopup {
       <div class="pp-drag-handle"></div>
       <div class="pp-header">
         <div class="pp-title">Purchase Units</div>
-        <div class="pp-phase">Purchase Phase</div>
+        <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
       </div>
 
       <div class="pp-budget">
@@ -331,7 +332,7 @@ export class PurchasePopup {
       <div class="pp-drag-handle"></div>
       <div class="pp-header">
         <div class="pp-title">Purchase Units</div>
-        <div class="pp-phase">Purchase Phase</div>
+        <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
       </div>
 
       <div class="pp-selected">
@@ -448,6 +449,13 @@ export class PurchasePopup {
   }
 
   _bindEvents() {
+    // Minimize toggle
+    this.el.querySelector('[data-action="toggle-minimize"]')?.addEventListener('click', () => {
+      this.isMinimized = !this.isMinimized;
+      this.el.classList.toggle('minimized', this.isMinimized);
+      this._render();
+    });
+
     // Quantity buttons
     this.el.querySelectorAll('.pp-qty-btn').forEach(btn => {
       btn.addEventListener('click', () => {

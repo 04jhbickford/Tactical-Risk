@@ -14,7 +14,7 @@ const OUT_DIR = path.join(__dirname, '..', 'data');
 // connections unioned, and `from` is deleted from the map.
 const MERGES = [
   { from: 'Sinkiang',          into: 'China' },
-  { from: 'French Indo China', into: 'Kwangtung' },
+  // French Indo China kept separate from Kwangtung
   { from: 'Yakut S.S.R.',      into: 'Soviet Far East' },
   { from: 'Afghanistan',       into: 'India' },
   { from: 'Caucasus',          into: 'Ukraine S.S.R.' },
@@ -35,7 +35,7 @@ const CONTINENT_DEFS = [
   { name: 'Europe', territories: ['United Kingdom','West Europe','Germany','South Europe','East Europe','Eire','Spain','Sweden','Switzerland','Finland Norway'] }, // 10 territories = 30 bonus
   { name: 'Middle East', territories: ['Turkey','Syria Jordan','Saudi Arabia','Persia','India','Kazakh S.S.R.'] },                                 // 6 territories = 18 bonus
   { name: 'Africa', territories: ['Algeria','Anglo Sudan Egypt','French West Africa','French Equatorial Africa','Congo','Kenya-Rhodesia','South Africa','Italian East Africa','Madagascar'] }, // 9 territories = 27 bonus
-  { name: 'Asia', territories: ['Russia','Karelia S.S.R.','Ukraine S.S.R.','Novosibirsk','Evenki National Okrug','Soviet Far East','Mongolia','Manchuria','China','Kwangtung'] }, // 10 territories = 30 bonus
+  { name: 'Asia', territories: ['Russia','Karelia S.S.R.','Ukraine S.S.R.','Novosibirsk','Evenki National Okrug','Soviet Far East','Mongolia','Manchuria','China','Kwangtung','French Indo China'] }, // 11 territories = 33 bonus
   { name: 'Oceania', territories: ['Japan','Borneo Celebes','East Indies','Philippines','Okinawa','Australia','New Zealand','New Guinea','Solomon Islands','Caroline Islands','Hawaiian Islands','Midway','Wake Island'] }, // 13 territories = 39 bonus
 ];
 
