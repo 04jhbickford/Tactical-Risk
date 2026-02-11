@@ -2207,6 +2207,424 @@ html, body {
   color: #fff;
 }
 
+/* --- Purchase Panel (Map-Based) --- */
+.purchase-panel {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(25, 25, 50, 0.98);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+  min-width: 320px;
+  max-width: 420px;
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 150;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+
+.purchase-panel.hidden {
+  display: none;
+}
+
+.purchase-panel.dragging {
+  opacity: 0.9;
+  cursor: grabbing;
+}
+
+.pp-drag-handle {
+  height: 4px;
+  background: rgba(255, 215, 0, 0.3);
+  border-radius: 2px;
+  margin: -8px auto 12px auto;
+  width: 40px;
+  cursor: grab;
+}
+
+.pp-drag-handle:hover {
+  background: rgba(255, 215, 0, 0.5);
+}
+
+.pp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 215, 0, 0.2);
+}
+
+.pp-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.pp-phase {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  padding: 4px 10px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 4px;
+}
+
+.pp-budget {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 6px;
+}
+
+.pp-budget-label {
+  font-size: 11px;
+  color: #888;
+}
+
+.pp-budget-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.pp-budget-value.low {
+  color: #ef5350;
+}
+
+.pp-budget-total {
+  font-size: 12px;
+  color: #666;
+}
+
+.pp-instructions {
+  text-align: center;
+  font-size: 13px;
+  color: #aaa;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.pp-instructions strong {
+  color: #ffd700;
+}
+
+.pp-valid-locations {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pp-location-group {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.pp-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pp-location-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pp-location-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 4px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-location-item:hover {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+  color: #fff;
+}
+
+.pp-location-item.sea {
+  background: rgba(65, 105, 225, 0.1);
+  border-color: rgba(65, 105, 225, 0.3);
+}
+
+.pp-location-item.sea:hover {
+  background: rgba(65, 105, 225, 0.2);
+  border-color: rgba(65, 105, 225, 0.5);
+}
+
+.pp-location-item.factory-build {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.pp-location-item.factory-build:hover {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.pp-more {
+  font-size: 10px;
+  color: #888;
+  font-style: italic;
+  padding: 4px 8px;
+}
+
+.pp-empty {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+}
+
+.pp-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 6px;
+}
+
+.pp-label {
+  font-size: 11px;
+  color: #888;
+}
+
+.pp-territory {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffd700;
+  flex: 1;
+}
+
+.pp-deselect {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pp-deselect:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.pp-units {
+  margin-bottom: 12px;
+}
+
+.pp-unit-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pp-unit-row:last-child {
+  border-bottom: none;
+}
+
+.pp-unit-row.has-qty {
+  background: rgba(255, 215, 0, 0.08);
+  margin: 0 -12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.pp-unit-row.blocked {
+  opacity: 0.5;
+}
+
+.pp-unit-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pp-unit-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.pp-unit-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #e0e0e0;
+  text-transform: capitalize;
+}
+
+.pp-unit-cost {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffd700;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.pp-unit-stats {
+  font-size: 10px;
+  color: #666;
+}
+
+.pp-blocked-msg {
+  font-size: 10px;
+  color: #ef5350;
+  font-style: italic;
+}
+
+.pp-unit-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-qty-btn {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-qty-btn:hover:not(:disabled) {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.pp-qty-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pp-qty {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 600;
+  color: #fff;
+}
+
+.pp-max-btn {
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 215, 0, 0.1);
+  color: #ffd700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-max-btn:hover:not(:disabled) {
+  background: rgba(255, 215, 0, 0.2);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.pp-max-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pp-summary {
+  padding: 10px 12px;
+  background: rgba(255, 215, 0, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.pp-summary-items {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 4px;
+}
+
+.pp-summary-total {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.pp-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pp-btn {
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-btn.confirm {
+  background: linear-gradient(135deg, #ffd700, #daa520);
+  color: #000;
+}
+
+.pp-btn.confirm:hover {
+  background: linear-gradient(135deg, #ffe136, #e6b428);
+}
+
+.pp-btn.clear,
+.pp-btn.skip,
+.pp-btn.done {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #aaa;
+}
+
+.pp-btn.clear:hover,
+.pp-btn.skip:hover,
+.pp-btn.done:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.pp-note {
+  text-align: center;
+  font-size: 10px;
+  color: #666;
+  margin-top: 8px;
+}
+
 /* --- Movement Panel --- */
 .movement-panel {
   position: fixed;
@@ -2705,6 +3123,130 @@ html, body {
   font-size: 10px;
   color: #666;
   font-style: italic;
+}
+
+/* Carrier Aircraft Launch UI */
+.mp-carrier-aircraft {
+  margin: 12px 0;
+  padding: 10px;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
+}
+
+.mp-carrier-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffb74d;
+  margin-bottom: 4px;
+}
+
+.mp-carrier-desc {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.mp-carrier-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-carrier-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.mp-carrier-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #e0e0e0;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mp-carrier-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.mp-carrier-damaged {
+  font-size: 10px;
+  color: #ef5350;
+  font-style: italic;
+}
+
+.mp-carrier-aircraft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mp-aircraft-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: rgba(255, 152, 0, 0.08);
+  border-radius: 4px;
+}
+
+.mp-aircraft-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mp-aircraft-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.mp-aircraft-name {
+  font-size: 11px;
+  color: #e0e0e0;
+}
+
+.mp-aircraft-count {
+  font-size: 10px;
+  color: #888;
+}
+
+.mp-aircraft-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.mp-launch-btn,
+.mp-launch-all-btn {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  border-radius: 4px;
+  background: rgba(255, 152, 0, 0.15);
+  color: #ffb74d;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mp-launch-btn:hover,
+.mp-launch-all-btn:hover {
+  background: rgba(255, 152, 0, 0.3);
+  border-color: rgba(255, 152, 0, 0.6);
+}
+
+.mp-launch-all-btn {
+  background: rgba(255, 152, 0, 0.25);
 }
 
 /* Loading Target Selection UI */
@@ -6240,6 +6782,26 @@ html, body {
 .bug-report-context {
   font-size: 11px;
   color: #707090;
+}
+
+.bug-report-combat {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 100, 100, 0.2);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.bug-report-combat strong {
+  color: #ff8080;
+}
+
+.bug-combat-item {
+  margin-top: 4px;
+  padding-left: 8px;
+  color: #c0c0d0;
+  font-family: monospace;
 }
 
 .bug-reports-actions {

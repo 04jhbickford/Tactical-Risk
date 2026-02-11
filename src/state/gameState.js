@@ -372,7 +372,10 @@ export class GameState {
     // Use custom starting IPCs if provided, otherwise use player count-based defaults
     const startingIPCs = options.startingIPCs || STARTING_IPCS_BY_PLAYER_COUNT[playerCount] || 18;
 
-    this.players = selectedPlayers.map((p, i) => ({
+    // Randomize player order for initial placement
+    const shuffledPlayers = this._shuffleArray([...selectedPlayers]);
+
+    this.players = shuffledPlayers.map((p, i) => ({
       ...p,
       turnOrder: i,
     }));
@@ -870,14 +873,26 @@ export class GameState {
     return units.reduce((sum, u) => sum + u.quantity, 0);
   }
 
+  // Check if this is the final placement round (all players have ≤ 7 units remaining)
+  isFinalPlacementRound() {
+    if (!this.players) return false;
+    return this.players.every(p => this.getTotalUnitsToPlace(p.id) <= 7);
+  }
+
+  // Get the units per round limit (7 for final round, 6 otherwise)
+  getUnitsPerRoundLimit() {
+    return this.isFinalPlacementRound() ? 7 : 6;
+  }
+
   // Place an initial unit during Risk setup (6-unit rounds)
   placeInitialUnit(territoryName, unitType, unitDefs) {
     const player = this.currentPlayer;
     if (!player) return { success: false, error: 'No current player' };
 
-    // Enforce 6-unit limit per turn during initial placement
-    if (this.unitsPlacedThisRound >= 6) {
-      return { success: false, error: 'You can only place up to 6 units per turn. Click "End Turn" to continue.' };
+    // Enforce unit limit per turn during initial placement (7 for final round, 6 otherwise)
+    const limit = this.getUnitsPerRoundLimit();
+    if (this.unitsPlacedThisRound >= limit) {
+      return { success: false, error: `You can only place up to ${limit} units per turn. Click "Done" to continue.` };
     }
 
     // Check if player has this unit to place
@@ -2097,10 +2112,14 @@ export class GameState {
         const t = this.territoryByName[territory];
         if (!t?.isWater) {
           this.territoryState[territory].owner = player.id;
-          // Transfer factory ownership
+          // Transfer factory ownership (factories are captured, not destroyed)
           for (const unit of units) {
             if (unit.type === 'factory') {
               unit.owner = player.id;
+              // Ensure factory has quantity (safeguard)
+              if (!unit.quantity || unit.quantity < 1) {
+                unit.quantity = 1;
+              }
             }
           }
           // Award Risk card for conquering
@@ -2146,7 +2165,8 @@ export class GameState {
     const defenderCasualties = this._applyCasualtiesWithDamage(attackers, defenseHits, unitDefs, isNavalBattle);
 
     // Clean up destroyed units (quantity <= 0)
-    this.units[territory] = units.filter(u => u.quantity > 0);
+    // IMPORTANT: Preserve factories - they are captured, never destroyed
+    this.units[territory] = units.filter(u => u.quantity > 0 || u.type === 'factory');
 
     // Check if combat is over
     // Note: Factories are captured (not destroyed) and AA guns have 0 combat value
@@ -2190,6 +2210,10 @@ export class GameState {
         for (const unit of territoryUnits) {
           if (unit.type === 'factory') {
             unit.owner = player.id;
+            // Ensure factory has quantity (safeguard)
+            if (!unit.quantity || unit.quantity < 1) {
+              unit.quantity = 1;
+            }
           }
         }
 
@@ -2369,6 +2393,15 @@ export class GameState {
         unit.damagedCount = 0;
       }
     }
+  }
+
+  // Fisher-Yates shuffle for randomizing player order
+  _shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
   }
 
   // Apply specific casualties (for player selection)

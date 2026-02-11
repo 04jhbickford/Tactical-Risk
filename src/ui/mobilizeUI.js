@@ -10,6 +10,7 @@ export class MobilizeUI {
     this.territoryByName = null;
     this.selectedTerritory = null;
     this.onMobilizeComplete = null;
+    this.onUnitsMobilized = null;  // Callback when units are mobilized (for logging)
 
     this._create();
   }
@@ -41,6 +42,10 @@ export class MobilizeUI {
 
   setOnComplete(callback) {
     this.onMobilizeComplete = callback;
+  }
+
+  setOnUnitsMobilized(callback) {
+    this.onUnitsMobilized = callback;
   }
 
   isActive() {
@@ -257,6 +262,7 @@ export class MobilizeUI {
   _placeUnit(unitType) {
     if (!this.selectedTerritory || !this.isActive()) return;
 
+    const player = this.gameState.currentPlayer;
     const result = this.gameState.mobilizeUnit(
       unitType,
       this.selectedTerritory.name,
@@ -264,6 +270,11 @@ export class MobilizeUI {
     );
 
     if (result.success) {
+      // Log the mobilization
+      if (this.onUnitsMobilized && player) {
+        this.onUnitsMobilized(player, [{ type: unitType, quantity: 1 }], this.selectedTerritory.name);
+      }
+
       // Check if all units placed
       const remaining = this.gameState.getPendingPurchases();
       if (remaining.length === 0) {
@@ -281,18 +292,28 @@ export class MobilizeUI {
   _placeAllOfType(unitType) {
     if (!this.selectedTerritory || !this.isActive()) return;
 
+    const player = this.gameState.currentPlayer;
     const pending = this.gameState.getPendingPurchases();
     const unit = pending.find(u => u.type === unitType);
     if (!unit) return;
 
+    const quantityToPlace = unit.quantity;
+    let placed = 0;
+
     // Place all units of this type
-    for (let i = 0; i < unit.quantity; i++) {
+    for (let i = 0; i < quantityToPlace; i++) {
       const result = this.gameState.mobilizeUnit(
         unitType,
         this.selectedTerritory.name,
         this.unitDefs
       );
       if (!result.success) break;
+      placed++;
+    }
+
+    // Log the mobilization
+    if (this.onUnitsMobilized && player && placed > 0) {
+      this.onUnitsMobilized(player, [{ type: unitType, quantity: placed }], this.selectedTerritory.name);
     }
 
     // Check if all units placed
@@ -309,6 +330,7 @@ export class MobilizeUI {
   _placeAllUnits() {
     if (!this.selectedTerritory || !this.isActive()) return;
 
+    const player = this.gameState.currentPlayer;
     const isSeaZone = this.selectedTerritory.isWater;
 
     // Filter units that can be placed here
@@ -320,16 +342,29 @@ export class MobilizeUI {
       return def.isLand || def.isAir || def.isBuilding;
     });
 
+    const placedUnits = [];
+
     // Place all available units
     for (const unit of availableUnits) {
-      for (let i = 0; i < unit.quantity; i++) {
+      let placed = 0;
+      const quantityToPlace = unit.quantity;  // Capture before loop as quantity changes
+      for (let i = 0; i < quantityToPlace; i++) {
         const result = this.gameState.mobilizeUnit(
           unit.type,
           this.selectedTerritory.name,
           this.unitDefs
         );
         if (!result.success) break;
+        placed++;
       }
+      if (placed > 0) {
+        placedUnits.push({ type: unit.type, quantity: placed });
+      }
+    }
+
+    // Log the mobilization
+    if (this.onUnitsMobilized && player && placedUnits.length > 0) {
+      this.onUnitsMobilized(player, placedUnits, this.selectedTerritory.name);
     }
 
     // Check if all units placed

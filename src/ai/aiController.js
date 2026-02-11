@@ -207,7 +207,7 @@ export class AIController {
   }
 
   // ============================================
-  // INITIAL UNIT PLACEMENT (6 units per round)
+  // INITIAL UNIT PLACEMENT (6 or 7 units per round)
   // ============================================
   async _handleInitialPlacement(aiPlayer, player) {
     this._updateStatus(`${player.name} is placing units...`);
@@ -231,9 +231,10 @@ export class AIController {
     // Get adjacent sea zones for naval units
     const ownedSeas = this._getAdjacentSeaZones(player.id);
 
-    // Place up to 6 units this round
+    // Place units this round (7 for final round, 6 otherwise)
     let placedThisRound = 0;
-    const maxThisRound = Math.min(6, totalRemaining);
+    const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+    const maxThisRound = Math.min(limit, totalRemaining);
 
     while (placedThisRound < maxThisRound) {
       // Find a unit type to place

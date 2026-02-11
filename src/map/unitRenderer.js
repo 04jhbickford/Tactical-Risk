@@ -104,28 +104,51 @@ export class UnitRenderer {
     }
   }
 
-  // Adjust sea zone center to avoid island overlap
+  // Adjust sea zone center to avoid island/land overlap
   _adjustSeaZoneCenter(territory, cx, cy) {
-    // For now, just offset slightly - could be improved with actual island detection
-    // Check if there are any adjacent land territories that might overlap
     const connections = territory.connections || [];
-    let hasAdjacentLand = false;
+    const landNeighbors = [];
 
+    // Find all adjacent land territories
     for (const conn of connections) {
       const neighbor = this.territoryByName[conn];
       if (neighbor && !neighbor.isWater) {
-        hasAdjacentLand = true;
-        break;
+        const [nx, ny] = this._getTerritoryCenter(neighbor);
+        if (nx !== null && ny !== null) {
+          landNeighbors.push({ x: nx, y: ny });
+        }
       }
     }
 
-    // If there's adjacent land, offset the center slightly
-    if (hasAdjacentLand) {
-      // Offset towards the center of the sea zone away from land
-      return { x: cx, y: cy + 30 };
+    if (landNeighbors.length === 0) {
+      return { x: cx, y: cy };
     }
 
-    return { x: cx, y: cy };
+    // Calculate average direction towards land
+    let avgDx = 0;
+    let avgDy = 0;
+    for (const land of landNeighbors) {
+      avgDx += land.x - cx;
+      avgDy += land.y - cy;
+    }
+    avgDx /= landNeighbors.length;
+    avgDy /= landNeighbors.length;
+
+    // Normalize and move AWAY from land
+    const dist = Math.sqrt(avgDx * avgDx + avgDy * avgDy);
+    if (dist < 1) {
+      return { x: cx, y: cy };
+    }
+
+    // Offset 40-60 pixels away from the average land direction
+    const offsetDist = 50;
+    const offsetX = -(avgDx / dist) * offsetDist;
+    const offsetY = -(avgDy / dist) * offsetDist;
+
+    return {
+      x: cx + offsetX,
+      y: cy + offsetY
+    };
   }
 
   _groupUnits(placements, includeCargo = false) {

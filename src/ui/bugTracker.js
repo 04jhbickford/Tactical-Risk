@@ -42,6 +42,8 @@ export class BugTracker {
     const phase = this.gameState?.turnPhase || 'unknown';
     const round = this.gameState?.round || 0;
     const reports = BugTracker.getBugReports();
+    const combatQueue = this.gameState?.combatQueue || [];
+    const isAI = player?.isAI ? `Yes (${player.aiDifficulty})` : 'No';
 
     this.el.innerHTML = `
       <div class="bug-tracker-overlay" data-action="close"></div>
@@ -85,12 +87,20 @@ export class BugTracker {
               <span class="bug-context-value">${player?.name || 'None'}</span>
             </div>
             <div class="bug-context-item">
+              <span class="bug-context-label">Is AI:</span>
+              <span class="bug-context-value">${isAI}</span>
+            </div>
+            <div class="bug-context-item">
               <span class="bug-context-label">Phase:</span>
-              <span class="bug-context-value">${phase}</span>
+              <span class="bug-context-value">${this.gameState?.phase || 'unknown'} / ${phase}</span>
             </div>
             <div class="bug-context-item">
               <span class="bug-context-label">Round:</span>
               <span class="bug-context-value">${round}</span>
+            </div>
+            <div class="bug-context-item">
+              <span class="bug-context-label">Combat Queue:</span>
+              <span class="bug-context-value">${combatQueue.length > 0 ? combatQueue.join(', ') : 'Empty'}</span>
             </div>
             <div class="bug-context-item">
               <span class="bug-context-label">Timestamp:</span>
@@ -117,8 +127,22 @@ export class BugTracker {
                   </div>
                   <div class="bug-report-desc">${this._escapeHtml(r.description)}</div>
                   <div class="bug-report-context">
-                    Phase: ${r.gamePhase || 'N/A'} | Player: ${r.currentPlayer || 'N/A'} | Round: ${r.round || 'N/A'}
+                    Phase: ${r.gameStateSnapshot?.phase || 'N/A'}/${r.gamePhase || 'N/A'} |
+                    Player: ${r.currentPlayer || 'N/A'}${r.gameStateSnapshot?.aiPlayer ? ' (AI)' : ''} |
+                    Round: ${r.round || 'N/A'}
                   </div>
+                  ${r.gameStateSnapshot?.combatQueue ? `
+                    <div class="bug-report-combat">
+                      <strong>Combat Queue:</strong>
+                      ${r.gameStateSnapshot.combatQueue.map(c => `
+                        <div class="bug-combat-item">
+                          ${c.territory}${c.isCapital ? ' (CAPITAL)' : ''}:
+                          Att: ${c.attackerCount} (${c.attackers.map(a => a.type).join(', ')}) vs
+                          Def: ${c.defenderCount} (${c.defenders.map(d => d.type).join(', ')})
+                        </div>
+                      `).join('')}
+                    </div>
+                  ` : ''}
                 </div>
               `).join('')}
             </div>
@@ -233,16 +257,59 @@ export class BugTracker {
   _getGameStateSnapshot() {
     if (!this.gameState) return null;
 
-    return {
+    const snapshot = {
       gameMode: this.gameState.gameMode,
       phase: this.gameState.phase,
       turnPhase: this.gameState.turnPhase,
       round: this.gameState.round,
       currentPlayerIndex: this.gameState.currentPlayerIndex,
       playerCount: this.gameState.players?.length || 0,
-      combatQueueLength: this.gameState.combatQueue?.length || 0,
       pendingPurchasesCount: this.gameState.pendingPurchases?.length || 0,
     };
+
+    // Combat-specific debugging
+    if (this.gameState.combatQueue && this.gameState.combatQueue.length > 0) {
+      snapshot.combatQueue = this.gameState.combatQueue.map(territory => {
+        const units = this.gameState.units[territory] || [];
+        const owner = this.gameState.getOwner(territory);
+        const currentPlayer = this.gameState.currentPlayer;
+
+        const attackers = units.filter(u => u.owner === currentPlayer?.id);
+        const defenders = units.filter(u => u.owner !== currentPlayer?.id);
+
+        return {
+          territory,
+          owner,
+          isCapital: this.gameState.territoryState[territory]?.isCapital || false,
+          attackers: attackers.map(u => ({ type: u.type, qty: u.quantity, owner: u.owner })),
+          defenders: defenders.map(u => ({ type: u.type, qty: u.quantity, owner: u.owner })),
+          attackerCount: attackers.reduce((sum, u) => sum + u.quantity, 0),
+          defenderCount: defenders.reduce((sum, u) => sum + u.quantity, 0),
+        };
+      });
+    }
+
+    // AI state if applicable
+    const currentPlayer = this.gameState.currentPlayer;
+    if (currentPlayer?.isAI) {
+      snapshot.aiPlayer = {
+        name: currentPlayer.name,
+        id: currentPlayer.id,
+        difficulty: currentPlayer.aiDifficulty,
+      };
+    }
+
+    // Player states summary
+    snapshot.players = this.gameState.players?.map(p => ({
+      id: p.id,
+      name: p.name,
+      isAI: p.isAI,
+      ipcs: this.gameState.getIPCs(p.id),
+      territories: this.gameState.getPlayerTerritories(p.id).length,
+      capital: this.gameState.playerState[p.id]?.capitalTerritory,
+    }));
+
+    return snapshot;
   }
 
   _saveBugReport(report) {

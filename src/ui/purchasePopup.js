@@ -1,26 +1,74 @@
-// Purchase popup overlay for buying units
-// Flow: First select territory (factory or adjacent sea zone), then buy units for that location
+// Purchase panel for buying units - left-side panel with map-based territory selection
+// Flow: Click territory on map (factory or adjacent sea zone), then buy units for that location
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
+import { TURN_PHASES } from '../state/gameState.js';
 
 export class PurchasePopup {
   constructor() {
     this.gameState = null;
     this.unitDefs = null;
     this.onPurchaseComplete = null;
+    this.onHighlightTerritory = null; // Callback for territory highlighting
     this.purchaseCart = {};
     this.cartCost = 0;
     this.selectedTerritory = null; // Territory to place purchased units
     this.territories = null;
+
+    // Drag state
+    this.isDragging = false;
 
     this._create();
   }
 
   _create() {
     this.el = document.createElement('div');
-    this.el.id = 'purchasePopup';
-    this.el.className = 'purchase-popup hidden';
+    this.el.id = 'purchasePanel';
+    this.el.className = 'purchase-panel hidden';
     document.body.appendChild(this.el);
+
+    this._initDrag();
+  }
+
+  _initDrag() {
+    let startX, startY, startLeft, startTop;
+
+    const onMouseDown = (e) => {
+      if (!e.target.classList.contains('pp-drag-handle')) return;
+
+      this.isDragging = true;
+      this.el.classList.add('dragging');
+
+      const rect = this.el.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    const onMouseMove = (e) => {
+      if (!this.isDragging) return;
+
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+
+      this.el.style.left = `${startLeft + dx}px`;
+      this.el.style.top = `${startTop + dy}px`;
+      this.el.style.right = 'auto';
+      this.el.style.bottom = 'auto';
+    };
+
+    const onMouseUp = () => {
+      this.isDragging = false;
+      this.el.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    this.el.addEventListener('mousedown', onMouseDown);
   }
 
   setGameState(gameState) {
@@ -42,6 +90,14 @@ export class PurchasePopup {
     this.onPurchaseComplete = callback;
   }
 
+  setOnHighlightTerritory(callback) {
+    this.onHighlightTerritory = callback;
+  }
+
+  isPurchasePhase() {
+    return this.gameState && this.gameState.turnPhase === TURN_PHASES.PURCHASE;
+  }
+
   show() {
     this.purchaseCart = {};
     this.cartCost = 0;
@@ -54,6 +110,49 @@ export class PurchasePopup {
     this.el.classList.add('hidden');
   }
 
+  // Called when user clicks a territory on the map during purchase phase
+  handleTerritoryClick(territory) {
+    if (!this.isPurchasePhase()) return false;
+
+    const player = this.gameState.currentPlayer;
+    if (!player) return false;
+
+    // Check valid locations:
+    // 1. Factory territories (can buy land/air/buildings)
+    // 2. Any owned land territory (can buy factory there)
+    // 3. Adjacent sea zones to factories (can buy naval units)
+    const factoryTerritories = this._getFactoryTerritories(player.id);
+    const ownedTerritories = this._getOwnedTerritories(player.id);
+    const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
+
+    const isValidFactory = factoryTerritories.includes(territory.name);
+    const isValidOwned = ownedTerritories.includes(territory.name);
+    const isValidSeaZone = adjacentSeaZones.includes(territory.name);
+
+    if (isValidFactory || isValidOwned || isValidSeaZone) {
+      this.selectedTerritory = territory.name;
+      this._render();
+      return true;
+    }
+
+    return false;
+  }
+
+  // Get valid territories for purchase (for map highlighting)
+  getValidPurchaseTerritories() {
+    if (!this.isPurchasePhase() || !this.gameState) return [];
+
+    const player = this.gameState.currentPlayer;
+    if (!player) return [];
+
+    const factoryTerritories = this._getFactoryTerritories(player.id);
+    const ownedTerritories = this._getOwnedTerritories(player.id);
+    const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
+
+    // Include all owned territories (for factory purchase) and adjacent sea zones
+    return [...new Set([...factoryTerritories, ...ownedTerritories, ...adjacentSeaZones])];
+  }
+
   _render() {
     if (!this.gameState || !this.unitDefs) return;
 
@@ -63,9 +162,9 @@ export class PurchasePopup {
     const ipcs = this.gameState.getIPCs(player.id);
     const remaining = ipcs - this.cartCost;
 
-    // If no territory selected, show territory selection
+    // If no territory selected, show instructions to click map
     if (!this.selectedTerritory) {
-      this._renderTerritorySelection(player, ipcs);
+      this._renderTerritoryPrompt(player, ipcs);
       return;
     }
 
@@ -73,65 +172,89 @@ export class PurchasePopup {
     this._renderUnitPurchase(player, ipcs, remaining);
   }
 
-  _renderTerritorySelection(player, ipcs) {
-    // Get factories and adjacent sea zones
+  _renderTerritoryPrompt(player, ipcs) {
     const factoryTerritories = this._getFactoryTerritories(player.id);
     const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
+    const ownedTerritories = this._getOwnedTerritories(player.id);
+    // Territories where you can build a factory (owned but no factory yet)
+    const buildableTerritories = ownedTerritories.filter(name => !factoryTerritories.includes(name));
 
     let html = `
-      <div class="purchase-popup-content territory-select">
-        <div class="purchase-header">
-          <div class="purchase-title">Select Location</div>
-          <div class="purchase-budget">
-            <span class="budget-value">$${ipcs}</span>
-          </div>
-          <button class="purchase-close" data-action="close">✕</button>
-        </div>
+      <div class="pp-drag-handle"></div>
+      <div class="pp-header">
+        <div class="pp-title">Purchase Units</div>
+        <div class="pp-phase">Purchase Phase</div>
+      </div>
 
-        <div class="purchase-instructions">
-          Choose where to place your purchased units
-        </div>
+      <div class="pp-budget">
+        <span class="pp-budget-label">Budget:</span>
+        <span class="pp-budget-value">$${ipcs}</span>
+      </div>
 
-        <div class="territory-groups">
-          <div class="territory-group">
-            <div class="territory-group-header">🏭 Factories (Land/Air Units)</div>
-            <div class="territory-list">
-              ${factoryTerritories.map(name => `
-                <button class="territory-option" data-territory="${name}" data-type="land">
-                  <span class="territory-name">${name}</span>
-                  <span class="territory-type">Land, Air, Buildings</span>
-                </button>
-              `).join('')}
-              ${factoryTerritories.length === 0 ? `
-                <div class="territory-empty">No factories available</div>
-              ` : ''}
-            </div>
-          </div>
+      <div class="pp-instructions">
+        <strong>Click a territory</strong> on the map to select where to purchase units
+      </div>
 
-          <div class="territory-group">
-            <div class="territory-group-header">⚓ Sea Zones (Naval Units)</div>
-            <div class="territory-list">
-              ${adjacentSeaZones.map(name => `
-                <button class="territory-option" data-territory="${name}" data-type="sea">
-                  <span class="territory-name">${name}</span>
-                  <span class="territory-type">Naval Units</span>
-                </button>
-              `).join('')}
-              ${adjacentSeaZones.length === 0 ? `
-                <div class="territory-empty">No sea zones adjacent to factories</div>
-              ` : ''}
-            </div>
+      <div class="pp-valid-locations">
+        <div class="pp-location-group">
+          <div class="pp-group-header">Factories (Land/Air Units)</div>
+          <div class="pp-location-list">
+            ${factoryTerritories.map(name => `
+              <div class="pp-location-item"
+                   data-territory="${name}"
+                   title="Click to select">
+                ${name}
+              </div>
+            `).join('')}
+            ${factoryTerritories.length === 0 ? `
+              <div class="pp-empty">No factories</div>
+            ` : ''}
           </div>
         </div>
 
-        <div class="purchase-actions">
-          <button class="purchase-btn skip" data-action="skip">Skip Purchase Phase</button>
+        <div class="pp-location-group">
+          <div class="pp-group-header">Sea Zones (Naval Units)</div>
+          <div class="pp-location-list">
+            ${adjacentSeaZones.map(name => `
+              <div class="pp-location-item sea"
+                   data-territory="${name}"
+                   title="Click to select">
+                ${name}
+              </div>
+            `).join('')}
+            ${adjacentSeaZones.length === 0 ? `
+              <div class="pp-empty">No sea zones near factories</div>
+            ` : ''}
+          </div>
         </div>
+
+        <div class="pp-location-group">
+          <div class="pp-group-header">Build Factory (New)</div>
+          <div class="pp-location-list">
+            ${buildableTerritories.slice(0, 10).map(name => `
+              <div class="pp-location-item factory-build"
+                   data-territory="${name}"
+                   title="Build a factory here">
+                ${name}
+              </div>
+            `).join('')}
+            ${buildableTerritories.length > 10 ? `
+              <div class="pp-more">+${buildableTerritories.length - 10} more (click on map)</div>
+            ` : ''}
+            ${buildableTerritories.length === 0 ? `
+              <div class="pp-empty">All territories have factories</div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="pp-actions">
+        <button class="pp-btn skip" data-action="skip">Skip Purchase Phase</button>
       </div>
     `;
 
     this.el.innerHTML = html;
-    this._bindTerritoryEvents();
+    this._bindPromptEvents();
   }
 
   _getFactoryTerritories(playerId) {
@@ -161,10 +284,28 @@ export class PurchasePopup {
     return Array.from(seaZones);
   }
 
+  _getOwnedTerritories(playerId) {
+    const owned = [];
+    for (const [name, state] of Object.entries(this.gameState.territoryState)) {
+      if (state.owner === playerId) {
+        const t = this.territories?.[name];
+        // Only land territories (not sea zones)
+        if (t && !t.isWater) {
+          owned.push(name);
+        }
+      }
+    }
+    return owned;
+  }
+
   _renderUnitPurchase(player, ipcs, remaining) {
     const isSeaZone = this.territories?.[this.selectedTerritory]?.isWater;
 
-    // Filter units based on territory type
+    // Check if selected territory already has a factory
+    const selectedHasFactory = (this.gameState.units[this.selectedTerritory] || [])
+      .some(u => u.type === 'factory' && u.owner === player.id);
+
+    // Filter units based on territory type and factory presence
     const units = Object.entries(this.unitDefs)
       .filter(([type, u]) => {
         // Exclude AA guns from purchase
@@ -173,123 +314,124 @@ export class PurchasePopup {
         if (isSeaZone) {
           // Sea zones: only naval units
           return u.isSea;
-        } else {
-          // Land territories: land, air, and buildings (factory)
+        } else if (selectedHasFactory) {
+          // Land territories WITH factory: land, air, and buildings (factory)
           return u.isLand || u.isAir || u.isBuilding;
+        } else {
+          // Land territories WITHOUT factory: can only buy a factory
+          return u.isBuilding;
         }
       });
 
-    // Factory limit check
-    const ownedTerritories = this.gameState.getPlayerTerritories(player.id);
-    const territoriesWithFactory = ownedTerritories.filter(tName => {
-      const units = this.gameState.units[tName] || [];
-      return units.some(u => u.type === 'factory');
-    });
-    const maxFactories = ownedTerritories.length - territoriesWithFactory.length;
-    const factoriesInCart = this.purchaseCart['factory'] || 0;
-
-    // Check if selected territory already has a factory
-    const selectedHasFactory = (this.gameState.units[this.selectedTerritory] || [])
-      .some(u => u.type === 'factory');
-
     let html = `
-      <div class="purchase-popup-content">
-        <div class="purchase-header">
-          <div class="purchase-title">Purchase Units</div>
-          <div class="purchase-budget">
-            <span class="budget-value">$${remaining}</span>
-            <span class="budget-total">/ $${ipcs}</span>
+      <div class="pp-drag-handle"></div>
+      <div class="pp-header">
+        <div class="pp-title">Purchase Units</div>
+        <div class="pp-phase">Purchase Phase</div>
+      </div>
+
+      <div class="pp-selected">
+        <span class="pp-label">Placing at:</span>
+        <span class="pp-territory">${this.selectedTerritory}</span>
+        <button class="pp-deselect" data-action="deselect">×</button>
+      </div>
+
+      <div class="pp-budget">
+        <span class="pp-budget-label">Remaining:</span>
+        <span class="pp-budget-value ${remaining < 5 ? 'low' : ''}">$${remaining}</span>
+        <span class="pp-budget-total">/ $${ipcs}</span>
+      </div>
+
+      <div class="pp-units">
+    `;
+
+    for (const [unitType, def] of units) {
+      const qty = this.purchaseCart[unitType] || 0;
+      const canAdd = remaining >= def.cost;
+      const imageSrc = getUnitIconPath(unitType, player.id);
+
+      // Factory specific: can't add if territory already has one
+      let factoryBlocked = false;
+      if (unitType === 'factory') {
+        factoryBlocked = selectedHasFactory || qty >= 1;
+      }
+
+      html += `
+        <div class="pp-unit-row ${qty > 0 ? 'has-qty' : ''} ${factoryBlocked ? 'blocked' : ''}" data-unit="${unitType}">
+          <div class="pp-unit-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="pp-unit-icon" alt="${unitType}">` : ''}
+            <span class="pp-unit-name">${unitType}</span>
+            <span class="pp-unit-cost">$${def.cost}</span>
+            <span class="pp-unit-stats">A${def.attack}/D${def.defense}/M${def.movement}</span>
           </div>
-          <button class="purchase-close" data-action="close">✕</button>
-        </div>
-
-        <div class="purchase-location">
-          <span class="location-label">Placing at:</span>
-          <span class="location-name">${this.selectedTerritory}</span>
-          <button class="location-change" data-action="change-location">Change</button>
-        </div>
-
-        <div class="purchase-grid">
-          ${units.map(([unitType, def]) => {
-            const qty = this.purchaseCart[unitType] || 0;
-            const canAdd = remaining >= def.cost;
-
-            // Factory specific: can't add if territory already has one
-            let factoryBlocked = false;
-            if (unitType === 'factory') {
-              factoryBlocked = selectedHasFactory || (factoriesInCart > 0 && qty > 0);
-            }
-
-            const imageSrc = player ? getUnitIconPath(unitType, player.id) : (def.image ? `assets/units/${def.image}` : null);
-            const maxAffordable = Math.floor(remaining / def.cost) + qty;
-
-            return `
-              <div class="purchase-item ${qty > 0 ? 'has-qty' : ''} ${factoryBlocked ? 'blocked' : ''}" data-unit="${unitType}">
-                <div class="item-row">
-                  <div class="item-visual">
-                    ${imageSrc ? `<img src="${imageSrc}" class="item-icon" alt="${unitType}">` : `<div class="item-placeholder">${unitType[0].toUpperCase()}</div>`}
-                  </div>
-                  <div class="item-info">
-                    <div class="item-name">${unitType}</div>
-                    <div class="item-stats">A${def.attack}/D${def.defense}/M${def.movement}</div>
-                  </div>
-                  <div class="item-cost">$${def.cost}</div>
-                </div>
-                ${factoryBlocked ? `
-                  <div class="item-blocked-msg">Territory already has factory</div>
-                ` : `
-                  <div class="item-controls">
-                    <button class="qty-btn minus" data-action="remove" data-unit="${unitType}">−</button>
-                    <span class="qty-display">${qty}</span>
-                    <button class="qty-btn plus" data-action="add" data-unit="${unitType}">+</button>
-                    <button class="qty-btn max" data-action="max" data-unit="${unitType}" data-max="${maxAffordable}">Max</button>
-                  </div>
-                `}
-              </div>`;
-          }).join('')}
-        </div>
-
-        ${this.cartCost > 0 ? `
-          <div class="purchase-summary">
-            <span class="summary-items">
-              ${Object.entries(this.purchaseCart).map(([type, qty]) => {
-                const def = this.unitDefs[type];
-                return `${qty}× ${type} ($${qty * def.cost})`;
-              }).join(', ')}
-            </span>
-            <span class="summary-total">Total: $${this.cartCost}</span>
-          </div>
-        ` : ''}
-
-        <div class="purchase-actions">
-          ${this.cartCost > 0 ? `
-            <button class="purchase-btn clear" data-action="clear">Clear</button>
-            <button class="purchase-btn confirm" data-action="confirm">Confirm Purchase</button>
+          ${factoryBlocked ? `
+            <div class="pp-blocked-msg">Already has factory</div>
           ` : `
-            <button class="purchase-btn back" data-action="change-location">← Back</button>
-            <button class="purchase-btn skip" data-action="skip">Done</button>
+            <div class="pp-unit-controls">
+              <button class="pp-qty-btn" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>
+              <span class="pp-qty">${qty}</span>
+              <button class="pp-qty-btn" data-unit="${unitType}" data-delta="1" ${!canAdd ? 'disabled' : ''}>+</button>
+              <button class="pp-max-btn" data-unit="${unitType}" ${!canAdd ? 'disabled' : ''}>Max</button>
+            </div>
           `}
         </div>
-        <div class="purchase-note">Units will be placed during Mobilize phase</div>
+      `;
+    }
+
+    html += `</div>`;
+
+    // Cart summary
+    if (this.cartCost > 0) {
+      const cartItems = Object.entries(this.purchaseCart)
+        .filter(([_, qty]) => qty > 0)
+        .map(([type, qty]) => `${qty}× ${type}`)
+        .join(', ');
+
+      html += `
+        <div class="pp-summary">
+          <div class="pp-summary-items">${cartItems}</div>
+          <div class="pp-summary-total">Total: $${this.cartCost}</div>
+        </div>
+      `;
+    }
+
+    // Actions
+    html += `
+      <div class="pp-actions">
+        ${this.cartCost > 0 ? `
+          <button class="pp-btn clear" data-action="clear">Clear</button>
+          <button class="pp-btn confirm" data-action="confirm">Buy & Continue</button>
+        ` : `
+          <button class="pp-btn done" data-action="done">Done Purchasing</button>
+        `}
       </div>
+      <div class="pp-note">Units placed during Mobilize phase</div>
     `;
 
     this.el.innerHTML = html;
     this._bindEvents();
   }
 
-  _bindTerritoryEvents() {
-    // Territory selection
-    this.el.querySelectorAll('.territory-option').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this.selectedTerritory = btn.dataset.territory;
+  _bindPromptEvents() {
+    // Location item clicks
+    this.el.querySelectorAll('.pp-location-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.selectedTerritory = item.dataset.territory;
         this._render();
       });
-    });
 
-    // Close button
-    this.el.querySelector('.purchase-close')?.addEventListener('click', () => {
-      this.hide();
+      // Hover highlighting
+      item.addEventListener('mouseenter', () => {
+        if (this.onHighlightTerritory) {
+          this.onHighlightTerritory(item.dataset.territory, true);
+        }
+      });
+
+      item.addEventListener('mouseleave', () => {
+        if (this.onHighlightTerritory) {
+          this.onHighlightTerritory(null, false);
+        }
+      });
     });
 
     // Skip button
@@ -303,55 +445,42 @@ export class PurchasePopup {
 
   _bindEvents() {
     // Quantity buttons
-    this.el.querySelector('.purchase-grid')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.qty-btn');
-      if (!btn) return;
-
-      e.stopPropagation();
-      const action = btn.dataset.action;
-      const unitType = btn.dataset.unit;
-
-      if (action === 'add') {
-        this._updateCart(unitType, 1);
-      } else if (action === 'remove') {
-        this._updateCart(unitType, -1);
-      } else if (action === 'max') {
-        this._setMax(unitType);
-      }
-    });
-
-    // Close button
-    this.el.querySelector('.purchase-close')?.addEventListener('click', () => {
-      this.hide();
-    });
-
-    // Change location
-    this.el.querySelectorAll('[data-action="change-location"]')?.forEach(btn => {
+    this.el.querySelectorAll('.pp-qty-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.selectedTerritory = null;
-        this._render();
+        const unit = btn.dataset.unit;
+        const delta = parseInt(btn.dataset.delta);
+        this._updateCart(unit, delta);
       });
+    });
+
+    // Max buttons
+    this.el.querySelectorAll('.pp-max-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const unit = btn.dataset.unit;
+        this._setMax(unit);
+      });
+    });
+
+    // Deselect territory
+    this.el.querySelector('[data-action="deselect"]')?.addEventListener('click', () => {
+      this.selectedTerritory = null;
+      this._render();
     });
 
     // Action buttons
-    this.el.querySelectorAll('.purchase-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const action = btn.dataset.action;
+    this.el.querySelector('[data-action="clear"]')?.addEventListener('click', () => {
+      this._clearCart();
+    });
 
-        if (action === 'clear') {
-          this._clearCart();
-        } else if (action === 'confirm') {
-          this._commitPurchase();
-        } else if (action === 'skip') {
-          this.hide();
-          if (this.onPurchaseComplete) {
-            this.onPurchaseComplete();
-          }
-        } else if (action === 'change-location') {
-          this.selectedTerritory = null;
-          this._render();
-        }
-      });
+    this.el.querySelector('[data-action="confirm"]')?.addEventListener('click', () => {
+      this._commitPurchase();
+    });
+
+    this.el.querySelector('[data-action="done"]')?.addEventListener('click', () => {
+      this.hide();
+      if (this.onPurchaseComplete) {
+        this.onPurchaseComplete();
+      }
     });
   }
 
@@ -387,7 +516,7 @@ export class PurchasePopup {
     }
 
     this._recalculateCartCost();
-    this._updateDisplay();
+    this._render();
   }
 
   _setMax(unitType) {
@@ -419,116 +548,7 @@ export class PurchasePopup {
     }
 
     this._recalculateCartCost();
-    this._updateDisplay();
-  }
-
-  _updateDisplay() {
-    const player = this.gameState.currentPlayer;
-    const ipcs = this.gameState.getIPCs(player.id);
-    const remaining = ipcs - this.cartCost;
-
-    const budgetValue = this.el.querySelector('.budget-value');
-    if (budgetValue) {
-      budgetValue.textContent = `$${remaining}`;
-      budgetValue.classList.toggle('low', remaining < 5);
-    }
-
-    this.el.querySelectorAll('.purchase-item').forEach(item => {
-      const unitType = item.dataset.unit;
-      if (!unitType) return;
-
-      const def = this.unitDefs[unitType];
-      if (!def) return;
-
-      const qty = this.purchaseCart[unitType] || 0;
-      const qtyDisplay = item.querySelector('.qty-display');
-      const addBtn = item.querySelector('[data-action="add"]');
-      const removeBtn = item.querySelector('[data-action="remove"]');
-      const maxBtn = item.querySelector('[data-action="max"]');
-
-      if (qtyDisplay) qtyDisplay.textContent = qty;
-
-      const canAdd = remaining >= def.cost;
-      const canRemove = qty > 0;
-      const maxAffordable = Math.floor(remaining / def.cost) + qty;
-
-      if (addBtn) addBtn.classList.toggle('disabled', !canAdd);
-      if (removeBtn) removeBtn.classList.toggle('disabled', !canRemove);
-      if (maxBtn) {
-        maxBtn.dataset.max = maxAffordable;
-        maxBtn.classList.toggle('disabled', remaining < def.cost);
-      }
-      item.classList.toggle('has-qty', qty > 0);
-    });
-
-    this._updateSummary();
-  }
-
-  _updateSummary() {
-    const existingSummary = this.el.querySelector('.purchase-summary');
-    const actionsContainer = this.el.querySelector('.purchase-actions');
-
-    let summaryHtml = '';
-    if (this.cartCost > 0) {
-      summaryHtml = `
-        <div class="purchase-summary">
-          <span class="summary-items">
-            ${Object.entries(this.purchaseCart).map(([type, qty]) => {
-              const def = this.unitDefs[type];
-              return `${qty}× ${type} ($${qty * def.cost})`;
-            }).join(', ')}
-          </span>
-          <span class="summary-total">Total: $${this.cartCost}</span>
-        </div>
-      `;
-    }
-
-    if (existingSummary) {
-      if (this.cartCost > 0) {
-        existingSummary.outerHTML = summaryHtml;
-      } else {
-        existingSummary.remove();
-      }
-    } else if (this.cartCost > 0 && actionsContainer) {
-      actionsContainer.insertAdjacentHTML('beforebegin', summaryHtml);
-    }
-
-    if (actionsContainer) {
-      if (this.cartCost > 0) {
-        actionsContainer.innerHTML = `
-          <button class="purchase-btn clear" data-action="clear">Clear</button>
-          <button class="purchase-btn confirm" data-action="confirm">Confirm Purchase</button>
-        `;
-      } else {
-        actionsContainer.innerHTML = `
-          <button class="purchase-btn back" data-action="change-location">← Back</button>
-          <button class="purchase-btn skip" data-action="skip">Done</button>
-        `;
-      }
-      this._bindActionButtons();
-    }
-  }
-
-  _bindActionButtons() {
-    this.el.querySelectorAll('.purchase-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const action = btn.dataset.action;
-
-        if (action === 'clear') {
-          this._clearCart();
-        } else if (action === 'confirm') {
-          this._commitPurchase();
-        } else if (action === 'skip') {
-          this.hide();
-          if (this.onPurchaseComplete) {
-            this.onPurchaseComplete();
-          }
-        } else if (action === 'change-location') {
-          this.selectedTerritory = null;
-          this._render();
-        }
-      });
-    });
+    this._render();
   }
 
   _clearCart() {
@@ -565,7 +585,16 @@ export class PurchasePopup {
     this.purchaseCart = {};
     this.cartCost = 0;
 
-    // Ask if they want to buy more at another location
+    // Go back to territory selection (user might want to buy at another location)
+    this.selectedTerritory = null;
+    this._render();
+  }
+
+  getSelectedTerritory() {
+    return this.selectedTerritory ? this.territories?.[this.selectedTerritory] : null;
+  }
+
+  clearSelection() {
     this.selectedTerritory = null;
     this._render();
   }

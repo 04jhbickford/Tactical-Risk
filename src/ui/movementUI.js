@@ -689,6 +689,85 @@ export class MovementUI {
     return html;
   }
 
+  // Render aircraft on carriers that can be launched during combat move
+  _renderCarrierAircraftLaunch(carrierAircraft, player) {
+    let html = `
+      <div class="mp-carrier-aircraft">
+        <div class="mp-carrier-header">Launch Aircraft</div>
+        <div class="mp-carrier-desc">Launch aircraft from carriers to attack targets</div>
+        <div class="mp-carrier-list">
+    `;
+
+    carrierAircraft.forEach((carrier, carrierIdx) => {
+      if (carrier.aircraft.length === 0) return;
+
+      const carrierImageSrc = getUnitIconPath('carrier', player.id);
+
+      html += `
+        <div class="mp-carrier-item">
+          <div class="mp-carrier-label">
+            ${carrierImageSrc ? `<img src="${carrierImageSrc}" class="mp-carrier-icon" alt="carrier">` : ''}
+            <span>Carrier #${carrierIdx + 1}</span>
+            ${carrier.damaged ? '<span class="mp-carrier-damaged">(Damaged)</span>' : ''}
+          </div>
+          <div class="mp-carrier-aircraft-list">
+      `;
+
+      // Group aircraft by type for display
+      const aircraftByType = {};
+      carrier.aircraft.forEach((ac, acIdx) => {
+        const key = ac.type;
+        if (!aircraftByType[key]) {
+          aircraftByType[key] = { type: ac.type, owner: ac.owner, indices: [] };
+        }
+        aircraftByType[key].indices.push(acIdx);
+      });
+
+      for (const [type, data] of Object.entries(aircraftByType)) {
+        const acImageSrc = getUnitIconPath(type, data.owner);
+        const count = data.indices.length;
+
+        html += `
+          <div class="mp-aircraft-row">
+            <div class="mp-aircraft-info">
+              ${acImageSrc ? `<img src="${acImageSrc}" class="mp-aircraft-icon" alt="${type}">` : ''}
+              <span class="mp-aircraft-name">${type}</span>
+              <span class="mp-aircraft-count">×${count}</span>
+            </div>
+            <div class="mp-aircraft-actions">
+              <button class="mp-launch-btn"
+                      data-carrier="${carrierIdx}"
+                      data-aircraft-type="${type}"
+                      data-aircraft-idx="${data.indices[0]}">
+                Launch 1
+              </button>
+              ${count > 1 ? `
+                <button class="mp-launch-all-btn"
+                        data-carrier="${carrierIdx}"
+                        data-aircraft-type="${type}"
+                        data-aircraft-indices="${data.indices.join(',')}">
+                  All (${count})
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      html += `
+          </div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
   // Render loading target selection (choose which ship to load cargo onto)
   _renderLoadingTargetSelection(destination, unitType, unitQty, player) {
     const ships = this.gameState.getShipsWithCargo(destination, player.id);
@@ -1147,6 +1226,15 @@ export class MovementUI {
       html += this._renderShipSelection(shipsWithCargo, player);
     }
 
+    // Show aircraft on carriers that can be launched (combat move phase only)
+    if (this.selectedFrom.isWater && isCombatMove) {
+      const carrierAircraft = this.gameState.getCarrierAircraft(this.selectedFrom.name, player.id);
+      const hasAircraftToLaunch = carrierAircraft.some(c => c.aircraft.length > 0);
+      if (hasAircraftToLaunch) {
+        html += this._renderCarrierAircraftLaunch(carrierAircraft, player);
+      }
+    }
+
     // Move All button
     const totalMovable = movableUnits.reduce((sum, u) => sum + u.quantity, 0);
     const totalSelected = Object.values(this.selectedUnits).reduce((sum, q) => sum + q, 0);
@@ -1264,6 +1352,27 @@ export class MovementUI {
       this._render();
     });
 
+    // Aircraft launch buttons (single aircraft)
+    this.el.querySelectorAll('.mp-launch-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const carrierIdx = parseInt(btn.dataset.carrier);
+        const aircraftIdx = parseInt(btn.dataset.aircraftIdx);
+        this._launchAircraft(carrierIdx, aircraftIdx);
+      });
+    });
+
+    // Aircraft launch all buttons (all of one type from carrier)
+    this.el.querySelectorAll('.mp-launch-all-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const carrierIdx = parseInt(btn.dataset.carrier);
+        const indices = btn.dataset.aircraftIndices.split(',').map(Number);
+        // Launch in reverse order to avoid index shifting
+        for (const idx of indices.sort((a, b) => b - a)) {
+          this._launchAircraft(carrierIdx, idx);
+        }
+      });
+    });
+
     // Destination dropdown
     const destSelect = this.el.querySelector('.mp-dest-select');
     if (destSelect) {
@@ -1334,6 +1443,24 @@ export class MovementUI {
     this.selectedUnits[unitType] = newValue;
 
     this._render();
+  }
+
+  // Launch aircraft from carrier - makes it a free unit that can be selected to move
+  _launchAircraft(carrierIndex, aircraftIndex) {
+    if (!this.selectedFrom || !this.gameState) return;
+
+    const result = this.gameState.launchFromCarrier(
+      this.selectedFrom.name,
+      carrierIndex,
+      aircraftIndex
+    );
+
+    if (result.success) {
+      // Re-render to show the launched aircraft as a movable unit
+      this._render();
+    } else {
+      console.warn('Launch failed:', result.error);
+    }
   }
 
   // Generate movement info tooltip for a unit

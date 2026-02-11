@@ -319,6 +319,10 @@ async function init() {
     purchasePopup.setOnComplete(() => {
       camera.dirty = true;
     });
+    purchasePopup.setOnHighlightTerritory((territory, highlight) => {
+      territoryRenderer.setHoverHighlight(territory, highlight);
+      camera.dirty = true;
+    });
 
     // Movement UI
     movementUI.setGameState(gameState);
@@ -339,6 +343,8 @@ async function init() {
           if (moveInfo.cardAwarded) {
             actionLog.logCardEarned(player, moveInfo.cardAwarded);
           }
+        } else if (gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
+          actionLog.logNonCombatMove(moveInfo.from, moveInfo.to, moveInfo.units, player);
         } else {
           actionLog.logMove(moveInfo.from, moveInfo.to, moveInfo.units, player);
         }
@@ -386,11 +392,17 @@ async function init() {
     placementUI.setOnComplete(() => {
       camera.dirty = true;
     });
+    placementUI.setOnUnitPlaced((unitType, territory, player) => {
+      actionLog.logInitialPlacement(player, unitType, territory);
+    });
 
     // Mobilize UI
     mobilizeUI.setGameState(gameState);
     mobilizeUI.setOnComplete(() => {
       camera.dirty = true;
+    });
+    mobilizeUI.setOnUnitsMobilized((player, units, territory) => {
+      actionLog.logMobilize(player, units, territory);
     });
 
     // Victory Screen
@@ -498,6 +510,15 @@ async function init() {
       // Check if we're in mobilize phase
       if (hit && gameState && mobilizeUI.isActive()) {
         const handled = mobilizeUI.handleTerritoryClick(hit);
+        if (handled) {
+          camera.dirty = true;
+          return;
+        }
+      }
+
+      // Check if we're in purchase phase
+      if (hit && gameState && purchasePopup.isPurchasePhase()) {
+        const handled = purchasePopup.handleTerritoryClick(hit);
         if (handled) {
           camera.dirty = true;
           return;

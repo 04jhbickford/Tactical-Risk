@@ -11,6 +11,7 @@ export class PlacementUI {
     this.territoryByName = null;
     this.selectedTerritory = null;  // Selected territory to place units on
     this.onPlacementComplete = null;
+    this.onUnitPlaced = null;  // Callback when a unit is placed (for logging)
 
     this._create();
   }
@@ -42,6 +43,10 @@ export class PlacementUI {
 
   setOnComplete(callback) {
     this.onPlacementComplete = callback;
+  }
+
+  setOnUnitPlaced(callback) {
+    this.onUnitPlaced = callback;
   }
 
   isActive() {
@@ -113,6 +118,11 @@ export class PlacementUI {
     if (result.success) {
       // Don't auto-advance - let user review and undo if needed
       // The "Done - Next Player" button will appear when 6 units placed
+
+      // Notify about the placed unit (for logging)
+      if (this.onUnitPlaced) {
+        this.onUnitPlaced(unitType, this.selectedTerritory.name, player);
+      }
 
       if (this.onPlacementComplete) {
         this.onPlacementComplete();

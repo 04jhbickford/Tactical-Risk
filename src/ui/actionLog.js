@@ -231,6 +231,33 @@ export class ActionLog {
     });
   }
 
+  logInitialPlacement(player, unitType, territory) {
+    this.log('placement', {
+      message: `${player.name} placed ${unitType} in ${territory}`,
+      unitType,
+      territory,
+      color: player.color
+    });
+  }
+
+  logNonCombatMove(from, to, units, player) {
+    const unitStr = units.map(u => `${u.quantity} ${u.type}`).join(', ');
+    this.log('ncm', {
+      message: `${player.name} moved ${unitStr} from ${from} to ${to}`,
+      from, to, units,
+      color: player.color
+    });
+  }
+
+  logMobilize(player, units, territory) {
+    const unitStr = units.map(u => `${u.quantity || 1} ${u.type}`).join(', ');
+    this.log('mobilize', {
+      message: `${player.name} deployed ${unitStr} to ${territory}`,
+      territory, units,
+      color: player.color
+    });
+  }
+
   _appendEntry(entry) {
     const div = document.createElement('div');
     div.className = `log-entry log-${entry.type}`;
@@ -343,6 +370,12 @@ export class ActionLog {
         return `Traded cards: +${data.value} IPCs`;
       case 'card-earned':
         return `Earned Risk card: ${data.cardType}`;
+      case 'placement':
+        return `Placed ${data.unitType} in ${data.territory}`;
+      case 'ncm':
+        return `NCM to ${data.to}`;
+      case 'mobilize':
+        return `Deployed to ${data.territory}`;
       default:
         return data.message || entry.type;
     }
@@ -378,6 +411,18 @@ export class ActionLog {
         break;
       case 'income':
         parts.push(`Round ${entry.round} income`);
+        break;
+      case 'ncm':
+        parts.push(`From: ${data.from}`);
+        parts.push(`To: ${data.to}`);
+        if (data.units) {
+          parts.push(`Units: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
+        }
+        break;
+      case 'mobilize':
+        if (data.units) {
+          data.units.forEach(u => parts.push(`${u.quantity || 1}x ${u.type}`));
+        }
         break;
       default:
         // No extra details

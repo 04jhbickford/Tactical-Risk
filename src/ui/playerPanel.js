@@ -240,11 +240,14 @@ export class PlayerPanel {
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
       const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
       const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
-      const canFinish = placedThisRound >= 6 || totalRemaining === 0;
+      const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+      const isFinalRound = this.gameState.isFinalPlacementRound?.() || false;
+      // Can finish when placed the limit OR no units left
+      const canFinish = placedThisRound >= limit || totalRemaining === 0;
       const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
 
       html += `<div class="pp-placement">`;
-      html += `<p class="pp-hint">Click a territory, then select units from the placement panel.</p>`;
+      html += `<p class="pp-hint">Place ${limit} units this round${isFinalRound ? ' (final round)' : ''}. (${placedThisRound}/${limit} placed, ${totalRemaining} remaining)</p>`;
       if (canUndo) {
         html += `<button class="pp-action-btn secondary" data-action="undo-placement">Undo Last</button>`;
       }
