@@ -2691,21 +2691,49 @@ html, body {
 /* --- Movement Panel --- */
 .movement-panel {
   position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
   background: rgba(25, 25, 50, 0.98);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 12px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
   padding: 16px 20px;
   min-width: 320px;
-  max-width: 480px;
+  max-width: 420px;
+  max-height: 70vh;
+  overflow-y: auto;
   z-index: 150;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease;
 }
 
 .movement-panel.hidden {
   display: none;
+}
+
+.movement-panel.minimized {
+  transform: translateY(-50%) translateX(calc(-100% + 40px));
+  overflow: hidden;
+}
+
+.movement-panel.minimized .mp-units,
+.movement-panel.minimized .mp-ships,
+.movement-panel.minimized .mp-actions,
+.movement-panel.minimized .mp-destinations,
+.movement-panel.minimized .mp-cargo,
+.movement-panel.minimized .mp-title {
+  display: none;
+}
+
+.movement-panel.minimized .left-modal-minimize-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 0 6px 6px 0;
+  padding: 12px 8px;
 }
 
 .mp-header {
@@ -5344,19 +5372,49 @@ html, body {
 /* --- Initial Placement Panel --- */
 .placement-panel {
   position: fixed;
-  bottom: 20px;
-  left: 20px;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
   width: 320px;
-  background: rgba(25, 25, 50, 0.95);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px;
+  background: rgba(25, 25, 50, 0.98);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
   padding: 16px;
-  z-index: 100;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 150;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .placement-panel.hidden {
   display: none;
+}
+
+.placement-panel.minimized {
+  transform: translateY(-50%) translateX(calc(-100% + 40px));
+  overflow: hidden;
+}
+
+.placement-panel.minimized .pl-progress,
+.placement-panel.minimized .pl-instructions,
+.placement-panel.minimized .pl-units,
+.placement-panel.minimized .pl-actions,
+.placement-panel.minimized .pl-selected-territory,
+.placement-panel.minimized .pl-remaining-summary,
+.placement-panel.minimized .pl-title {
+  display: none;
+}
+
+.placement-panel.minimized .left-modal-minimize-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 0 6px 6px 0;
+  padding: 12px 8px;
 }
 
 .pl-header {
@@ -6129,21 +6187,43 @@ html, body {
 .mobilize-panel {
   position: fixed;
   top: 50%;
-  left: 20px;
+  left: 0;
   transform: translateY(-50%);
-  width: 300px;
+  width: 320px;
   max-height: 80vh;
   overflow-y: auto;
-  background: rgba(25, 25, 50, 0.95);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 12px;
+  background: rgba(25, 25, 50, 0.98);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
   padding: 16px;
-  z-index: 100;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 150;
+  box-shadow: 4px 0 20px rgba(0,0,0,0.5);
+  transition: transform 0.3s ease;
 }
 
 .mobilize-panel.hidden {
   display: none;
+}
+
+.mobilize-panel.minimized {
+  transform: translateY(-50%) translateX(calc(-100% + 40px));
+  overflow: hidden;
+}
+
+.mobilize-panel.minimized .mob-content,
+.mobilize-panel.minimized .mob-title {
+  display: none;
+}
+
+.mobilize-panel.minimized .left-modal-minimize-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 215, 0, 0.2);
+  border-radius: 0 6px 6px 0;
+  padding: 12px 8px;
 }
 
 .mob-header {
@@ -6386,16 +6466,17 @@ html, body {
   font-style: italic;
 }
 
-/* --- Modal positioning from left side --- */
+/* --- Modal positioning from left edge --- */
 .movement-panel,
 .placement-panel,
 .mobilize-panel {
-  left: 20px;
+  left: 0;
   right: auto;
-  transform: none;
   bottom: auto;
   top: 50%;
   transform: translateY(-50%);
+  border-left: none;
+  border-radius: 0 12px 12px 0;
 }
 
 /* Fixed width and scrolling for modals */

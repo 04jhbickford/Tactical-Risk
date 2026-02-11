@@ -12,6 +12,7 @@ export class PlacementUI {
     this.selectedTerritory = null;  // Selected territory to place units on
     this.onPlacementComplete = null;
     this.onUnitPlaced = null;  // Callback when a unit is placed (for logging)
+    this.isMinimized = false;
 
     this._create();
   }
@@ -156,6 +157,7 @@ export class PlacementUI {
         <div class="pl-color-bar" style="background: ${player.color}"></div>
         <div class="pl-title">Initial Deployment</div>
         <div class="pl-player" style="color: ${player.color}">${player.name}</div>
+        <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '▶' : '◀'}</button>
       </div>
 
       <div class="pl-progress">
@@ -320,6 +322,13 @@ export class PlacementUI {
   }
 
   _bindEvents() {
+    // Minimize toggle
+    this.el.querySelector('[data-action="toggle-minimize"]')?.addEventListener('click', () => {
+      this.isMinimized = !this.isMinimized;
+      this.el.classList.toggle('minimized', this.isMinimized);
+      this._render();
+    });
+
     // Unit buttons - clicking places the unit immediately
     this.el.querySelectorAll('.pl-unit-btn').forEach(btn => {
       btn.addEventListener('click', () => {
