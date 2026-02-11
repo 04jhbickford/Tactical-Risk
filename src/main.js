@@ -493,10 +493,12 @@ async function init() {
   canvas.addEventListener('mouseup', (e) => {
     const wasDrag = camera.onMouseUp();
     canvas.classList.remove('panning');
+    console.log('[MouseUp] wasDrag:', wasDrag, 'Phase:', gameState?.phase);
 
     if (!wasDrag) {
       const world = camera.screenToWorld(e.clientX, e.clientY);
       const hit = territoryMap.hitTest(wrapX(world.x), world.y);
+      console.log('[MouseUp] Hit test result:', hit?.name || 'null');
 
       // Check if we're in initial placement phase
       if (hit && gameState && placementUI.isActive()) {
