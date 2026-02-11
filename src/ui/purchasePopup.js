@@ -15,8 +15,6 @@ export class PurchasePopup {
     this.selectedTerritory = null; // Territory to place purchased units
     this.territories = null;
 
-    // Drag state
-    this.isDragging = false;
     this.isMinimized = false;
 
     this._create();
@@ -28,48 +26,6 @@ export class PurchasePopup {
     this.el.className = 'purchase-panel hidden';
     document.body.appendChild(this.el);
 
-    this._initDrag();
-  }
-
-  _initDrag() {
-    let startX, startY, startLeft, startTop;
-
-    const onMouseDown = (e) => {
-      if (!e.target.classList.contains('pp-drag-handle')) return;
-
-      this.isDragging = true;
-      this.el.classList.add('dragging');
-
-      const rect = this.el.getBoundingClientRect();
-      startX = e.clientX;
-      startY = e.clientY;
-      startLeft = rect.left;
-      startTop = rect.top;
-
-      document.addEventListener('mousemove', onMouseMove);
-      document.addEventListener('mouseup', onMouseUp);
-    };
-
-    const onMouseMove = (e) => {
-      if (!this.isDragging) return;
-
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-
-      this.el.style.left = `${startLeft + dx}px`;
-      this.el.style.top = `${startTop + dy}px`;
-      this.el.style.right = 'auto';
-      this.el.style.bottom = 'auto';
-    };
-
-    const onMouseUp = () => {
-      this.isDragging = false;
-      this.el.classList.remove('dragging');
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    this.el.addEventListener('mousedown', onMouseDown);
   }
 
   setGameState(gameState) {
@@ -185,8 +141,7 @@ export class PurchasePopup {
     const buildableTerritories = ownedTerritories.filter(name => !factoryTerritories.includes(name));
 
     let html = `
-      <div class="pp-drag-handle"></div>
-      <div class="pp-header">
+            <div class="pp-header">
         <div class="pp-title">Purchase Units</div>
         <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
       </div>
@@ -329,8 +284,7 @@ export class PurchasePopup {
       });
 
     let html = `
-      <div class="pp-drag-handle"></div>
-      <div class="pp-header">
+            <div class="pp-header">
         <div class="pp-title">Purchase Units</div>
         <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
       </div>

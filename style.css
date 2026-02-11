@@ -2262,24 +2262,6 @@ html, body {
   display: none;
 }
 
-.purchase-panel.dragging {
-  opacity: 0.9;
-  cursor: grabbing;
-}
-
-.pp-drag-handle {
-  height: 4px;
-  background: rgba(255, 215, 0, 0.3);
-  border-radius: 2px;
-  margin: -8px auto 12px auto;
-  width: 40px;
-  cursor: grab;
-}
-
-.pp-drag-handle:hover {
-  background: rgba(255, 215, 0, 0.5);
-}
-
 .pp-header {
   display: flex;
   justify-content: space-between;
