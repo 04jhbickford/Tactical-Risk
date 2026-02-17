@@ -1561,16 +1561,11 @@ export class GameState {
           continue;
         }
       } else if (nextPhase === TURN_PHASES.MOBILIZE) {
-        // For AI players, auto-mobilize purchases
-        // For human players, they use the MobilizeUI to place manually
+        // Auto-mobilize all purchases - territory was already selected during purchase phase
         const player = this.currentPlayer;
-        if (player?.isAI) {
-          this._mobilizePurchases();
-        }
-        // Skip if nothing was purchased
-        if (this.pendingPurchases.filter(p => p.owner === player?.id).length === 0) {
-          continue;
-        }
+        this._mobilizePurchases();
+        // Always skip mobilize phase - units are auto-placed at their designated territories
+        continue;
       } else if (nextPhase === TURN_PHASES.COLLECT_INCOME) {
         this._collectIncome();
         // Auto-advance to next player
@@ -2539,36 +2534,35 @@ export class GameState {
     return { success: true };
   }
 
-  // Place purchased units at factories
+  // Place purchased units at their designated territories (selected during purchase phase)
   _mobilizePurchases() {
     const player = this.currentPlayer;
     if (!player) return;
 
-    // Find territories with factories
-    const factoryTerritories = [];
-    for (const [territory, units] of Object.entries(this.units)) {
-      const hasFactory = units.some(u => u.type === 'factory' && u.owner === player.id);
-      const isOwned = this.getOwner(territory) === player.id;
-      if (hasFactory && isOwned) {
-        factoryTerritories.push(territory);
+    // Get player's pending purchases
+    const playerPurchases = this.pendingPurchases.filter(p => p.owner === player.id);
+    if (playerPurchases.length === 0) return;
+
+    // Place each purchase at its designated territory
+    for (const purchase of playerPurchases) {
+      const territory = purchase.territory;
+      if (!territory) {
+        console.warn('Purchase missing territory:', purchase);
+        continue;
       }
-    }
 
-    if (factoryTerritories.length === 0) return;
-
-    // Place all purchases at first factory (simplified)
-    const mainFactory = factoryTerritories[0];
-    for (const purchase of this.pendingPurchases) {
-      const units = this.units[mainFactory] || [];
+      const units = this.units[territory] || [];
       const existing = units.find(u => u.type === purchase.type && u.owner === player.id);
       if (existing) {
         existing.quantity += purchase.quantity;
       } else {
         units.push({ type: purchase.type, quantity: purchase.quantity, owner: player.id });
       }
-      this.units[mainFactory] = units;
+      this.units[territory] = units;
     }
-    this.pendingPurchases = [];
+
+    // Remove player's purchases from pending
+    this.pendingPurchases = this.pendingPurchases.filter(p => p.owner !== player.id);
   }
 
   // Collect income from territories

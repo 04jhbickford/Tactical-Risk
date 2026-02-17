@@ -364,7 +364,7 @@ export class PurchasePopup {
           <button class="pp-btn done" data-action="done">Done Purchasing</button>
         `}
       </div>
-      <div class="pp-note">Units placed during Mobilize phase</div>
+      <div class="pp-note">Units will be placed at ${this.selectedTerritory}</div>
     `;
 
     this.el.innerHTML = html;
