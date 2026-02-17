@@ -6,13 +6,13 @@ export class HUD {
   constructor() {
     this.gameState = null;
     this.onNextPhase = null;
-    this.onBugReport = null;
+    this.onRulesToggle = null;
     this.el = document.getElementById('hud');
     this._render();
   }
 
-  setOnBugReport(callback) {
-    this.onBugReport = callback;
+  setOnRulesToggle(callback) {
+    this.onRulesToggle = callback;
   }
 
   setGameState(gameState) {
@@ -105,18 +105,18 @@ export class HUD {
     }
     html += `</div>`;
 
-    // Bug report button
-    html += `<button class="hud-btn bug-btn" data-action="bug-report" title="Report a Bug">Report Bug</button>`;
+    // Rules button (top right)
+    html += `<button class="hud-btn rules-btn" data-action="rules" title="Game Rules">📖 Rules</button>`;
 
     this.el.innerHTML = html;
     this._bindEvents();
   }
 
   _bindEvents() {
-    const bugBtn = this.el.querySelector('[data-action="bug-report"]');
-    bugBtn?.addEventListener('click', () => {
-      if (this.onBugReport) {
-        this.onBugReport();
+    const rulesBtn = this.el.querySelector('[data-action="rules"]');
+    rulesBtn?.addEventListener('click', () => {
+      if (this.onRulesToggle) {
+        this.onRulesToggle();
       }
     });
   }

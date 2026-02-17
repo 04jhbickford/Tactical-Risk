@@ -143,12 +143,7 @@ async function init() {
   airLandingUI.setUnitDefs(unitDefs);
   airLandingUI.setTerritories(territories);
 
-  // Rules button (fixed position)
-  const rulesBtn = document.createElement('button');
-  rulesBtn.className = 'hud-rules-btn';
-  rulesBtn.textContent = '📖 Rules';
-  rulesBtn.addEventListener('click', () => rulesPanel.toggle());
-  document.body.appendChild(rulesBtn);
+  // Rules button is now in the HUD (top bar)
 
   // Action handler for player panel buttons
   playerPanel.setActionCallback((action, data) => {
@@ -200,6 +195,21 @@ async function init() {
         }
         if (gameState.canTradeRiskCards(gameState.currentPlayer.id)) {
           const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
+          if (result.success) {
+            actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);
+            camera.dirty = true;
+          }
+        }
+        break;
+
+      case 'trade-set':
+        // Trade a specific card set (when multiple options exist)
+        if (gameState.turnPhase !== TURN_PHASES.PURCHASE) {
+          console.log('Risk cards can only be traded during the Purchase phase');
+          break;
+        }
+        if (data.cardSet) {
+          const result = gameState.tradeSpecificCards(gameState.currentPlayer.id, data.cardSet);
           if (result.success) {
             actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);
             camera.dirty = true;
@@ -319,8 +329,8 @@ async function init() {
       gameState.nextPhase();
       camera.dirty = true;
     });
-    hud.setOnBugReport(() => {
-      bugTracker.show();
+    hud.setOnRulesToggle(() => {
+      rulesPanel.toggle();
     });
 
     // Bug tracker

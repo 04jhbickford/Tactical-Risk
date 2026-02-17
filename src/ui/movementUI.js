@@ -210,10 +210,19 @@ export class MovementUI {
     const toOwner = this.gameState.getOwner(territory.name);
     const isEnemy = toOwner && toOwner !== player.id &&
       !this.gameState.areAllies(player.id, toOwner);
+    const isFriendly = toOwner === player.id || this.gameState.areAllies(player.id, toOwner);
     const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
 
     // Non-combat move cannot enter enemy territory
     if (!isCombatMove && isEnemy) {
+      return false;
+    }
+
+    // Combat move: land units can only move to enemy territory or sea zones (for loading)
+    // They cannot move to friendly territories during combat move
+    if (isCombatMove && !territory.isWater && isFriendly) {
+      // Exception: Allow if moving to load onto transports in adjacent sea zone
+      // For now, don't allow friendly land territories during combat move
       return false;
     }
 

@@ -1471,6 +1471,30 @@ html, body {
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
+.pp-header.compact {
+  padding: 10px 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pp-header.compact .pp-flag {
+  width: 32px;
+  height: 24px;
+  border-width: 1px;
+}
+
+.pp-header.compact .pp-player-name {
+  font-size: 14px;
+  margin-bottom: 0;
+}
+
+.pp-resources-inline {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
 .pp-flag {
   width: 48px;
   height: 36px;
@@ -1519,6 +1543,24 @@ html, body {
   padding: 16px;
   background: rgba(255,255,255,0.03);
   border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-phase.compact {
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pp-phase.compact .pp-phase-name {
+  font-size: 13px;
+  margin-bottom: 0;
+}
+
+.pp-phase-hint {
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
 }
 
 .pp-phase-label {
@@ -1571,22 +1613,35 @@ html, body {
 }
 
 .pp-actions {
-  padding: 16px;
+  padding: 10px 12px;
   flex: 1;
+}
+
+.pp-placement-status {
+  font-size: 12px;
+  color: #aaa;
+  text-align: center;
+  margin-bottom: 8px;
 }
 
 .pp-action-btn {
   width: 100%;
-  padding: 14px;
-  font-size: 15px;
+  padding: 10px 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #fff;
   background: linear-gradient(135deg, #4169e1, #3457b0);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.pp-action-btn.small {
+  padding: 6px 10px;
+  font-size: 11px;
+  margin-bottom: 6px;
 }
 
 .pp-action-btn:hover {
@@ -5233,19 +5288,19 @@ html, body {
 }
 
 .pp-card {
-  width: 50px;
-  height: 70px;
-  border-radius: 6px;
+  width: 36px;
+  height: 44px;
+  border-radius: 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   border: 2px solid;
   transition: all 0.2s ease;
   cursor: default;
   position: relative;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
 .pp-card:hover {
@@ -5254,7 +5309,7 @@ html, body {
 }
 
 .pp-card-icon {
-  font-size: 22px;
+  font-size: 18px;
 }
 
 .pp-card-label {
@@ -5333,6 +5388,31 @@ html, body {
 .pp-trade-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.pp-card-sets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pp-set-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 8px 6px;
+  font-size: 16px;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.08) 100%);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.pp-set-btn:hover {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.25) 0%, rgba(255, 215, 0, 0.15) 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(255, 215, 0, 0.15);
 }
 
 .pp-cards-note {

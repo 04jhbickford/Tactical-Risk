@@ -2895,37 +2895,63 @@ export class GameState {
     return this._findValidCardSet(cards) !== null;
   }
 
-  _findValidCardSet(cards) {
+  // Find all valid card sets that can be traded
+  _findAllValidCardSets(cards) {
     const counts = { infantry: 0, cavalry: 0, artillery: 0, wild: 0 };
     for (const c of cards) counts[c]++;
 
+    const validSets = [];
+
     // 3 of same type
     for (const type of ['infantry', 'cavalry', 'artillery']) {
-      if (counts[type] >= 3) return [type, type, type];
+      if (counts[type] >= 3) validSets.push([type, type, type]);
     }
 
     // 3 wilds
-    if (counts.wild >= 3) return ['wild', 'wild', 'wild'];
+    if (counts.wild >= 3) validSets.push(['wild', 'wild', 'wild']);
 
-    // 1 of each
+    // 1 of each (no wilds used)
     if (counts.infantry >= 1 && counts.cavalry >= 1 && counts.artillery >= 1) {
-      return ['infantry', 'cavalry', 'artillery'];
+      validSets.push(['infantry', 'cavalry', 'artillery']);
     }
 
-    // 2 of a kind + wild
+    // 2 of a kind + 1 wild
     for (const type of ['infantry', 'cavalry', 'artillery']) {
       if (counts[type] >= 2 && counts.wild >= 1) {
-        return [type, type, 'wild'];
+        validSets.push([type, type, 'wild']);
       }
     }
 
-    // 1 + 1 + wild
-    const types = ['infantry', 'cavalry', 'artillery'].filter(t => counts[t] >= 1);
-    if (types.length >= 2 && counts.wild >= 1) {
-      return [types[0], types[1], 'wild'];
+    // 1 of a kind + 2 wilds
+    for (const type of ['infantry', 'cavalry', 'artillery']) {
+      if (counts[type] >= 1 && counts.wild >= 2) {
+        validSets.push([type, 'wild', 'wild']);
+      }
     }
 
-    return null;
+    // 2 different types + 1 wild (making "1 of each" with wild)
+    const types = ['infantry', 'cavalry', 'artillery'].filter(t => counts[t] >= 1);
+    if (types.length >= 2 && counts.wild >= 1) {
+      // Add all combinations of 2 types + wild
+      for (let i = 0; i < types.length; i++) {
+        for (let j = i + 1; j < types.length; j++) {
+          validSets.push([types[i], types[j], 'wild']);
+        }
+      }
+    }
+
+    return validSets;
+  }
+
+  _findValidCardSet(cards) {
+    const sets = this._findAllValidCardSets(cards);
+    return sets.length > 0 ? sets[0] : null;
+  }
+
+  // Get all valid card sets for selection UI
+  getValidCardSets(playerId) {
+    const cards = this.riskCards[playerId] || [];
+    return this._findAllValidCardSets(cards);
   }
 
   // Trade RISK cards for IPCs
@@ -2961,6 +2987,43 @@ export class GameState {
   getNextRiskCardValue(playerId) {
     const tradeNum = this.cardTradeCount[playerId] || 0;
     return RISK_CARD_VALUES[Math.min(tradeNum, RISK_CARD_VALUES.length - 1)];
+  }
+
+  // Trade a specific set of RISK cards (for UI selection)
+  tradeSpecificCards(playerId, cardSet) {
+    // Can only trade during purchase phase
+    if (this.turnPhase !== TURN_PHASES.PURCHASE) {
+      return { success: false, ipcs: 0, error: 'Can only trade cards during Purchase phase' };
+    }
+
+    const cards = this.riskCards[playerId] || [];
+
+    // Validate the set exists in player's hand
+    const tempCards = [...cards];
+    for (const cardType of cardSet) {
+      const idx = tempCards.indexOf(cardType);
+      if (idx < 0) {
+        return { success: false, ipcs: 0, error: 'Invalid card set' };
+      }
+      tempCards.splice(idx, 1);
+    }
+
+    // Remove the cards from player's hand
+    for (const cardType of cardSet) {
+      const idx = cards.indexOf(cardType);
+      if (idx >= 0) cards.splice(idx, 1);
+    }
+
+    // Get trade value based on how many times player has traded
+    const tradeNum = this.cardTradeCount[playerId] || 0;
+    const value = RISK_CARD_VALUES[Math.min(tradeNum, RISK_CARD_VALUES.length - 1)];
+
+    // Increment trade count and award IPCs
+    this.cardTradeCount[playerId] = tradeNum + 1;
+    this.playerState[playerId].ipcs += value;
+
+    this._notify();
+    return { success: true, ipcs: value };
   }
 
   // --- Transport & Carrier System ---
