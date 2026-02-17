@@ -18,7 +18,7 @@ const LAND_BRIDGES = [
   ['Spain', 'Algeria'],
   ['South Europe', 'Anglo Sudan Egypt'],
   // Pacific / Asian connections
-  ['Kwangtung', 'East Indies'],
+  ['French Indo-China', 'East Indies'],
   ['East Indies', 'Australia'],
   ['Australia', 'New Zealand'],
   // African

@@ -1,28 +1,42 @@
 // AI Player logic for Tactical Risk
-// Handles automated decision making for computer opponents
+// Strategic AI that balances offense, defense, economics, and victory conditions
 
-// Strategy weights by difficulty - determines AI focus areas
-const DIFFICULTY_WEIGHTS = {
+// Difficulty configuration - affects all decision-making
+const DIFFICULTY_CONFIG = {
   easy: {
-    offense: 0.2,      // Low aggression
-    defense: 0.5,      // Prioritize defense
-    economics: 0.3,    // Some economic focus
-    expansion: 0.2,    // Low expansion
-    riskTolerance: 0.3 // Conservative
+    // Easy AI makes more mistakes and is less strategic
+    analysisDepth: 1,           // How many moves ahead to consider
+    economicWeight: 0.3,        // How much to value economic gains
+    defenseWeight: 0.5,         // How much to value defense
+    offenseWeight: 0.2,         // How much to value offense
+    victoryFocus: 0.1,          // How much to focus on victory conditions
+    mistakeChance: 0.25,        // Chance to make suboptimal decision
+    minAttackRatio: 2.0,        // Won't attack unless 2:1 advantage
+    reserveDefense: 0.6,        // Keep 60% of forces for defense
+    expandAggression: 0.3,      // Low desire to expand
   },
   medium: {
-    offense: 0.4,
-    defense: 0.4,
-    economics: 0.4,
-    expansion: 0.5,
-    riskTolerance: 0.5
+    analysisDepth: 2,
+    economicWeight: 0.5,
+    defenseWeight: 0.4,
+    offenseWeight: 0.5,
+    victoryFocus: 0.4,
+    mistakeChance: 0.1,
+    minAttackRatio: 1.4,
+    reserveDefense: 0.4,
+    expandAggression: 0.6,
   },
   hard: {
-    offense: 0.7,      // Aggressive
-    defense: 0.6,      // Still defends well
-    economics: 0.8,    // Strong economic focus
-    expansion: 0.8,    // Seeks to expand
-    riskTolerance: 0.7 // Willing to take calculated risks
+    // Hard AI plays optimally and aggressively pursues victory
+    analysisDepth: 3,
+    economicWeight: 0.8,
+    defenseWeight: 0.6,
+    offenseWeight: 0.7,
+    victoryFocus: 0.9,
+    mistakeChance: 0.0,
+    minAttackRatio: 1.2,
+    reserveDefense: 0.25,
+    expandAggression: 0.9,
   }
 };
 
@@ -31,13 +45,17 @@ export class AIPlayer {
     this.gameState = gameState;
     this.playerId = playerId;
     this.difficulty = difficulty;
-    this.weights = DIFFICULTY_WEIGHTS[difficulty] || DIFFICULTY_WEIGHTS.medium;
-    this.thinkDelay = difficulty === 'easy' ? 800 : difficulty === 'hard' ? 300 : 500;
+    this.config = DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.medium;
+    this.thinkDelay = difficulty === 'easy' ? 600 : difficulty === 'hard' ? 200 : 400;
+
+    // Cache for expensive calculations
+    this._cache = {};
   }
 
-  // Main entry point - called when it's this AI's turn
+  // Main entry point
   async takeTurn(phase, callbacks = {}) {
     await this._delay(this.thinkDelay);
+    this._cache = {}; // Clear cache each phase
 
     switch (phase) {
       case 'CAPITAL_PLACEMENT':
@@ -59,65 +77,259 @@ export class AIPlayer {
     }
   }
 
-  // Capital placement phase - strategically choose capital location
+  // ==================== STRATEGIC ANALYSIS ====================
+
+  // Analyze the overall game state for strategic decision making
+  _analyzeGameState() {
+    if (this._cache.gameAnalysis) return this._cache.gameAnalysis;
+
+    const analysis = {
+      // Our position
+      myTerritories: this._getOwnedTerritories(),
+      myIncome: this._calculateIncome(this.playerId),
+      myMilitaryStrength: this._calculateTotalMilitary(this.playerId),
+      myCapital: this.gameState.getCapital(this.playerId),
+      capitalSafe: true,
+
+      // Opponents
+      opponents: [],
+      strongestOpponent: null,
+      weakestOpponent: null,
+
+      // Strategic situation
+      totalTerritories: 0,
+      territoryShare: 0,
+      incomeShare: 0,
+      continentProgress: [],
+      threatenedTerritories: [],
+      opportunities: [],
+
+      // Victory tracking
+      capitalsControlled: 0,
+      capitalsNeededForVictory: 0,
+      closeToVictory: false,
+      opponentCloseToVictory: null,
+    };
+
+    // Count all land territories
+    const allTerritories = this.gameState.territories?.filter(t => !t.isWater) || [];
+    analysis.totalTerritories = allTerritories.length;
+    analysis.territoryShare = analysis.myTerritories.length / analysis.totalTerritories;
+
+    // Analyze opponents
+    const players = this.gameState.players || [];
+    let totalIncome = analysis.myIncome;
+
+    for (const p of players) {
+      if (p.id === this.playerId) continue;
+
+      const oppIncome = this._calculateIncome(p.id);
+      const oppStrength = this._calculateTotalMilitary(p.id);
+      const oppCapital = this.gameState.getCapital(p.id);
+
+      totalIncome += oppIncome;
+
+      analysis.opponents.push({
+        id: p.id,
+        income: oppIncome,
+        strength: oppStrength,
+        capital: oppCapital,
+        capitalCaptured: oppCapital ? this.gameState.getOwner(oppCapital) !== p.id : false,
+      });
+    }
+
+    analysis.incomeShare = analysis.myIncome / (totalIncome || 1);
+
+    // Find strongest and weakest opponents
+    analysis.opponents.sort((a, b) => b.strength - a.strength);
+    if (analysis.opponents.length > 0) {
+      analysis.strongestOpponent = analysis.opponents[0];
+      analysis.weakestOpponent = analysis.opponents[analysis.opponents.length - 1];
+    }
+
+    // Check capital safety
+    if (analysis.myCapital) {
+      const capitalOwner = this.gameState.getOwner(analysis.myCapital);
+      analysis.capitalSafe = capitalOwner === this.playerId;
+    }
+
+    // Analyze continent progress
+    for (const continent of this.gameState.continents || []) {
+      const owned = continent.territories.filter(t =>
+        this.gameState.getOwner(t) === this.playerId
+      ).length;
+      const total = continent.territories.length;
+      const progress = owned / total;
+
+      if (progress > 0 && progress < 1) {
+        analysis.continentProgress.push({
+          name: continent.name,
+          bonus: continent.bonus,
+          owned,
+          total,
+          progress,
+          remaining: total - owned,
+          value: continent.bonus / (total - owned), // Value per territory needed
+        });
+      }
+    }
+    analysis.continentProgress.sort((a, b) => b.value - a.value);
+
+    // Find threatened territories
+    for (const territory of analysis.myTerritories) {
+      const threat = this._calculateThreatLevel(territory);
+      if (threat > 0.3) {
+        analysis.threatenedTerritories.push({ territory, threat });
+      }
+    }
+    analysis.threatenedTerritories.sort((a, b) => b.threat - a.threat);
+
+    // Victory conditions analysis
+    let capitalsControlled = 0;
+    let totalCapitals = 0;
+    for (const p of players) {
+      const capital = this.gameState.getCapital(p.id);
+      if (capital) {
+        totalCapitals++;
+        if (this.gameState.getOwner(capital) === this.playerId) {
+          capitalsControlled++;
+        }
+      }
+    }
+    analysis.capitalsControlled = capitalsControlled;
+    analysis.capitalsNeededForVictory = Math.ceil(totalCapitals * 0.5) + 1;
+    analysis.closeToVictory = capitalsControlled >= analysis.capitalsNeededForVictory - 1;
+
+    // Check if any opponent is close to victory
+    for (const opp of analysis.opponents) {
+      let oppCapitals = 0;
+      for (const p of players) {
+        const capital = this.gameState.getCapital(p.id);
+        if (capital && this.gameState.getOwner(capital) === opp.id) {
+          oppCapitals++;
+        }
+      }
+      if (oppCapitals >= analysis.capitalsNeededForVictory - 1) {
+        analysis.opponentCloseToVictory = opp;
+        break;
+      }
+    }
+
+    this._cache.gameAnalysis = analysis;
+    return analysis;
+  }
+
+  // Calculate total income for a player
+  _calculateIncome(playerId) {
+    let income = 0;
+    const capital = this.gameState.getCapital(playerId);
+
+    for (const [territory, state] of Object.entries(this.gameState.territoryState || {})) {
+      if (state.owner === playerId) {
+        if (territory === capital) {
+          income += 10; // Capitals produce 10
+        } else {
+          const t = this.gameState.territoryByName[territory];
+          income += t?.production || 0;
+        }
+      }
+    }
+
+    // Add continent bonuses
+    for (const continent of this.gameState.continents || []) {
+      if (this.gameState.controlsContinent(playerId, continent.name)) {
+        income += continent.bonus;
+      }
+    }
+
+    return income;
+  }
+
+  // Calculate total military power for a player
+  _calculateTotalMilitary(playerId) {
+    let power = 0;
+    const unitDefs = this.gameState.unitDefs || {};
+
+    for (const [territory, units] of Object.entries(this.gameState.units || {})) {
+      for (const unit of units) {
+        if (unit.owner !== playerId) continue;
+        const def = unitDefs[unit.type];
+        if (def) {
+          // Value based on attack + defense + special abilities
+          const value = (def.attack || 0) + (def.defense || 0) + (def.hp || 1) - 1;
+          power += value * (unit.quantity || 1);
+        }
+      }
+    }
+
+    return power;
+  }
+
+  // ==================== CAPITAL PLACEMENT ====================
+
   _placeCapital(callbacks) {
     const territories = this._getOwnedTerritories();
     if (territories.length === 0) return { done: true };
 
+    // Score each territory for capital placement
+    const scored = territories.map(t => ({
+      territory: t,
+      score: this._scoreCapitalLocation(t),
+    }));
+    scored.sort((a, b) => b.score - a.score);
+
+    // Easy AI might pick suboptimally
     let choice;
-    if (this.difficulty === 'hard') {
-      // Hard AI: Consider multiple factors
-      choice = this._evaluateBestCapitalLocation(territories);
-    } else if (this.difficulty === 'easy') {
-      // Easy AI: Random choice
+    if (this.difficulty === 'easy' && Math.random() < this.config.mistakeChance) {
       choice = territories[Math.floor(Math.random() * territories.length)];
     } else {
-      // Medium AI: Pick centrally located territory
-      choice = this._findCentralTerritory(territories);
+      choice = scored[0].territory;
     }
 
     return { action: 'placeCapital', territory: choice };
   }
 
-  // Evaluate best capital location based on multiple factors
-  _evaluateBestCapitalLocation(territories) {
-    let bestTerritory = territories[0];
-    let bestScore = -Infinity;
+  _scoreCapitalLocation(territory) {
+    let score = 0;
+    const connections = this.gameState.getConnections(territory);
 
-    for (const t of territories) {
-      let score = 0;
+    // Prefer territories with more friendly neighbors (defensible)
+    const friendlyNeighbors = connections.filter(c =>
+      this.gameState.getOwner(c) === this.playerId
+    ).length;
+    score += friendlyNeighbors * 10;
 
-      // Connections (defensibility)
-      const connections = this.gameState.getConnections(t);
-      score += connections.length * 2;
+    // Avoid territories with many enemy neighbors
+    const enemyNeighbors = connections.filter(c => {
+      const owner = this.gameState.getOwner(c);
+      return owner && owner !== this.playerId;
+    }).length;
+    score -= enemyNeighbors * 8;
 
-      // Friendly neighbors (security)
-      const friendlyNeighbors = connections.filter(c =>
-        this.gameState.getOwner(c) === this.playerId
-      ).length;
-      score += friendlyNeighbors * 5;
+    // Prefer high-production territories
+    const t = this.gameState.territoryByName[territory];
+    score += (t?.production || 0) * 3;
 
-      // Distance from enemies (safety)
-      const enemyNeighbors = connections.filter(c => {
-        const owner = this.gameState.getOwner(c);
-        return owner && owner !== this.playerId;
-      }).length;
-      score -= enemyNeighbors * 3;
+    // Prefer territories with many total connections (strategic hub)
+    score += connections.length * 2;
 
-      // Territory production value
-      const production = this.gameState.getProductionValue?.(t) || 1;
-      score += production * 2;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestTerritory = t;
+    // Hard AI considers continent completion
+    if (this.difficulty === 'hard') {
+      const continent = this.gameState.continentByTerritory?.[territory];
+      if (continent) {
+        const owned = continent.territories.filter(ct =>
+          this.gameState.getOwner(ct) === this.playerId
+        ).length;
+        const progress = owned / continent.territories.length;
+        score += progress * continent.bonus * 2;
       }
     }
 
-    return bestTerritory;
+    return score;
   }
 
-  // Initial unit placement phase
+  // ==================== UNIT PLACEMENT (SETUP) ====================
+
   _placeUnits(callbacks) {
     const placementState = this.gameState.getPlacementState?.();
     if (!placementState) return { done: true };
@@ -127,9 +339,6 @@ export class AIPlayer {
       return { action: 'finishPlacement' };
     }
 
-    const territories = this._getOwnedTerritories();
-    if (territories.length === 0) return { done: true };
-
     const placements = [];
     let placed = 0;
 
@@ -138,18 +347,12 @@ export class AIPlayer {
 
       const toPlace = Math.min(count, maxPerRound - placed);
       for (let i = 0; i < toPlace; i++) {
-        let territory;
-        if (this.difficulty === 'hard') {
-          territory = this._findOptimalPlacementTerritory(territories, unitType);
-        } else if (this.difficulty === 'easy') {
-          territory = territories[Math.floor(Math.random() * territories.length)];
-        } else {
-          territory = this._findStrategicTerritory(territories);
+        const territory = this._findBestPlacementLocation(unitType);
+        if (territory) {
+          placements.push({ unitType, territory });
+          placed++;
+          if (placed >= maxPerRound) break;
         }
-
-        placements.push({ unitType, territory });
-        placed++;
-        if (placed >= maxPerRound) break;
       }
       if (placed >= maxPerRound) break;
     }
@@ -157,11 +360,11 @@ export class AIPlayer {
     return { action: 'placeUnits', placements };
   }
 
-  // Find optimal territory for placing a specific unit type
-  _findOptimalPlacementTerritory(territories, unitType) {
+  _findBestPlacementLocation(unitType) {
+    const territories = this._getOwnedTerritories();
     const unitDef = this.gameState.unitDefs?.[unitType];
 
-    // Naval units go to sea zones adjacent to capital
+    // Naval units go to sea zones
     if (unitDef?.isSea) {
       const seaZones = this._getAdjacentSeaZones();
       if (seaZones.length > 0) {
@@ -169,37 +372,50 @@ export class AIPlayer {
       }
     }
 
-    // Offensive units go to frontline
-    if (unitDef?.attack > unitDef?.defense) {
-      return this._findFrontlineTerritory(territories);
+    // Land and air units
+    const analysis = this._analyzeGameState();
+
+    // Prioritize frontline territories
+    const frontline = territories.filter(t => this._isFrontline(t));
+
+    if (this.difficulty === 'hard') {
+      // Hard AI places strategically
+      if (unitDef?.attack > unitDef?.defense) {
+        // Offensive units go to frontline near weak enemies
+        return frontline.length > 0 ? frontline[0] : territories[0];
+      } else {
+        // Defensive units go to capital or threatened territories
+        if (!analysis.capitalSafe && analysis.myCapital) {
+          return analysis.myCapital;
+        }
+        if (analysis.threatenedTerritories.length > 0) {
+          return analysis.threatenedTerritories[0].territory;
+        }
+      }
     }
 
-    // Defensive units go to capital or weak territories
-    return this._findWeakestTerritory(territories);
+    // Default: spread units across frontline or random
+    if (frontline.length > 0) {
+      return frontline[Math.floor(Math.random() * frontline.length)];
+    }
+    return territories[Math.floor(Math.random() * territories.length)];
   }
 
   _getAdjacentSeaZones() {
-    const capital = this.gameState.getCapital?.(this.playerId);
-    if (!capital) return [];
-    return this.gameState.getAdjacentSeaZones?.(capital) || [];
-  }
-
-  _findWeakestTerritory(territories) {
-    let weakest = territories[0];
-    let weakestStrength = Infinity;
-
-    for (const t of territories) {
-      const units = this.gameState.getUnits(t, this.playerId);
-      const strength = this._calculatePower(units || [], false);
-      if (strength < weakestStrength) {
-        weakestStrength = strength;
-        weakest = t;
+    const seaZones = new Set();
+    for (const territory of this._getOwnedTerritories()) {
+      const t = this.gameState.territoryByName[territory];
+      if (!t) continue;
+      for (const conn of t.connections || []) {
+        const ct = this.gameState.territoryByName[conn];
+        if (ct?.isWater) seaZones.add(conn);
       }
     }
-    return weakest;
+    return Array.from(seaZones);
   }
 
-  // Purchase phase - build army based on strategic needs
+  // ==================== PURCHASE PHASE ====================
+
   _purchaseUnits(callbacks) {
     const ipcs = this.gameState.getIPCs(this.playerId);
     if (ipcs <= 0) return { action: 'skipPurchase' };
@@ -207,31 +423,24 @@ export class AIPlayer {
     const unitDefs = this.gameState.unitDefs;
     if (!unitDefs) return { action: 'skipPurchase' };
 
+    const analysis = this._analyzeGameState();
     const purchases = [];
     let remaining = ipcs;
 
-    // Analyze current situation
-    const situation = this._analyzeStrategicSituation();
+    // Determine purchase strategy based on situation
+    const strategy = this._determinePurchaseStrategy(analysis);
 
-    // Get purchase priorities based on situation and difficulty
-    const priorities = this._getSmartPurchasePriorities(situation);
-
-    for (const { unitType, weight } of priorities) {
+    // Build purchase list based on strategy
+    for (const { unitType, ratio } of strategy) {
       const def = unitDefs[unitType];
       if (!def || def.cost > remaining) continue;
 
-      // Calculate how many to buy based on weight and available funds
-      let maxCount = Math.floor(remaining / def.cost);
-      let count = Math.ceil(maxCount * weight);
+      const maxAfford = Math.floor(remaining / def.cost);
+      let count = Math.ceil(maxAfford * ratio);
 
-      // Easy AI makes suboptimal purchases
+      // Easy AI buys less optimally
       if (this.difficulty === 'easy') {
-        count = Math.max(1, Math.floor(count * (0.3 + Math.random() * 0.5)));
-      }
-
-      // Medium AI doesn't over-concentrate
-      if (this.difficulty === 'medium') {
-        count = Math.min(count, 4);
+        count = Math.max(1, Math.floor(count * (0.5 + Math.random() * 0.5)));
       }
 
       if (count > 0) {
@@ -245,122 +454,204 @@ export class AIPlayer {
     return { action: 'purchase', purchases };
   }
 
-  // Analyze the current strategic situation
-  _analyzeStrategicSituation() {
-    const ownedTerritories = this._getOwnedTerritories();
-    const totalTerritories = this.gameState.territories?.filter(t => !t.isWater).length || 100;
+  _determinePurchaseStrategy(analysis) {
+    const strategy = [];
 
-    // Calculate relative strength vs opponents
-    const myStrength = this._calculateTotalStrength(this.playerId);
-    let enemyStrength = 0;
-    let strongestEnemy = null;
-    let strongestEnemyStrength = 0;
-
-    const players = this.gameState.players || [];
-    for (const p of players) {
-      if (p.id === this.playerId) continue;
-      const strength = this._calculateTotalStrength(p.id);
-      enemyStrength += strength;
-      if (strength > strongestEnemyStrength) {
-        strongestEnemyStrength = strength;
-        strongestEnemy = p.id;
-      }
+    // CRITICAL: Capital under threat - buy defensive units
+    if (!analysis.capitalSafe || analysis.threatenedTerritories.length > 2) {
+      strategy.push({ unitType: 'infantry', ratio: 0.6 });
+      strategy.push({ unitType: 'artillery', ratio: 0.25 });
+      strategy.push({ unitType: 'fighter', ratio: 0.15 });
+      return strategy;
     }
 
-    const frontlineCount = ownedTerritories.filter(t => this._isFrontline(t)).length;
-
-    return {
-      territoryShare: ownedTerritories.length / totalTerritories,
-      strengthRatio: myStrength / (enemyStrength || 1),
-      frontlineRatio: frontlineCount / (ownedTerritories.length || 1),
-      underThreat: frontlineCount > ownedTerritories.length * 0.5,
-      dominant: myStrength > enemyStrength * 1.5,
-      strongestEnemy,
-      myStrength,
-      enemyStrength
-    };
-  }
-
-  _calculateTotalStrength(playerId) {
-    const territories = this.gameState.territories || [];
-    let total = 0;
-    for (const t of territories) {
-      if (this.gameState.getOwner(t.name) !== playerId) continue;
-      const units = this.gameState.getUnits(t.name, playerId);
-      total += this._calculatePower(units || [], true);
-    }
-    return total;
-  }
-
-  // Get smart purchase priorities based on situation
-  _getSmartPurchasePriorities(situation) {
-    const priorities = [];
-
-    if (this.difficulty === 'hard') {
-      // Hard AI adapts to situation
-      if (situation.underThreat) {
-        // Need defense
-        priorities.push({ unitType: 'infantry', weight: 0.5 });
-        priorities.push({ unitType: 'artillery', weight: 0.3 });
-        priorities.push({ unitType: 'fighter', weight: 0.2 });
-      } else if (situation.dominant) {
-        // Press advantage with mobile units
-        priorities.push({ unitType: 'armour', weight: 0.4 });
-        priorities.push({ unitType: 'artillery', weight: 0.3 });
-        priorities.push({ unitType: 'bomber', weight: 0.2 });
-        priorities.push({ unitType: 'infantry', weight: 0.1 });
-      } else {
-        // Balanced build
-        priorities.push({ unitType: 'infantry', weight: 0.35 });
-        priorities.push({ unitType: 'armour', weight: 0.25 });
-        priorities.push({ unitType: 'artillery', weight: 0.2 });
-        priorities.push({ unitType: 'fighter', weight: 0.2 });
-      }
-    } else if (this.difficulty === 'easy') {
-      // Easy AI builds mostly infantry with occasional tanks
-      priorities.push({ unitType: 'infantry', weight: 0.7 });
-      priorities.push({ unitType: 'armour', weight: 0.3 });
-    } else {
-      // Medium AI has balanced but simpler priorities
-      priorities.push({ unitType: 'infantry', weight: 0.4 });
-      priorities.push({ unitType: 'armour', weight: 0.3 });
-      priorities.push({ unitType: 'artillery', weight: 0.3 });
+    // Close to victory - buy mobile offensive units
+    if (analysis.closeToVictory && this.difficulty !== 'easy') {
+      strategy.push({ unitType: 'armour', ratio: 0.4 });
+      strategy.push({ unitType: 'infantry', ratio: 0.3 });
+      strategy.push({ unitType: 'artillery', ratio: 0.2 });
+      strategy.push({ unitType: 'fighter', ratio: 0.1 });
+      return strategy;
     }
 
-    return priorities;
+    // Opponent close to victory - aggressive counter
+    if (analysis.opponentCloseToVictory && this.difficulty === 'hard') {
+      strategy.push({ unitType: 'armour', ratio: 0.35 });
+      strategy.push({ unitType: 'infantry', ratio: 0.35 });
+      strategy.push({ unitType: 'fighter', ratio: 0.2 });
+      strategy.push({ unitType: 'bomber', ratio: 0.1 });
+      return strategy;
+    }
+
+    // Weaker than opponents - defensive build
+    if (analysis.myMilitaryStrength < (analysis.strongestOpponent?.strength || 0) * 0.7) {
+      strategy.push({ unitType: 'infantry', ratio: 0.5 });
+      strategy.push({ unitType: 'artillery', ratio: 0.3 });
+      strategy.push({ unitType: 'armour', ratio: 0.2 });
+      return strategy;
+    }
+
+    // Stronger than opponents - offensive build
+    if (analysis.myMilitaryStrength > (analysis.strongestOpponent?.strength || 0) * 1.3) {
+      strategy.push({ unitType: 'armour', ratio: 0.35 });
+      strategy.push({ unitType: 'infantry', ratio: 0.3 });
+      strategy.push({ unitType: 'artillery', ratio: 0.2 });
+      strategy.push({ unitType: 'fighter', ratio: 0.15 });
+      return strategy;
+    }
+
+    // Default balanced build
+    strategy.push({ unitType: 'infantry', ratio: 0.4 });
+    strategy.push({ unitType: 'artillery', ratio: 0.25 });
+    strategy.push({ unitType: 'armour', ratio: 0.25 });
+    strategy.push({ unitType: 'fighter', ratio: 0.1 });
+    return strategy;
   }
 
-  // Combat movement phase - decide which attacks to make
+  // ==================== COMBAT MOVEMENT ====================
+
   _combatMove(callbacks) {
+    const analysis = this._analyzeGameState();
+    const moves = [];
+    const committedUnits = new Set(); // Track units already committed to attacks
+
+    // PRIORITY 1: Retake own capital if captured
+    if (!analysis.capitalSafe && analysis.myCapital) {
+      const capitalAttack = this._planCapitalRetake(analysis, committedUnits);
+      if (capitalAttack) {
+        moves.push(...capitalAttack);
+      }
+    }
+
+    // PRIORITY 2: Defend against opponent about to win
+    if (analysis.opponentCloseToVictory && this.difficulty !== 'easy') {
+      const counterAttack = this._planCounterAttack(analysis, committedUnits);
+      if (counterAttack) {
+        moves.push(...counterAttack);
+      }
+    }
+
+    // PRIORITY 3: Capture enemy capitals if close to victory
+    if (analysis.closeToVictory || this.config.victoryFocus > 0.5) {
+      const capitalAssaults = this._planCapitalAssaults(analysis, committedUnits);
+      moves.push(...capitalAssaults);
+    }
+
+    // PRIORITY 4: Economic expansion - complete continents
+    if (analysis.continentProgress.length > 0) {
+      const continentAttacks = this._planContinentCompletion(analysis, committedUnits);
+      moves.push(...continentAttacks);
+    }
+
+    // PRIORITY 5: Opportunistic attacks on weak targets
+    const opportunisticAttacks = this._planOpportunisticAttacks(analysis, committedUnits);
+    moves.push(...opportunisticAttacks);
+
+    return { action: 'combatMoves', moves };
+  }
+
+  _planCapitalRetake(analysis, committedUnits) {
+    const moves = [];
+    const capital = analysis.myCapital;
+    if (!capital) return moves;
+
+    // Gather ALL available forces to retake capital
+    const attackForce = this._gatherAttackForce(capital, committedUnits, true);
+
+    if (attackForce.length > 0) {
+      for (const { from, units } of attackForce) {
+        moves.push({ from, to: capital, units });
+        units.forEach(u => committedUnits.add(`${from}_${u.type}`));
+      }
+    }
+
+    return moves;
+  }
+
+  _planCounterAttack(analysis, committedUnits) {
+    const moves = [];
+    const opponent = analysis.opponentCloseToVictory;
+    if (!opponent) return moves;
+
+    // Attack the opponent's capital or their newest conquest
+    const target = opponent.capital;
+    if (!target) return moves;
+
+    const owner = this.gameState.getOwner(target);
+    if (owner === opponent.id) {
+      const attack = this._evaluateAndPlanAttack(target, committedUnits, 0.5); // Lower threshold
+      if (attack) moves.push(attack);
+    }
+
+    return moves;
+  }
+
+  _planCapitalAssaults(analysis, committedUnits) {
+    const moves = [];
+
+    for (const opponent of analysis.opponents) {
+      if (opponent.capitalCaptured) continue; // Already captured
+      const capital = opponent.capital;
+      if (!capital) continue;
+
+      const owner = this.gameState.getOwner(capital);
+      if (owner === this.playerId) continue; // We already own it
+
+      const attack = this._evaluateAndPlanAttack(capital, committedUnits, 0.6);
+      if (attack) moves.push(attack);
+    }
+
+    return moves;
+  }
+
+  _planContinentCompletion(analysis, committedUnits) {
+    const moves = [];
+    const maxAttacks = this.difficulty === 'hard' ? 3 : this.difficulty === 'medium' ? 2 : 1;
+
+    for (const continentInfo of analysis.continentProgress.slice(0, maxAttacks)) {
+      const continent = this.gameState.continents.find(c => c.name === continentInfo.name);
+      if (!continent) continue;
+
+      // Find enemy territories in this continent
+      for (const territory of continent.territories) {
+        const owner = this.gameState.getOwner(territory);
+        if (owner === this.playerId) continue;
+
+        const attack = this._evaluateAndPlanAttack(territory, committedUnits);
+        if (attack) {
+          moves.push(attack);
+          break; // One attack per continent per turn
+        }
+      }
+    }
+
+    return moves;
+  }
+
+  _planOpportunisticAttacks(analysis, committedUnits) {
     const moves = [];
     const ownedTerritories = this._getOwnedTerritories();
 
-    // Check if we need to prioritize capital retake (CRITICAL)
-    const capitalRetakeTarget = this._shouldPrioritizeCapitalRetake();
-
-    // Analyze all potential attacks
+    // Find all possible attacks and score them
     const attackOptions = [];
 
     for (const territory of ownedTerritories) {
-      const units = this.gameState.getUnits(territory, this.playerId);
-      if (!units || units.length === 0) continue;
-
       const connections = this.gameState.getConnections(territory);
-      const enemyTargets = connections.filter(t => {
-        const owner = this.gameState.getOwner(t);
-        const isWater = this.gameState.isWater ? this.gameState.isWater(t) : false;
-        return owner && owner !== this.playerId && !isWater;
-      });
 
-      for (const target of enemyTargets) {
-        const evaluation = this._evaluateAttackOpportunity(territory, target, units);
-        if (evaluation.shouldAttack) {
+      for (const target of connections) {
+        const owner = this.gameState.getOwner(target);
+        const t = this.gameState.territoryByName[target];
+
+        if (!owner || owner === this.playerId || t?.isWater) continue;
+
+        const evaluation = this._evaluateAttack(territory, target, committedUnits);
+        if (evaluation.viable) {
           attackOptions.push({
             from: territory,
             to: target,
             units: evaluation.attackers,
             score: evaluation.score,
-            winProbability: evaluation.winProbability
+            winProbability: evaluation.winProbability,
           });
         }
       }
@@ -369,227 +660,281 @@ export class AIPlayer {
     // Sort by score and execute best attacks
     attackOptions.sort((a, b) => b.score - a.score);
 
-    // If we need to retake our capital, prioritize it heavily
-    if (capitalRetakeTarget) {
-      // Move capital retake attack to the front
-      const capitalAttackIdx = attackOptions.findIndex(a => a.to === capitalRetakeTarget);
-      if (capitalAttackIdx > 0) {
-        const capitalAttack = attackOptions.splice(capitalAttackIdx, 1)[0];
-        attackOptions.unshift(capitalAttack);
-      }
-    }
-
-    // Hard AI coordinates attacks, others just attack greedily
-    const maxAttacks = this.difficulty === 'hard' ? 5 : this.difficulty === 'medium' ? 3 : 2;
+    const maxAttacks = this.difficulty === 'hard' ? 4 : this.difficulty === 'medium' ? 2 : 1;
 
     for (let i = 0; i < Math.min(attackOptions.length, maxAttacks); i++) {
       const attack = attackOptions[i];
-      moves.push({
-        from: attack.from,
-        to: attack.to,
-        units: attack.units
-      });
+
+      // Check if units are still available
+      const stillAvailable = attack.units.every(u =>
+        !committedUnits.has(`${attack.from}_${u.type}`)
+      );
+
+      if (stillAvailable) {
+        moves.push({
+          from: attack.from,
+          to: attack.to,
+          units: attack.units,
+        });
+        attack.units.forEach(u => committedUnits.add(`${attack.from}_${u.type}`));
+      }
     }
 
-    return { action: 'combatMoves', moves };
+    return moves;
   }
 
-  // Check if AI should prioritize retaking its own capital
-  _shouldPrioritizeCapitalRetake() {
-    const myCapital = this.gameState.getCapital(this.playerId);
-    if (!myCapital) return null;
+  _evaluateAndPlanAttack(target, committedUnits, minWinProb = null) {
+    const minProb = minWinProb || (1 - this.config.minAttackRatio * 0.3);
+    const attackForce = this._gatherAttackForce(target, committedUnits);
 
-    // Check if our capital is held by enemy
-    const capitalOwner = this.gameState.getOwner(myCapital);
-    if (capitalOwner === this.playerId) return null; // We own it
-    if (this.gameState.areAllies(this.playerId, capitalOwner)) return null; // Allied owns it
+    if (attackForce.length === 0) return null;
 
-    // Our capital is enemy-held - return the territory name
-    return myCapital;
+    // Combine all attack forces
+    const combinedUnits = [];
+    let totalPower = 0;
+
+    for (const { from, units } of attackForce) {
+      for (const unit of units) {
+        const def = this.gameState.unitDefs?.[unit.type];
+        totalPower += (def?.attack || 0) * unit.quantity;
+        combinedUnits.push({ from, ...unit });
+      }
+    }
+
+    const defenderPower = this._calculateDefensePower(target);
+    const winProb = this._estimateWinProbability(totalPower, defenderPower);
+
+    if (winProb >= minProb) {
+      // Return the first source with the combined attack
+      const primary = attackForce[0];
+      return {
+        from: primary.from,
+        to: target,
+        units: primary.units,
+      };
+    }
+
+    return null;
   }
 
-  // Evaluate an attack opportunity with detailed scoring
-  _evaluateAttackOpportunity(from, to, units) {
-    const attackPower = this._calculatePower(units, true);
-    const defenderUnits = this.gameState.getUnits(to) || [];
-    const defensePower = this._calculatePower(defenderUnits, false);
+  _evaluateAttack(fromTerritory, toTerritory, committedUnits) {
+    const units = this.gameState.getUnits(fromTerritory, this.playerId) || [];
 
-    const ratio = attackPower / (defensePower || 1);
+    // Filter out committed and immobile units
+    const available = units.filter(u => {
+      if (committedUnits.has(`${fromTerritory}_${u.type}`)) return false;
+      const def = this.gameState.unitDefs?.[u.type];
+      return def && def.attack > 0 && !u.moved;
+    });
+
+    if (available.length === 0) {
+      return { viable: false };
+    }
+
+    const attackPower = this._calculateAttackPower(available);
+    const defensePower = this._calculateDefensePower(toTerritory);
     const winProbability = this._estimateWinProbability(attackPower, defensePower);
 
-    // Calculate strategic value of target
-    const targetValue = this._evaluateTargetValue(to);
+    // Calculate strategic value
+    let score = winProbability * 10;
+    score += this._evaluateTargetValue(toTerritory);
 
-    // Score combines win probability, strategic value, and difficulty weights
-    let score = winProbability * targetValue;
-    score *= this.weights.offense;
+    // Easy AI requires higher odds
+    const minWinProb = 1 - this.config.minAttackRatio * 0.35;
+    const viable = winProbability >= minWinProb;
 
-    // Adjust for risk tolerance
-    if (winProbability < 0.5) {
-      score *= this.weights.riskTolerance;
+    // Don't attack if it would leave territory defenseless (except hard AI)
+    if (this.difficulty !== 'hard') {
+      const remainingDefense = this._calculateDefenseAfterAttack(fromTerritory, available);
+      if (remainingDefense < defensePower * 0.5) {
+        return { viable: false };
+      }
     }
 
-    // Minimum threshold based on difficulty
-    const minRatio = this.difficulty === 'hard' ? 1.2 :
-                     this.difficulty === 'medium' ? 1.5 : 2.0;
-
-    const shouldAttack = ratio >= minRatio || (
-      this.difficulty === 'hard' && winProbability > 0.6 && targetValue > 5
-    );
-
     return {
-      shouldAttack,
+      viable,
+      attackers: available.map(u => ({ type: u.type, quantity: u.quantity })),
       score,
       winProbability,
-      attackers: shouldAttack ? this._selectAttackers(units, to) : []
     };
   }
 
-  // Estimate probability of winning the battle
-  _estimateWinProbability(attackPower, defensePower) {
-    if (defensePower === 0) return 1.0;
-    if (attackPower === 0) return 0.0;
+  _gatherAttackForce(target, committedUnits, allIn = false) {
+    const forces = [];
+    const connections = this.gameState.getConnections(target);
 
-    // Simplified probability based on power ratio
-    const ratio = attackPower / defensePower;
-    if (ratio >= 3) return 0.95;
-    if (ratio >= 2) return 0.85;
-    if (ratio >= 1.5) return 0.7;
-    if (ratio >= 1) return 0.55;
-    if (ratio >= 0.7) return 0.35;
-    return 0.2;
-  }
+    for (const territory of connections) {
+      if (this.gameState.getOwner(territory) !== this.playerId) continue;
 
-  // Evaluate strategic value of a target territory
-  _evaluateTargetValue(territory) {
-    let value = 0;
+      const units = this.gameState.getUnits(territory, this.playerId) || [];
+      const available = units.filter(u => {
+        if (committedUnits.has(`${territory}_${u.type}`)) return false;
+        const def = this.gameState.unitDefs?.[u.type];
+        return def && def.attack > 0 && !u.moved;
+      });
 
-    // Production value
-    value += (this.gameState.getProductionValue?.(territory) || 1) * 2;
+      if (available.length === 0) continue;
 
-    // Is it a capital? Very valuable
-    if (this.gameState.isCapital?.(territory)) {
-      value += 20;
+      // Decide how many to send
+      let attackers;
+      if (allIn) {
+        // Send everything for capital retake
+        attackers = available.map(u => ({ type: u.type, quantity: u.quantity }));
+      } else {
+        // Keep some for defense based on difficulty
+        const keepRatio = this.config.reserveDefense;
+        attackers = available.map(u => ({
+          type: u.type,
+          quantity: Math.max(1, Math.floor(u.quantity * (1 - keepRatio))),
+        })).filter(u => u.quantity > 0);
+      }
 
-      // CRITICAL: Is this OUR OWN capital that was captured?
-      // Retaking our capital is the highest priority
-      const myCapital = this.gameState.getCapital(this.playerId);
-      if (territory === myCapital) {
-        // Our capital is held by enemy - massive priority to retake
-        value += 100;
+      if (attackers.length > 0) {
+        forces.push({ from: territory, units: attackers });
       }
     }
 
-    // Continent bonus consideration
-    const continentBonus = this._getContinentBonusValue(territory);
-    value += continentBonus * this.weights.economics;
+    return forces;
+  }
 
-    // Strategic position (connections)
+  _evaluateTargetValue(territory) {
+    let value = 0;
+    const t = this.gameState.territoryByName[territory];
+
+    // Production value
+    value += (t?.production || 1) * 2;
+
+    // Capital value
+    if (this.gameState.isCapital?.(territory)) {
+      const isMyCapital = territory === this.gameState.getCapital(this.playerId);
+      value += isMyCapital ? 100 : 30; // Huge bonus for own capital
+    }
+
+    // Continent completion value
+    const continent = this.gameState.continentByTerritory?.[territory];
+    if (continent) {
+      const owned = continent.territories.filter(ct =>
+        this.gameState.getOwner(ct) === this.playerId
+      ).length;
+      const wouldComplete = owned === continent.territories.length - 1;
+      if (wouldComplete) {
+        value += continent.bonus * 3;
+      }
+    }
+
+    // Strategic position
     const connections = this.gameState.getConnections(territory);
     value += connections.length;
 
-    return value;
+    return value * this.config.economicWeight;
   }
 
-  _getContinentBonusValue(territory) {
-    // Check if capturing this territory completes a continent
-    const continents = this.gameState.continents || [];
-    for (const continent of continents) {
-      if (!continent.territories?.includes(territory)) continue;
+  // ==================== COMBAT RESOLUTION ====================
 
-      // Count how many territories we'd control after capture
-      const wouldControl = continent.territories.filter(t =>
-        t === territory || this.gameState.getOwner(t) === this.playerId
-      ).length;
-
-      if (wouldControl === continent.territories.length) {
-        return continent.bonus || 0;
-      }
-    }
-    return 0;
-  }
-
-  // Combat resolution
   _resolveCombat(callbacks) {
     return { action: 'autoCombat' };
   }
 
-  // Non-combat movement phase - reinforce and reposition
+  // ==================== NON-COMBAT MOVEMENT ====================
+
   _nonCombatMove(callbacks) {
     const moves = [];
-    const ownedTerritories = this._getOwnedTerritories();
+    const analysis = this._analyzeGameState();
 
-    // Calculate threat levels for all territories
-    const threatLevels = {};
-    for (const t of ownedTerritories) {
-      threatLevels[t] = this._calculateThreatLevel(t);
+    // Reinforce threatened territories
+    for (const { territory, threat } of analysis.threatenedTerritories) {
+      const reinforcements = this._findReinforcements(territory);
+      if (reinforcements.length > 0) {
+        moves.push(...reinforcements);
+      }
     }
 
-    // Move units from safe territories to threatened ones
-    for (const territory of ownedTerritories) {
-      const units = this.gameState.getUnits(territory, this.playerId);
-      if (!units || units.length <= 1) continue;
+    // Reinforce capital
+    if (analysis.myCapital) {
+      const capitalReinforcements = this._findReinforcements(analysis.myCapital, true);
+      moves.push(...capitalReinforcements);
+    }
 
-      // Only move from safe territories
-      if (threatLevels[territory] > 0.3) continue;
-
-      const connections = this.gameState.getConnections(territory);
-      const friendlyTargets = connections.filter(t =>
-        this.gameState.getOwner(t) === this.playerId
-      );
-
-      // Find most threatened neighbor
-      let mostThreatened = null;
-      let highestThreat = 0;
-
-      for (const target of friendlyTargets) {
-        if (threatLevels[target] > highestThreat) {
-          highestThreat = threatLevels[target];
-          mostThreatened = target;
-        }
-      }
-
-      if (mostThreatened && highestThreat > 0.4) {
-        const sourceCount = units.reduce((sum, u) => sum + u.quantity, 0);
-        const toMove = Math.floor(sourceCount * 0.5);
-
-        if (toMove > 0) {
-          moves.push({
-            from: territory,
-            to: mostThreatened,
-            count: toMove
-          });
-        }
+    // Move units towards frontline
+    const interiorUnits = this._findInteriorUnits();
+    for (const { territory, units } of interiorUnits) {
+      const frontline = this._findNearestFrontline(territory);
+      if (frontline) {
+        moves.push({
+          from: territory,
+          to: frontline,
+          count: Math.floor(units * 0.7),
+        });
       }
     }
 
     return { action: 'nonCombatMoves', moves };
   }
 
-  // Calculate threat level for a territory (0-1 scale)
-  _calculateThreatLevel(territory) {
-    const myUnits = this.gameState.getUnits(territory, this.playerId);
-    const myPower = this._calculatePower(myUnits || [], false);
+  _findReinforcements(target, isCapital = false) {
+    const moves = [];
+    const connections = this.gameState.getConnections(target);
 
-    let maxEnemyPower = 0;
-    const connections = this.gameState.getConnections(territory);
+    for (const territory of connections) {
+      if (this.gameState.getOwner(territory) !== this.playerId) continue;
+      if (this._isFrontline(territory) && !isCapital) continue; // Don't weaken frontline
 
-    for (const conn of connections) {
-      const owner = this.gameState.getOwner(conn);
-      if (owner && owner !== this.playerId) {
-        const enemyUnits = this.gameState.getUnits(conn, owner);
-        const enemyPower = this._calculatePower(enemyUnits || [], true);
-        maxEnemyPower = Math.max(maxEnemyPower, enemyPower);
+      const units = this.gameState.getUnits(territory, this.playerId) || [];
+      const totalUnits = units.reduce((sum, u) => sum + u.quantity, 0);
+
+      if (totalUnits > 1) {
+        moves.push({
+          from: territory,
+          to: target,
+          count: Math.floor(totalUnits * 0.5),
+        });
       }
     }
 
-    if (maxEnemyPower === 0) return 0;
-    if (myPower === 0) return 1;
-
-    return Math.min(1, maxEnemyPower / (myPower * 2));
+    return moves;
   }
 
-  // Mobilize (place purchased units)
+  _findInteriorUnits() {
+    const interior = [];
+
+    for (const territory of this._getOwnedTerritories()) {
+      if (this._isFrontline(territory)) continue;
+
+      const units = this.gameState.getUnits(territory, this.playerId) || [];
+      const totalUnits = units.reduce((sum, u) => sum + u.quantity, 0);
+
+      if (totalUnits > 1) {
+        interior.push({ territory, units: totalUnits });
+      }
+    }
+
+    return interior;
+  }
+
+  _findNearestFrontline(territory) {
+    const visited = new Set([territory]);
+    const queue = [territory];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+
+      if (current !== territory && this._isFrontline(current)) {
+        return current;
+      }
+
+      for (const conn of this.gameState.getConnections(current)) {
+        if (visited.has(conn)) continue;
+        if (this.gameState.getOwner(conn) !== this.playerId) continue;
+        visited.add(conn);
+        queue.push(conn);
+      }
+    }
+
+    return null;
+  }
+
+  // ==================== MOBILIZE ====================
+
   _mobilize(callbacks) {
     const pending = this.gameState.getPendingPurchases?.(this.playerId);
     if (!pending || pending.length === 0) return { action: 'skipMobilize' };
@@ -597,11 +942,15 @@ export class AIPlayer {
     const capital = this.gameState.getCapital(this.playerId);
     if (!capital) return { action: 'skipMobilize' };
 
-    // Hard AI distributes units across factories
+    // Hard AI distributes to multiple factories
     if (this.difficulty === 'hard') {
       const factories = this._getFactoryLocations();
       if (factories.length > 1) {
-        return { action: 'mobilize', territory: this._findBestMobilizationTerritory(factories) };
+        // Place at frontline factory if available
+        const frontlineFactory = factories.find(f => this._isFrontline(f));
+        if (frontlineFactory) {
+          return { action: 'mobilize', territory: frontlineFactory };
+        }
       }
     }
 
@@ -610,100 +959,113 @@ export class AIPlayer {
 
   _getFactoryLocations() {
     const factories = [];
-    const territories = this.gameState.territories || [];
 
-    for (const t of territories) {
-      if (this.gameState.getOwner(t.name) !== this.playerId) continue;
-      const units = this.gameState.getUnits(t.name, this.playerId);
-      if (units?.some(u => u.type === 'factory')) {
-        factories.push(t.name);
+    for (const [territory, units] of Object.entries(this.gameState.units || {})) {
+      if (this.gameState.getOwner(territory) !== this.playerId) continue;
+      if (units.some(u => u.type === 'factory')) {
+        factories.push(territory);
       }
     }
+
     return factories;
   }
 
-  _findBestMobilizationTerritory(factories) {
-    // Prefer frontline factories for offensive units
-    for (const f of factories) {
-      if (this._isFrontline(f)) return f;
-    }
-    return factories[0];
-  }
+  // ==================== UTILITY METHODS ====================
 
-  // Helper methods
   _getOwnedTerritories() {
-    return this.gameState.territories
-      ?.filter(t => !t.isWater && this.gameState.getOwner(t.name) === this.playerId)
-      .map(t => t.name) || [];
-  }
+    if (this._cache.ownedTerritories) return this._cache.ownedTerritories;
 
-  _findCentralTerritory(territories) {
-    let best = territories[0];
-    let bestScore = 0;
+    const owned = (this.gameState.territories || [])
+      .filter(t => !t.isWater && this.gameState.getOwner(t.name) === this.playerId)
+      .map(t => t.name);
 
-    for (const t of territories) {
-      const connections = this.gameState.getConnections(t);
-      const friendlyNeighbors = connections.filter(c =>
-        this.gameState.getOwner(c) === this.playerId
-      ).length;
-      if (friendlyNeighbors > bestScore) {
-        bestScore = friendlyNeighbors;
-        best = t;
-      }
-    }
-    return best;
-  }
-
-  _findFrontlineTerritory(territories) {
-    for (const t of territories) {
-      if (this._isFrontline(t)) return t;
-    }
-    return territories[0];
-  }
-
-  _findStrategicTerritory(territories) {
-    const frontline = territories.filter(t => this._isFrontline(t));
-    if (frontline.length > 0 && Math.random() > 0.3) {
-      return frontline[Math.floor(Math.random() * frontline.length)];
-    }
-    return this._findCentralTerritory(territories);
+    this._cache.ownedTerritories = owned;
+    return owned;
   }
 
   _isFrontline(territory) {
     const connections = this.gameState.getConnections(territory);
     return connections.some(c => {
       const owner = this.gameState.getOwner(c);
-      const isWater = this.gameState.isWater ? this.gameState.isWater(c) : false;
-      return owner && owner !== this.playerId && !isWater;
+      const t = this.gameState.territoryByName[c];
+      return owner && owner !== this.playerId && !t?.isWater;
     });
   }
 
-  _calculatePower(units, isAttack) {
-    if (!units || !Array.isArray(units)) return 0;
+  _calculateThreatLevel(territory) {
+    const myUnits = this.gameState.getUnits(territory, this.playerId) || [];
+    const myPower = this._calculateDefensePower(territory);
 
-    const unitDefs = this.gameState.unitDefs || {};
+    let maxEnemyPower = 0;
+    for (const conn of this.gameState.getConnections(territory)) {
+      const owner = this.gameState.getOwner(conn);
+      if (owner && owner !== this.playerId) {
+        const enemyUnits = this.gameState.getUnits(conn, owner) || [];
+        const power = this._calculateAttackPower(enemyUnits);
+        maxEnemyPower = Math.max(maxEnemyPower, power);
+      }
+    }
+
+    if (maxEnemyPower === 0) return 0;
+    if (myPower === 0) return 1;
+    return Math.min(1, maxEnemyPower / (myPower * 1.5));
+  }
+
+  _calculateAttackPower(units) {
+    let power = 0;
+    for (const unit of units) {
+      const def = this.gameState.unitDefs?.[unit.type];
+      if (def) {
+        power += (def.attack || 0) * (unit.quantity || 1);
+      }
+    }
+    return power;
+  }
+
+  _calculateDefensePower(territory) {
+    const units = this.gameState.getUnits(territory) || [];
+    let power = 0;
+    for (const unit of units) {
+      if (unit.owner === this.playerId) continue;
+      const def = this.gameState.unitDefs?.[unit.type];
+      if (def) {
+        power += (def.defense || 0) * (unit.quantity || 1);
+      }
+    }
+    return power;
+  }
+
+  _calculateDefenseAfterAttack(territory, attackers) {
+    const units = this.gameState.getUnits(territory, this.playerId) || [];
     let power = 0;
 
     for (const unit of units) {
-      const def = unitDefs[unit.type];
-      if (!def) continue;
-      const value = isAttack ? def.attack : def.defense;
-      power += value * (unit.quantity || 1);
+      const attacker = attackers.find(a => a.type === unit.type);
+      const remaining = attacker ? unit.quantity - attacker.quantity : unit.quantity;
+      if (remaining > 0) {
+        const def = this.gameState.unitDefs?.[unit.type];
+        if (def) {
+          power += (def.defense || 0) * remaining;
+        }
+      }
     }
 
     return power;
   }
 
-  _selectAttackers(units, target) {
-    return units.filter(u => {
-      const def = this.gameState.unitDefs?.[u.type];
-      return def && def.attack > 0;
-    }).map(u => ({
-      type: u.type,
-      quantity: this.difficulty === 'easy'
-        ? Math.ceil(u.quantity / 2)
-        : u.quantity
-    }));
+  _estimateWinProbability(attackPower, defensePower) {
+    if (defensePower === 0) return 1.0;
+    if (attackPower === 0) return 0.0;
+
+    const ratio = attackPower / defensePower;
+    if (ratio >= 3) return 0.95;
+    if (ratio >= 2.5) return 0.90;
+    if (ratio >= 2) return 0.80;
+    if (ratio >= 1.5) return 0.65;
+    if (ratio >= 1.2) return 0.55;
+    if (ratio >= 1) return 0.45;
+    if (ratio >= 0.8) return 0.30;
+    return 0.15;
   }
 
   _delay(ms) {
