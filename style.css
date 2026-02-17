@@ -2434,6 +2434,14 @@ html, body {
   color: #ffd700;
 }
 
+.pp-instructions-small {
+  text-align: center;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 12px;
+  font-style: italic;
+}
+
 .pp-valid-locations {
   display: flex;
   flex-direction: column;
@@ -3000,6 +3008,30 @@ html, body {
 
 .mp-dest-select option.enemy {
   color: #ff6060;
+}
+
+.mp-dest-select option.no-landing {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.15);
+}
+
+.mp-air-warning {
+  background: rgba(255, 152, 0, 0.15);
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11px;
+  color: #ffb74d;
+  line-height: 1.4;
+}
+
+.mp-warning-icon {
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 /* Cargo Unload UI (Amphibious Assault) */

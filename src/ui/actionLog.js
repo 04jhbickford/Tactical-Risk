@@ -27,13 +27,13 @@ export class ActionLog {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'actionLog';
-    this.el.className = 'action-log-integrated hidden collapsed'; // Start collapsed
+    this.el.className = 'action-log-integrated info-section hidden collapsed'; // Start collapsed
     this.el.innerHTML = `
-      <div class="action-log-header">
-        <span class="action-log-title">Game Log</span>
-        <button class="action-log-toggle" title="Toggle Log">▶</button>
+      <div class="info-section-header" data-toggle="game-log">
+        <span class="info-section-title">Game Log</span>
+        <span class="info-section-toggle">▶</span>
       </div>
-      <div class="action-log-content"></div>
+      <div class="info-section-content action-log-content"></div>
     `;
 
     // Append to sidebar instead of body
@@ -45,13 +45,13 @@ export class ActionLog {
     }
 
     // Toggle visibility - persist collapsed state
-    this.el.querySelector('.action-log-toggle').addEventListener('click', () => {
+    this.el.querySelector('.info-section-header').addEventListener('click', () => {
       this.isCollapsed = !this.isCollapsed;
       this.el.classList.toggle('collapsed', this.isCollapsed);
-      // Update toggle button icon
-      const toggleBtn = this.el.querySelector('.action-log-toggle');
-      if (toggleBtn) {
-        toggleBtn.textContent = this.isCollapsed ? '▶' : '▼';
+      // Update toggle icon
+      const toggleIcon = this.el.querySelector('.info-section-toggle');
+      if (toggleIcon) {
+        toggleIcon.textContent = this.isCollapsed ? '▶' : '▼';
       }
     });
 

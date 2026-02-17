@@ -558,8 +558,9 @@ export class GameState {
     const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
     // Get all territories within remaining movement
-    // If no movement tracked (unit didn't move in combat phase), use full movement
-    const searchRange = remainingMovement > 0 ? remainingMovement : totalMovement;
+    // If unit moved and has no remaining movement, it can only stay in current territory
+    // If unit didn't move (no origin tracked), use full movement
+    const searchRange = distanceTraveled > 0 ? remainingMovement : totalMovement;
     const reachable = this.getReachableTerritoriesForAir(territory, searchRange, player.id, false);
     const validLandings = [];
 
@@ -623,6 +624,62 @@ export class GameState {
   // Clear air unit origins for a territory (after landing resolution)
   clearAirUnitOrigins(territory) {
     delete this.airUnitOrigins[territory];
+  }
+
+  // Check if an air unit can land somewhere valid after moving from->to
+  // Returns { canLand: boolean, remainingMovement: number }
+  checkAirUnitCanLand(fromTerritory, toTerritory, unitType, unitDefs) {
+    const player = this.currentPlayer;
+    if (!player) return { canLand: false, remainingMovement: 0 };
+
+    const unitDef = unitDefs[unitType];
+    if (!unitDef?.isAir) return { canLand: true, remainingMovement: 0 };
+
+    const totalMovement = unitDef.movement || 4;
+
+    // Get current tracking info if the unit already moved
+    const existingOrigin = this.airUnitOrigins[fromTerritory]?.[unitType];
+    const previousDistance = existingOrigin?.distance || 0;
+
+    // Calculate new distance
+    const newDistance = this._calculateAirDistance(fromTerritory, toTerritory);
+    const totalDistanceTraveled = previousDistance + newDistance;
+    const remainingMovement = Math.max(0, totalMovement - totalDistanceTraveled);
+
+    // Check if there are valid landing spots within remaining movement
+    // Get territories that were friendly at turn start
+    let friendlyAtStart = this.friendlyTerritoriesAtTurnStart || new Set();
+    if (friendlyAtStart.size === 0) {
+      // Fallback: use current ownership
+      for (const [terrName, state] of Object.entries(this.territoryState)) {
+        if (state.owner === player.id || this.areAllies(player.id, state.owner)) {
+          friendlyAtStart.add(terrName);
+        }
+      }
+    }
+
+    // Check if any landing options exist
+    const reachable = this.getReachableTerritoriesForAir(toTerritory, remainingMovement, player.id, false);
+
+    for (const [destName] of reachable) {
+      const destT = this.territoryByName[destName];
+
+      if (destT?.isWater) {
+        // Check for friendly carriers
+        const seaUnits = this.units[destName] || [];
+        const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        if (carriers.length > 0) {
+          const carrierDef = unitDefs.carrier;
+          if (carrierDef?.canCarry?.includes(unitType)) {
+            return { canLand: true, remainingMovement };
+          }
+        }
+      } else if (friendlyAtStart.has(destName)) {
+        return { canLand: true, remainingMovement };
+      }
+    }
+
+    return { canLand: false, remainingMovement };
   }
 
   // Get flight path for air unit (for validation and display)
@@ -1561,11 +1618,13 @@ export class GameState {
           continue;
         }
       } else if (nextPhase === TURN_PHASES.MOBILIZE) {
-        // Auto-mobilize all purchases - territory was already selected during purchase phase
+        // Check if there are any pending purchases to place
         const player = this.currentPlayer;
-        this._mobilizePurchases();
-        // Always skip mobilize phase - units are auto-placed at their designated territories
-        continue;
+        const hasPurchases = this.pendingPurchases.some(p => p.owner === player.id);
+        if (!hasPurchases) {
+          // Skip mobilize phase if nothing to place
+          continue;
+        }
       } else if (nextPhase === TURN_PHASES.COLLECT_INCOME) {
         this._collectIncome();
         // Auto-advance to next player

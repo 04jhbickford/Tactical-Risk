@@ -1329,7 +1329,37 @@ export class MovementUI {
     const hasUnitsSelected = Object.values(this.selectedUnits).some(q => q > 0);
     const hasShipsSelected = this.selectedShipIds.size > 0;
 
+    // Check for air units that can't land (combat move only)
+    let airWarningDests = new Set();
+    if (isCombatMove && hasUnitsSelected) {
+      for (const dest of validDests) {
+        for (const [unitType, qty] of Object.entries(this.selectedUnits)) {
+          if (qty > 0) {
+            const def = this.unitDefs[unitType];
+            if (def?.isAir) {
+              const landCheck = this.gameState.checkAirUnitCanLand(
+                this.selectedFrom.name, dest, unitType, this.unitDefs
+              );
+              if (!landCheck.canLand) {
+                airWarningDests.add(dest);
+              }
+            }
+          }
+        }
+      }
+    }
+
     if ((hasUnitsSelected || hasShipsSelected) && validDests.length > 0) {
+      // Show warning if any air units can't land
+      if (airWarningDests.size > 0) {
+        html += `
+          <div class="mp-air-warning">
+            <span class="mp-warning-icon">⚠️</span>
+            <span>WARNING: Air unit cannot land after attacking marked destinations. Unit will crash!</span>
+          </div>
+        `;
+      }
+
       html += `
         <div class="mp-destinations">
           <span class="mp-label">Move to:</span>
@@ -1338,7 +1368,9 @@ export class MovementUI {
             ${validDests.map(dest => {
               const owner = this.gameState.getOwner(dest);
               const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
-              return `<option value="${dest}" data-territory="${dest}" class="${isEnemy ? 'enemy' : ''}">${dest}${isEnemy ? ' (Enemy)' : ''}</option>`;
+              const cantLand = airWarningDests.has(dest);
+              const label = cantLand ? `${dest} ⚠️ NO LANDING` : `${dest}${isEnemy ? ' (Enemy)' : ''}`;
+              return `<option value="${dest}" data-territory="${dest}" class="${isEnemy ? 'enemy' : ''} ${cantLand ? 'no-landing' : ''}">${label}</option>`;
             }).join('')}
           </select>
         </div>

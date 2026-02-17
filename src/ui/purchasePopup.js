@@ -123,13 +123,8 @@ export class PurchasePopup {
     const ipcs = this.gameState.getIPCs(player.id);
     const remaining = ipcs - this.cartCost;
 
-    // If no territory selected, show instructions to click map
-    if (!this.selectedTerritory) {
-      this._renderTerritoryPrompt(player, ipcs);
-      return;
-    }
-
-    // Territory selected - show unit purchase for that territory
+    // Show unit purchase directly - no territory selection needed
+    // Territory selection happens during MOBILIZE phase
     this._renderUnitPurchase(player, ipcs, remaining);
   }
 
@@ -259,46 +254,46 @@ export class PurchasePopup {
   }
 
   _renderUnitPurchase(player, ipcs, remaining) {
-    const isSeaZone = this.territories?.[this.selectedTerritory]?.isWater;
+    // Check what placement options player has
+    const factoryTerritories = this._getFactoryTerritories(player.id);
+    const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
+    const hasFactories = factoryTerritories.length > 0;
+    const hasSeaZones = adjacentSeaZones.length > 0;
+    const ownedTerritories = this._getOwnedTerritories(player.id);
+    const canBuildFactory = ownedTerritories.some(name => !factoryTerritories.includes(name));
 
-    // Check if selected territory already has a factory
-    const selectedHasFactory = (this.gameState.units[this.selectedTerritory] || [])
-      .some(u => u.type === 'factory' && u.owner === player.id);
-
-    // Filter units based on territory type and factory presence
+    // Show all units that can be placed somewhere
     const units = Object.entries(this.unitDefs)
       .filter(([type, u]) => {
         // Exclude AA guns from purchase
         if (type === 'aaGun') return false;
 
-        if (isSeaZone) {
-          // Sea zones: only naval units
-          return u.isSea;
-        } else if (selectedHasFactory) {
-          // Land territories WITH factory: land, air, and buildings (factory)
-          return u.isLand || u.isAir || u.isBuilding;
-        } else {
-          // Land territories WITHOUT factory: can only buy a factory
-          return u.isBuilding;
-        }
+        // Can buy land/air units if player has factories
+        if ((u.isLand || u.isAir) && hasFactories) return true;
+
+        // Can buy naval units if player has sea zones adjacent to factories
+        if (u.isSea && hasSeaZones) return true;
+
+        // Can buy factory if player has territory without factory
+        if (u.isBuilding && canBuildFactory) return true;
+
+        return false;
       });
 
     let html = `
-            <div class="pp-header">
+      <div class="pp-header">
         <div class="pp-title">Purchase Units</div>
         <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
-      </div>
-
-      <div class="pp-selected">
-        <span class="pp-label">Placing at:</span>
-        <span class="pp-territory">${this.selectedTerritory}</span>
-        <button class="pp-deselect" data-action="deselect">×</button>
       </div>
 
       <div class="pp-budget">
         <span class="pp-budget-label">Remaining:</span>
         <span class="pp-budget-value ${remaining < 5 ? 'low' : ''}">$${remaining}</span>
         <span class="pp-budget-total">/ $${ipcs}</span>
+      </div>
+
+      <div class="pp-instructions-small">
+        Units will be placed during Mobilize phase
       </div>
 
       <div class="pp-units">
@@ -309,30 +304,20 @@ export class PurchasePopup {
       const canAdd = remaining >= def.cost;
       const imageSrc = getUnitIconPath(unitType, player.id);
 
-      // Factory specific: can't add if territory already has one
-      let factoryBlocked = false;
-      if (unitType === 'factory') {
-        factoryBlocked = selectedHasFactory || qty >= 1;
-      }
-
       html += `
-        <div class="pp-unit-row ${qty > 0 ? 'has-qty' : ''} ${factoryBlocked ? 'blocked' : ''}" data-unit="${unitType}">
+        <div class="pp-unit-row ${qty > 0 ? 'has-qty' : ''}" data-unit="${unitType}">
           <div class="pp-unit-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-unit-icon" alt="${unitType}">` : ''}
             <span class="pp-unit-name">${unitType}</span>
             <span class="pp-unit-cost">$${def.cost}</span>
             <span class="pp-unit-stats">A${def.attack}/D${def.defense}/M${def.movement}</span>
           </div>
-          ${factoryBlocked ? `
-            <div class="pp-blocked-msg">Already has factory</div>
-          ` : `
-            <div class="pp-unit-controls">
-              <button class="pp-qty-btn" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>
-              <span class="pp-qty">${qty}</span>
-              <button class="pp-qty-btn" data-unit="${unitType}" data-delta="1" ${!canAdd ? 'disabled' : ''}>+</button>
-              <button class="pp-max-btn" data-unit="${unitType}" ${!canAdd ? 'disabled' : ''}>Max</button>
-            </div>
-          `}
+          <div class="pp-unit-controls">
+            <button class="pp-qty-btn" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>
+            <span class="pp-qty">${qty}</span>
+            <button class="pp-qty-btn" data-unit="${unitType}" data-delta="1" ${!canAdd ? 'disabled' : ''}>+</button>
+            <button class="pp-max-btn" data-unit="${unitType}" ${!canAdd ? 'disabled' : ''}>Max</button>
+          </div>
         </div>
       `;
     }
@@ -359,12 +344,11 @@ export class PurchasePopup {
       <div class="pp-actions">
         ${this.cartCost > 0 ? `
           <button class="pp-btn clear" data-action="clear">Clear</button>
-          <button class="pp-btn confirm" data-action="confirm">Buy & Continue</button>
+          <button class="pp-btn confirm" data-action="confirm">Confirm Purchase</button>
         ` : `
-          <button class="pp-btn done" data-action="done">Done Purchasing</button>
+          <button class="pp-btn done" data-action="done">Done</button>
         `}
       </div>
-      <div class="pp-note">Units will be placed at ${this.selectedTerritory}</div>
     `;
 
     this.el.innerHTML = html;
@@ -427,12 +411,6 @@ export class PurchasePopup {
       });
     });
 
-    // Deselect territory
-    this.el.querySelector('[data-action="deselect"]')?.addEventListener('click', () => {
-      this.selectedTerritory = null;
-      this._render();
-    });
-
     // Action buttons
     this.el.querySelector('[data-action="clear"]')?.addEventListener('click', () => {
       this._clearCart();
@@ -466,14 +444,6 @@ export class PurchasePopup {
       return;
     }
 
-    // Factory limit
-    if (unitType === 'factory' && delta > 0) {
-      const selectedHasFactory = (this.gameState.units[this.selectedTerritory] || [])
-        .some(u => u.type === 'factory');
-      if (selectedHasFactory || newQty > 1) {
-        return;
-      }
-    }
 
     if (newQty === 0) {
       delete this.purchaseCart[unitType];
@@ -496,16 +466,6 @@ export class PurchasePopup {
 
     let additionalAffordable = Math.floor(remaining / def.cost);
 
-    // Factory limit
-    if (unitType === 'factory') {
-      const selectedHasFactory = (this.gameState.units[this.selectedTerritory] || [])
-        .some(u => u.type === 'factory');
-      if (selectedHasFactory) {
-        additionalAffordable = 0;
-      } else {
-        additionalAffordable = Math.min(additionalAffordable, 1 - currentQty);
-      }
-    }
 
     const newQty = currentQty + additionalAffordable;
 
@@ -537,10 +497,10 @@ export class PurchasePopup {
     const player = this.gameState.currentPlayer;
     if (!player) return;
 
-    // Add all units to pending purchases with the selected territory
+    // Add all units to pending purchases (territory selected during mobilize phase)
     for (const [unitType, qty] of Object.entries(this.purchaseCart)) {
       for (let i = 0; i < qty; i++) {
-        const result = this.gameState.addToPendingPurchases(unitType, this.unitDefs, this.selectedTerritory);
+        const result = this.gameState.addToPendingPurchases(unitType, this.unitDefs, null);
         if (!result.success) {
           console.warn('Failed to add to pending purchases:', result.error);
           break;

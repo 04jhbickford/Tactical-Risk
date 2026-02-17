@@ -97,6 +97,9 @@ export class MobilizeUI {
       return;
     }
 
+    // Auto-show when active
+    this.el.classList.remove('hidden');
+
     const player = this.gameState.currentPlayer;
     if (!player) return;
 
