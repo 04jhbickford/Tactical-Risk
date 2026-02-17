@@ -18,7 +18,7 @@ const LAND_BRIDGES = [
   ['Spain', 'Algeria'],
   ['South Europe', 'Anglo Sudan Egypt'],
   // Pacific / Asian connections
-  ['French Indo-China', 'East Indies'],
+  ['French Indo China', 'East Indies'],  // Note: "French Indo China" (no hyphen) matches territory name
   ['East Indies', 'Australia'],
   ['Australia', 'New Zealand'],
   // African

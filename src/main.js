@@ -41,6 +41,7 @@ import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
 import { BugTracker } from './ui/bugTracker.js';
 import { AirLandingUI } from './ui/airLandingUI.js';
+import { UnitTooltip } from './ui/unitTooltip.js';
 
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
@@ -89,6 +90,10 @@ async function init() {
   // Territory tooltip (shows on hover)
   const tooltip = new TerritoryTooltip(continents);
   tooltip.setUnitDefs(unitDefs);
+
+  // Unit tooltip (shows on hover over unit icons)
+  const unitTooltip = new UnitTooltip();
+  unitTooltip.setUnitDefs(unitDefs);
 
   // Player panel (replaces territory-focused sidebar)
   const playerPanel = new PlayerPanel();
@@ -323,6 +328,7 @@ async function init() {
     bugTracker.setActionLog(actionLog);
     playerPanel.setGameState(gameState);
     tooltip.setGameState(gameState);
+    unitTooltip.setGameState(gameState);
     territoryRenderer.setGameState(gameState);
     continentPanel.setGameState(gameState);
     unitRenderer = new UnitRenderer(gameState, territories, unitDefs);
@@ -483,22 +489,40 @@ async function init() {
       canvas.classList.add('panning');
       canvas.classList.remove('hovering');
       tooltip.hide();
+      unitTooltip.hide();
       return;
     }
 
     if (!camera.isDragging) {
       const world = camera.screenToWorld(e.clientX, e.clientY);
-      const hit = territoryMap.hitTest(wrapX(world.x), world.y);
-      if (hit !== hoverTerritory) {
-        hoverTerritory = hit;
-        camera.dirty = true;
-        canvas.classList.toggle('hovering', !!hit);
+      const wrappedX = wrapX(world.x);
+
+      // First check for unit icon hover (higher priority)
+      let unitHit = null;
+      if (unitRenderer && gameState) {
+        unitHit = unitRenderer.hitTestUnit(wrappedX, world.y, camera.getZoom());
       }
-      // Show tooltip for hovered territory
-      if (hit && gameState) {
-        tooltip.show(hit, e.clientX, e.clientY);
-      } else {
+
+      if (unitHit) {
+        // Show unit tooltip, hide territory tooltip
+        unitTooltip.show(unitHit, e.clientX, e.clientY);
         tooltip.hide();
+        canvas.classList.add('hovering');
+      } else {
+        // Check for territory hover
+        unitTooltip.hide();
+        const hit = territoryMap.hitTest(wrappedX, world.y);
+        if (hit !== hoverTerritory) {
+          hoverTerritory = hit;
+          camera.dirty = true;
+          canvas.classList.toggle('hovering', !!hit);
+        }
+        // Show tooltip for hovered territory
+        if (hit && gameState) {
+          tooltip.show(hit, e.clientX, e.clientY);
+        } else {
+          tooltip.hide();
+        }
       }
     }
   });
@@ -575,6 +599,7 @@ async function init() {
 
   canvas.addEventListener('mouseleave', () => {
     tooltip.hide();
+    unitTooltip.hide();
     hoverTerritory = null;
     camera.dirty = true;
   });

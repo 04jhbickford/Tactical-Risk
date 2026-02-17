@@ -1,6 +1,6 @@
 // Lobby UI for player selection - Risk Style only
 
-export const GAME_VERSION = 'V0.90';
+export const GAME_VERSION = 'V0.91';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
@@ -124,6 +124,20 @@ export class Lobby {
           </div>
         </div>
 
+        <div class="lobby-options">
+          <div class="option-item">
+            <span class="option-label">Starting IPCs:</span>
+            <select id="starting-ipcs" class="starting-ipcs-select">
+              <option value="40" ${this.startingIPCs === 40 ? 'selected' : ''}>40 IPCs</option>
+              <option value="60" ${this.startingIPCs === 60 ? 'selected' : ''}>60 IPCs</option>
+              <option value="80" ${this.startingIPCs === 80 ? 'selected' : ''}>80 IPCs (Default)</option>
+              <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100 IPCs</option>
+              <option value="120" ${this.startingIPCs === 120 ? 'selected' : ''}>120 IPCs</option>
+              <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150 IPCs</option>
+            </select>
+          </div>
+        </div>
+
         <div class="lobby-footer">
           <div class="lobby-info">
             <span class="info-item">Random Territories</span>
@@ -198,6 +212,11 @@ export class Lobby {
         this.playerAI[e.target.dataset.player] = e.target.value;
       });
       select.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    // Starting IPCs selector
+    this.el.querySelector('.starting-ipcs-select')?.addEventListener('change', (e) => {
+      this.startingIPCs = parseInt(e.target.value, 10);
     });
 
     // Continue game button

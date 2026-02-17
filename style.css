@@ -7781,3 +7781,102 @@ html, body {
   background: rgba(255,255,255,0.15);
   color: #e0e0e0;
 }
+
+/* Unit Tooltip (hover over unit icons on map) */
+.unit-tooltip {
+  position: fixed;
+  z-index: 100;
+  background: rgba(20, 20, 40, 0.95);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #fff;
+  pointer-events: none;
+  min-width: 140px;
+  max-width: 200px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+  transition: opacity 0.15s ease;
+}
+
+.unit-tooltip.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ut-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 2px solid #4169e1;
+}
+
+.ut-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.ut-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffd700;
+}
+
+.ut-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.ut-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ut-stat-icon {
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+}
+
+.ut-stat-icon.attack { color: #f44336; }
+.ut-stat-icon.defense { color: #4caf50; }
+.ut-stat-icon.movement { color: #2196f3; }
+
+.ut-stat-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.ut-stat-value.boosted {
+  color: #4caf50;
+}
+
+.ut-bonus {
+  font-size: 10px;
+  color: #4caf50;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.ut-specials {
+  font-size: 10px;
+  color: #aaa;
+  padding: 4px 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-top: 4px;
+}
+
+.ut-owner {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}

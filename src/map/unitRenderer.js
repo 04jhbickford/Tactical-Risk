@@ -104,8 +104,27 @@ export class UnitRenderer {
     }
   }
 
+  // Custom offsets for specific sea zones that need manual adjustment
+  static SEA_ZONE_OFFSETS = {
+    'West Mediteranean Sea Zone': { x: -60, y: 40 },  // Move away from Algeria
+    'Central Mediteranean Sea Zone': { x: 0, y: 50 }, // Move south away from Italy
+    'East Mediteranean Sea Zone': { x: 40, y: 30 },   // Move away from Egypt
+    'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
+    'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
+    'North Sea Zone': { x: -30, y: 0 },               // Move west into water
+  };
+
   // Adjust sea zone center to avoid island/land overlap
   _adjustSeaZoneCenter(territory, cx, cy) {
+    // First check for manual overrides
+    const manualOffset = UnitRenderer.SEA_ZONE_OFFSETS[territory.name];
+    if (manualOffset) {
+      return {
+        x: cx + manualOffset.x,
+        y: cy + manualOffset.y
+      };
+    }
+
     const connections = territory.connections || [];
     const landNeighbors = [];
 
@@ -140,8 +159,8 @@ export class UnitRenderer {
       return { x: cx, y: cy };
     }
 
-    // Offset 40-60 pixels away from the average land direction
-    const offsetDist = 50;
+    // Offset 60-80 pixels away from the average land direction (increased from 50)
+    const offsetDist = 70;
     const offsetX = -(avgDx / dist) * offsetDist;
     const offsetY = -(avgDy / dist) * offsetDist;
 
@@ -366,5 +385,72 @@ export class UnitRenderer {
       cy: Math.abs(cy * factor),
       area
     };
+  }
+
+  /**
+   * Hit test for unit icons at the given world coordinates.
+   * Returns { territory, unitType, owner, quantity, unitDef } if hit, null otherwise.
+   */
+  hitTestUnit(worldX, worldY, zoom) {
+    if (zoom < 0.35) return null;
+
+    const iconSize = Math.max(14, Math.min(24, 20 * zoom));
+    const spacingX = iconSize + 4;
+    const spacingY = iconSize + 8;
+    const maxPerRow = 5;
+    const hitRadius = (iconSize + 4) / 2;
+
+    for (const [territory, placements] of Object.entries(this.gameState.units)) {
+      const t = this.territoryByName[territory];
+      if (!t) continue;
+
+      let [cx, cy] = this._getTerritoryCenter(t);
+      if (cx === null) continue;
+
+      if (t.isWater) {
+        const adjusted = this._adjustSeaZoneCenter(t, cx, cy);
+        cx = adjusted.x;
+        cy = adjusted.y;
+      }
+
+      const grouped = this._groupUnits(placements, true);
+      const types = Object.keys(grouped);
+      if (types.length === 0) continue;
+
+      const numRows = Math.ceil(types.length / maxPerRow);
+      const baseY = cy + 25;
+
+      let typeIndex = 0;
+      for (let row = 0; row < numRows; row++) {
+        const typesInRow = Math.min(maxPerRow, types.length - row * maxPerRow);
+        const rowY = baseY + row * spacingY;
+        const startX = cx - ((typesInRow - 1) * spacingX) / 2;
+
+        for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
+          const key = types[typeIndex];
+          const unitInfo = grouped[key];
+          const x = startX + col * spacingX;
+
+          // Check if point is within this icon's bounds
+          const dx = worldX - x;
+          const dy = worldY - rowY;
+          if (Math.abs(dx) <= hitRadius && Math.abs(dy) <= hitRadius) {
+            return {
+              territory: territory,
+              unitType: unitInfo.type,
+              owner: unitInfo.owner,
+              quantity: unitInfo.total,
+              isOnCarrier: unitInfo.isOnCarrier || false,
+              isOnTransport: unitInfo.isOnTransport || false,
+              damaged: unitInfo.damaged || 0,
+              unitDef: this.unitDefs[unitInfo.type]
+            };
+          }
+          typeIndex++;
+        }
+      }
+    }
+
+    return null;
   }
 }

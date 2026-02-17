@@ -62,7 +62,7 @@ export const LAND_BRIDGES = [
   ['United Kingdom', 'West Europe'],  // Channel crossing
   ['South Europe', 'Anglo Sudan Egypt'],
   ['Syria Jordan', 'Anglo Sudan Egypt'],
-  ['French Indo-China', 'East Indies'],
+  ['French Indo China', 'East Indies'],  // Note: "French Indo China" (no hyphen) matches territory name
   ['East Indies', 'Australia'],
   ['Australia', 'New Zealand'],
   ['Kenya-Rhodesia', 'Madagascar'],
