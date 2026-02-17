@@ -67,6 +67,7 @@ export const LAND_BRIDGES = [
   ['Australia', 'New Zealand'],
   ['Kenya-Rhodesia', 'Madagascar'],
   ['Spain', 'Algeria'],  // Strait of Gibraltar
+  ['Japan', 'Manchuria'],  // Korea Strait crossing
 ];
 
 // Starting IPCs by player count for Risk mode
@@ -157,6 +158,9 @@ export class GameState {
     this.cardTradeCount = {};
     // Track if player has conquered a territory this turn (for Risk card award - one per turn)
     this.conqueredThisTurn = {};
+
+    // Territories with amphibious assault this turn (for shore bombardment - only bombard with amphibious units)
+    this.amphibiousTerritories = new Set();
 
     // Placement history for undo: [{ territory, unitType, owner }]
     this.placementHistory = [];
@@ -2116,6 +2120,7 @@ export class GameState {
   _detectCombats() {
     this.combatQueue = [];
     this.clearedSeaZones = new Set(); // Track sea zones cleared for shore bombardment
+    // Note: amphibiousTerritories is set during combat move and used during combat phase
     const player = this.currentPlayer;
     if (!player) return;
 
@@ -2167,6 +2172,11 @@ export class GameState {
 
     if (!hasEnemyCombatUnits) return true;
     return this.clearedSeaZones?.has(seaZone) || false;
+  }
+
+  // Check if a territory has amphibious attackers (units unloaded from transports)
+  hasAmphibiousAssault(territory) {
+    return this.amphibiousTerritories?.has(territory) || false;
   }
 
   // Resolve combat in a territory (dice combat with naval rules)
@@ -2478,6 +2488,18 @@ export class GameState {
     }
   }
 
+  // Repair all damaged battleships owned by a player at end of turn (A&A Anniversary rule)
+  _repairPlayerBattleships(playerId) {
+    for (const [territory, units] of Object.entries(this.units)) {
+      for (const unit of units) {
+        if (unit.owner === playerId && unit.type === 'battleship' && unit.damaged) {
+          unit.damaged = false;
+          unit.damagedCount = 0;
+        }
+      }
+    }
+  }
+
   // Fisher-Yates shuffle for randomizing player order
   _shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
@@ -2553,6 +2575,9 @@ export class GameState {
   _collectIncome() {
     const player = this.currentPlayer;
     if (!player) return;
+
+    // Repair damaged battleships at turn end (A&A Anniversary rule)
+    this._repairPlayerBattleships(player.id);
 
     // Cannot collect income if capital is captured
     if (!this.canCollectIncome(player.id)) {
@@ -2911,6 +2936,11 @@ export class GameState {
 
   // Trade RISK cards for IPCs
   tradeRiskCards(playerId) {
+    // Can only trade during purchase phase
+    if (this.turnPhase !== TURN_PHASES.PURCHASE) {
+      return { success: false, ipcs: 0, error: 'Can only trade cards during Purchase phase' };
+    }
+
     const cards = this.riskCards[playerId] || [];
     const set = this._findValidCardSet(cards);
     if (!set) return { success: false, ipcs: 0 };
@@ -3043,6 +3073,14 @@ export class GameState {
     }
     this.units[coastalTerritory] = coastalUnits;
 
+    // Mark as amphibious assault if unloading during combat move to enemy territory
+    if (this.turnPhase === TURN_PHASES.COMBAT_MOVE) {
+      const owner = this.getOwner(coastalTerritory);
+      if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
+        this.amphibiousTerritories.add(coastalTerritory);
+      }
+    }
+
     // Clear transport cargo
     transport.cargo = [];
 
@@ -3096,6 +3134,14 @@ export class GameState {
       coastalUnits.push({ type: unitType, quantity: 1, owner: player.id, moved: true });
     }
     this.units[coastalTerritory] = coastalUnits;
+
+    // Mark as amphibious assault if unloading during combat move to enemy territory
+    if (this.turnPhase === TURN_PHASES.COMBAT_MOVE) {
+      const owner = this.getOwner(coastalTerritory);
+      if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
+        this.amphibiousTerritories.add(coastalTerritory);
+      }
+    }
 
     this._notify();
     return { success: true };

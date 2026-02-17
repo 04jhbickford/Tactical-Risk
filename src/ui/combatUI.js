@@ -141,7 +141,7 @@ export class CombatUI {
 
   _calculateBombardment() {
     // Calculate shore bombardment from ships in adjacent sea zones
-    // A&A Anniversary Rule: Shore bombardment ONLY occurs when there are no defending naval units
+    // A&A Rule: Shore bombardment ONLY occurs during amphibious assaults (units from transports)
     const player = this.gameState.currentPlayer;
     const territory = this.currentTerritory;
     const hits = [];
@@ -150,6 +150,11 @@ export class CombatUI {
     // Check if this is a land territory
     const t = this.gameState.territoryByName[territory];
     if (!t || t.isWater) return { hits: 0, rolls: [] };
+
+    // Shore bombardment only allowed when units are amphibiously assaulting (came from transports)
+    if (!this.gameState.hasAmphibiousAssault(territory)) {
+      return { hits: 0, rolls: [] };
+    }
 
     // Find adjacent sea zones with friendly ships that can bombard
     const connections = t.connections || [];
@@ -501,13 +506,27 @@ export class CombatUI {
     // Roll for attackers
     const attackRolls = [];
     let attackHits = 0;
+
+    // Artillery support: Count artillery for infantry bonus (1:1 ratio)
+    const artilleryCount = attackers.filter(u => u.type === 'artillery')
+      .reduce((sum, u) => sum + u.quantity, 0);
+    let supportedInfantry = artilleryCount; // Number of infantry that get +1 attack
+
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
       if (!def) continue;
       for (let i = 0; i < unit.quantity; i++) {
+        let attackValue = def.attack;
+
+        // Artillery support: Infantry gets +1 attack when paired with artillery (1:1 ratio)
+        if (unit.type === 'infantry' && supportedInfantry > 0) {
+          attackValue += 1; // Infantry attack 1 -> 2
+          supportedInfantry--;
+        }
+
         const roll = Math.floor(Math.random() * 6) + 1;
-        const hit = roll <= def.attack;
-        attackRolls.push({ roll, hit, unitType: unit.type });
+        const hit = roll <= attackValue;
+        attackRolls.push({ roll, hit, unitType: unit.type, attackValue });
         if (hit) attackHits++;
       }
     }
@@ -606,22 +625,64 @@ export class CombatUI {
     // A&A Anniversary Rule: Transports are defenseless and cannot be taken as casualties
     // They are automatically destroyed when all other combat units are eliminated
     // Factories are captured, not destroyed - exclude from casualties
+    // Battleship 2-hit system: Damage battleships first before destroying other units
+    const selected = {};
+    let remaining = count;
+
+    // First, try to damage undamaged battleships (2-hit system)
+    const battleships = units.filter(u => u.type === 'battleship' && u.quantity > 0);
+    for (const battleship of battleships) {
+      if (remaining <= 0) break;
+      const def = this.unitDefs[battleship.type];
+      if (def?.hp > 1) {
+        // Count undamaged battleships
+        const undamaged = battleship.quantity - (battleship.damagedCount || 0);
+        if (undamaged > 0) {
+          const toDamage = Math.min(undamaged, remaining);
+          selected['battleship_damage'] = (selected['battleship_damage'] || 0) + toDamage;
+          remaining -= toDamage;
+        }
+      }
+    }
+
+    // Then, destroy damaged battleships
+    for (const battleship of battleships) {
+      if (remaining <= 0) break;
+      const damagedCount = battleship.damagedCount || 0;
+      if (damagedCount > 0) {
+        const toDestroy = Math.min(damagedCount, remaining);
+        selected['battleship'] = (selected['battleship'] || 0) + toDestroy;
+        remaining -= toDestroy;
+      }
+    }
+
+    // Then, apply to other units by cost
     const sorted = [...units]
-      .filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory')
+      .filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory' && u.type !== 'battleship')
       .sort((a, b) => {
         const costA = this.unitDefs[a.type]?.cost || 999;
         const costB = this.unitDefs[b.type]?.cost || 999;
         return costA - costB;
       });
 
-    const selected = {};
-    let remaining = count;
-
     for (const unit of sorted) {
       if (remaining <= 0) break;
       const take = Math.min(unit.quantity, remaining);
       selected[unit.type] = take;
       remaining -= take;
+    }
+
+    // Finally, destroy remaining undamaged battleships if still hits left
+    if (remaining > 0) {
+      for (const battleship of battleships) {
+        if (remaining <= 0) break;
+        const undamaged = battleship.quantity - (battleship.damagedCount || 0) - (selected['battleship_damage'] || 0);
+        if (undamaged > 0) {
+          const toDestroy = Math.min(undamaged, remaining);
+          selected['battleship'] = (selected['battleship'] || 0) + toDestroy;
+          remaining -= toDestroy;
+        }
+      }
     }
 
     return selected;
@@ -777,6 +838,15 @@ export class CombatUI {
 
     // Apply attacker casualties and track total losses
     for (const [type, count] of Object.entries(selectedAttackerCasualties)) {
+      // Handle battleship damage specially
+      if (type === 'battleship_damage') {
+        const battleship = attackers.find(u => u.type === 'battleship');
+        if (battleship) {
+          battleship.damaged = true;
+          battleship.damagedCount = (battleship.damagedCount || 0) + count;
+        }
+        continue;
+      }
       const unit = attackers.find(u => u.type === type);
       if (unit) {
         unit.quantity -= count;
@@ -787,6 +857,15 @@ export class CombatUI {
 
     // Apply defender casualties and track total losses
     for (const [type, count] of Object.entries(selectedDefenderCasualties)) {
+      // Handle battleship damage specially
+      if (type === 'battleship_damage') {
+        const battleship = defenders.find(u => u.type === 'battleship');
+        if (battleship) {
+          battleship.damaged = true;
+          battleship.damagedCount = (battleship.damagedCount || 0) + count;
+        }
+        continue;
+      }
       const unit = defenders.find(u => u.type === type);
       if (unit) {
         unit.quantity -= count;

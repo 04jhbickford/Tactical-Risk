@@ -89,11 +89,11 @@ export class UnitRenderer {
 
         for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
           const key = types[typeIndex];
-          const { total, owner, type: unitType, isOnCarrier, isOnTransport } = grouped[key];
+          const { total, owner, type: unitType, isOnCarrier, isOnTransport, damaged } = grouped[key];
           const x = startX + col * spacingX;
           const color = this.gameState.getPlayerColor(owner);
 
-          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport);
+          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport, damaged);
 
           if (total > 1) {
             this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, total, zoom);
@@ -157,9 +157,13 @@ export class UnitRenderer {
     for (const p of placements) {
       const key = `${p.type}_${p.owner}`;
       if (!grouped[key]) {
-        grouped[key] = { total: 0, owner: p.owner, type: p.type };
+        grouped[key] = { total: 0, owner: p.owner, type: p.type, damaged: 0 };
       }
       grouped[key].total += p.quantity;
+      // Track damaged battleships for visual indicator
+      if (p.type === 'battleship' && p.damaged) {
+        grouped[key].damaged = p.damagedCount || 1;
+      }
 
       // Include cargo from carriers (aircraft)
       if (includeCargo && p.type === 'carrier' && p.aircraft && p.aircraft.length > 0) {
@@ -190,7 +194,7 @@ export class UnitRenderer {
     return grouped;
   }
 
-  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false) {
+  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false, damaged = 0) {
     const img = this._getUnitImage(unitType, factionId);
 
     ctx.save();
@@ -212,6 +216,9 @@ export class UnitRenderer {
 
       // Slightly different border color for cargo units
       ctx.strokeStyle = isOnCarrier ? 'rgba(100,150,255,0.8)' : 'rgba(150,100,50,0.8)';
+    } else if (damaged > 0) {
+      // Damaged battleship indicator - orange/red border and cross
+      ctx.strokeStyle = 'rgba(255,100,0,0.9)';
     } else {
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     }
@@ -221,6 +228,17 @@ export class UnitRenderer {
     ctx.roundRect(x - bgSize / 2, y - bgSize / 2, bgSize, bgSize, 4);
     ctx.fill();
     ctx.stroke();
+
+    // Draw damage indicator for battleships
+    if (damaged > 0 && unitType === 'battleship') {
+      ctx.strokeStyle = 'rgba(255,50,0,0.8)';
+      ctx.lineWidth = 2;
+      // Draw diagonal line through icon to indicate damage
+      ctx.beginPath();
+      ctx.moveTo(x - bgSize / 3, y - bgSize / 3);
+      ctx.lineTo(x + bgSize / 3, y + bgSize / 3);
+      ctx.stroke();
+    }
 
     // Draw unit image
     if (img && img.complete && img.naturalWidth > 0) {

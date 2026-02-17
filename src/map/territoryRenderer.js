@@ -23,6 +23,8 @@ const LAND_BRIDGES = [
   ['Australia', 'New Zealand'],
   // African
   ['Kenya-Rhodesia', 'Madagascar'],
+  // Asian
+  ['Japan', 'Manchuria'],  // Korea Strait crossing
 ];
 
 export class TerritoryRenderer {
@@ -1277,12 +1279,26 @@ export class TerritoryRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
+    // Per-territory label offsets to avoid unit overlap
+    const LABEL_OFFSETS = {
+      'Finland Norway': { x: 0, y: -25 },  // Move label up to avoid unit icons
+      'Eire': { x: 0, y: -15 },
+      'United Kingdom': { x: 0, y: -15 },
+    };
+
     for (const t of this.territories) {
       if (t.isWater) continue;
 
       // Calculate center from all polygons for proper centering of merged territories
-      const [cx, cy] = this._getTerritoryCenter(t);
+      let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
+
+      // Apply per-territory label offset if defined
+      const offset = LABEL_OFFSETS[t.name];
+      if (offset) {
+        cx += offset.x;
+        cy += offset.y;
+      }
 
       // Background for readability
       ctx.strokeStyle = 'rgba(0,0,0,0.8)';

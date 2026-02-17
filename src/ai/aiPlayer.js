@@ -335,6 +335,9 @@ export class AIPlayer {
     const moves = [];
     const ownedTerritories = this._getOwnedTerritories();
 
+    // Check if we need to prioritize capital retake (CRITICAL)
+    const capitalRetakeTarget = this._shouldPrioritizeCapitalRetake();
+
     // Analyze all potential attacks
     const attackOptions = [];
 
@@ -366,6 +369,16 @@ export class AIPlayer {
     // Sort by score and execute best attacks
     attackOptions.sort((a, b) => b.score - a.score);
 
+    // If we need to retake our capital, prioritize it heavily
+    if (capitalRetakeTarget) {
+      // Move capital retake attack to the front
+      const capitalAttackIdx = attackOptions.findIndex(a => a.to === capitalRetakeTarget);
+      if (capitalAttackIdx > 0) {
+        const capitalAttack = attackOptions.splice(capitalAttackIdx, 1)[0];
+        attackOptions.unshift(capitalAttack);
+      }
+    }
+
     // Hard AI coordinates attacks, others just attack greedily
     const maxAttacks = this.difficulty === 'hard' ? 5 : this.difficulty === 'medium' ? 3 : 2;
 
@@ -379,6 +392,20 @@ export class AIPlayer {
     }
 
     return { action: 'combatMoves', moves };
+  }
+
+  // Check if AI should prioritize retaking its own capital
+  _shouldPrioritizeCapitalRetake() {
+    const myCapital = this.gameState.getCapital(this.playerId);
+    if (!myCapital) return null;
+
+    // Check if our capital is held by enemy
+    const capitalOwner = this.gameState.getOwner(myCapital);
+    if (capitalOwner === this.playerId) return null; // We own it
+    if (this.gameState.areAllies(this.playerId, capitalOwner)) return null; // Allied owns it
+
+    // Our capital is enemy-held - return the territory name
+    return myCapital;
   }
 
   // Evaluate an attack opportunity with detailed scoring
@@ -443,6 +470,14 @@ export class AIPlayer {
     // Is it a capital? Very valuable
     if (this.gameState.isCapital?.(territory)) {
       value += 20;
+
+      // CRITICAL: Is this OUR OWN capital that was captured?
+      // Retaking our capital is the highest priority
+      const myCapital = this.gameState.getCapital(this.playerId);
+      if (territory === myCapital) {
+        // Our capital is held by enemy - massive priority to retake
+        value += 100;
+      }
     }
 
     // Continent bonus consideration
