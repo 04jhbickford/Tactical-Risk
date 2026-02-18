@@ -19,6 +19,7 @@ export class MovementUI {
     this.unloadMode = false; // True when unloading cargo from transports
     this.shipSelectionMode = false; // True when selecting individual ships to move
     this.loadingTargetShipId = null; // Ship selected to load cargo onto
+    this.pendingDestination = null; // Selected destination awaiting confirmation
 
     // Drag state
     this.isDragging = false;
@@ -125,7 +126,9 @@ export class MovementUI {
 
       // Check if valid destination
       if (this.canMoveTo(territory)) {
-        this._showMoveConfirm(territory);
+        // Set as pending destination (user must click Confirm Move button)
+        this.pendingDestination = territory.name;
+        this._render();
         return true;
       } else {
         // Try selecting this territory as new source
@@ -672,6 +675,7 @@ export class MovementUI {
     this.unloadMode = false;
     this.shipSelectionMode = false;
     this.loadingTargetShipId = null;
+    this.pendingDestination = null;
     this.el.classList.add('hidden');
   }
 
@@ -1220,8 +1224,10 @@ export class MovementUI {
 
     const player = this.gameState.currentPlayer;
     const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+    const isNonCombatMove = this.gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
     const phaseLabel = isCombatMove ? 'Combat Movement' : 'Non-Combat Movement';
-    const canUndo = isCombatMove && this.gameState.moveHistory && this.gameState.moveHistory.length > 0;
+    // Allow undo during both combat and non-combat move phases
+    const canUndo = (isCombatMove || isNonCombatMove) && this.gameState.moveHistory && this.gameState.moveHistory.length > 0;
 
     // Check if we should show cargo unload UI
     if (this.unloadMode && this.selectedFrom.isWater) {
@@ -1363,18 +1369,34 @@ export class MovementUI {
       html += `
         <div class="mp-destinations">
           <span class="mp-label">Move to:</span>
-          <select class="mp-dest-select" data-action="move-dest">
+          <select class="mp-dest-select" data-action="select-dest">
             <option value="">-- Select destination or click map --</option>
             ${validDests.map(dest => {
               const owner = this.gameState.getOwner(dest);
               const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
               const cantLand = airWarningDests.has(dest);
+              const isSelected = this.pendingDestination === dest;
               const label = cantLand ? `${dest} ⚠️ NO LANDING` : `${dest}${isEnemy ? ' (Enemy)' : ''}`;
-              return `<option value="${dest}" data-territory="${dest}" class="${isEnemy ? 'enemy' : ''} ${cantLand ? 'no-landing' : ''}">${label}</option>`;
+              return `<option value="${dest}" ${isSelected ? 'selected' : ''} data-territory="${dest}" class="${isEnemy ? 'enemy' : ''} ${cantLand ? 'no-landing' : ''}">${label}</option>`;
             }).join('')}
           </select>
         </div>
       `;
+
+      // Show confirm button if destination is selected
+      if (this.pendingDestination) {
+        const destOwner = this.gameState.getOwner(this.pendingDestination);
+        const isEnemyDest = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
+        html += `
+          <div class="mp-confirm-section">
+            <div class="mp-confirm-info">
+              Moving to: <strong>${this.pendingDestination}</strong>
+              ${isEnemyDest ? '<span class="mp-enemy-tag">ENEMY</span>' : ''}
+            </div>
+            <button class="mp-confirm-btn" data-action="confirm-move">Confirm Move</button>
+          </div>
+        `;
+      }
     }
 
     html += `
@@ -1449,6 +1471,15 @@ export class MovementUI {
       for (const unit of movableUnits) {
         this.selectedUnits[unit.type] = unit.quantity;
       }
+
+      // Also select all ships with cargo (transports and carriers)
+      const shipsWithCargo = this._getShipsWithCargo(this.selectedFrom.name, player.id);
+      for (const ship of shipsWithCargo) {
+        if (ship.id && this._hasRemainingMovement(ship)) {
+          this.selectedShipIds.add(ship.id);
+        }
+      }
+
       this._render();
     });
 
@@ -1479,17 +1510,17 @@ export class MovementUI {
       });
     });
 
-    // Destination dropdown
+    // Destination dropdown - now just sets pending destination
     const destSelect = this.el.querySelector('.mp-dest-select');
     if (destSelect) {
-      // Change event - execute move
+      // Change event - set pending destination (don't execute move yet)
       destSelect.addEventListener('change', () => {
         const destName = destSelect.value;
-        if (destName) {
-          const dest = this.territoryByName[destName];
-          if (dest) {
-            this._showMoveConfirm(dest);
-          }
+        this.pendingDestination = destName || null;
+        this._render();
+        // Highlight the selected destination
+        if (destName && this.onHighlightTerritory) {
+          this.onHighlightTerritory(destName, true);
         }
       });
 
@@ -1507,21 +1538,17 @@ export class MovementUI {
           this.onHighlightTerritory(null, false);
         }
       });
-
-      // Focus on selected option change (keyboard nav)
-      destSelect.addEventListener('focus', () => {
-        const value = destSelect.value;
-        if (value && this.onHighlightTerritory) {
-          this.onHighlightTerritory(value, true);
-        }
-      });
-
-      destSelect.addEventListener('blur', () => {
-        if (this.onHighlightTerritory) {
-          this.onHighlightTerritory(null, false);
-        }
-      });
     }
+
+    // Confirm Move button
+    this.el.querySelector('[data-action="confirm-move"]')?.addEventListener('click', () => {
+      if (this.pendingDestination) {
+        const dest = this.territoryByName[this.pendingDestination];
+        if (dest) {
+          this._showMoveConfirm(dest);
+        }
+      }
+    });
 
     // Cancel
     this.el.querySelector('.mp-cancel-btn')?.addEventListener('click', () => {

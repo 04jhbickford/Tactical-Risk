@@ -519,6 +519,7 @@ export class GameState {
   }
 
   // Calculate distance between two territories for air units (BFS shortest path)
+  // Uses getConnections() which includes land bridges
   _calculateAirDistance(fromTerritory, toTerritory) {
     if (fromTerritory === toTerritory) return 0;
 
@@ -527,10 +528,11 @@ export class GameState {
 
     while (queue.length > 0) {
       const { territory, distance } = queue.shift();
-      const t = this.territoryByName[territory];
-      if (!t) continue;
 
-      for (const conn of t.connections || []) {
+      // Use getConnections to include land bridges
+      const connections = this.getConnections(territory);
+
+      for (const conn of connections) {
         if (conn === toTerritory) return distance + 1;
         if (!visited.has(conn)) {
           visited.add(conn);

@@ -293,6 +293,30 @@ export class AIPlayer {
     let score = 0;
     const connections = this.gameState.getConnections(territory);
 
+    // CRITICAL: Heavily penalize territories adjacent to existing capitals
+    // Enforce minimum 1-territory separation between any two capitals
+    for (const conn of connections) {
+      for (const player of this.gameState.players) {
+        if (player.id !== this.playerId) {
+          const playerCapital = this.gameState.playerState[player.id]?.capitalTerritory;
+          if (playerCapital === conn) {
+            // Adjacent to another capital - massive penalty
+            score -= 100;
+          }
+        }
+      }
+    }
+
+    // Also check if this territory IS another player's capital (shouldn't happen but safety check)
+    for (const player of this.gameState.players) {
+      if (player.id !== this.playerId) {
+        const playerCapital = this.gameState.playerState[player.id]?.capitalTerritory;
+        if (playerCapital === territory) {
+          score -= 200;
+        }
+      }
+    }
+
     // Prefer territories with more friendly neighbors (defensible)
     const friendlyNeighbors = connections.filter(c =>
       this.gameState.getOwner(c) === this.playerId

@@ -77,7 +77,17 @@ export class MobilizeUI {
     const isValidLand = factoryTerritories.includes(territory.name);
     const isValidSea = validNavalZones.has(territory.name);
 
-    if (isValidLand || isValidSea) {
+    // Check if player has pending factories to place
+    const pendingUnits = this.gameState.getPendingPurchases();
+    const hasPendingFactory = pendingUnits.some(u => u.type === 'factory');
+
+    // For factory placement, allow any owned land territory without existing factory
+    const isOwnedLand = this.gameState.getOwner(territory.name) === player.id && !territory.isWater;
+    const hasExistingFactory = (this.gameState.units[territory.name] || [])
+      .some(u => u.type === 'factory' && u.owner === player.id);
+    const isValidForFactory = hasPendingFactory && isOwnedLand && !hasExistingFactory;
+
+    if (isValidLand || isValidSea || isValidForFactory) {
       this.selectedTerritory = territory;
       this._render();
       return true;

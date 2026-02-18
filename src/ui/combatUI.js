@@ -1430,6 +1430,11 @@ export class CombatUI {
       return costB - costA;
     });
 
+    // Calculate artillery support for attackers
+    const attackerArtillery = attackers.find(u => u.type === 'artillery')?.quantity || 0;
+    const attackerInfantry = attackers.find(u => u.type === 'infantry')?.quantity || 0;
+    const supportedInfantryCount = Math.min(attackerArtillery, attackerInfantry);
+
     return sortedTypes.map(unitType => {
       const attackerUnit = attackers.find(u => u.type === unitType);
       const defenderUnit = defenders.find(u => u.type === unitType);
@@ -1442,19 +1447,50 @@ export class CombatUI {
       const attackQty = attackerUnit?.quantity || 0;
       const defendQty = defenderUnit?.quantity || 0;
 
-      return `
-        <div class="combat-unit-row">
-          <div class="combat-unit-side attacker ${attackQty > 0 ? '' : 'empty'}">
-            ${attackQty > 0 ? `
+      // Special handling for infantry with artillery support
+      let attackerHtml = '';
+      if (attackQty > 0) {
+        if (unitType === 'infantry' && supportedInfantryCount > 0) {
+          const unsupportedCount = attackQty - supportedInfantryCount;
+          // Show supported infantry (attack 2) and unsupported infantry (attack 1) separately
+          attackerHtml = `
+            <div class="combat-unit-side attacker">
+              <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
+                ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                <span class="combat-unit-qty">${supportedInfantryCount}</span>
+              </div>
+              <span class="combat-unit-stat supported">A2*</span>
+            </div>`;
+          if (unsupportedCount > 0) {
+            attackerHtml += `
+            <div class="combat-unit-side attacker secondary">
+              <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
+                ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon small" alt="${unitType}">` : ''}
+                <span class="combat-unit-qty">${unsupportedCount}</span>
+              </div>
+              <span class="combat-unit-stat">A1</span>
+            </div>`;
+          }
+        } else {
+          attackerHtml = `
+            <div class="combat-unit-side attacker">
               <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
                 ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
                 <span class="combat-unit-qty">${attackQty}</span>
               </div>
               <span class="combat-unit-stat">A${def?.attack || 0}</span>
-            ` : ''}
-          </div>
+            </div>`;
+        }
+      } else {
+        attackerHtml = `<div class="combat-unit-side attacker empty"></div>`;
+      }
+
+      return `
+        <div class="combat-unit-row ${unitType === 'infantry' && supportedInfantryCount > 0 ? 'has-support' : ''}">
+          ${attackerHtml}
           <div class="combat-unit-type">
             <span class="combat-type-name">${unitType}</span>
+            ${unitType === 'infantry' && supportedInfantryCount > 0 ? '<span class="support-note">+artillery</span>' : ''}
           </div>
           <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'}">
             ${defendQty > 0 ? `

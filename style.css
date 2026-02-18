@@ -3154,6 +3154,57 @@ html, body {
   color: #fff;
 }
 
+/* Confirm Move section */
+.mp-confirm-section {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.mp-confirm-info {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-confirm-info strong {
+  color: #4caf50;
+  font-size: 14px;
+}
+
+.mp-enemy-tag {
+  background: #d32f2f;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.mp-confirm-btn {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #4caf50, #388e3c);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mp-confirm-btn:hover {
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
 /* Select All Units section */
 .mp-select-all {
   display: flex;
@@ -3784,6 +3835,38 @@ html, body {
   padding: 2px 6px;
   background: rgba(255,255,255,0.05);
   border-radius: 3px;
+}
+
+.combat-unit-stat.supported {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+  font-weight: 600;
+}
+
+.combat-unit-side.secondary {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
+
+.combat-unit-side.secondary .combat-unit-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.combat-unit-icon.small {
+  width: 18px;
+  height: 18px;
+}
+
+.combat-unit-row.has-support .combat-unit-type {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.support-note {
+  display: block;
+  font-size: 9px;
+  color: #4caf50;
+  font-style: italic;
 }
 
 .combat-unit-stats {
