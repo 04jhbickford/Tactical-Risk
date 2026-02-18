@@ -68,6 +68,7 @@ export const LAND_BRIDGES = [
   ['Kenya-Rhodesia', 'Madagascar'],
   ['Spain', 'Algeria'],  // Strait of Gibraltar
   ['Japan', 'Manchuria'],  // Korea Strait crossing
+  ['Italian East Africa', 'Saudi Arabia'],  // Red Sea crossing
 ];
 
 // Starting IPCs by player count for Risk mode
@@ -1834,7 +1835,11 @@ export class GameState {
       }
     }
 
+    // Track which ship IDs were moved (for move history)
+    const movedShipIds = [];
+
     // Handle moving specific ships by ID (carriers/transports with cargo)
+    // IMPORTANT: Don't return early - continue to process unitsToMove as well
     if (options.shipIds && options.shipIds.length > 0) {
       const toUnits = this.units[toTerritory] || [];
 
@@ -1860,26 +1865,10 @@ export class GameState {
         ship.movementUsed = movementUsed + 1;
         ship.moved = ship.movementUsed >= maxMove; // Mark fully moved when out of movement
         toUnits.push(ship);
+        movedShipIds.push(shipId);
       }
 
       this.units[toTerritory] = toUnits;
-
-      // Record move
-      this.moveHistory.push({
-        from: fromTerritory,
-        to: toTerritory,
-        shipIds: options.shipIds,
-        player: player.id,
-      });
-
-      this._notify();
-      return {
-        success: true,
-        from: fromTerritory,
-        to: toTerritory,
-        shipIds: options.shipIds,
-        isAttack: isCombatMove && isEnemy,
-      };
     }
 
     for (const moveUnit of unitsToMove) {
@@ -2008,11 +1997,13 @@ export class GameState {
         }
       } else {
         // Normal movement - add to destination
-        const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id);
+        // IMPORTANT: Don't merge with unmoved units - keep them separate so they can still move
+        const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id && u.moved);
         if (destUnit) {
+          // Merge with existing moved stack
           destUnit.quantity += moveUnit.quantity;
-          destUnit.moved = true;
         } else {
+          // Create new moved stack (separate from any unmoved units in territory)
           toUnits.push({
             type: moveUnit.type,
             quantity: moveUnit.quantity,
@@ -2058,6 +2049,7 @@ export class GameState {
       from: fromTerritory,
       to: toTerritory,
       units: unitsToMove.map(u => ({ ...u })),
+      shipIds: movedShipIds.length > 0 ? movedShipIds : undefined,
       player: player.id,
       captured, // Track if territory was captured for undo
       previousOwner: isEnemy ? toOwner : null,
@@ -2105,6 +2097,7 @@ export class GameState {
       from: fromTerritory,
       to: toTerritory,
       units: unitsToMove,
+      shipIds: movedShipIds.length > 0 ? movedShipIds : undefined,
       captured,
       cardAwarded,
       isAttack: isCombatMove && isEnemy && !captured,
@@ -2667,11 +2660,42 @@ export class GameState {
   }
 
   _clearMovedFlags() {
-    for (const units of Object.values(this.units)) {
+    // Clear moved flags and consolidate duplicate stacks
+    for (const territory of Object.keys(this.units)) {
+      const units = this.units[territory];
+
+      // Clear flags first
       for (const unit of units) {
         delete unit.moved;
         delete unit.movementUsed;
       }
+
+      // Consolidate duplicate stacks (same type + owner, no special properties)
+      // Skip units with IDs, cargo, or aircraft - those need to stay individual
+      const consolidated = [];
+      const grouped = new Map(); // key: "type_owner" -> quantity
+
+      for (const unit of units) {
+        // Keep individual ships (with IDs) and units with cargo/aircraft separate
+        if (unit.id || (unit.cargo && unit.cargo.length > 0) || (unit.aircraft && unit.aircraft.length > 0)) {
+          consolidated.push(unit);
+        } else {
+          const key = `${unit.type}_${unit.owner}`;
+          const existing = grouped.get(key);
+          if (existing) {
+            existing.quantity += unit.quantity;
+          } else {
+            grouped.set(key, { type: unit.type, owner: unit.owner, quantity: unit.quantity });
+          }
+        }
+      }
+
+      // Add consolidated groups
+      for (const unit of grouped.values()) {
+        consolidated.push(unit);
+      }
+
+      this.units[territory] = consolidated;
     }
   }
 
@@ -3138,16 +3162,29 @@ export class GameState {
 
   // Check if a unit can be loaded onto a transport given current cargo
   _canLoadOnTransport(cargo, unitType) {
-    // Transport capacity: 2 infantry OR 1 infantry + 1 other OR 1 non-infantry
+    // Transport capacity: 2 infantry OR 1 infantry + 1 other ground unit
+    // Valid combinations: 2 inf, 1 inf + 1 tank, 1 inf + 1 artillery, or 1 tank/artillery alone
     const infantryCount = cargo.filter(c => c.type === 'infantry').length;
     const otherCount = cargo.filter(c => c.type !== 'infantry').length;
+    const totalCount = cargo.length;
+
+    // Transport is full at 2 units
+    if (totalCount >= 2) {
+      return false;
+    }
 
     if (unitType === 'infantry') {
-      // Can load infantry if: empty, or 1 infantry already, or no other units
-      return cargo.length < 2 && otherCount === 0;
+      // Infantry can always be added if transport not full
+      // - Empty: start with infantry
+      // - 1 infantry: makes 2 infantry (valid)
+      // - 1 other: makes 1 inf + 1 other (valid)
+      return true;
     } else {
-      // Can load other unit if: empty, or 1 infantry only
-      return cargo.length === 0 || (infantryCount === 1 && otherCount === 0);
+      // Non-infantry (tank/artillery) can be added if:
+      // - Empty: 1 tank alone
+      // - 1 infantry only: makes 1 inf + 1 tank (valid)
+      // Cannot add if there's already a non-infantry (no 2 tanks)
+      return otherCount === 0;
     }
   }
 
@@ -3179,12 +3216,12 @@ export class GameState {
     }
 
     // Unload all cargo to coastal territory
+    // IMPORTANT: Don't merge with unmoved units - keep them separate so they can still move
     const coastalUnits = this.units[coastalTerritory] || [];
     for (const cargo of transport.cargo) {
-      const existing = coastalUnits.find(u => u.type === cargo.type && u.owner === cargo.owner);
+      const existing = coastalUnits.find(u => u.type === cargo.type && u.owner === cargo.owner && u.moved);
       if (existing) {
         existing.quantity++;
-        existing.moved = true;
       } else {
         coastalUnits.push({ type: cargo.type, quantity: 1, owner: cargo.owner, moved: true });
       }
@@ -3243,11 +3280,11 @@ export class GameState {
     transport.cargo.splice(cargoIdx, 1);
 
     // Add to coastal territory
+    // IMPORTANT: Don't merge with unmoved units - keep them separate so they can still move
     const coastalUnits = this.units[coastalTerritory] || [];
-    const existing = coastalUnits.find(u => u.type === unitType && u.owner === player.id);
+    const existing = coastalUnits.find(u => u.type === unitType && u.owner === player.id && u.moved);
     if (existing) {
       existing.quantity++;
-      existing.moved = true;
     } else {
       coastalUnits.push({ type: unitType, quantity: 1, owner: player.id, moved: true });
     }

@@ -17,6 +17,9 @@ const LAND_BRIDGES = [
   // Mediterranean
   ['Spain', 'Algeria'],
   ['South Europe', 'Anglo Sudan Egypt'],
+  ['Syria Jordan', 'Anglo Sudan Egypt'],  // Suez crossing
+  // Red Sea
+  ['Italian East Africa', 'Saudi Arabia'],  // Red Sea crossing
   // Pacific / Asian connections
   ['French Indo China', 'East Indies'],  // Note: "French Indo China" (no hyphen) matches territory name
   ['East Indies', 'Australia'],
@@ -1281,7 +1284,7 @@ export class TerritoryRenderer {
 
     // Per-territory label offsets to avoid unit overlap
     const LABEL_OFFSETS = {
-      'Finland Norway': { x: 0, y: -25 },  // Move label up to avoid unit icons
+      'Finland Norway': { x: 0, y: -60 },  // Move label up into Finland area (away from Sweden)
       'Eire': { x: 0, y: -15 },
       'United Kingdom': { x: 0, y: -15 },
     };

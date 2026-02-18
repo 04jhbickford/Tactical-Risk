@@ -367,14 +367,18 @@ export class PlacementUI {
 
   // Check if a unit can be loaded onto a transport given current cargo
   _canLoadOnTransport(cargo, unitType) {
-    // Transport capacity: 2 infantry OR 1 infantry + 1 other OR 1 non-infantry
-    const infantryCount = cargo.filter(c => c.type === 'infantry').length;
+    // Transport capacity: 2 infantry OR 1 infantry + 1 other ground unit
     const otherCount = cargo.filter(c => c.type !== 'infantry').length;
+    const totalCount = cargo.length;
+
+    if (totalCount >= 2) {
+      return false;
+    }
 
     if (unitType === 'infantry') {
-      return cargo.length < 2 && otherCount === 0;
+      return true; // Infantry can always be added if not full
     } else {
-      return cargo.length === 0 || (infantryCount === 1 && otherCount === 0);
+      return otherCount === 0; // Only add non-infantry if no other tank/artillery
     }
   }
 }

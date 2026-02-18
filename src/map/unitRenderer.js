@@ -65,6 +65,13 @@ export class UnitRenderer {
       let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
 
+      // Apply manual offsets for land territories that need adjustment
+      const landOffset = UnitRenderer.TERRITORY_CENTER_OFFSETS[territory];
+      if (landOffset && !t.isWater) {
+        cx += landOffset.x;
+        cy += landOffset.y;
+      }
+
       // If this is a sea zone, adjust center to avoid land overlap
       if (t.isWater) {
         const adjusted = this._adjustSeaZoneCenter(t, cx, cy);
@@ -112,6 +119,11 @@ export class UnitRenderer {
     'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
     'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
     'North Sea Zone': { x: -30, y: 0 },               // Move west into water
+  };
+
+  // Custom offsets for land territories where units appear in wrong location
+  static TERRITORY_CENTER_OFFSETS = {
+    'Finland Norway': { x: 0, y: -60 },  // Move units north into Finland area
   };
 
   // Adjust sea zone center to avoid island/land overlap
@@ -406,6 +418,13 @@ export class UnitRenderer {
 
       let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
+
+      // Apply manual offsets for land territories that need adjustment
+      const landOffset = UnitRenderer.TERRITORY_CENTER_OFFSETS[territory];
+      if (landOffset && !t.isWater) {
+        cx += landOffset.x;
+        cy += landOffset.y;
+      }
 
       if (t.isWater) {
         const adjusted = this._adjustSeaZoneCenter(t, cx, cy);
