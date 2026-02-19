@@ -44,6 +44,10 @@ export class PlayerPanel {
     // Inline tech state
     this.techDiceCount = 0;
 
+    // Inline movement state
+    this.moveSelectedUnits = {};  // { unitType: quantity }
+    this.movePendingDest = null;
+
     // Create panel element
     this.el = document.getElementById('sidebar');
     this.el.innerHTML = '';
@@ -85,6 +89,11 @@ export class PlayerPanel {
   }
 
   setSelectedTerritory(territory) {
+    // Reset movement state when territory changes
+    if (this.selectedTerritory?.name !== territory?.name) {
+      this.moveSelectedUnits = {};
+      this.movePendingDest = null;
+    }
     this.selectedTerritory = territory;
     this._render();
   }
@@ -264,7 +273,14 @@ export class PlayerPanel {
       }
 
       if (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
-        html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
+        // Check if we have a territory selected with movable units
+        const hasMovableTerritory = this.selectedTerritory && this._hasMovableUnits(this.selectedTerritory, player);
+
+        if (hasMovableTerritory) {
+          html += this._renderInlineMovement(player, turnPhase);
+        } else {
+          html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
+        }
 
         // Show recent moves with individual undo option
         const moveHistory = this.gameState.moveHistory || [];
@@ -890,6 +906,161 @@ export class PlayerPanel {
     return Array.from(seaZones);
   }
 
+  // Check if territory has movable units owned by player
+  _hasMovableUnits(territory, player) {
+    if (!territory || !player) return false;
+    const units = this.gameState.getUnitsAt(territory.name);
+    return units.some(u => {
+      if (u.owner !== player.id) return false;
+      const def = this.unitDefs?.[u.type];
+      if (!def || def.movement <= 0 || def.isBuilding) return false;
+      // Check if unit hasn't moved yet
+      return !u.moved;
+    });
+  }
+
+  // Get movable units at a territory for current player
+  _getMovableUnits(territory, player) {
+    if (!territory || !player) return [];
+    const units = this.gameState.getUnitsAt(territory.name);
+    const movable = {};
+
+    for (const u of units) {
+      if (u.owner !== player.id) continue;
+      const def = this.unitDefs?.[u.type];
+      if (!def || def.movement <= 0 || def.isBuilding) continue;
+      if (u.moved) continue;
+
+      // Skip individual ships (have IDs) - aggregate by type
+      if (u.id) continue;
+
+      if (!movable[u.type]) {
+        movable[u.type] = { type: u.type, quantity: 0 };
+      }
+      movable[u.type].quantity += u.quantity;
+    }
+
+    return Object.values(movable);
+  }
+
+  // Get valid destinations for selected units
+  _getValidDestinations(fromTerritory, player, isCombatMove) {
+    if (!fromTerritory || !this.territories) return [];
+    const from = this.territories[fromTerritory.name];
+    if (!from) return [];
+
+    const destinations = [];
+    for (const connName of from.connections || []) {
+      const conn = this.territories[connName];
+      if (!conn) continue;
+
+      const owner = this.gameState.getOwner(connName);
+      const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+      const isFriendly = owner === player.id || this.gameState.areAllies(player.id, owner);
+
+      // Combat move: can attack enemies, non-combat: friendly only
+      if (isCombatMove) {
+        // Land units can attack enemies, all units can move to sea zones
+        if (isEnemy || conn.isWater || !owner) {
+          destinations.push({ name: connName, isEnemy, isWater: conn.isWater });
+        }
+      } else {
+        // Non-combat: friendly or neutral only
+        if (!isEnemy) {
+          destinations.push({ name: connName, isEnemy: false, isWater: conn.isWater });
+        }
+      }
+    }
+
+    return destinations;
+  }
+
+  _renderInlineMovement(player, turnPhase) {
+    const isCombatMove = turnPhase === TURN_PHASES.COMBAT_MOVE;
+    const movableUnits = this._getMovableUnits(this.selectedTerritory, player);
+    const totalSelected = Object.values(this.moveSelectedUnits).reduce((sum, q) => sum + q, 0);
+    const destinations = this._getValidDestinations(this.selectedTerritory, player, isCombatMove);
+
+    let html = `
+      <div class="pp-inline-movement">
+        <div class="pp-move-from">
+          <span class="pp-move-label">From:</span>
+          <span class="pp-move-territory">${this.selectedTerritory.name}</span>
+        </div>
+
+        <div class="pp-move-units">`;
+
+    // Show movable units with +/- controls
+    for (const unit of movableUnits) {
+      const selected = this.moveSelectedUnits[unit.type] || 0;
+      const imageSrc = getUnitIconPath(unit.type, player.id);
+
+      html += `
+        <div class="pp-move-unit-row">
+          <div class="pp-move-unit-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="pp-move-icon" alt="${unit.type}">` : ''}
+            <span class="pp-move-name">${unit.type}</span>
+            <span class="pp-move-avail">(${unit.quantity})</span>
+          </div>
+          <div class="pp-move-controls">
+            <button class="pp-qty-btn" data-action="move-unit" data-unit="${unit.type}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
+            <span class="pp-move-qty">${selected}</span>
+            <button class="pp-qty-btn" data-action="move-unit" data-unit="${unit.type}" data-delta="1" ${selected >= unit.quantity ? 'disabled' : ''}>+</button>
+            <button class="pp-move-all-btn" data-action="move-all" data-unit="${unit.type}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
+          </div>
+        </div>`;
+    }
+
+    html += `</div>`;
+
+    // Select All / Clear buttons
+    const totalMovable = movableUnits.reduce((sum, u) => sum + u.quantity, 0);
+    html += `
+      <div class="pp-move-select-all">
+        <button class="pp-move-btn secondary" data-action="move-select-all" ${totalSelected >= totalMovable ? 'disabled' : ''}>Select All</button>
+        ${totalSelected > 0 ? `<button class="pp-move-btn secondary" data-action="move-clear">Clear</button>` : ''}
+      </div>`;
+
+    // Destination selection
+    if (totalSelected > 0 && destinations.length > 0) {
+      html += `
+        <div class="pp-move-destinations">
+          <span class="pp-move-label">Move to:</span>
+          <div class="pp-dest-list">`;
+
+      for (const dest of destinations.slice(0, 8)) {
+        const isSelected = this.movePendingDest === dest.name;
+        html += `
+          <button class="pp-dest-btn ${isSelected ? 'selected' : ''} ${dest.isEnemy ? 'enemy' : ''}"
+                  data-action="select-dest" data-dest="${dest.name}">
+            ${dest.name}${dest.isEnemy ? ' ⚔' : ''}
+          </button>`;
+      }
+      if (destinations.length > 8) {
+        html += `<div class="pp-dest-more">+${destinations.length - 8} more (click map)</div>`;
+      }
+
+      html += `</div></div>`;
+
+      // Confirm button
+      if (this.movePendingDest) {
+        html += `
+          <button class="pp-action-btn primary" data-action="confirm-move">
+            Confirm Move to ${this.movePendingDest}
+          </button>`;
+      }
+    } else if (totalSelected > 0) {
+      html += `<div class="pp-hint">Click a destination on the map</div>`;
+    }
+
+    // Cancel button
+    html += `
+      <button class="pp-move-btn cancel" data-action="cancel-move">Cancel</button>
+    </div>`;
+
+    return html;
+  }
+
   _bindEvents() {
     // Tab switching
     this.contentEl.querySelectorAll('.pp-tab').forEach(tab => {
@@ -961,6 +1132,82 @@ export class PlayerPanel {
             this.onAction('roll-tech', { diceCount: this.techDiceCount });
             this.techDiceCount = 0; // Reset after rolling
           }
+          return;
+        }
+
+        // Handle movement unit selection (+/-)
+        if (action === 'move-unit') {
+          const unitType = btn.dataset.unit;
+          const delta = parseInt(btn.dataset.delta, 10);
+          const current = this.moveSelectedUnits[unitType] || 0;
+          const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
+          const maxQty = movable.find(u => u.type === unitType)?.quantity || 0;
+          const newQty = Math.max(0, Math.min(maxQty, current + delta));
+          this.moveSelectedUnits[unitType] = newQty;
+          this._render();
+          return;
+        }
+
+        // Handle move-all for a unit type
+        if (action === 'move-all') {
+          const unitType = btn.dataset.unit;
+          const qty = parseInt(btn.dataset.qty, 10);
+          this.moveSelectedUnits[unitType] = qty;
+          this._render();
+          return;
+        }
+
+        // Handle select-all units for movement
+        if (action === 'move-select-all') {
+          const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
+          for (const unit of movable) {
+            this.moveSelectedUnits[unit.type] = unit.quantity;
+          }
+          this._render();
+          return;
+        }
+
+        // Handle clear movement selection
+        if (action === 'move-clear') {
+          this.moveSelectedUnits = {};
+          this.movePendingDest = null;
+          this._render();
+          return;
+        }
+
+        // Handle destination selection
+        if (action === 'select-dest') {
+          const dest = btn.dataset.dest;
+          this.movePendingDest = dest;
+          this._render();
+          return;
+        }
+
+        // Handle confirm move
+        if (action === 'confirm-move') {
+          if (this.onAction && this.movePendingDest && this.selectedTerritory) {
+            const units = Object.entries(this.moveSelectedUnits)
+              .filter(([_, qty]) => qty > 0)
+              .map(([type, quantity]) => ({ type, quantity }));
+            if (units.length > 0) {
+              this.onAction('execute-move', {
+                from: this.selectedTerritory.name,
+                to: this.movePendingDest,
+                units
+              });
+              // Reset movement state after confirming
+              this.moveSelectedUnits = {};
+              this.movePendingDest = null;
+            }
+          }
+          return;
+        }
+
+        // Handle cancel move
+        if (action === 'cancel-move') {
+          this.moveSelectedUnits = {};
+          this.movePendingDest = null;
+          this._render();
           return;
         }
 

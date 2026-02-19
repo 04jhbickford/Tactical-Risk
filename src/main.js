@@ -328,6 +328,20 @@ async function init() {
         }
         break;
 
+      case 'execute-move':
+        // Execute a move from inline movement UI
+        if (data.from && data.to && data.units && data.units.length > 0) {
+          const result = gameState.moveUnits(data.from, data.to, data.units);
+          if (result.success) {
+            actionLog.logMove(data.from, data.to, data.units, gameState.currentPlayer);
+            camera.dirty = true;
+            // Clear selection after successful move
+            selectedTerritory = null;
+            playerPanel.setSelectedTerritory(null);
+          }
+        }
+        break;
+
       case 'next-phase':
         const prevPlayer = gameState.currentPlayer;
         const prevRound = gameState.round;
@@ -695,14 +709,8 @@ async function init() {
         }
       }
 
-      // Check if we're in a movement phase
-      if (hit && gameState && movementUI.isMovementPhase()) {
-        const handled = movementUI.selectTerritory(hit);
-        if (handled) {
-          camera.dirty = true;
-          return;
-        }
-      }
+      // Movement phases now use inline UI in player panel - don't show modal
+      // Just let the territory selection flow through to setSelectedTerritory
 
       if (hit) {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);

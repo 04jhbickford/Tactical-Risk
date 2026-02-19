@@ -2173,6 +2173,210 @@ html, body {
   flex: 1 0 100%;
 }
 
+/* Inline Movement UI */
+.pp-inline-movement {
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.pp-move-from {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-move-label {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+}
+
+.pp-move-territory {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.pp-move-units {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.pp-move-unit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+
+.pp-move-unit-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-move-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.pp-move-name {
+  font-size: 12px;
+  color: #ddd;
+  text-transform: capitalize;
+}
+
+.pp-move-avail {
+  font-size: 10px;
+  color: #888;
+}
+
+.pp-move-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-move-qty {
+  min-width: 20px;
+  text-align: center;
+  font-size: 12px;
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.pp-move-all-btn {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 3px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-move-all-btn:hover:not(:disabled) {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: #4caf50;
+  color: #fff;
+}
+
+.pp-move-all-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pp-move-select-all {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pp-move-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 11px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-move-btn.secondary {
+  background: rgba(255,255,255,0.08);
+  color: #ccc;
+}
+
+.pp-move-btn.secondary:hover:not(:disabled) {
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+}
+
+.pp-move-btn.cancel {
+  background: rgba(255,100,100,0.15);
+  border-color: rgba(255,100,100,0.3);
+  color: #ff8888;
+  margin-top: 8px;
+}
+
+.pp-move-btn.cancel:hover {
+  background: rgba(255,100,100,0.3);
+  color: #fff;
+}
+
+.pp-move-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pp-move-destinations {
+  margin-bottom: 10px;
+}
+
+.pp-dest-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.pp-dest-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 4px;
+  color: #ccc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-dest-btn:hover {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.3);
+  color: #fff;
+}
+
+.pp-dest-btn.selected {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: #4caf50;
+  color: #fff;
+}
+
+.pp-dest-btn.enemy {
+  background: rgba(255,100,100,0.15);
+  border-color: rgba(255,100,100,0.3);
+  color: #ff8888;
+}
+
+.pp-dest-btn.enemy:hover {
+  background: rgba(255,100,100,0.3);
+  color: #fff;
+}
+
+.pp-dest-btn.enemy.selected {
+  background: rgba(255,100,100,0.4);
+  border-color: #ff6666;
+}
+
+.pp-dest-more {
+  font-size: 10px;
+  color: #888;
+  padding: 4px;
+  font-style: italic;
+}
+
 .pp-purchase-type {
   flex: 1;
   font-size: 12px;
