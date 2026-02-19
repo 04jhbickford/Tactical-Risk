@@ -696,39 +696,63 @@ export class CombatUI {
     const player = this.gameState.currentPlayer;
     const { airUnitsToLand, selectedLandings, attackers } = this.combatState;
 
-    // Process each air unit landing
+    // Group landings by destination to batch moves of same unit type
+    const landingsByDest = {}; // { destination: { unitType: quantity } }
+    const crashes = {}; // { unitType: quantity }
+
+    // Process each air unit landing (now individually tracked by ID)
     for (const airUnit of airUnitsToLand) {
-      const destination = selectedLandings[airUnit.type];
+      // Use unit ID for individual tracking (allows same type to land at different locations)
+      const unitKey = airUnit.id || airUnit.type;
+      const destination = selectedLandings[unitKey];
 
       if (!destination && airUnit.landingOptions.length > 0) {
         // No selection made but has options - shouldn't happen due to button disabled
         continue;
       }
 
-      // Find the unit in attackers
-      const attackerUnit = attackers.find(u => u.type === airUnit.type);
-      if (!attackerUnit || attackerUnit.quantity <= 0) continue;
-
       if (airUnit.landingOptions.length === 0) {
-        // No valid landing - unit crashes (remove from attackers)
-        attackerUnit.quantity = 0;
+        // No valid landing - unit crashes
+        crashes[airUnit.type] = (crashes[airUnit.type] || 0) + airUnit.quantity;
         console.log(`${airUnit.type} crashed - no valid landing location`);
       } else if (destination && destination !== this.currentTerritory) {
-        // Move air units to destination
-        // First remove from attackers (will be added to destination)
-        const quantityToMove = attackerUnit.quantity;
-        attackerUnit.quantity = 0;
+        // Track this landing
+        if (!landingsByDest[destination]) {
+          landingsByDest[destination] = {};
+        }
+        landingsByDest[destination][airUnit.type] =
+          (landingsByDest[destination][airUnit.type] || 0) + airUnit.quantity;
+      }
+      // If destination === currentTerritory, unit stays (do nothing)
+    }
+
+    // Apply crashes - reduce attacker quantities
+    for (const [unitType, crashCount] of Object.entries(crashes)) {
+      const attackerUnit = attackers.find(u => u.type === unitType);
+      if (attackerUnit) {
+        attackerUnit.quantity = Math.max(0, attackerUnit.quantity - crashCount);
+      }
+    }
+
+    // Apply landings - move units from attackers to destinations
+    for (const [destination, unitTypes] of Object.entries(landingsByDest)) {
+      for (const [unitType, quantity] of Object.entries(unitTypes)) {
+        // Remove from attackers
+        const attackerUnit = attackers.find(u => u.type === unitType);
+        if (attackerUnit) {
+          attackerUnit.quantity = Math.max(0, attackerUnit.quantity - quantity);
+        }
 
         // Add to destination territory
         const destUnits = this.gameState.units[destination] || [];
-        const existing = destUnits.find(u => u.type === airUnit.type && u.owner === player.id);
+        const existing = destUnits.find(u => u.type === unitType && u.owner === player.id);
         if (existing) {
-          existing.quantity += quantityToMove;
+          existing.quantity += quantity;
           existing.moved = true;
         } else {
           destUnits.push({
-            type: airUnit.type,
-            quantity: quantityToMove,
+            type: unitType,
+            quantity: quantity,
             owner: player.id,
             moved: true
           });
@@ -744,14 +768,16 @@ export class CombatUI {
           const carrierDef = this.unitDefs.carrier;
 
           // Add to carrier's aircraft array
+          let remainingToAdd = quantity;
           for (const carrier of carriers) {
+            if (remainingToAdd <= 0) break;
             carrier.aircraft = carrier.aircraft || [];
             const capacity = (carrierDef?.aircraftCapacity || 2) - carrier.aircraft.length;
-            const toAdd = Math.min(quantityToMove, capacity);
+            const toAdd = Math.min(remainingToAdd, capacity);
             for (let i = 0; i < toAdd; i++) {
-              carrier.aircraft.push({ type: airUnit.type, owner: player.id });
+              carrier.aircraft.push({ type: unitType, owner: player.id });
             }
-            if (carrier.aircraft.length >= (carrierDef?.aircraftCapacity || 2)) break;
+            remainingToAdd -= toAdd;
           }
         }
       }
@@ -787,6 +813,7 @@ export class CombatUI {
     const airUnitsToLand = [];
     const territory = this.currentTerritory;
 
+    let unitIdCounter = 0;
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
       if (!def?.isAir || unit.quantity <= 0) continue;
@@ -794,12 +821,16 @@ export class CombatUI {
       // Get valid landing options (only territories friendly at turn start)
       const landingOptions = this.gameState.getAirLandingOptions(territory, unit.type, this.unitDefs);
 
-      // ALL air units must choose a landing location after combat
-      airUnitsToLand.push({
-        type: unit.type,
-        quantity: unit.quantity,
-        landingOptions: landingOptions,
-      });
+      // Expand each unit into individual entries for separate landing selection
+      // This allows 2x fighters to be sent to different territories
+      for (let i = 0; i < unit.quantity; i++) {
+        airUnitsToLand.push({
+          id: `${unit.type}_${unitIdCounter++}`,
+          type: unit.type,
+          quantity: 1, // Each entry is now a single unit
+          landingOptions: landingOptions,
+        });
+      }
     }
 
     if (airUnitsToLand.length > 0) {
@@ -913,6 +944,9 @@ export class CombatUI {
       this.combatState.defenders = [];
     }
 
+    // IMMEDIATE UPDATE: Sync casualties to gameState so map updates in real-time
+    this._syncCombatStateToGame();
+
     // Check for resolution
     if (this.combatState.defenders.length === 0) {
       this.combatState.winner = 'attacker';
@@ -931,6 +965,32 @@ export class CombatUI {
     }
 
     this._render();
+  }
+
+  // Sync current combat state to gameState.units for real-time map updates
+  _syncCombatStateToGame() {
+    if (!this.currentTerritory) return;
+
+    // Build units array from current combat state
+    const units = [];
+
+    // Add surviving attackers
+    for (const unit of this.combatState.attackers) {
+      if (unit.quantity > 0) {
+        units.push({ ...unit });
+      }
+    }
+
+    // Add surviving defenders
+    for (const unit of this.combatState.defenders) {
+      if (unit.quantity > 0) {
+        units.push({ ...unit });
+      }
+    }
+
+    // Update gameState and trigger re-render
+    this.gameState.units[this.currentTerritory] = units;
+    this.gameState._notify();
   }
 
   _finalizeCombat() {
@@ -1049,8 +1109,9 @@ export class CombatUI {
         const { airUnitsToLand } = this.combatState;
         for (const airUnit of airUnitsToLand) {
           if (airUnit.landingOptions.length > 0) {
-            // Select the closest landing option
-            this.combatState.selectedLandings[airUnit.type] = airUnit.landingOptions[0].territory;
+            // Select the closest landing option (use unit ID for individual tracking)
+            const unitKey = airUnit.id || airUnit.type;
+            this.combatState.selectedLandings[unitKey] = airUnit.landingOptions[0].territory;
           }
         }
         this._confirmAirLandings();
@@ -1281,10 +1342,13 @@ export class CombatUI {
           </div>
       `;
 
-      for (const airUnit of airUnitsToLand) {
+      for (let i = 0; i < airUnitsToLand.length; i++) {
+        const airUnit = airUnitsToLand[i];
         const def = this.unitDefs[airUnit.type];
         const imageSrc = player ? getUnitIconPath(airUnit.type, player.id) : null;
-        const selectedDest = selectedLandings[airUnit.type];
+        // Use unit ID for individual tracking (allows same type to land at different locations)
+        const unitKey = airUnit.id || airUnit.type;
+        const selectedDest = selectedLandings[unitKey];
         const hasOptions = airUnit.landingOptions.length > 0;
 
         // Get movement info for this unit
@@ -1293,17 +1357,24 @@ export class CombatUI {
         const distanceTraveled = originInfo?.distance || 0;
         const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
+        // Display unit number if there are multiple of same type (e.g., "Fighter #1", "Fighter #2")
+        const sameTypeUnits = airUnitsToLand.filter(u => u.type === airUnit.type);
+        const unitIndex = sameTypeUnits.indexOf(airUnit) + 1;
+        const displayName = sameTypeUnits.length > 1
+          ? `${airUnit.type} #${unitIndex}`
+          : `${airUnit.quantity}× ${airUnit.type}`;
+
         html += `
           <div class="air-landing-unit ${!hasOptions ? 'no-options' : ''}">
             <div class="air-landing-unit-info">
               ${imageSrc ? `<img src="${imageSrc}" class="air-landing-icon" alt="${airUnit.type}">` : ''}
               <div class="air-landing-unit-details">
-                <span class="air-landing-name">${airUnit.quantity}× ${airUnit.type}</span>
+                <span class="air-landing-name">${displayName}</span>
                 <span class="air-landing-movement">Movement: ${remainingMovement}/${totalMovement} remaining</span>
               </div>
             </div>
             ${hasOptions ? `
-              <select class="air-landing-select" data-unit="${airUnit.type}">
+              <select class="air-landing-select" data-unit="${unitKey}">
                 <option value="">-- Select Landing --</option>
                 ${airUnit.landingOptions.map(opt =>
                   `<option value="${opt.territory}" ${selectedDest === opt.territory ? 'selected' : ''}>
@@ -1391,9 +1462,11 @@ export class CombatUI {
       `;
     } else if (phase === 'airLanding') {
       const { airUnitsToLand, selectedLandings } = this.combatState;
-      const allSelected = airUnitsToLand.every(u =>
-        u.landingOptions.length === 0 || selectedLandings[u.type]
-      );
+      // Use unit ID for individual tracking (allows same type to land at different locations)
+      const allSelected = airUnitsToLand.every(u => {
+        const unitKey = u.id || u.type;
+        return u.landingOptions.length === 0 || selectedLandings[unitKey];
+      });
       html += `
         <button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>
           Confirm Landings

@@ -18,7 +18,7 @@ const PHASE_HINTS = {
 
 const TABS = [
   { id: 'actions', label: 'Actions', icon: '⚔' },
-  { id: 'stats', label: 'Stats', icon: '📊' },
+  { id: 'stats', label: 'Players', icon: '📊' },
   { id: 'territory', label: 'Territory', icon: '🗺' },
   { id: 'log', label: 'Log', icon: '📜' },
 ];
@@ -186,12 +186,26 @@ export class PlayerPanel {
 
     // End Phase button (always visible during PLAYING phase)
     if (phase === GAME_PHASES.PLAYING) {
-      html += `
-        <div class="pp-end-phase">
-          <button class="pp-action-btn end-phase" data-action="next-phase">
-            End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
-          </button>
-        </div>`;
+      // Check if we need to block advancing due to unresolved combats
+      const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
+        this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
+
+      if (hasUnresolvedCombats) {
+        html += `
+          <div class="pp-end-phase">
+            <div class="pp-combat-warning">⚠️ Resolve all battles before advancing</div>
+            <button class="pp-action-btn end-phase disabled" disabled>
+              End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
+            </button>
+          </div>`;
+      } else {
+        html += `
+          <div class="pp-end-phase">
+            <button class="pp-action-btn end-phase" data-action="next-phase">
+              End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
+            </button>
+          </div>`;
+      }
     }
 
     html += '</div>';
@@ -250,13 +264,50 @@ export class PlayerPanel {
 
       if (turnPhase === TURN_PHASES.PURCHASE) {
         html += `<button class="pp-action-btn primary" data-action="open-purchase">🛒 Purchase Units</button>`;
+
+        // Show current purchases with individual undo buttons
+        const purchases = this.gameState.getPendingPurchases?.() || [];
+        if (purchases.length > 0) {
+          const totalCost = purchases.reduce((sum, p) => sum + (p.cost || 0) * p.quantity, 0);
+          html += `
+            <div class="pp-purchase-list">
+              <div class="pp-purchase-header">Current Purchases (${totalCost} IPCs)</div>`;
+          for (const p of purchases) {
+            html += `
+              <div class="pp-purchase-item">
+                <span class="pp-purchase-qty">${p.quantity}×</span>
+                <span class="pp-purchase-type">${p.type}</span>
+                <button class="pp-undo-btn" data-action="undo-purchase" data-type="${p.type}">✕</button>
+              </div>`;
+          }
+          html += `
+              <button class="pp-action-btn secondary small" data-action="clear-purchases">Clear All</button>
+            </div>`;
+        }
       }
 
       if (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
         html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
-        const canUndo = this.gameState.moveHistory && this.gameState.moveHistory.length > 0;
-        if (canUndo) {
-          html += `<button class="pp-action-btn secondary" data-action="undo-move">Undo Last Move</button>`;
+
+        // Show recent moves with individual undo option
+        const moveHistory = this.gameState.moveHistory || [];
+        if (moveHistory.length > 0) {
+          html += `
+            <div class="pp-move-history">
+              <div class="pp-move-header">Recent Moves</div>`;
+          // Show last 5 moves (most recent first)
+          const recentMoves = moveHistory.slice(-5).reverse();
+          for (let i = 0; i < recentMoves.length; i++) {
+            const move = recentMoves[i];
+            const unitStr = move.units.map(u => `${u.quantity}${u.type.charAt(0)}`).join(',');
+            const isLast = i === 0;
+            html += `
+              <div class="pp-move-item ${isLast ? 'last' : ''}">
+                <span class="pp-move-desc">${unitStr}: ${move.from} → ${move.to}</span>
+                ${isLast ? `<button class="pp-undo-btn" data-action="undo-move">↩</button>` : ''}
+              </div>`;
+          }
+          html += `</div>`;
         }
       }
 
@@ -290,80 +341,127 @@ export class PlayerPanel {
     return html;
   }
 
-  _renderStatsTab(player) {
-    const ipcs = this.gameState.getIPCs(player.id);
-    const territories = this.gameState.getPlayerTerritories(player.id);
-    const income = this._calculateIncome(player.id);
-    const units = this._countUnits(player.id);
-    const techs = this.gameState.playerTechs?.[player.id]?.unlockedTechs || [];
-
+  _renderStatsTab(currentPlayer) {
     let html = '<div class="pp-stats-tab">';
 
-    // Resources
-    html += `
-      <div class="pp-stat-section">
-        <div class="pp-stat-header">💰 Resources</div>
-        <div class="pp-stat-grid">
-          <div class="pp-stat-item">
-            <span class="pp-stat-value">${ipcs}</span>
-            <span class="pp-stat-label">IPCs</span>
+    // All players comparison table
+    html += `<div class="pp-all-players">`;
+
+    // Gather stats for all players
+    const playerStats = this.gameState.players.map(p => {
+      const territories = this.gameState.getPlayerTerritories(p.id);
+      const income = this._calculateIncome(p.id);
+      const units = this._countUnits(p.id);
+      const totalUnits = Object.values(units).reduce((a, b) => a + b, 0);
+      const techs = this.gameState.playerTechs?.[p.id]?.unlockedTechs || [];
+      const ipcs = this.gameState.getIPCs(p.id);
+      const capital = this.gameState.capitals?.[p.id];
+      const capitalOwner = capital ? this.gameState.getOwner(capital) : null;
+      const hasCapital = capitalOwner === p.id;
+
+      return {
+        player: p,
+        territories: territories.length,
+        income,
+        totalUnits,
+        units,
+        techs: techs.length,
+        ipcs,
+        hasCapital,
+        isCurrentTurn: p.id === currentPlayer.id
+      };
+    });
+
+    // Sort by territories (most to least)
+    playerStats.sort((a, b) => b.territories - a.territories);
+
+    // Player cards
+    for (const stats of playerStats) {
+      const p = stats.player;
+      const flagSrc = p.flag ? `assets/flags/${p.flag}` : null;
+      const isActive = stats.isCurrentTurn;
+      const isEliminated = !stats.hasCapital && stats.territories === 0;
+
+      html += `
+        <div class="pp-player-card ${isActive ? 'active' : ''} ${isEliminated ? 'eliminated' : ''}"
+             style="--player-color: ${p.color}">
+          <div class="pp-player-header">
+            ${flagSrc ? `<img src="${flagSrc}" class="pp-player-flag" alt="${p.name}">` : ''}
+            <span class="pp-player-name" style="color: ${p.color}">${p.name}</span>
+            ${isActive ? '<span class="pp-turn-indicator">◀ Turn</span>' : ''}
+            ${!stats.hasCapital ? '<span class="pp-capital-lost">⚠ Capital Lost</span>' : ''}
           </div>
-          <div class="pp-stat-item">
-            <span class="pp-stat-value">${income}</span>
-            <span class="pp-stat-label">Income/Turn</span>
+          <div class="pp-player-stats">
+            <div class="pp-pstat">
+              <span class="pp-pstat-value">${stats.ipcs}</span>
+              <span class="pp-pstat-label">IPCs</span>
+            </div>
+            <div class="pp-pstat">
+              <span class="pp-pstat-value">${stats.income}</span>
+              <span class="pp-pstat-label">Income</span>
+            </div>
+            <div class="pp-pstat">
+              <span class="pp-pstat-value">${stats.territories}</span>
+              <span class="pp-pstat-label">Terr.</span>
+            </div>
+            <div class="pp-pstat">
+              <span class="pp-pstat-value">${stats.totalUnits}</span>
+              <span class="pp-pstat-label">Units</span>
+            </div>
+            <div class="pp-pstat">
+              <span class="pp-pstat-value">${stats.techs}</span>
+              <span class="pp-pstat-label">Techs</span>
+            </div>
           </div>
-        </div>
-      </div>`;
-
-    // Unit counts
-    html += `
-      <div class="pp-stat-section">
-        <div class="pp-stat-header">🎖️ Military Forces</div>
-        <div class="pp-unit-counts">`;
-
-    const unitCategories = {
-      'Land': ['infantry', 'artillery', 'tank', 'aaGun'],
-      'Naval': ['transport', 'submarine', 'destroyer', 'cruiser', 'battleship', 'carrier'],
-      'Air': ['fighter', 'bomber']
-    };
-
-    for (const [category, types] of Object.entries(unitCategories)) {
-      const categoryUnits = types.filter(t => units[t] > 0);
-      if (categoryUnits.length > 0) {
-        html += `<div class="pp-unit-category">
-          <span class="pp-unit-cat-label">${category}:</span>
-          ${categoryUnits.map(t => `<span class="pp-unit-count">${units[t]} ${t}</span>`).join(', ')}
         </div>`;
-      }
     }
 
-    const totalUnits = Object.values(units).reduce((a, b) => a + b, 0);
-    html += `<div class="pp-unit-total">Total: ${totalUnits} units</div>`;
-    html += `</div></div>`;
+    html += `</div>`;
 
-    // Technologies
-    html += `
-      <div class="pp-stat-section">
-        <div class="pp-stat-header">🔬 Technologies</div>`;
+    // Current player detailed breakdown
+    const currentStats = playerStats.find(s => s.player.id === currentPlayer.id);
+    if (currentStats) {
+      html += `
+        <div class="pp-stat-section pp-current-detail">
+          <div class="pp-stat-header">Your Forces</div>
+          <div class="pp-unit-breakdown">`;
 
-    if (techs.length > 0) {
-      html += `<div class="pp-tech-list">`;
-      for (const techId of techs) {
-        const tech = TECHNOLOGIES[techId];
-        if (tech) {
-          html += `
-            <div class="pp-tech-item">
-              <span class="pp-tech-name">${tech.name}</span>
-              <span class="pp-tech-desc">${tech.description}</span>
-            </div>`;
+      const unitCategories = {
+        'Land': ['infantry', 'artillery', 'tank', 'aaGun'],
+        'Naval': ['transport', 'submarine', 'destroyer', 'cruiser', 'battleship', 'carrier'],
+        'Air': ['fighter', 'bomber']
+      };
+
+      for (const [category, types] of Object.entries(unitCategories)) {
+        const categoryUnits = types.filter(t => currentStats.units[t] > 0);
+        if (categoryUnits.length > 0) {
+          html += `<div class="pp-unit-category">
+            <span class="pp-unit-cat-label">${category}:</span>
+            ${categoryUnits.map(t => `<span class="pp-unit-count">${currentStats.units[t]} ${t}</span>`).join(', ')}
+          </div>`;
         }
       }
-      html += `</div>`;
-    } else {
-      html += `<div class="pp-no-tech">No technologies researched</div>`;
+
+      html += `</div></div>`;
+
+      // Technologies for current player
+      const techs = this.gameState.playerTechs?.[currentPlayer.id]?.unlockedTechs || [];
+      if (techs.length > 0) {
+        html += `
+          <div class="pp-stat-section">
+            <div class="pp-stat-header">🔬 Your Technologies</div>
+            <div class="pp-tech-list">`;
+        for (const techId of techs) {
+          const tech = TECHNOLOGIES[techId];
+          if (tech) {
+            html += `<div class="pp-tech-item"><span class="pp-tech-name">${tech.name}</span></div>`;
+          }
+        }
+        html += `</div></div>`;
+      }
     }
 
-    html += `</div></div>`;
+    html += `</div>`;
     return html;
   }
 
@@ -563,7 +661,8 @@ export class PlayerPanel {
         }
 
         if (this.onAction) {
-          this.onAction(action, { territory });
+          const unitType = btn.dataset.type;
+          this.onAction(action, { territory, unitType });
         }
       });
     });

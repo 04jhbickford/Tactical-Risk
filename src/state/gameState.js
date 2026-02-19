@@ -1623,6 +1623,13 @@ export class GameState {
         if (this.combatQueue.length === 0) {
           continue;
         }
+      } else if (nextPhase === TURN_PHASES.NON_COMBAT_MOVE) {
+        // Block advancing if there are unresolved combats
+        if (this.combatQueue && this.combatQueue.length > 0) {
+          // Cannot advance - combats must be resolved first
+          console.warn('Cannot advance to non-combat move: unresolved combats remain');
+          return; // Don't advance, stay in current phase
+        }
       } else if (nextPhase === TURN_PHASES.MOBILIZE) {
         // Check if there are any pending purchases to place
         const player = this.currentPlayer;
@@ -1890,25 +1897,19 @@ export class GameState {
         return true;
       };
 
-      // Find the unit in source territory - prefer grouped units over individual ships
-      // Individual ships (with IDs) should be moved using options.shipIds
-      let sourceUnit = fromUnits.find(u =>
+      // Find ALL matching units (grouped) that can provide units
+      // This handles multiple stacks with different movementUsed values
+      const sourceStacks = fromUnits.filter(u =>
         u.type === moveUnit.type &&
         u.owner === player.id &&
         hasRemainingMovement(u) &&
-        !u.id // Prefer grouped units
+        !u.id // Only grouped units
       );
 
-      // Fall back to individual ships if no grouped units
-      if (!sourceUnit) {
-        sourceUnit = fromUnits.find(u =>
-          u.type === moveUnit.type &&
-          u.owner === player.id &&
-          hasRemainingMovement(u)
-        );
-      }
+      // Calculate total available
+      const totalAvailable = sourceStacks.reduce((sum, u) => sum + u.quantity, 0);
 
-      if (!sourceUnit || sourceUnit.quantity < moveUnit.quantity) {
+      if (totalAvailable < moveUnit.quantity) {
         return { success: false, error: `Not enough ${moveUnit.type} to move` };
       }
 
@@ -1933,11 +1934,27 @@ export class GameState {
         }
       }
 
-      // Perform the move
-      sourceUnit.quantity -= moveUnit.quantity;
-      if (sourceUnit.quantity <= 0) {
-        const idx = fromUnits.indexOf(sourceUnit);
-        fromUnits.splice(idx, 1);
+      // Perform the move - pull from multiple stacks if needed
+      // Track how much we took from each stack (for sea units with multi-hop)
+      const takenByMovementUsed = {}; // { movementUsed: quantity }
+      let remaining = moveUnit.quantity;
+
+      for (const sourceUnit of sourceStacks) {
+        if (remaining <= 0) break;
+
+        const toTake = Math.min(remaining, sourceUnit.quantity);
+        const srcMovementUsed = sourceUnit.movementUsed || 0;
+
+        // Track for sea unit multi-hop
+        takenByMovementUsed[srcMovementUsed] = (takenByMovementUsed[srcMovementUsed] || 0) + toTake;
+
+        sourceUnit.quantity -= toTake;
+        remaining -= toTake;
+
+        if (sourceUnit.quantity <= 0) {
+          const idx = fromUnits.indexOf(sourceUnit);
+          fromUnits.splice(idx, 1);
+        }
       }
 
       // Handle special loading onto carriers/transports
@@ -2017,28 +2034,31 @@ export class GameState {
 
         if (unitDef.isSea && maxMovement > 1) {
           // Sea units with multi-hop capability need individual tracking
-          // Calculate movement used for this move
-          const sourceMovementUsed = sourceUnit.movementUsed || 0;
-          const newMovementUsed = sourceMovementUsed + 1;
-          const isFullyMoved = newMovementUsed >= maxMovement;
+          // Units from different source stacks (different movementUsed) go to different dest stacks
 
-          // Find matching stack at destination with same movement state
-          const destUnit = toUnits.find(u =>
-            u.type === moveUnit.type &&
-            u.owner === player.id &&
-            (u.movementUsed || 0) === newMovementUsed
-          );
+          for (const [srcMovementStr, quantity] of Object.entries(takenByMovementUsed)) {
+            const srcMovement = parseInt(srcMovementStr);
+            const newMovementUsed = srcMovement + 1;
+            const isFullyMoved = newMovementUsed >= maxMovement;
 
-          if (destUnit) {
-            destUnit.quantity += moveUnit.quantity;
-          } else {
-            toUnits.push({
-              type: moveUnit.type,
-              quantity: moveUnit.quantity,
-              owner: player.id,
-              moved: isFullyMoved,
-              movementUsed: newMovementUsed
-            });
+            // Find matching stack at destination with same movement state
+            const destUnit = toUnits.find(u =>
+              u.type === moveUnit.type &&
+              u.owner === player.id &&
+              (u.movementUsed || 0) === newMovementUsed
+            );
+
+            if (destUnit) {
+              destUnit.quantity += quantity;
+            } else {
+              toUnits.push({
+                type: moveUnit.type,
+                quantity: quantity,
+                owner: player.id,
+                moved: isFullyMoved,
+                movementUsed: newMovementUsed
+              });
+            }
           }
         } else {
           // Land/air units or sea units with movement=1: use simple moved flag

@@ -224,6 +224,20 @@ async function init() {
         }
         break;
 
+      case 'undo-purchase':
+        if (data.unitType) {
+          const undoPurchaseResult = gameState.removeFromPendingPurchases(data.unitType, unitDefs);
+          if (undoPurchaseResult.success) {
+            camera.dirty = true;
+          }
+        }
+        break;
+
+      case 'clear-purchases':
+        gameState.clearPendingPurchases(unitDefs);
+        camera.dirty = true;
+        break;
+
       case 'undo-placement':
         if (gameState.undoPlacement()) {
           camera.dirty = true;

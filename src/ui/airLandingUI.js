@@ -83,7 +83,9 @@ export class AirLandingUI {
     // Check if this is a valid landing destination
     const validDest = currentUnit.landingOptions.find(opt => opt.territory === territory.name);
     if (validDest) {
-      this.selectedLandings[currentUnit.type] = territory.name;
+      // Use unit ID for individual tracking (allows same type to land at different locations)
+      const unitKey = currentUnit.id || currentUnit.type;
+      this.selectedLandings[unitKey] = territory.name;
 
       // Move to next unit if available
       if (this.currentUnitIndex < this.airUnitsToLand.length - 1) {
@@ -130,9 +132,11 @@ export class AirLandingUI {
     const currentUnit = this.airUnitsToLand[this.currentUnitIndex];
 
     // Check if all units have landing selections (or will crash)
-    const allSelected = this.airUnitsToLand.every(u =>
-      u.landingOptions.length === 0 || this.selectedLandings[u.type]
-    );
+    // Use unit ID for individual tracking (allows same type to land at different locations)
+    const allSelected = this.airUnitsToLand.every(u => {
+      const unitKey = u.id || u.type;
+      return u.landingOptions.length === 0 || this.selectedLandings[unitKey];
+    });
 
     let html = `
       <div class="alp-header" style="border-left: 5px solid ${player.color}">
@@ -158,7 +162,9 @@ export class AirLandingUI {
       const airUnit = this.airUnitsToLand[i];
       const def = this.unitDefs[airUnit.type];
       const imageSrc = getUnitIconPath(airUnit.type, player.id);
-      const selectedDest = this.selectedLandings[airUnit.type];
+      // Use unit ID for individual tracking (allows same type to land at different locations)
+      const unitKey = airUnit.id || airUnit.type;
+      const selectedDest = this.selectedLandings[unitKey];
       const hasOptions = airUnit.landingOptions.length > 0;
       const isCurrentUnit = i === this.currentUnitIndex;
 
@@ -168,13 +174,20 @@ export class AirLandingUI {
       const distanceTraveled = originInfo?.distance || 0;
       const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
+      // Display unit number if there are multiple of same type (e.g., "Fighter #1", "Fighter #2")
+      const sameTypeUnits = this.airUnitsToLand.filter(u => u.type === airUnit.type);
+      const unitIndex = sameTypeUnits.indexOf(airUnit) + 1;
+      const displayName = sameTypeUnits.length > 1
+        ? `${airUnit.type} #${unitIndex}`
+        : `${airUnit.quantity}× ${airUnit.type}`;
+
       html += `
         <div class="alp-unit ${isCurrentUnit ? 'current' : ''} ${!hasOptions ? 'no-options' : ''} ${selectedDest ? 'selected' : ''}">
           <div class="alp-unit-header" data-index="${i}">
             <div class="alp-unit-info">
               ${imageSrc ? `<img src="${imageSrc}" class="alp-unit-icon" alt="${airUnit.type}">` : ''}
               <div class="alp-unit-details">
-                <span class="alp-unit-name">${airUnit.quantity}× ${airUnit.type}</span>
+                <span class="alp-unit-name">${displayName}</span>
                 <span class="alp-unit-movement">${remainingMovement}/${totalMovement} movement left</span>
               </div>
             </div>
@@ -184,7 +197,7 @@ export class AirLandingUI {
           ${isCurrentUnit || selectedDest ? `
             <div class="alp-unit-content">
               ${hasOptions ? `
-                <select class="alp-dest-select" data-unit="${airUnit.type}">
+                <select class="alp-dest-select" data-unit="${unitKey}">
                   <option value="">-- Click map or select --</option>
                   ${airUnit.landingOptions.map(opt =>
                     `<option value="${opt.territory}" ${selectedDest === opt.territory ? 'selected' : ''}>
@@ -248,12 +261,12 @@ export class AirLandingUI {
 
       // Change event
       select.addEventListener('change', () => {
-        const unitType = select.dataset.unit;
+        const unitKey = select.dataset.unit; // Now uses unit ID, not just type
         const destination = select.value;
         if (destination) {
-          this.selectedLandings[unitType] = destination;
+          this.selectedLandings[unitKey] = destination;
         } else {
-          delete this.selectedLandings[unitType];
+          delete this.selectedLandings[unitKey];
         }
         this._render();
       });
@@ -261,8 +274,8 @@ export class AirLandingUI {
       // Focus/blur for dropdown highlighting
       select.addEventListener('focus', () => {
         // When dropdown opens, highlight all options
-        const unitType = select.dataset.unit;
-        const unit = this.airUnitsToLand.find(u => u.type === unitType);
+        const unitKey = select.dataset.unit;
+        const unit = this.airUnitsToLand.find(u => (u.id || u.type) === unitKey);
         if (unit && this.onHighlightTerritory) {
           // Could highlight all options - for now just clear
         }
@@ -278,17 +291,20 @@ export class AirLandingUI {
   _confirmLandings() {
     if (!this.onComplete) return;
 
-    // Build result with selected landings
+    // Build result with selected landings (keyed by unit ID for individual tracking)
     const result = {
       landings: { ...this.selectedLandings },
       crashes: [],
       isRetreating: this.isRetreating,
+      // Include original air units for ID-based processing
+      airUnitsToLand: this.airUnitsToLand,
     };
 
     // Track units that will crash
     for (const unit of this.airUnitsToLand) {
       if (unit.landingOptions.length === 0) {
         result.crashes.push({
+          id: unit.id,
           type: unit.type,
           quantity: unit.quantity,
         });

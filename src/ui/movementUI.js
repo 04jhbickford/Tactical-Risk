@@ -1245,6 +1245,22 @@ export class MovementUI {
       this._canUnitMove(u.type)
     );
 
+    // Aggregate movable units by type (handles multiple stacks with different movementUsed)
+    const aggregatedUnits = {};
+    for (const unit of movableUnits) {
+      // Skip individual ships (those with IDs) - they're shown in ship selection
+      if (unit.id) continue;
+
+      if (!aggregatedUnits[unit.type]) {
+        aggregatedUnits[unit.type] = {
+          type: unit.type,
+          owner: unit.owner,
+          totalQuantity: 0
+        };
+      }
+      aggregatedUnits[unit.type].totalQuantity += unit.quantity;
+    }
+
     // Check for ships with cargo that need individual selection
     const shipsWithCargo = this._getShipsWithCargo(this.selectedFrom.name, player.id);
     const hasMultipleShipsWithCargo = shipsWithCargo.filter(s =>
@@ -1284,11 +1300,12 @@ export class MovementUI {
       <div class="mp-units">
     `;
 
-    for (const unit of movableUnits) {
-      const def = this.unitDefs[unit.type];
-      const selected = this.selectedUnits[unit.type] || 0;
+    // Display aggregated units (grouped units without IDs)
+    for (const [unitType, unitData] of Object.entries(aggregatedUnits)) {
+      const def = this.unitDefs[unitType];
+      const selected = this.selectedUnits[unitType] || 0;
       // Use faction-specific icon
-      const imageSrc = unit.owner ? getUnitIconPath(unit.type, unit.owner) : (def?.image ? `assets/units/${def.image}` : null);
+      const imageSrc = unitData.owner ? getUnitIconPath(unitType, unitData.owner) : (def?.image ? `assets/units/${def.image}` : null);
 
       // Build detailed tooltip
       const tooltipParts = [
@@ -1305,16 +1322,16 @@ export class MovementUI {
       html += `
         <div class="mp-unit-row">
           <div class="mp-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="mp-unit-icon" alt="${unit.type}">` : ''}
-            <span class="mp-unit-name">${unit.type}</span>
+            ${imageSrc ? `<img src="${imageSrc}" class="mp-unit-icon" alt="${unitType}">` : ''}
+            <span class="mp-unit-name">${unitType}</span>
             <span class="mp-unit-info-icon" title="${tooltipText}">ⓘ</span>
-            <span class="mp-unit-avail">(${unit.quantity})</span>
+            <span class="mp-unit-avail">(${unitData.totalQuantity})</span>
           </div>
           <div class="mp-unit-select">
-            <button class="mp-qty-btn" data-unit="${unit.type}" data-delta="-1">−</button>
+            <button class="mp-qty-btn" data-unit="${unitType}" data-delta="-1">−</button>
             <span class="mp-qty">${selected}</span>
-            <button class="mp-qty-btn" data-unit="${unit.type}" data-delta="1">+</button>
-            <button class="mp-all-btn" data-unit="${unit.type}" data-qty="${unit.quantity}">All</button>
+            <button class="mp-qty-btn" data-unit="${unitType}" data-delta="1">+</button>
+            <button class="mp-all-btn" data-unit="${unitType}" data-qty="${unitData.totalQuantity}">All</button>
           </div>
         </div>
       `;
@@ -1336,8 +1353,8 @@ export class MovementUI {
       }
     }
 
-    // Move All button
-    const totalMovable = movableUnits.reduce((sum, u) => sum + u.quantity, 0);
+    // Move All button - use aggregated totals
+    const totalMovable = Object.values(aggregatedUnits).reduce((sum, u) => sum + u.totalQuantity, 0);
     const totalSelected = Object.values(this.selectedUnits).reduce((sum, q) => sum + q, 0);
 
     html += `
@@ -1475,8 +1492,16 @@ export class MovementUI {
       const movableUnits = units.filter(u =>
         u.owner === player.id && this._hasRemainingMovement(u) && this._canUnitMove(u.type)
       );
+
+      // Aggregate quantities by type (there may be multiple stacks with different movementUsed)
+      const totalByType = {};
       for (const unit of movableUnits) {
-        this.selectedUnits[unit.type] = unit.quantity;
+        if (!unit.id) { // Only aggregate grouped units, not individual ships
+          totalByType[unit.type] = (totalByType[unit.type] || 0) + unit.quantity;
+        }
+      }
+      for (const [type, qty] of Object.entries(totalByType)) {
+        this.selectedUnits[type] = qty;
       }
 
       // Also select all ships with cargo (transports and carriers)
@@ -1575,11 +1600,19 @@ export class MovementUI {
   _updateSelection(unitType, delta) {
     const player = this.gameState.currentPlayer;
     const units = this.gameState.getUnitsAt(this.selectedFrom.name);
-    const unit = units.find(u => u.type === unitType && u.owner === player.id);
-    if (!unit) return;
+
+    // Calculate total available across all stacks of this type
+    let totalAvailable = 0;
+    for (const u of units) {
+      if (u.type === unitType && u.owner === player.id && this._hasRemainingMovement(u) && !u.id) {
+        totalAvailable += u.quantity;
+      }
+    }
+
+    if (totalAvailable === 0) return;
 
     const current = this.selectedUnits[unitType] || 0;
-    const newValue = Math.max(0, Math.min(unit.quantity, current + delta));
+    const newValue = Math.max(0, Math.min(totalAvailable, current + delta));
     this.selectedUnits[unitType] = newValue;
 
     this._render();
