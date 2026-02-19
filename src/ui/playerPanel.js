@@ -1558,11 +1558,40 @@ export class PlayerPanel {
       if (this.movePendingDest) {
         const destInfo = destinations.find(d => d.name === this.movePendingDest);
         const isAttack = destInfo?.isEnemy;
+
+        // Check for air unit landing warning during combat move
+        let airLandingWarning = '';
+        if (isCombatMove && isAttack) {
+          // Check if any selected air units would have no landing options
+          const selectedAirUnits = [];
+          for (const [unitKey, qty] of Object.entries(this.moveSelectedUnits)) {
+            if (qty <= 0) continue;
+            const unit = regularUnits.find(u => (u.isIndividual ? `ship:${u.id}` : u.type) === unitKey);
+            if (unit && this.unitDefs[unit.type]?.isAir) {
+              selectedAirUnits.push(unit);
+            }
+          }
+
+          if (selectedAirUnits.length > 0 && this.gameState) {
+            // Simulate landing options from the destination
+            for (const airUnit of selectedAirUnits) {
+              const landingOptions = this.gameState.getAirLandingOptions(
+                this.movePendingDest, airUnit.type, this.unitDefs
+              );
+              if (landingOptions.length === 0) {
+                airLandingWarning = `⚠️ Warning: ${airUnit.type} may not have valid landing options and could crash!`;
+                break;
+              }
+            }
+          }
+        }
+
         html += `
           <div class="pp-move-confirm-area">
             <div class="pp-move-dest-info ${isAttack ? 'attack' : ''}">
               ${isAttack ? '⚔ Attack: ' : 'Moving to: '}${this.movePendingDest}
             </div>
+            ${airLandingWarning ? `<div class="pp-air-warning">${airLandingWarning}</div>` : ''}
             <button class="pp-action-btn primary" data-action="confirm-move">
               ${isAttack ? 'Confirm Attack' : 'Confirm Move'}
             </button>
@@ -1695,8 +1724,7 @@ export class PlayerPanel {
     if (totalPending === 0) {
       html += `
         <div class="pp-mobilize-done">
-          <div class="pp-mobilize-msg">All units deployed!</div>
-          <button class="pp-action-btn primary" data-action="next-phase">Complete Mobilization →</button>
+          <div class="pp-mobilize-msg">✓ All units deployed!</div>
         </div>
       </div>`;
       return html;

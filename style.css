@@ -3506,6 +3506,17 @@ html, body {
   margin-bottom: 8px;
 }
 
+.pp-air-warning {
+  color: #ffa500;
+  font-size: 11px;
+  text-align: center;
+  padding: 6px 8px;
+  background: rgba(255,165,0,0.15);
+  border: 1px solid rgba(255,165,0,0.3);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
 .pp-action-btn.primary {
   background: linear-gradient(135deg, #4169e1, #3457b0);
 }

@@ -557,7 +557,10 @@ export class GameState {
     // Get origin tracking info - if no origin tracked, assume unit started here
     const originInfo = this.airUnitOrigins[territory]?.[unitType];
     const distanceTraveled = originInfo?.distance || 0;
-    const totalMovement = unitDef.movement || 4;
+    // Apply Long Range Aircraft tech bonus (+2 movement for fighters and bombers)
+    const hasLongRange = this.hasTech(player.id, 'longRangeAircraft');
+    const baseMovement = unitDef.movement || 4;
+    const totalMovement = hasLongRange ? baseMovement + 2 : baseMovement;
     const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
     // Get all territories within remaining movement
@@ -1836,11 +1839,14 @@ export class GameState {
     // For air units, check if destination is within movement range
     // Also check if landing on carrier is allowed during non-combat
     let landingOnCarrier = false;
+    const hasLongRangeAircraft = this.hasTech(player.id, 'longRangeAircraft');
     for (const airUnit of airUnits) {
       const unitDef = unitDefs[airUnit.type];
       if (!unitDef) continue;
 
-      const movementRange = unitDef.movement || 4;
+      // Apply Long Range Aircraft tech bonus (+2 movement for fighters and bombers)
+      const baseMovement = unitDef.movement || 4;
+      const movementRange = hasLongRangeAircraft ? baseMovement + 2 : baseMovement;
 
       // Check if destination is reachable within air unit's movement range
       if (!this.canAirUnitReach(fromTerritory, toTerritory, movementRange)) {
@@ -2218,6 +2224,40 @@ export class GameState {
     // Move units back from destination to source
     const toUnits = this.units[lastMove.to] || [];
     const fromUnits = this.units[lastMove.from] || [];
+
+    // Handle amphibious unload (cargo was unloaded from transport)
+    if (lastMove.isAmphibious && lastMove.transportId) {
+      // Find the transport in the source territory (sea zone)
+      const transport = fromUnits.find(u => u.id === lastMove.transportId);
+
+      for (const moveUnit of lastMove.units) {
+        // Remove from destination (land territory)
+        const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
+        if (destUnit) {
+          destUnit.quantity -= moveUnit.quantity;
+          if (destUnit.quantity <= 0) {
+            const idx = toUnits.indexOf(destUnit);
+            toUnits.splice(idx, 1);
+          }
+        }
+
+        // Put cargo back on transport
+        if (transport) {
+          transport.cargo = transport.cargo || [];
+          const existingCargo = transport.cargo.find(c => c.type === moveUnit.type);
+          if (existingCargo) {
+            existingCargo.quantity = (existingCargo.quantity || 1) + moveUnit.quantity;
+          } else {
+            transport.cargo.push({ type: moveUnit.type, quantity: moveUnit.quantity, owner: player.id });
+          }
+        }
+      }
+
+      this.units[lastMove.from] = fromUnits;
+      this.units[lastMove.to] = toUnits;
+      this._notify();
+      return { success: true };
+    }
 
     // Handle individual ships (transports/carriers with cargo) moved by ID
     if (lastMove.shipIds && lastMove.shipIds.length > 0) {
