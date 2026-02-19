@@ -175,15 +175,18 @@ export class MovementUI {
     const def = this.unitDefs?.[unit.type];
     if (!def) return false;
 
-    // For individual ships (with IDs), check movementUsed
-    if (unit.id) {
+    // Units with moved=true are done moving
+    if (unit.moved) return false;
+
+    // For ships (individual or grouped), check movementUsed for multi-hop capability
+    if (def.isSea || unit.id) {
       const maxMove = def.movement || 2;
       const used = unit.movementUsed || 0;
       return used < maxMove;
     }
 
-    // For grouped units, use the moved flag
-    return !unit.moved;
+    // For other grouped units, having no moved flag means they can move
+    return true;
   }
 
   selectSource(territory) {
