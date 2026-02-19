@@ -283,10 +283,23 @@ export class PlayerPanel {
       const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
         this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
 
+      // Check if we need to block advancing due to unplaced units in mobilize phase
+      const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
+      const unplacedUnits = pendingPurchases.reduce((sum, p) => sum + p.quantity, 0);
+      const hasUnplacedUnits = turnPhase === TURN_PHASES.MOBILIZE && unplacedUnits > 0;
+
       if (hasUnresolvedCombats) {
         html += `
           <div class="pp-end-phase">
             <div class="pp-combat-warning">⚠️ Resolve all battles before advancing</div>
+            <button class="pp-action-btn end-phase disabled" disabled>
+              End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
+            </button>
+          </div>`;
+      } else if (hasUnplacedUnits) {
+        html += `
+          <div class="pp-end-phase">
+            <div class="pp-mobilize-warning">⚠️ Place all ${unplacedUnits} unit${unplacedUnits > 1 ? 's' : ''} before advancing</div>
             <button class="pp-action-btn end-phase disabled" disabled>
               End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
             </button>
@@ -1629,9 +1642,17 @@ export class PlayerPanel {
         </div>`;
     }
 
-    // Confirm button
+    // Check if any selections have been made (for undo button)
+    const hasSelections = Object.keys(this.airLandingSelections).length > 0;
+
+    // Action buttons
     html += `
       <div class="pp-air-landing-actions">
+        ${hasSelections ? `
+          <button class="pp-action-btn secondary" data-action="undo-air-landing">
+            ↩ Undo Selections
+          </button>
+        ` : ''}
         <button class="pp-action-btn primary ${allSelected ? '' : 'disabled'}"
                 data-action="confirm-air-landing" ${allSelected ? '' : 'disabled'}>
           Confirm All Landings
@@ -2135,6 +2156,16 @@ export class PlayerPanel {
               airUnitsToLand: this.airLandingData.airUnitsToLand,
             });
             this.clearAirLanding();
+          }
+          return;
+        }
+
+        // Handle undo air landing selections
+        if (action === 'undo-air-landing') {
+          if (this.isAirLandingActive()) {
+            this.airLandingSelections = {};
+            this.airLandingIndex = 0;
+            this._render();
           }
           return;
         }

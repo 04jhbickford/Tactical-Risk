@@ -3496,6 +3496,16 @@ html, body {
   margin-bottom: 8px;
 }
 
+.pp-mobilize-warning {
+  color: #ff6b6b;
+  font-size: 11px;
+  text-align: center;
+  padding: 6px 8px;
+  background: rgba(255,107,107,0.1);
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
 .pp-action-btn.primary {
   background: linear-gradient(135deg, #4169e1, #3457b0);
 }

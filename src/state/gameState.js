@@ -1395,6 +1395,7 @@ export class GameState {
       }
     } else if (unitDef.isBuilding) {
       // Factories: placed on owned land territories without a factory
+      // CRITICAL: Cannot place on territories captured this turn
       const owner = this.getOwner(territoryName);
       if (owner !== player.id) {
         return { success: false, error: 'Factories must be placed on your own territories' };
@@ -1402,6 +1403,11 @@ export class GameState {
       const t = this.territoryByName[territoryName];
       if (t?.isWater) {
         return { success: false, error: 'Factories cannot be placed on water' };
+      }
+      // Check if territory was owned at turn start (cannot place on newly captured territories)
+      const friendlyAtStart = this.friendlyTerritoriesAtTurnStart || new Set();
+      if (friendlyAtStart.size > 0 && !friendlyAtStart.has(territoryName)) {
+        return { success: false, error: 'Factories cannot be placed on territories captured this turn' };
       }
       // Check if territory already has a factory
       const units = this.units[territoryName] || [];
@@ -1650,6 +1656,16 @@ export class GameState {
           continue;
         }
       } else if (nextPhase === TURN_PHASES.COLLECT_INCOME) {
+        // Block advancing from MOBILIZE if there are still pending purchases
+        if (this.turnPhase === TURN_PHASES.MOBILIZE) {
+          const player = this.currentPlayer;
+          const remainingPurchases = this.pendingPurchases.filter(p => p.owner === player.id);
+          const totalRemaining = remainingPurchases.reduce((sum, p) => sum + p.quantity, 0);
+          if (totalRemaining > 0) {
+            console.warn('Cannot advance: must place all purchased units first');
+            return; // Don't advance, stay in mobilize phase
+          }
+        }
         this._collectIncome();
         // Auto-advance to next player
         this.nextTurn();

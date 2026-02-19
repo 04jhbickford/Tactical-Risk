@@ -1049,10 +1049,23 @@ export class CombatUI {
       }
     }
 
-    // Add surviving defenders
-    for (const unit of this.combatState.defenders) {
-      if (unit.quantity > 0) {
-        units.push({ ...unit });
+    // Only add surviving defenders if defender won
+    // If attacker won, ALL defender units are destroyed (including AA guns)
+    if (this.combatState.winner !== 'attacker') {
+      for (const unit of this.combatState.defenders) {
+        if (unit.quantity > 0) {
+          units.push({ ...unit });
+        }
+      }
+    }
+
+    // Handle factory capture - transfer ownership to attacker
+    if (this.combatState.winner === 'attacker') {
+      const existingUnits = this.gameState.units[this.currentTerritory] || [];
+      const factory = existingUnits.find(u => u.type === 'factory');
+      if (factory) {
+        // Transfer factory to attacker
+        units.push({ ...factory, owner: player.id });
       }
     }
 
