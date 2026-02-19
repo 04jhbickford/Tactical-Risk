@@ -1032,7 +1032,7 @@ export class PlayerPanel {
     const airUnits = selectedUnits.filter(u => u.def.isAir);
     const seaUnits = selectedUnits.filter(u => u.def.isSea);
 
-    // Land units - use land reachability
+    // Land units - use land reachability + adjacent sea zones with transports
     if (landUnits.length > 0 && !from.isWater) {
       // Use minimum movement of all land units (they move together)
       const minMovement = Math.min(...landUnits.map(u => u.def.movement || 1));
@@ -1045,6 +1045,18 @@ export class PlayerPanel {
         const owner = this.gameState.getOwner(terrName);
         const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
         destinations.set(terrName, { name: terrName, isEnemy, isWater: false, distance: info.distance });
+      }
+
+      // Also add adjacent sea zones with friendly transports (for loading)
+      for (const connName of from.connections || []) {
+        const conn = this.territories[connName];
+        if (!conn?.isWater) continue;
+        // Check if there's a friendly transport in this sea zone
+        const seaUnits = this.gameState.getUnitsAt(connName) || [];
+        const hasTransport = seaUnits.some(u => u.type === 'transport' && u.owner === player.id);
+        if (hasTransport) {
+          destinations.set(connName, { name: connName, isEnemy: false, isWater: true, distance: 1, isTransportLoad: true });
+        }
       }
     }
 

@@ -2024,9 +2024,15 @@ export class CombatUI {
   }
 
   _retreat() {
-    // Retreating attacker - air units still need to select landing locations
-    // Set retreat flag so air landing knows not to finalize combat
+    // Retreating attacker - move all land/sea units back to origin territories
+    // Air units still need to select landing locations
     this.combatState.isRetreating = true;
+
+    // Move retreating units back to their origin territories
+    const retreatResult = this.gameState.retreatFromCombat(this.currentTerritory);
+    if (!retreatResult.success) {
+      console.warn('Retreat failed:', retreatResult.error);
+    }
 
     // Check for air landing BEFORE removing from queue
     this._checkAirLanding();

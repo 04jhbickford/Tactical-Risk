@@ -49,8 +49,9 @@ export class MobilizeUI {
   }
 
   isActive() {
-    if (!this.gameState) return false;
-    return this.gameState.turnPhase === TURN_PHASES.MOBILIZE;
+    // Disabled - now using inline mobilize UI in Actions tab
+    // The old modal is no longer shown, so don't intercept clicks
+    return false;
   }
 
   show() {

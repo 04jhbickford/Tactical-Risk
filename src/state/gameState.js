@@ -2240,6 +2240,68 @@ export class GameState {
     return { success: true };
   }
 
+  // Retreat all attacking units from a combat territory back to where they came from
+  retreatFromCombat(combatTerritory) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    // Find all moves that went TO this combat territory
+    const movesToRetreat = this.moveHistory.filter(m =>
+      m.to === combatTerritory && m.player === player.id
+    );
+
+    if (movesToRetreat.length === 0) {
+      return { success: false, error: 'No moves to retreat' };
+    }
+
+    const combatUnits = this.units[combatTerritory] || [];
+
+    // Move each unit back to its origin
+    for (const move of movesToRetreat) {
+      const fromUnits = this.units[move.from] || [];
+
+      for (const moveUnit of move.units) {
+        // Find unit in combat territory
+        const combatUnit = combatUnits.find(u =>
+          u.type === moveUnit.type && u.owner === player.id
+        );
+
+        if (combatUnit) {
+          // Calculate how many to retreat (might be fewer due to casualties)
+          const retreatQty = Math.min(combatUnit.quantity, moveUnit.quantity);
+
+          if (retreatQty > 0) {
+            // Remove from combat territory
+            combatUnit.quantity -= retreatQty;
+            if (combatUnit.quantity <= 0) {
+              const idx = combatUnits.indexOf(combatUnit);
+              combatUnits.splice(idx, 1);
+            }
+
+            // Add back to origin territory
+            const originUnit = fromUnits.find(u =>
+              u.type === moveUnit.type && u.owner === player.id
+            );
+            if (originUnit) {
+              originUnit.quantity += retreatQty;
+            } else {
+              fromUnits.push({
+                type: moveUnit.type,
+                quantity: retreatQty,
+                owner: player.id,
+              });
+            }
+            this.units[move.from] = fromUnits;
+          }
+        }
+      }
+    }
+
+    this.units[combatTerritory] = combatUnits;
+    this._notify();
+    return { success: true };
+  }
+
   // Detect territories where combat should occur
   // Per A&A rules: Naval battles are resolved before land battles (amphibious assaults)
   _detectCombats() {
