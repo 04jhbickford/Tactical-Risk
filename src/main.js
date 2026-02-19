@@ -338,6 +338,11 @@ async function init() {
 
             // Handle cargo unloads (specific units selected for amphibious assault)
             if (data.cargoUnloads?.length > 0) {
+              // Check if destination is enemy territory (for amphibious assault marking)
+              const destOwner = gameState.getOwner(data.to);
+              const isEnemyTerritory = destOwner && destOwner !== gameState.currentPlayer.id &&
+                !gameState.areAllies(gameState.currentPlayer.id, destOwner);
+
               for (const cargoUnload of data.cargoUnloads) {
                 const transport = transports.find(t => t.id === cargoUnload.transportId);
                 if (transport && transport.cargo) {
@@ -357,19 +362,26 @@ async function init() {
                     // Mark transport as moved (can't move again this turn)
                     transport.moved = true;
 
-                    // Add to destination
+                    // Add to destination (mark units as moved)
                     const destUnits = gameState.units[data.to] || [];
-                    const existingUnit = destUnits.find(u => u.type === cargoUnload.unitType && u.owner === gameState.currentPlayer.id);
+                    const existingUnit = destUnits.find(u => u.type === cargoUnload.unitType && u.owner === gameState.currentPlayer.id && u.moved);
                     if (existingUnit) {
                       existingUnit.quantity = (existingUnit.quantity || 1) + unloadQty;
                     } else {
                       destUnits.push({
                         type: cargoUnload.unitType,
                         owner: gameState.currentPlayer.id,
-                        quantity: unloadQty
+                        quantity: unloadQty,
+                        moved: true
                       });
                     }
                     gameState.units[data.to] = destUnits;
+
+                    // Mark as amphibious assault if unloading to enemy territory during combat move
+                    if (isEnemyTerritory && gameState.turnPhase === TURN_PHASES.COMBAT_MOVE) {
+                      if (!gameState.amphibiousTerritories) gameState.amphibiousTerritories = new Set();
+                      gameState.amphibiousTerritories.add(data.to);
+                    }
 
                     // Track for move history (for undo)
                     if (!gameState.moveHistory) gameState.moveHistory = [];
