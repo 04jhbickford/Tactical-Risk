@@ -502,6 +502,8 @@ export class CombatUI {
 
   _rollDice() {
     const { attackers, defenders } = this.combatState;
+    const attackerId = this.gameState.currentPlayer?.id;
+    const defenderId = defenders[0]?.owner;
 
     // Roll for attackers
     const attackRolls = [];
@@ -512,35 +514,67 @@ export class CombatUI {
       .reduce((sum, u) => sum + u.quantity, 0);
     let supportedInfantry = artilleryCount; // Number of infantry that get +1 attack
 
+    // Check attacker technologies
+    const hasJets = attackerId && this.gameState.hasTech(attackerId, 'jets');
+    const hasSuperSubs = attackerId && this.gameState.hasTech(attackerId, 'superSubs');
+    const hasHeavyBombers = attackerId && this.gameState.hasTech(attackerId, 'heavyBombers');
+
     for (const unit of attackers) {
       const def = this.unitDefs[unit.type];
       if (!def) continue;
+
+      // Heavy Bombers: Bombers roll 2 dice each
+      const dicePerUnit = (unit.type === 'bomber' && hasHeavyBombers) ? 2 : 1;
+
       for (let i = 0; i < unit.quantity; i++) {
-        let attackValue = def.attack;
+        for (let d = 0; d < dicePerUnit; d++) {
+          let attackValue = def.attack;
 
-        // Artillery support: Infantry gets +1 attack when paired with artillery (1:1 ratio)
-        if (unit.type === 'infantry' && supportedInfantry > 0) {
-          attackValue += 1; // Infantry attack 1 -> 2
-          supportedInfantry--;
+          // Artillery support: Infantry gets +1 attack when paired with artillery (1:1 ratio)
+          if (unit.type === 'infantry' && supportedInfantry > 0 && d === 0) {
+            attackValue += 1; // Infantry attack 1 -> 2
+            supportedInfantry--;
+          }
+
+          // Jets technology: Fighters +1 attack
+          if (unit.type === 'fighter' && hasJets) {
+            attackValue += 1;
+          }
+
+          // Super Submarines: Submarines +1 attack
+          if (unit.type === 'submarine' && hasSuperSubs) {
+            attackValue += 1;
+          }
+
+          const roll = Math.floor(Math.random() * 6) + 1;
+          const hit = roll <= attackValue;
+          attackRolls.push({ roll, hit, unitType: unit.type, attackValue });
+          if (hit) attackHits++;
         }
-
-        const roll = Math.floor(Math.random() * 6) + 1;
-        const hit = roll <= attackValue;
-        attackRolls.push({ roll, hit, unitType: unit.type, attackValue });
-        if (hit) attackHits++;
       }
     }
 
     // Roll for defenders
     const defenseRolls = [];
     let defenseHits = 0;
+
+    // Check defender technologies
+    const defenderHasJets = defenderId && this.gameState.hasTech(defenderId, 'jets');
+
     for (const unit of defenders) {
       const def = this.unitDefs[unit.type];
       if (!def) continue;
       for (let i = 0; i < unit.quantity; i++) {
+        let defenseValue = def.defense;
+
+        // Jets technology: Fighters +1 defense
+        if (unit.type === 'fighter' && defenderHasJets) {
+          defenseValue += 1;
+        }
+
         const roll = Math.floor(Math.random() * 6) + 1;
-        const hit = roll <= def.defense;
-        defenseRolls.push({ roll, hit, unitType: unit.type, defenseValue: def.defense });
+        const hit = roll <= defenseValue;
+        defenseRolls.push({ roll, hit, unitType: unit.type, defenseValue });
         if (hit) defenseHits++;
       }
     }

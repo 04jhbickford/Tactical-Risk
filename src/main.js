@@ -243,6 +243,17 @@ async function init() {
         camera.dirty = true;
         break;
 
+      case 'trade-risk-cards':
+        // Trade Risk cards for IPCs during purchase phase
+        if (gameState.turnPhase === TURN_PHASES.PURCHASE) {
+          const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
+          if (result.success) {
+            actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);
+            camera.dirty = true;
+          }
+        }
+        break;
+
       case 'buy-unit':
         // Inline purchase - add or remove unit from pending purchases
         if (data.unitType && data.delta) {

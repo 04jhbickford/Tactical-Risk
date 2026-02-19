@@ -806,6 +806,11 @@ export class PlayerPanel {
       })
       .sort((a, b) => (a[1].cost || 0) - (b[1].cost || 0));
 
+    // Risk cards section
+    const riskCards = this.gameState.riskCards?.[player.id] || [];
+    const canTradeCards = this.gameState.canTradeRiskCards?.(player.id);
+    const nextCardValue = this.gameState.getNextRiskCardValue?.(player.id) || 12;
+
     let html = `
       <div class="pp-inline-purchase">
         <div class="pp-budget-bar">
@@ -813,9 +818,37 @@ export class PlayerPanel {
           <span class="pp-budget-value ${remaining < 5 ? 'low' : ''}">${remaining}</span>
           <span class="pp-budget-sep">/</span>
           <span class="pp-budget-total">${totalBudget} IPCs</span>
-        </div>
+        </div>`;
 
-        <div class="pp-unit-list">`;
+    // Show Risk cards trade option if available
+    if (riskCards.length > 0) {
+      const cardIcons = { infantry: '🚶', cavalry: '🐎', artillery: '💣', wild: '⭐' };
+      const cardCounts = {};
+      riskCards.forEach(c => cardCounts[c] = (cardCounts[c] || 0) + 1);
+
+      html += `
+        <div class="pp-risk-cards-section">
+          <div class="pp-risk-cards-header">
+            <span class="pp-risk-cards-label">🃏 Risk Cards (${riskCards.length})</span>
+            <span class="pp-risk-cards-summary">
+              ${Object.entries(cardCounts).map(([type, count]) => `${cardIcons[type]}${count}`).join(' ')}
+            </span>
+          </div>`;
+
+      if (canTradeCards) {
+        html += `
+          <div class="pp-risk-cards-trade">
+            <span class="pp-trade-value">Trade for +${nextCardValue} IPCs</span>
+            <button class="pp-action-btn trade-cards" data-action="trade-risk-cards">Cash In</button>
+          </div>`;
+      } else if (riskCards.length >= 5) {
+        html += `<div class="pp-risk-cards-warning">⚠️ You must trade cards (5+ cards)</div>`;
+      }
+
+      html += `</div>`;
+    }
+
+    html += `<div class="pp-unit-list">`;
 
     // Group units by category (factory goes in Land)
     const landUnits = purchasableUnits.filter(([_, def]) => def.isLand || def.isBuilding);
@@ -1258,7 +1291,12 @@ export class PlayerPanel {
     // Air units - use air reachability
     if (airUnits.length > 0) {
       // Use minimum movement of all air units
-      const minMovement = Math.min(...airUnits.map(u => u.def.movement || 4));
+      // Long Range Aircraft tech: +2 movement for fighters and bombers
+      const hasLongRange = this.gameState.hasTech(player.id, 'longRangeAircraft');
+      const minMovement = Math.min(...airUnits.map(u => {
+        const baseMove = u.def.movement || 4;
+        return hasLongRange ? baseMove + 2 : baseMove;
+      }));
       const reachable = this.gameState.getReachableTerritoriesForAir(
         fromTerritory.name, minMovement, player.id, isCombatMove
       );
@@ -1704,6 +1742,14 @@ export class PlayerPanel {
           const cardSet = this.validCardSets[parseInt(setIndex)];
           if (this.onAction && cardSet) {
             this.onAction('trade-set', { cardSet });
+          }
+          return;
+        }
+
+        // Handle trade-risk-cards action (trade cards for IPCs during purchase phase)
+        if (action === 'trade-risk-cards') {
+          if (this.onAction) {
+            this.onAction('trade-risk-cards', {});
           }
           return;
         }
