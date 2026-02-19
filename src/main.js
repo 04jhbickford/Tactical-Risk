@@ -328,10 +328,15 @@ async function init() {
 
       case 'execute-move':
         // Execute a move from inline movement UI
-        if (data.from && data.to && data.units && data.units.length > 0) {
-          const result = gameState.moveUnits(data.from, data.to, data.units, unitDefs);
+        if (data.from && data.to && (data.units?.length > 0 || data.shipIds?.length > 0)) {
+          const moveOptions = {};
+          if (data.shipIds && data.shipIds.length > 0) {
+            moveOptions.shipIds = data.shipIds;
+          }
+          const unitsToMove = data.units || [];
+          const result = gameState.moveUnits(data.from, data.to, unitsToMove, unitDefs, moveOptions);
           if (result.success) {
-            actionLog.logMove(data.from, data.to, data.units, gameState.currentPlayer);
+            actionLog.logMove(data.from, data.to, unitsToMove, gameState.currentPlayer);
             camera.dirty = true;
             // Clear selection after successful move
             selectedTerritory = null;

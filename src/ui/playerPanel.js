@@ -964,6 +964,7 @@ export class PlayerPanel {
     if (!territory || !player) return [];
     const units = this.gameState.getUnitsAt(territory.name);
     const movable = {};
+    const individualShips = []; // Track transports/carriers with cargo separately
 
     for (const u of units) {
       if (u.owner !== player.id) continue;
@@ -971,16 +972,31 @@ export class PlayerPanel {
       if (!def || def.movement <= 0 || def.isBuilding) continue;
       if (u.moved) continue;
 
-      // Skip individual ships (have IDs) - aggregate by type
-      if (u.id) continue;
+      // Individual ships (transports/carriers with cargo) are tracked separately
+      if (u.id) {
+        const cargo = u.cargo || u.aircraft || [];
+        const cargoDesc = cargo.length > 0
+          ? ` (${cargo.map(c => c.type).join(', ')})`
+          : ' (empty)';
+        individualShips.push({
+          type: u.type,
+          id: u.id,
+          quantity: 1,
+          cargo: cargo,
+          displayName: `${u.type}${cargoDesc}`,
+          isIndividual: true
+        });
+        continue;
+      }
 
       if (!movable[u.type]) {
         movable[u.type] = { type: u.type, quantity: 0 };
       }
-      movable[u.type].quantity += u.quantity;
+      movable[u.type].quantity += u.quantity || 1;
     }
 
-    return Object.values(movable);
+    // Combine: aggregated units first, then individual ships
+    return [...Object.values(movable), ...individualShips];
   }
 
   // Get valid destinations for selected units based on their movement range
@@ -1090,21 +1106,24 @@ export class PlayerPanel {
 
     // Show movable units with +/- controls
     for (const unit of movableUnits) {
-      const selected = this.moveSelectedUnits[unit.type] || 0;
+      // Use ship ID as key for individual ships, otherwise use type
+      const unitKey = unit.isIndividual ? `ship:${unit.id}` : unit.type;
+      const selected = this.moveSelectedUnits[unitKey] || 0;
       const imageSrc = getUnitIconPath(unit.type, player.id);
+      const displayName = unit.displayName || unit.type;
 
       html += `
-        <div class="pp-move-unit-row">
+        <div class="pp-move-unit-row ${unit.isIndividual ? 'individual-ship' : ''}">
           <div class="pp-move-unit-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-move-icon" alt="${unit.type}">` : ''}
-            <span class="pp-move-name">${unit.type}</span>
-            <span class="pp-move-avail">(${unit.quantity})</span>
+            <span class="pp-move-name">${displayName}</span>
+            ${!unit.isIndividual ? `<span class="pp-move-avail">(${unit.quantity})</span>` : ''}
           </div>
           <div class="pp-move-controls">
-            <button class="pp-qty-btn" data-action="move-unit" data-unit="${unit.type}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
+            <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
             <span class="pp-move-qty">${selected}</span>
-            <button class="pp-qty-btn" data-action="move-unit" data-unit="${unit.type}" data-delta="1" ${selected >= unit.quantity ? 'disabled' : ''}>+</button>
-            <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unit.type}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
+            <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="1" ${selected >= unit.quantity ? 'disabled' : ''}>+</button>
+            <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unitKey}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
           </div>
         </div>`;
     }
@@ -1482,22 +1501,27 @@ export class PlayerPanel {
 
         // Handle movement unit selection (+/-)
         if (action === 'move-unit') {
-          const unitType = btn.dataset.unit;
+          const unitKey = btn.dataset.unit; // Can be "infantry" or "ship:12345"
           const delta = parseInt(btn.dataset.delta, 10);
-          const current = this.moveSelectedUnits[unitType] || 0;
+          const current = this.moveSelectedUnits[unitKey] || 0;
           const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
-          const maxQty = movable.find(u => u.type === unitType)?.quantity || 0;
+          // Find max qty - match by key (type for regular, "ship:id" for individual)
+          const unitEntry = movable.find(u => {
+            const key = u.isIndividual ? `ship:${u.id}` : u.type;
+            return key === unitKey;
+          });
+          const maxQty = unitEntry?.quantity || 0;
           const newQty = Math.max(0, Math.min(maxQty, current + delta));
-          this.moveSelectedUnits[unitType] = newQty;
+          this.moveSelectedUnits[unitKey] = newQty;
           this._render();
           return;
         }
 
         // Handle move-all for a unit type
         if (action === 'move-all') {
-          const unitType = btn.dataset.unit;
+          const unitKey = btn.dataset.unit;
           const qty = parseInt(btn.dataset.qty, 10);
-          this.moveSelectedUnits[unitType] = qty;
+          this.moveSelectedUnits[unitKey] = qty;
           this._render();
           return;
         }
@@ -1506,7 +1530,8 @@ export class PlayerPanel {
         if (action === 'move-select-all') {
           const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
           for (const unit of movable) {
-            this.moveSelectedUnits[unit.type] = unit.quantity;
+            const unitKey = unit.isIndividual ? `ship:${unit.id}` : unit.type;
+            this.moveSelectedUnits[unitKey] = unit.quantity;
           }
           this._render();
           return;
@@ -1531,14 +1556,29 @@ export class PlayerPanel {
         // Handle confirm move
         if (action === 'confirm-move') {
           if (this.onAction && this.movePendingDest && this.selectedTerritory) {
-            const units = Object.entries(this.moveSelectedUnits)
-              .filter(([_, qty]) => qty > 0)
-              .map(([type, quantity]) => ({ type, quantity }));
-            if (units.length > 0) {
+            const units = [];
+            const shipIds = [];
+
+            // Separate regular units from individual ships
+            for (const [key, qty] of Object.entries(this.moveSelectedUnits)) {
+              if (qty <= 0) continue;
+
+              if (key.startsWith('ship:')) {
+                // Individual ship with cargo - extract ID
+                const shipId = key.replace('ship:', '');
+                shipIds.push(shipId);
+              } else {
+                // Regular unit type
+                units.push({ type: key, quantity: qty });
+              }
+            }
+
+            if (units.length > 0 || shipIds.length > 0) {
               this.onAction('execute-move', {
                 from: this.selectedTerritory.name,
                 to: this.movePendingDest,
-                units
+                units,
+                shipIds
               });
               // Reset movement state after confirming
               this.moveSelectedUnits = {};

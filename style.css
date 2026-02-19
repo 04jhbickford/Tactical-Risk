@@ -2386,6 +2386,16 @@ html, body {
   border-radius: 4px;
 }
 
+.pp-move-unit-row.individual-ship {
+  background: rgba(0,128,255,0.15);
+  border: 1px solid rgba(0,128,255,0.3);
+}
+
+.pp-move-unit-row.individual-ship .pp-move-name {
+  color: #87ceeb;
+  font-size: 11px;
+}
+
 .pp-move-unit-info {
   display: flex;
   align-items: center;
