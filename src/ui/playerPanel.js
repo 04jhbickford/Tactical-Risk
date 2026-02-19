@@ -664,9 +664,8 @@ export class PlayerPanel {
     const purchasableUnits = Object.entries(this.unitDefs || {})
       .filter(([type, def]) => {
         if (type === 'aaGun') return false;
-        if ((def.isLand || def.isAir) && hasFactories) return true;
+        if ((def.isLand || def.isAir || def.isBuilding) && hasFactories) return true;
         if (def.isSea && hasSeaZones) return true;
-        if (def.isBuilding) return true;
         return false;
       })
       .sort((a, b) => (a[1].cost || 0) - (b[1].cost || 0));
@@ -680,23 +679,21 @@ export class PlayerPanel {
           <span class="pp-budget-total">${ipcs} IPCs</span>
         </div>
 
-        <div class="pp-unit-grid">`;
+        <div class="pp-unit-list">`;
 
-    // Group units by category
-    const landUnits = purchasableUnits.filter(([_, def]) => def.isLand);
-    const navalUnits = purchasableUnits.filter(([_, def]) => def.isSea);
+    // Group units by category (factory goes in Land)
+    const landUnits = purchasableUnits.filter(([_, def]) => def.isLand || def.isBuilding);
     const airUnits = purchasableUnits.filter(([_, def]) => def.isAir);
-    const buildingUnits = purchasableUnits.filter(([_, def]) => def.isBuilding);
+    const navalUnits = purchasableUnits.filter(([_, def]) => def.isSea);
 
     const renderUnitRow = ([unitType, def]) => {
       const pendingUnit = pending.find(p => p.type === unitType);
       const qty = pendingUnit?.quantity || 0;
       const canAfford = remaining >= def.cost;
-      const maxQty = Math.floor(remaining / def.cost);
       const imageSrc = getUnitIconPath(unitType, player.id);
 
       return `
-        <div class="pp-buy-row ${qty > 0 ? 'has-qty' : ''}" data-unit="${unitType}">
+        <div class="pp-buy-row ${qty > 0 ? 'has-qty' : ''}">
           <div class="pp-buy-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unitType}">` : ''}
             <span class="pp-buy-name">${unitType}</span>
@@ -705,10 +702,8 @@ export class PlayerPanel {
           <div class="pp-buy-controls">
             <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>
             <span class="pp-buy-qty">${qty}</span>
-            <div class="pp-buy-plus-stack">
-              <button class="pp-qty-btn max" data-action="buy-max" data-unit="${unitType}" ${!canAfford ? 'disabled' : ''} title="Buy max">^</button>
-              <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="1" ${!canAfford ? 'disabled' : ''}>+</button>
-            </div>
+            <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="1" ${!canAfford ? 'disabled' : ''}>+</button>
+            <button class="pp-qty-btn max-btn" data-action="buy-max" data-unit="${unitType}" ${!canAfford ? 'disabled' : ''}>Max</button>
           </div>
         </div>`;
     };
@@ -725,20 +720,21 @@ export class PlayerPanel {
       html += `<div class="pp-unit-category-label">Naval</div>`;
       html += navalUnits.map(renderUnitRow).join('');
     }
-    if (buildingUnits.length > 0) {
-      html += `<div class="pp-unit-category-label">Buildings</div>`;
-      html += buildingUnits.map(renderUnitRow).join('');
-    }
 
     html += `</div>`;
 
-    // Cart summary
-    if (pending.length > 0) {
+    // Cart summary and Buy button
+    const totalUnits = pending.reduce((sum, p) => sum + p.quantity, 0);
+    if (totalUnits > 0) {
       const cartItems = pending.map(p => `${p.quantity}× ${p.type}`).join(', ');
       html += `
         <div class="pp-cart-summary">
-          <span class="pp-cart-items">${cartItems}</span>
-          <button class="pp-action-btn secondary small" data-action="clear-purchases">Clear</button>
+          <div class="pp-cart-items">${cartItems}</div>
+          <div class="pp-cart-total">Total: ${pendingCost} IPCs</div>
+        </div>
+        <div class="pp-purchase-actions">
+          <button class="pp-action-btn secondary" data-action="clear-purchases">Clear All</button>
+          <button class="pp-action-btn primary" data-action="confirm-purchase">Buy ${totalUnits} Unit${totalUnits > 1 ? 's' : ''}</button>
         </div>`;
     }
 
@@ -759,40 +755,40 @@ export class PlayerPanel {
       <div class="pp-inline-tech">
         <div class="pp-tech-budget">
           <span>IPCs: ${ipcs}</span>
-          <span class="pp-tech-cost-note">(5 per research die)</span>
+          <span class="pp-tech-cost-note">(5 per die, roll 6 = breakthrough)</span>
         </div>
 
-        <div class="pp-tech-dice-select">
-          <span>Research Dice:</span>
-          <div class="pp-tech-dice-btns">`;
-
-    for (let i = 0; i <= Math.min(maxDice, 5); i++) {
-      html += `<button class="pp-tech-dice-btn ${this.techDiceCount === i ? 'selected' : ''}" data-action="set-tech-dice" data-count="${i}">${i}</button>`;
-    }
-
-    html += `
+        <div class="pp-tech-dice-row">
+          <span class="pp-tech-dice-label">Research Dice:</span>
+          <div class="pp-tech-dice-controls">
+            <button class="pp-qty-btn" data-action="tech-dice-delta" data-delta="-1" ${this.techDiceCount <= 0 ? 'disabled' : ''}>−</button>
+            <span class="pp-tech-dice-count">${this.techDiceCount}</span>
+            <button class="pp-qty-btn" data-action="tech-dice-delta" data-delta="1" ${this.techDiceCount >= maxDice ? 'disabled' : ''}>+</button>
+            <button class="pp-qty-btn max-btn" data-action="tech-dice-max" ${maxDice <= 0 ? 'disabled' : ''}>Max</button>
           </div>
-          <span class="pp-tech-cost">${this.techDiceCount * 5} IPCs</span>
+          <span class="pp-tech-cost">Cost: ${this.techDiceCount * 5} IPCs</span>
         </div>`;
 
     if (this.techDiceCount > 0) {
       html += `
         <button class="pp-action-btn primary" data-action="roll-tech">
-          Roll ${this.techDiceCount} Dice (cost: ${this.techDiceCount * 5} IPCs)
+          Roll ${this.techDiceCount} Research Dice
         </button>`;
     }
 
-    // Show available techs
-    if (availableTechs.length > 0) {
-      html += `<div class="pp-tech-available"><div class="pp-tech-avail-label">Available Technologies:</div>`;
-      for (const [id, tech] of availableTechs.slice(0, 4)) {
-        html += `<div class="pp-tech-item-small">${tech.name}</div>`;
-      }
-      if (availableTechs.length > 4) {
-        html += `<div class="pp-tech-more">+${availableTechs.length - 4} more</div>`;
-      }
-      html += `</div>`;
+    // Show all technologies with descriptions and owned status
+    html += `<div class="pp-tech-list">`;
+    html += `<div class="pp-tech-list-header">Technologies</div>`;
+
+    for (const [id, tech] of Object.entries(TECHNOLOGIES)) {
+      const isOwned = unlockedTechs.includes(id);
+      html += `
+        <div class="pp-tech-item ${isOwned ? 'owned' : ''}">
+          <div class="pp-tech-item-name">${isOwned ? '✓ ' : ''}${tech.name}</div>
+          <div class="pp-tech-item-desc">${tech.description}</div>
+        </div>`;
     }
+    html += `</div>`;
 
     html += `</div>`;
     return html;
@@ -809,6 +805,9 @@ export class PlayerPanel {
     const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
     const needMore = limit - placedThisRound;
 
+    // Calculate actual total remaining from unit quantities
+    const actualRemaining = unitsToPlace.reduce((sum, u) => sum + u.quantity, 0);
+
     let html = `
       <div class="pp-inline-placement">
         <div class="pp-placement-progress-bar">
@@ -816,29 +815,51 @@ export class PlayerPanel {
           <span class="pp-placement-label">placed this round</span>
         </div>`;
 
+    // Show all remaining units summary (both land and naval)
+    const landUnits = unitsToPlace.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def && (def.isLand || def.isAir) && u.quantity > 0;
+    });
+    const navalUnits = unitsToPlace.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def?.isSea && u.quantity > 0;
+    });
+
+    html += `<div class="pp-placement-inventory">`;
+    html += `<div class="pp-placement-inv-header">Units to Deploy (${actualRemaining} total)</div>`;
+
+    if (landUnits.length > 0) {
+      html += `<div class="pp-placement-inv-group"><span class="pp-inv-label">Land/Air:</span>`;
+      for (const unit of landUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        html += `<span class="pp-inv-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-inv-icon">` : ''}${unit.quantity}</span>`;
+      }
+      html += `</div>`;
+    }
+    if (navalUnits.length > 0) {
+      html += `<div class="pp-placement-inv-group"><span class="pp-inv-label">Naval:</span>`;
+      for (const unit of navalUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        html += `<span class="pp-inv-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-inv-icon">` : ''}${unit.quantity}</span>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+
     // Check if selected territory is valid for placement
     const isValidPlacement = this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player);
 
     // Show selected territory if valid
     if (isValidPlacement) {
+      const isWater = this.selectedTerritory.isWater;
       html += `
         <div class="pp-placement-selected">
           <span class="pp-selected-label">Placing on:</span>
           <span class="pp-selected-name">${this.selectedTerritory.name}</span>
+          <span class="pp-selected-type">(${isWater ? 'Sea Zone' : 'Land'})</span>
         </div>`;
 
-      // Show unit buttons for units that can be placed
-      const landUnits = unitsToPlace.filter(u => {
-        const def = this.unitDefs?.[u.type];
-        return def && (def.isLand || def.isAir) && u.quantity > 0;
-      });
-      const navalUnits = unitsToPlace.filter(u => {
-        const def = this.unitDefs?.[u.type];
-        return def?.isSea && u.quantity > 0;
-      });
-
       // Show appropriate units based on territory type
-      const isWater = this.selectedTerritory.isWater;
       const unitsForTerritory = isWater ? navalUnits : landUnits;
 
       if (unitsForTerritory.length > 0 && needMore > 0) {
@@ -848,26 +869,20 @@ export class PlayerPanel {
           html += `
             <button class="pp-place-btn" data-action="place-unit" data-unit="${unit.type}">
               ${imageSrc ? `<img src="${imageSrc}" class="pp-place-icon" alt="${unit.type}">` : ''}
-              <span class="pp-place-qty">${unit.quantity}</span>
               <span class="pp-place-name">${unit.type}</span>
+              <span class="pp-place-qty">×${unit.quantity}</span>
             </button>`;
         }
         html += `</div>`;
       } else if (needMore <= 0) {
-        html += `<div class="pp-placement-done-msg">Round limit reached</div>`;
+        html += `<div class="pp-placement-done-msg">Round limit reached (${limit} units)</div>`;
       } else {
-        html += `<div class="pp-placement-done-msg">No ${isWater ? 'naval' : 'land'} units to place</div>`;
+        html += `<div class="pp-placement-done-msg">No ${isWater ? 'naval' : 'land/air'} units to place</div>`;
       }
     } else if (this.selectedTerritory) {
-      // Territory selected but not valid for placement
       html += `<div class="pp-hint">Select one of your territories to place units</div>`;
     } else {
-      html += `<div class="pp-hint">Click a territory to place units</div>`;
-    }
-
-    // Remaining units summary
-    if (totalRemaining > 0) {
-      html += `<div class="pp-placement-remaining">${totalRemaining} units left to place</div>`;
+      html += `<div class="pp-hint">Click a territory you own to place units</div>`;
     }
 
     // Action buttons
@@ -876,7 +891,7 @@ export class PlayerPanel {
       html += `<button class="pp-action-btn secondary small" data-action="undo-placement">Undo</button>`;
     }
     if (canFinish) {
-      html += `<button class="pp-action-btn primary" data-action="finish-placement">Done</button>`;
+      html += `<button class="pp-action-btn primary" data-action="finish-placement">Done - Next Player</button>`;
     }
     html += `</div>`;
 
@@ -1035,7 +1050,7 @@ export class PlayerPanel {
             <button class="pp-qty-btn" data-action="move-unit" data-unit="${unit.type}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
             <span class="pp-move-qty">${selected}</span>
             <button class="pp-qty-btn" data-action="move-unit" data-unit="${unit.type}" data-delta="1" ${selected >= unit.quantity ? 'disabled' : ''}>+</button>
-            <button class="pp-move-all-btn" data-action="move-all" data-unit="${unit.type}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
+            <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unit.type}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
           </div>
         </div>`;
     }
@@ -1050,36 +1065,38 @@ export class PlayerPanel {
         ${totalSelected > 0 ? `<button class="pp-move-btn secondary" data-action="move-clear">Clear</button>` : ''}
       </div>`;
 
-    // Destination selection
-    if (totalSelected > 0 && destinations.length > 0) {
+    // Destination selection - use dropdown
+    if (totalSelected > 0) {
       html += `
         <div class="pp-move-destinations">
           <span class="pp-move-label">Move to:</span>
-          <div class="pp-dest-list">`;
+          <select class="pp-dest-dropdown" data-action="select-dest-dropdown">
+            <option value="">-- Select destination or click map --</option>`;
 
-      for (const dest of destinations.slice(0, 8)) {
+      for (const dest of destinations) {
         const isSelected = this.movePendingDest === dest.name;
-        html += `
-          <button class="pp-dest-btn ${isSelected ? 'selected' : ''} ${dest.isEnemy ? 'enemy' : ''}"
-                  data-action="select-dest" data-dest="${dest.name}">
-            ${dest.name}${dest.isEnemy ? ' ⚔' : ''}
-          </button>`;
-      }
-      if (destinations.length > 8) {
-        html += `<div class="pp-dest-more">+${destinations.length - 8} more (click map)</div>`;
+        html += `<option value="${dest.name}" ${isSelected ? 'selected' : ''}>${dest.name}${dest.isEnemy ? ' ⚔ (Attack)' : ''}</option>`;
       }
 
-      html += `</div></div>`;
+      html += `</select>
+        </div>`;
 
-      // Confirm button
+      // Show selected destination and confirm button
       if (this.movePendingDest) {
+        const destInfo = destinations.find(d => d.name === this.movePendingDest);
+        const isAttack = destInfo?.isEnemy;
         html += `
-          <button class="pp-action-btn primary" data-action="confirm-move">
-            Confirm Move to ${this.movePendingDest}
-          </button>`;
+          <div class="pp-move-confirm-area">
+            <div class="pp-move-dest-info ${isAttack ? 'attack' : ''}">
+              ${isAttack ? '⚔ Attack: ' : 'Moving to: '}${this.movePendingDest}
+            </div>
+            <button class="pp-action-btn primary" data-action="confirm-move">
+              ${isAttack ? 'Confirm Attack' : 'Confirm Move'}
+            </button>
+          </div>`;
+      } else {
+        html += `<div class="pp-hint">Select destination above or click on the map</div>`;
       }
-    } else if (totalSelected > 0) {
-      html += `<div class="pp-hint">Click a destination on the map</div>`;
     }
 
     // Cancel button
@@ -1148,9 +1165,20 @@ export class PlayerPanel {
           return;
         }
 
-        // Handle tech dice selection
-        if (action === 'set-tech-dice') {
-          this.techDiceCount = parseInt(btn.dataset.count, 10);
+        // Handle tech dice +/- delta
+        if (action === 'tech-dice-delta') {
+          const delta = parseInt(btn.dataset.delta, 10);
+          const ipcs = this.gameState.getIPCs(this.gameState.currentPlayer.id);
+          const maxDice = Math.floor(ipcs / 5);
+          this.techDiceCount = Math.max(0, Math.min(maxDice, this.techDiceCount + delta));
+          this._render();
+          return;
+        }
+
+        // Handle tech dice max
+        if (action === 'tech-dice-max') {
+          const ipcs = this.gameState.getIPCs(this.gameState.currentPlayer.id);
+          this.techDiceCount = Math.floor(ipcs / 5);
           this._render();
           return;
         }
@@ -1160,6 +1188,14 @@ export class PlayerPanel {
           if (this.onAction && this.techDiceCount > 0) {
             this.onAction('roll-tech', { diceCount: this.techDiceCount });
             this.techDiceCount = 0; // Reset after rolling
+          }
+          return;
+        }
+
+        // Handle confirm purchase
+        if (action === 'confirm-purchase') {
+          if (this.onAction) {
+            this.onAction('next-phase', {});
           }
           return;
         }
@@ -1247,10 +1283,47 @@ export class PlayerPanel {
       });
     });
 
+    // Dropdown for destination selection
+    const destDropdown = this.contentEl.querySelector('.pp-dest-dropdown');
+    if (destDropdown) {
+      destDropdown.addEventListener('change', (e) => {
+        this.movePendingDest = e.target.value || null;
+        this._render();
+      });
+    }
+
     // Scroll log to bottom
     const logTab = this.contentEl.querySelector('.pp-log-entries');
     if (logTab) {
       logTab.scrollTop = logTab.scrollHeight;
     }
+  }
+
+  // Called when map is clicked during movement - allows selecting destination from map
+  handleMapDestinationClick(territory) {
+    if (!this.selectedTerritory || !this.gameState) return false;
+
+    const player = this.gameState.currentPlayer;
+    const turnPhase = this.gameState.turnPhase;
+    const isCombatMove = turnPhase === TURN_PHASES.COMBAT_MOVE;
+    const isNonCombatMove = turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+
+    if (!isCombatMove && !isNonCombatMove) return false;
+
+    // Check if we have units selected
+    const totalSelected = Object.values(this.moveSelectedUnits).reduce((sum, q) => sum + q, 0);
+    if (totalSelected === 0) return false;
+
+    // Check if clicked territory is a valid destination
+    const destinations = this._getValidDestinations(this.selectedTerritory, player, isCombatMove);
+    const isValidDest = destinations.some(d => d.name === territory.name);
+
+    if (isValidDest) {
+      this.movePendingDest = territory.name;
+      this._render();
+      return true;
+    }
+
+    return false;
   }
 }

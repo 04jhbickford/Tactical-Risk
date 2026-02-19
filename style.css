@@ -1869,22 +1869,17 @@ html, body {
   cursor: not-allowed;
 }
 
-.pp-qty-btn.max {
+.pp-qty-btn.max-btn {
+  width: auto;
+  padding: 0 6px;
   font-size: 9px;
   font-weight: bold;
   color: #4caf50;
 }
 
-.pp-buy-plus-stack {
+.pp-unit-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-}
-
-.pp-buy-plus-stack .pp-qty-btn {
-  width: 18px;
-  height: 10px;
-  font-size: 9px;
 }
 
 .pp-buy-qty {
@@ -1896,9 +1891,6 @@ html, body {
 }
 
 .pp-cart-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-top: 10px;
   padding: 8px;
   background: rgba(76, 175, 80, 0.1);
@@ -1909,6 +1901,23 @@ html, body {
 .pp-cart-items {
   font-size: 11px;
   color: #4caf50;
+}
+
+.pp-cart-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffd700;
+  margin-top: 4px;
+}
+
+.pp-purchase-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pp-purchase-actions .pp-action-btn {
+  flex: 1;
 }
 
 /* Inline Tech UI */
@@ -1924,12 +1933,90 @@ html, body {
   justify-content: space-between;
   font-size: 12px;
   color: #ccc;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .pp-tech-cost-note {
   font-size: 10px;
   color: #888;
+}
+
+.pp-tech-dice-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 6px;
+}
+
+.pp-tech-dice-label {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.pp-tech-dice-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-tech-dice-count {
+  min-width: 24px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #9b59b6;
+}
+
+.pp-tech-cost {
+  font-size: 11px;
+  color: #ffd700;
+  margin-left: auto;
+}
+
+.pp-tech-list {
+  margin-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 10px;
+}
+
+.pp-tech-list-header {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.pp-tech-item {
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  border-left: 3px solid rgba(255,255,255,0.1);
+}
+
+.pp-tech-item.owned {
+  background: rgba(76, 175, 80, 0.1);
+  border-left-color: #4caf50;
+}
+
+.pp-tech-item-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.pp-tech-item.owned .pp-tech-item-name {
+  color: #81c784;
+}
+
+.pp-tech-item-desc {
+  font-size: 10px;
+  color: #888;
+  margin-top: 2px;
 }
 
 .pp-tech-dice-select {
@@ -2037,26 +2124,76 @@ html, body {
   transition: width 0.3s ease;
 }
 
-.pp-placement-selected {
+.pp-placement-inventory {
+  background: rgba(255,255,255,0.05);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.pp-placement-inv-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ccc;
+  margin-bottom: 6px;
+}
+
+.pp-placement-inv-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.pp-inv-label {
+  font-size: 10px;
+  color: #888;
+  min-width: 50px;
+}
+
+.pp-inv-unit {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px;
   background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  font-size: 11px;
+  color: #fff;
+}
+
+.pp-inv-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.pp-placement-selected {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
 }
 
-.pp-placement-selected-label {
+.pp-selected-label {
   font-size: 10px;
   color: #888;
   text-transform: uppercase;
 }
 
-.pp-placement-selected-name {
+.pp-selected-name {
   font-size: 13px;
   font-weight: 600;
   color: #fff;
+}
+
+.pp-selected-type {
+  font-size: 10px;
+  color: #888;
 }
 
 .pp-placement-deselect {
@@ -2375,6 +2512,51 @@ html, body {
   color: #888;
   padding: 4px;
   font-style: italic;
+}
+
+.pp-dest-dropdown {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 12px;
+  background: rgba(30, 30, 50, 0.9);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.pp-dest-dropdown:hover {
+  border-color: rgba(255,255,255,0.4);
+}
+
+.pp-dest-dropdown:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.pp-move-confirm-area {
+  margin-top: 10px;
+  padding: 10px;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+}
+
+.pp-move-confirm-area.attack {
+  background: rgba(255, 100, 100, 0.1);
+  border-color: rgba(255, 100, 100, 0.3);
+}
+
+.pp-move-dest-info {
+  font-size: 12px;
+  color: #4caf50;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.pp-move-dest-info.attack {
+  color: #ff8888;
 }
 
 .pp-purchase-type {
@@ -6814,6 +6996,56 @@ html, body {
 .tech-dice-result-msg.fail {
   background: rgba(255,255,255,0.05);
   color: #888;
+}
+
+/* Tech Selection in Centered Overlay */
+.tech-dice-result-box.breakthrough {
+  max-width: 500px;
+}
+
+.tech-select-header {
+  font-size: 16px;
+  color: #ffd700;
+  margin: 20px 0 15px;
+  text-align: center;
+}
+
+.tech-select-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.tech-select-btn {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.tech-select-btn:hover {
+  background: rgba(155, 89, 182, 0.3);
+  border-color: #9b59b6;
+  transform: translateX(5px);
+}
+
+.tech-select-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.tech-select-desc {
+  font-size: 12px;
+  color: #aaa;
 }
 
 /* --- Turn Order Display --- */

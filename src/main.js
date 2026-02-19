@@ -701,8 +701,15 @@ async function init() {
         }
       }
 
-      // Movement phases now use inline UI in player panel - don't show modal
-      // Just let the territory selection flow through to setSelectedTerritory
+      // Check if clicking a destination during movement (inline UI)
+      if (hit && gameState && (gameState.turnPhase === TURN_PHASES.COMBAT_MOVE || gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+        // Try to set as destination first (if units are selected)
+        const handled = playerPanel.handleMapDestinationClick(hit);
+        if (handled) {
+          camera.dirty = true;
+          return;
+        }
+      }
 
       if (hit) {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);

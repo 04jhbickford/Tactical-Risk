@@ -295,14 +295,10 @@ export class TechUI {
     // Show final result
     this._showCenteredDiceResult(diceCount, result, false);
 
-    // If breakthrough, wait then show tech selection modal
+    // If breakthrough, show tech selection in centered overlay
     if (result.success) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      this._hideCenteredDiceResult();
-      this.breakthrough = true;
-      this.lastRolls = result.rolls;
-      this._render();
-      this.el.classList.remove('hidden');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      this._showCenteredTechSelection(result.rolls, player.id);
     } else {
       // Auto-hide after 2 seconds if no breakthrough
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -382,5 +378,51 @@ export class TechUI {
       }
       overlay.classList.add('hidden');
     }
+  }
+
+  _showCenteredTechSelection(rolls, playerId) {
+    const overlay = document.getElementById('techDiceOverlay');
+    if (!overlay) return;
+
+    // Get available techs
+    const techState = this.gameState.playerTechs?.[playerId] || { unlockedTechs: [] };
+    const unlockedTechs = techState.unlockedTechs || [];
+    const availableTechs = Object.entries(TECHNOLOGIES)
+      .filter(([id, _]) => !unlockedTechs.includes(id));
+
+    let html = `<div class="tech-dice-result-box breakthrough">
+      <div class="tech-dice-result-title">🔬 BREAKTHROUGH!</div>
+      <div class="dice-display tech-dice-centered">
+        ${rolls.map(roll => `
+          <div class="die ${roll === 6 ? 'hit' : 'miss'}">${roll}</div>
+        `).join('')}
+      </div>
+      <div class="tech-select-header">Choose a Technology to Unlock:</div>
+      <div class="tech-select-options">`;
+
+    for (const [id, tech] of availableTechs) {
+      html += `
+        <button class="tech-select-btn" data-tech="${id}">
+          <span class="tech-select-name">${tech.name}</span>
+          <span class="tech-select-desc">${tech.description}</span>
+        </button>`;
+    }
+
+    html += `</div></div>`;
+
+    overlay.innerHTML = html;
+    overlay.classList.add('breakthrough');
+
+    // Bind click events for tech selection
+    overlay.querySelectorAll('.tech-select-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const techId = btn.dataset.tech;
+        this.gameState.unlockTech(playerId, techId);
+        this._hideCenteredDiceResult();
+        if (this.onComplete) {
+          this.onComplete();
+        }
+      });
+    });
   }
 }
