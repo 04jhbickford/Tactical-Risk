@@ -671,14 +671,8 @@ async function init() {
       const hit = territoryMap.hitTest(wrapX(world.x), world.y);
       console.log('[MouseUp] Hit test result:', hit?.name || 'null');
 
-      // Check if we're in initial placement phase
-      if (hit && gameState && placementUI.isActive()) {
-        const handled = placementUI.handleTerritoryClick(hit);
-        if (handled) {
-          camera.dirty = true;
-          return;
-        }
-      }
+      // Initial placement now uses inline UI in player panel - don't intercept clicks
+      // Just let the territory selection flow through to setSelectedTerritory
 
       // Check if we're in mobilize phase
       if (hit && gameState && mobilizeUI.isActive()) {
