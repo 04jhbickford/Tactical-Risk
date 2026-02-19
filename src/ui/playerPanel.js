@@ -531,19 +531,26 @@ export class PlayerPanel {
     if (this.actionLog && this.actionLog.entries) {
       const entries = this.actionLog.entries.slice(-50); // Last 50 entries
 
-      if (entries.length === 0) {
+      // Collapse consecutive placement entries into summaries
+      const collapsedEntries = this._collapseLogEntries(entries);
+
+      if (collapsedEntries.length === 0) {
         html += `<div class="pp-log-empty">No actions yet</div>`;
       } else {
         html += `<div class="pp-log-entries">`;
-        for (const entry of entries) {
+        for (const entry of collapsedEntries) {
           const time = entry.timestamp.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit'
           });
           const colorStyle = entry.data.color ? `border-left-color: ${entry.data.color}` : '';
 
+          // Extract territory and movement data for hover highlighting
+          const territoryData = this._getLogTerritoryData(entry);
+          const dataAttrs = this._buildLogDataAttrs(territoryData);
+
           html += `
-            <div class="pp-log-entry" style="${colorStyle}">
+            <div class="pp-log-entry" style="${colorStyle}" ${dataAttrs}>
               <span class="pp-log-time">${time}</span>
               <span class="pp-log-msg">${this._getLogSummary(entry)}</span>
             </div>`;
@@ -556,6 +563,138 @@ export class PlayerPanel {
 
     html += '</div>';
     return html;
+  }
+
+  // Collapse consecutive placement entries into summaries
+  _collapseLogEntries(entries) {
+    const result = [];
+    let placementGroup = null;
+
+    for (const entry of entries) {
+      if (entry.type === 'placement' || entry.type === 'mobilize') {
+        const territory = entry.data.territory;
+
+        // Get units to add - mobilize has units array, placement has single unitType
+        let unitsToAdd = [];
+        if (entry.data.units && Array.isArray(entry.data.units)) {
+          unitsToAdd = entry.data.units.map(u => ({
+            type: u.type,
+            quantity: u.quantity || 1
+          }));
+        } else if (entry.data.unitType) {
+          unitsToAdd = [{ type: entry.data.unitType, quantity: 1 }];
+        }
+
+        // Start new group or add to existing
+        if (placementGroup && placementGroup.territory === territory &&
+            placementGroup.data.color === entry.data.color) {
+          // Add to existing group
+          for (const unit of unitsToAdd) {
+            const existing = placementGroup.units.find(u => u.type === unit.type);
+            if (existing) {
+              existing.quantity += unit.quantity;
+            } else {
+              placementGroup.units.push({ type: unit.type, quantity: unit.quantity });
+            }
+          }
+          placementGroup.timestamp = entry.timestamp; // Update to latest timestamp
+        } else {
+          // Flush previous group if exists
+          if (placementGroup) {
+            result.push(this._createPlacementSummary(placementGroup));
+          }
+          // Start new group
+          placementGroup = {
+            territory,
+            units: unitsToAdd,
+            timestamp: entry.timestamp,
+            data: { color: entry.data.color },
+            type: entry.type
+          };
+        }
+      } else {
+        // Flush placement group if exists
+        if (placementGroup) {
+          result.push(this._createPlacementSummary(placementGroup));
+          placementGroup = null;
+        }
+        result.push(entry);
+      }
+    }
+
+    // Flush final placement group
+    if (placementGroup) {
+      result.push(this._createPlacementSummary(placementGroup));
+    }
+
+    return result;
+  }
+
+  // Create a summary entry from a placement group
+  _createPlacementSummary(group) {
+    const unitStr = group.units.map(u => `${u.quantity} ${u.type}`).join(', ');
+    const action = group.type === 'mobilize' ? 'deployed' : 'placed';
+    return {
+      type: 'placement-summary',
+      timestamp: group.timestamp,
+      data: {
+        message: `${unitStr} ${action} on ${group.territory}`,
+        territory: group.territory,
+        units: group.units,
+        color: group.data.color
+      }
+    };
+  }
+
+  // Extract territory/movement data from log entry for hover highlighting
+  _getLogTerritoryData(entry) {
+    const data = entry.data;
+    const result = { territories: [], from: null, to: null, isCombat: false };
+
+    switch (entry.type) {
+      case 'move':
+      case 'ncm':
+        result.from = data.from;
+        result.to = data.to;
+        result.territories = [data.from, data.to].filter(Boolean);
+        break;
+      case 'attack':
+        result.from = data.from;
+        result.to = data.to;
+        result.territories = [data.from, data.to].filter(Boolean);
+        result.isCombat = true;
+        break;
+      case 'combat-summary':
+      case 'combat':
+      case 'capture':
+        result.territories = [data.territory].filter(Boolean);
+        result.isCombat = true;
+        break;
+      case 'placement':
+      case 'placement-summary':
+      case 'mobilize':
+      case 'capital':
+        result.territories = [data.territory].filter(Boolean);
+        break;
+      default:
+        break;
+    }
+
+    return result;
+  }
+
+  // Build data attributes string for log entry hover
+  _buildLogDataAttrs(territoryData) {
+    const attrs = [];
+    if (territoryData.territories.length > 0) {
+      attrs.push(`data-territories="${territoryData.territories.join(',')}"`);
+    }
+    if (territoryData.from && territoryData.to) {
+      attrs.push(`data-from="${territoryData.from}"`);
+      attrs.push(`data-to="${territoryData.to}"`);
+      attrs.push(`data-combat="${territoryData.isCombat}"`);
+    }
+    return attrs.join(' ');
   }
 
   _getLogSummary(entry) {
@@ -573,6 +712,7 @@ export class PlayerPanel {
       case 'phase': return data.message;
       case 'cards': return `🃏 +${data.value} IPCs`;
       case 'placement': return `Placed ${data.unitType}`;
+      case 'placement-summary': return data.message;
       case 'ncm': return `Moved to ${data.to}`;
       case 'mobilize': return `Deployed to ${data.territory}`;
       default: return data.message || entry.type;
@@ -1008,13 +1148,35 @@ export class PlayerPanel {
     const destinations = new Map(); // name -> { name, isEnemy, isWater, distance }
 
     // Get selected units and their movement ranges
-    const selectedUnits = Object.entries(this.moveSelectedUnits)
-      .filter(([_, qty]) => qty > 0)
-      .map(([type, qty]) => ({ type, quantity: qty, def: this.unitDefs?.[type] }))
-      .filter(u => u.def);
+    // Handle both regular unit types and individual ships (ship:ID format)
+    const selectedUnits = [];
+    const selectedShipIds = [];
+    for (const [key, qty] of Object.entries(this.moveSelectedUnits)) {
+      if (qty <= 0) continue;
+      if (key.startsWith('ship:')) {
+        selectedShipIds.push(key.replace('ship:', ''));
+      } else {
+        const def = this.unitDefs?.[key];
+        if (def) {
+          selectedUnits.push({ type: key, quantity: qty, def });
+        }
+      }
+    }
+
+    // Check if we have transports with cargo selected (for amphibious assault)
+    const selectedShipsWithCargo = [];
+    if (selectedShipIds.length > 0 && from.isWater) {
+      const seaUnits = this.gameState.getUnitsAt(fromTerritory.name) || [];
+      for (const shipId of selectedShipIds) {
+        const ship = seaUnits.find(u => u.id === shipId);
+        if (ship && ship.cargo && ship.cargo.length > 0) {
+          selectedShipsWithCargo.push(ship);
+        }
+      }
+    }
 
     // If no units selected, show adjacent territories as preview
-    if (selectedUnits.length === 0) {
+    if (selectedUnits.length === 0 && selectedShipIds.length === 0) {
       for (const connName of from.connections || []) {
         const conn = this.territories[connName];
         if (!conn) continue;
@@ -1092,6 +1254,26 @@ export class PlayerPanel {
         const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
         if (!destinations.has(terrName)) {
           destinations.set(terrName, { name: terrName, isEnemy, isWater: true, distance: info.distance });
+        }
+      }
+    }
+
+    // Transports with cargo - add adjacent coastal territories for amphibious assault/unloading
+    if (selectedShipsWithCargo.length > 0 && from.isWater) {
+      for (const connName of from.connections || []) {
+        const conn = this.territories[connName];
+        if (!conn || conn.isWater) continue; // Only coastal (land) territories
+        const owner = this.gameState.getOwner(connName);
+        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        // During combat move, can unload to attack enemy; during non-combat, only friendly
+        if (isCombatMove || !isEnemy) {
+          destinations.set(connName, {
+            name: connName,
+            isEnemy,
+            isWater: false,
+            distance: 1,
+            isAmphibious: true
+          });
         }
       }
     }
@@ -1193,7 +1375,7 @@ export class PlayerPanel {
     return html;
   }
 
-  // Inline Mobilize UI - place purchased units
+  // Inline Mobilize UI - place purchased units (like buy phase with +/- controls)
   _renderInlineMobilize(player) {
     const pending = this.gameState.getPendingPurchases?.() || [];
     const totalPending = pending.reduce((sum, p) => sum + p.quantity, 0);
@@ -1232,116 +1414,108 @@ export class PlayerPanel {
       return html;
     }
 
-    // Show pending units summary
-    html += `
-      <div class="pp-mobilize-pending">
-        <div class="pp-mobilize-header">Units to Deploy (${totalPending})</div>`;
-
-    if (landUnits.length > 0) {
-      html += `<div class="pp-mobilize-group"><span class="pp-mob-label">Land/Air:</span>`;
-      for (const unit of landUnits) {
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        html += `<span class="pp-mob-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-mob-icon">` : ''}${unit.quantity}× ${unit.type}</span>`;
-      }
-      html += `</div>`;
-    }
-    if (navalUnits.length > 0) {
-      html += `<div class="pp-mobilize-group"><span class="pp-mob-label">Naval:</span>`;
-      for (const unit of navalUnits) {
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        html += `<span class="pp-mob-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-mob-icon">` : ''}${unit.quantity}× ${unit.type}</span>`;
-      }
-      html += `</div>`;
-    }
-    if (buildingUnits.length > 0) {
-      html += `<div class="pp-mobilize-group"><span class="pp-mob-label">Buildings:</span>`;
-      for (const unit of buildingUnits) {
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        html += `<span class="pp-mob-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-mob-icon">` : ''}${unit.quantity}× ${unit.type}</span>`;
-      }
-      html += `</div>`;
-    }
-
-    html += `</div>`;
-
-    // Show valid placement locations
-    html += `<div class="pp-mobilize-locations">`;
-    html += `<div class="pp-mob-loc-label">Factory Territories:</div>`;
-    html += `<div class="pp-mob-loc-list">`;
-    for (const loc of validFactories) {
-      const isSelected = this.selectedTerritory?.name === loc;
-      html += `<button class="pp-mob-loc-btn ${isSelected ? 'selected' : ''}" data-action="select-mob-location" data-territory="${loc}">${loc}</button>`;
-    }
-    html += `</div>`;
-
-    if (validSeaZones.length > 0 && navalUnits.length > 0) {
-      html += `<div class="pp-mob-loc-label">Sea Zones:</div>`;
-      html += `<div class="pp-mob-loc-list">`;
-      for (const loc of validSeaZones) {
-        const isSelected = this.selectedTerritory?.name === loc;
-        html += `<button class="pp-mob-loc-btn sea ${isSelected ? 'selected' : ''}" data-action="select-mob-location" data-territory="${loc}">${loc}</button>`;
-      }
-      html += `</div>`;
-    }
-    html += `</div>`;
-
-    // If a valid territory is selected, show placeable units
+    // Check if a valid territory is selected
     const isValidPlacement = this._isValidMobilizeLocation(this.selectedTerritory, player);
-    if (isValidPlacement && this.selectedTerritory) {
-      const isWater = this.selectedTerritory.isWater;
-      const isFactoryTerritory = !isWater && validFactories.includes(this.selectedTerritory.name);
-      const isOwnedLand = !isWater && this.gameState.getOwner(this.selectedTerritory.name) === player.id;
+    const isWater = this.selectedTerritory?.isWater;
+    const isFactoryTerritory = !isWater && this.selectedTerritory && validFactories.includes(this.selectedTerritory.name);
+    const isOwnedLand = !isWater && this.selectedTerritory && this.gameState.getOwner(this.selectedTerritory.name) === player.id;
 
+    // Show selected territory or hint to select
+    if (isValidPlacement && this.selectedTerritory) {
       html += `
         <div class="pp-mobilize-selected">
           <span class="pp-mob-sel-label">Deploying to:</span>
           <span class="pp-mob-sel-name">${this.selectedTerritory.name}</span>
-        </div>
-        <div class="pp-mobilize-units">`;
-
-      // Show appropriate units based on territory type
-      if (isWater) {
-        // Naval placement
-        for (const unit of navalUnits) {
-          const imageSrc = getUnitIconPath(unit.type, player.id);
-          html += `
-            <button class="pp-mob-unit-btn" data-action="mobilize-unit" data-unit="${unit.type}">
-              ${imageSrc ? `<img src="${imageSrc}" class="pp-mob-btn-icon" alt="${unit.type}">` : ''}
-              <span class="pp-mob-btn-name">${unit.type}</span>
-              <span class="pp-mob-btn-qty">×${unit.quantity}</span>
-            </button>`;
-        }
-      } else if (isOwnedLand && !isFactoryTerritory) {
-        // Non-factory territory - only buildings (factories) can be placed here
-        for (const unit of buildingUnits) {
-          const imageSrc = getUnitIconPath(unit.type, player.id);
-          html += `
-            <button class="pp-mob-unit-btn" data-action="mobilize-unit" data-unit="${unit.type}">
-              ${imageSrc ? `<img src="${imageSrc}" class="pp-mob-btn-icon" alt="${unit.type}">` : ''}
-              <span class="pp-mob-btn-name">${unit.type}</span>
-              <span class="pp-mob-btn-qty">×${unit.quantity}</span>
-            </button>`;
-        }
-        if (buildingUnits.length === 0) {
-          html += `<div class="pp-mob-hint">Only factories can be placed on non-factory territories</div>`;
-        }
-      } else if (isFactoryTerritory) {
-        // Factory territory - land/air units can be placed
-        for (const unit of landUnits) {
-          const imageSrc = getUnitIconPath(unit.type, player.id);
-          html += `
-            <button class="pp-mob-unit-btn" data-action="mobilize-unit" data-unit="${unit.type}">
-              ${imageSrc ? `<img src="${imageSrc}" class="pp-mob-btn-icon" alt="${unit.type}">` : ''}
-              <span class="pp-mob-btn-name">${unit.type}</span>
-              <span class="pp-mob-btn-qty">×${unit.quantity}</span>
-            </button>`;
-        }
-      }
-
-      html += `</div>`;
-    } else if (this.selectedTerritory) {
-      html += `<div class="pp-hint">Select a valid factory territory or sea zone</div>`;
+        </div>`;
     } else {
+      html += `<div class="pp-hint">Click a factory territory on the map to deploy units</div>`;
+    }
+
+    // Get units that can be placed at the current location
+    let placeableUnits = [];
+    if (isValidPlacement && this.selectedTerritory) {
+      if (isWater) {
+        placeableUnits = navalUnits;
+      } else if (isOwnedLand && !isFactoryTerritory) {
+        placeableUnits = buildingUnits;
+      } else if (isFactoryTerritory) {
+        placeableUnits = landUnits;
+      }
+    }
+
+    // Show unit list with +/- controls (like buy phase)
+    html += `<div class="pp-unit-list">`;
+
+    // Land units section
+    if (landUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Land/Air</div>`;
+      for (const unit of landUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        const canPlace = isFactoryTerritory && isValidPlacement;
+        html += `
+          <div class="pp-buy-row ${canPlace ? 'can-place' : ''}">
+            <div class="pp-buy-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
+              <span class="pp-buy-name">${unit.type}</span>
+              <span class="pp-buy-qty-label">×${unit.quantity}</span>
+            </div>
+            <div class="pp-buy-controls">
+              <button class="pp-qty-btn" data-action="mobilize-unit" data-unit="${unit.type}" ${!canPlace ? 'disabled' : ''}>+</button>
+              <button class="pp-qty-btn max-btn" data-action="mobilize-all" data-unit="${unit.type}" ${!canPlace ? 'disabled' : ''}>All</button>
+            </div>
+          </div>`;
+      }
+    }
+
+    // Naval units section
+    if (navalUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Naval</div>`;
+      for (const unit of navalUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        const canPlace = isWater && isValidPlacement;
+        html += `
+          <div class="pp-buy-row ${canPlace ? 'can-place' : ''}">
+            <div class="pp-buy-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
+              <span class="pp-buy-name">${unit.type}</span>
+              <span class="pp-buy-qty-label">×${unit.quantity}</span>
+            </div>
+            <div class="pp-buy-controls">
+              <button class="pp-qty-btn" data-action="mobilize-unit" data-unit="${unit.type}" ${!canPlace ? 'disabled' : ''}>+</button>
+              <button class="pp-qty-btn max-btn" data-action="mobilize-all" data-unit="${unit.type}" ${!canPlace ? 'disabled' : ''}>All</button>
+            </div>
+          </div>`;
+      }
+    }
+
+    // Building units section
+    if (buildingUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Buildings</div>`;
+      for (const unit of buildingUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        const canPlace = isOwnedLand && !isFactoryTerritory && isValidPlacement;
+        html += `
+          <div class="pp-buy-row ${canPlace ? 'can-place' : ''}">
+            <div class="pp-buy-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
+              <span class="pp-buy-name">${unit.type}</span>
+              <span class="pp-buy-qty-label">×${unit.quantity}</span>
+            </div>
+            <div class="pp-buy-controls">
+              <button class="pp-qty-btn" data-action="mobilize-unit" data-unit="${unit.type}" ${!canPlace ? 'disabled' : ''}>+</button>
+              <button class="pp-qty-btn max-btn" data-action="mobilize-all" data-unit="${unit.type}" ${!canPlace ? 'disabled' : ''}>All</button>
+            </div>
+          </div>`;
+      }
+    }
+
+    html += `</div>`;
+
+    // Remaining units indicator
+    html += `<div class="pp-mobilize-remaining">${totalPending} unit${totalPending !== 1 ? 's' : ''} remaining</div>`;
+
+    // Territory type hint
+    if (this.selectedTerritory && !isValidPlacement) {
       html += `<div class="pp-hint">Click a territory above or on the map to place units</div>`;
     }
 
@@ -1586,11 +1760,17 @@ export class PlayerPanel {
             }
 
             if (units.length > 0 || shipIds.length > 0) {
+              // Check if this is an amphibious unload (from sea zone to land)
+              const fromTerritory = this.territories?.[this.selectedTerritory.name];
+              const toTerritory = this.territories?.[this.movePendingDest];
+              const isAmphibiousUnload = fromTerritory?.isWater && !toTerritory?.isWater && shipIds.length > 0;
+
               this.onAction('execute-move', {
                 from: this.selectedTerritory.name,
                 to: this.movePendingDest,
                 units,
-                shipIds
+                shipIds,
+                isAmphibiousUnload
               });
               // Reset movement state after confirming
               this.moveSelectedUnits = {};
@@ -1630,6 +1810,15 @@ export class PlayerPanel {
           return;
         }
 
+        // Handle mobilize all of a unit type
+        if (action === 'mobilize-all') {
+          const unitType = btn.dataset.unit;
+          if (this.onAction && unitType && this.selectedTerritory) {
+            this.onAction('mobilize-all', { unitType, territory: this.selectedTerritory.name });
+          }
+          return;
+        }
+
         if (this.onAction) {
           const unitType = btn.dataset.type;
           this.onAction(action, { territory, unitType });
@@ -1651,6 +1840,39 @@ export class PlayerPanel {
     if (logTab) {
       logTab.scrollTop = logTab.scrollHeight;
     }
+
+    // Log entry hover handlers for territory/movement highlighting
+    this.contentEl.querySelectorAll('.pp-log-entry').forEach(entry => {
+      const territories = entry.dataset.territories?.split(',').filter(Boolean) || [];
+      const from = entry.dataset.from;
+      const to = entry.dataset.to;
+      const isCombat = entry.dataset.combat === 'true';
+
+      if (territories.length > 0 || (from && to)) {
+        entry.classList.add('hoverable');
+
+        entry.addEventListener('mouseenter', () => {
+          // Highlight territories
+          if (territories.length > 0 && this.actionLog?.onHighlightTerritory) {
+            this.actionLog.onHighlightTerritory(territories, true);
+          }
+          // Show movement arrow if we have from/to
+          if (from && to && this.actionLog?.onHighlightMovement) {
+            this.actionLog.onHighlightMovement(from, to, true, isCombat);
+          }
+        });
+
+        entry.addEventListener('mouseleave', () => {
+          // Clear highlights
+          if (this.actionLog?.onHighlightTerritory) {
+            this.actionLog.onHighlightTerritory(null, false);
+          }
+          if (this.actionLog?.onHighlightMovement) {
+            this.actionLog.onHighlightMovement(null, null, false, false);
+          }
+        });
+      }
+    });
   }
 
   // Called when map is clicked during movement - allows selecting destination from map

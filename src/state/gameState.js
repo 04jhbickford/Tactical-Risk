@@ -2203,9 +2203,23 @@ export class GameState {
     const toUnits = this.units[lastMove.to] || [];
     const fromUnits = this.units[lastMove.from] || [];
 
+    // Handle individual ships (transports/carriers with cargo) moved by ID
+    if (lastMove.shipIds && lastMove.shipIds.length > 0) {
+      for (const shipId of lastMove.shipIds) {
+        // Find ship in destination
+        const shipIdx = toUnits.findIndex(u => u.id === shipId);
+        if (shipIdx >= 0) {
+          const ship = toUnits.splice(shipIdx, 1)[0];
+          delete ship.moved;
+          fromUnits.push(ship);
+        }
+      }
+    }
+
+    // Handle regular units (aggregated by type)
     for (const moveUnit of lastMove.units) {
       // Remove from destination
-      const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id);
+      const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
       if (destUnit) {
         destUnit.quantity -= moveUnit.quantity;
         if (destUnit.quantity <= 0) {
@@ -2215,7 +2229,7 @@ export class GameState {
       }
 
       // Add back to source (without moved flag)
-      const sourceUnit = fromUnits.find(u => u.type === moveUnit.type && u.owner === player.id);
+      const sourceUnit = fromUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
       if (sourceUnit) {
         sourceUnit.quantity += moveUnit.quantity;
         delete sourceUnit.moved;

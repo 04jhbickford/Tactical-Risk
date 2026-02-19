@@ -329,20 +329,46 @@ async function init() {
       case 'execute-move':
         // Execute a move from inline movement UI
         if (data.from && data.to && (data.units?.length > 0 || data.shipIds?.length > 0)) {
-          const moveOptions = {};
-          if (data.shipIds && data.shipIds.length > 0) {
-            moveOptions.shipIds = data.shipIds;
-          }
-          const unitsToMove = data.units || [];
-          const result = gameState.moveUnits(data.from, data.to, unitsToMove, unitDefs, moveOptions);
-          if (result.success) {
-            actionLog.logMove(data.from, data.to, unitsToMove, gameState.currentPlayer);
-            camera.dirty = true;
-            // Clear selection after successful move
-            selectedTerritory = null;
-            playerPanel.setSelectedTerritory(null);
+          // Handle amphibious unload (from sea zone to coastal territory)
+          if (data.isAmphibiousUnload && data.shipIds?.length > 0) {
+            const seaUnits = gameState.getUnitsAt(data.from) || [];
+            const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === gameState.currentPlayer.id);
+            let anySuccess = false;
+
+            for (const shipId of data.shipIds) {
+              // Find transport index by ID
+              const transportIdx = transports.findIndex(t => t.id === shipId);
+              if (transportIdx >= 0) {
+                const result = gameState.unloadTransport(data.from, transportIdx, data.to);
+                if (result.success) {
+                  anySuccess = true;
+                }
+              }
+            }
+
+            if (anySuccess) {
+              actionLog.logMove(data.from, data.to, [{ type: 'amphibious', quantity: 1 }], gameState.currentPlayer);
+              camera.dirty = true;
+              selectedTerritory = null;
+              playerPanel.setSelectedTerritory(null);
+            }
           } else {
-            console.warn('Move failed:', result.error);
+            // Regular move
+            const moveOptions = {};
+            if (data.shipIds && data.shipIds.length > 0) {
+              moveOptions.shipIds = data.shipIds;
+            }
+            const unitsToMove = data.units || [];
+            const result = gameState.moveUnits(data.from, data.to, unitsToMove, unitDefs, moveOptions);
+            if (result.success) {
+              actionLog.logMove(data.from, data.to, unitsToMove, gameState.currentPlayer);
+              camera.dirty = true;
+              // Clear selection after successful move
+              selectedTerritory = null;
+              playerPanel.setSelectedTerritory(null);
+            } else {
+              console.warn('Move failed:', result.error);
+            }
           }
         }
         break;
@@ -354,6 +380,27 @@ async function init() {
           if (result.success) {
             actionLog.logMobilize(gameState.currentPlayer, [{ type: data.unitType, quantity: 1 }], data.territory);
             camera.dirty = true;
+          }
+        }
+        break;
+
+      case 'mobilize-all':
+        // Mobilize all units of a type to a territory
+        if (data.unitType && data.territory) {
+          const pending = gameState.getPendingPurchases?.() || [];
+          const unit = pending.find(p => p.type === data.unitType);
+          if (unit) {
+            let placed = 0;
+            const toPlace = unit.quantity;
+            for (let i = 0; i < toPlace; i++) {
+              const result = gameState.mobilizeUnit(data.unitType, data.territory, unitDefs);
+              if (!result.success) break;
+              placed++;
+            }
+            if (placed > 0) {
+              actionLog.logMobilize(gameState.currentPlayer, [{ type: data.unitType, quantity: placed }], data.territory);
+              camera.dirty = true;
+            }
           }
         }
         break;
