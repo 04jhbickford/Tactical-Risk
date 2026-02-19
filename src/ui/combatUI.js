@@ -734,30 +734,38 @@ export class CombatUI {
     const landingsByDest = {}; // { destination: { unitType: quantity } }
     const crashes = {}; // { unitType: quantity }
 
+    // Check if current territory was friendly at turn start (valid to stay)
+    const friendlyAtStart = this.gameState.friendlyTerritoriesAtTurnStart || new Set();
+    const canStayInCurrent = friendlyAtStart.has(this.currentTerritory);
+
     // Process each air unit landing (now individually tracked by ID)
     for (const airUnit of airUnitsToLand) {
       // Use unit ID for individual tracking (allows same type to land at different locations)
       const unitKey = airUnit.id || airUnit.type;
       const destination = selectedLandings[unitKey];
 
-      if (!destination && airUnit.landingOptions.length > 0) {
-        // No selection made but has options - shouldn't happen due to button disabled
-        continue;
-      }
-
       if (airUnit.landingOptions.length === 0) {
         // No valid landing - unit crashes
         crashes[airUnit.type] = (crashes[airUnit.type] || 0) + airUnit.quantity;
         console.log(`${airUnit.type} crashed - no valid landing location`);
       } else if (destination && destination !== this.currentTerritory) {
-        // Track this landing
+        // Track this landing to another territory
         if (!landingsByDest[destination]) {
           landingsByDest[destination] = {};
         }
         landingsByDest[destination][airUnit.type] =
           (landingsByDest[destination][airUnit.type] || 0) + airUnit.quantity;
+      } else if (destination === this.currentTerritory && canStayInCurrent) {
+        // Explicitly selected current territory and it's valid - unit stays
+        // (do nothing, unit remains in attackers)
+      } else if (!destination && canStayInCurrent) {
+        // No selection made but current territory is valid - unit stays
+        // (do nothing, unit remains in attackers)
+      } else {
+        // No valid destination selected and cannot stay in current territory - crash!
+        crashes[airUnit.type] = (crashes[airUnit.type] || 0) + airUnit.quantity;
+        console.log(`${airUnit.type} crashed - no landing selected and cannot stay in captured territory`);
       }
-      // If destination === currentTerritory, unit stays (do nothing)
     }
 
     // Apply crashes - reduce attacker quantities
