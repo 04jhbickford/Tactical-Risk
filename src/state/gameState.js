@@ -992,6 +992,9 @@ export class GameState {
       // Land units: can place on owned territories
       if (def.isLand) return true;
 
+      // Building units (factories): can place on owned land territories
+      if (def.isBuilding) return true;
+
       // Naval units: can place on valid sea zones
       if (def.isSea && validSeaZones.size > 0) return true;
 
