@@ -650,10 +650,20 @@ async function init() {
       camera.dirty = true;
     });
     combatUI.setOnAirLandingRequired((data) => {
-      // Show the external air landing UI
-      airLandingUI.setAirUnits(data.airUnitsToLand, data.combatTerritory, data.isRetreating);
+      // Use inline air landing UI in player panel
+      playerPanel.setAirLanding(
+        data.airUnitsToLand,
+        data.combatTerritory,
+        data.isRetreating,
+        (result) => {
+          // Air landing complete - pass result back to combat UI
+          combatUI.handleAirLandingComplete(result);
+          territoryRenderer.clearAirLandingDestinations();
+          camera.dirty = true;
+        }
+      );
       // Highlight valid destinations on map
-      territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
+      territoryRenderer.setAirLandingDestinations(playerPanel.getAirLandingDestinations());
       camera.dirty = true;
     });
 
@@ -835,10 +845,12 @@ async function init() {
         }
       }
 
-      // Check if we're in air landing phase
-      if (hit && gameState && airLandingUI.isActive()) {
-        const handled = airLandingUI.handleTerritoryClick(hit);
+      // Check if we're in air landing phase (inline UI in player panel)
+      if (hit && gameState && playerPanel.isAirLandingActive()) {
+        const handled = playerPanel.handleAirLandingTerritoryClick(hit);
         if (handled) {
+          // Update map highlighting for valid destinations
+          territoryRenderer.setAirLandingDestinations(playerPanel.getAirLandingDestinations());
           camera.dirty = true;
           return;
         }

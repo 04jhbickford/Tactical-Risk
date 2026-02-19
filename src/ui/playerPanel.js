@@ -48,6 +48,12 @@ export class PlayerPanel {
     this.moveSelectedUnits = {};  // { unitType: quantity }
     this.movePendingDest = null;
 
+    // Inline air landing state
+    this.airLandingData = null;  // { airUnitsToLand, combatTerritory, isRetreating }
+    this.airLandingIndex = 0;
+    this.airLandingSelections = {};
+    this.onAirLandingComplete = null;
+
     // Create panel element
     this.el = document.getElementById('sidebar');
     this.el.innerHTML = '';
@@ -96,6 +102,61 @@ export class PlayerPanel {
     }
     this.selectedTerritory = territory;
     this._render();
+  }
+
+  // Air landing methods
+  setAirLanding(airUnitsToLand, combatTerritory, isRetreating, onComplete) {
+    this.airLandingData = { airUnitsToLand, combatTerritory, isRetreating };
+    this.airLandingIndex = 0;
+    this.airLandingSelections = {};
+    this.onAirLandingComplete = onComplete;
+    this.activeTab = 'actions'; // Switch to actions tab
+    this._render();
+  }
+
+  clearAirLanding() {
+    this.airLandingData = null;
+    this.airLandingIndex = 0;
+    this.airLandingSelections = {};
+    this.onAirLandingComplete = null;
+    this._render();
+  }
+
+  isAirLandingActive() {
+    return this.airLandingData && this.airLandingData.airUnitsToLand?.length > 0;
+  }
+
+  getAirLandingDestinations() {
+    if (!this.isAirLandingActive()) return [];
+    const allDests = new Set();
+    for (const unit of this.airLandingData.airUnitsToLand) {
+      for (const opt of unit.landingOptions || []) {
+        allDests.add(opt.territory);
+      }
+    }
+    return Array.from(allDests);
+  }
+
+  handleAirLandingTerritoryClick(territory) {
+    if (!this.isAirLandingActive()) return false;
+
+    const currentUnit = this.airLandingData.airUnitsToLand[this.airLandingIndex];
+    if (!currentUnit) return false;
+
+    const validDest = currentUnit.landingOptions?.find(opt => opt.territory === territory.name);
+    if (validDest) {
+      const unitKey = currentUnit.id || `${currentUnit.type}_${this.airLandingIndex}`;
+      this.airLandingSelections[unitKey] = territory.name;
+
+      // Move to next unit if available
+      if (this.airLandingIndex < this.airLandingData.airUnitsToLand.length - 1) {
+        this.airLandingIndex++;
+      }
+
+      this._render();
+      return true;
+    }
+    return false;
   }
 
   show() {
@@ -202,6 +263,13 @@ export class PlayerPanel {
     // AI status
     if (player.isAI) {
       html += `<div class="pp-ai-thinking"><span class="pp-ai-spinner"></span> AI is thinking...</div>`;
+      html += '</div>';
+      return html;
+    }
+
+    // Air landing takes priority when active
+    if (this.isAirLandingActive()) {
+      html += this._renderInlineAirLanding(player);
       html += '</div>';
       return html;
     }
@@ -1499,6 +1567,81 @@ export class PlayerPanel {
     return html;
   }
 
+  // Inline Air Landing UI
+  _renderInlineAirLanding(player) {
+    const { airUnitsToLand, combatTerritory, isRetreating } = this.airLandingData;
+    const currentUnit = airUnitsToLand[this.airLandingIndex];
+
+    // Check if all units have landing selections
+    const allSelected = airUnitsToLand.every((u, idx) => {
+      const unitKey = u.id || `${u.type}_${idx}`;
+      return u.landingOptions?.length === 0 || this.airLandingSelections[unitKey];
+    });
+
+    let html = `
+      <div class="pp-inline-air-landing">
+        <div class="pp-air-landing-header" style="border-left: 4px solid ${player.color}">
+          <span class="pp-air-landing-icon">✈️</span>
+          <span class="pp-air-landing-title">${isRetreating ? 'Retreat - ' : ''}Air Unit Landing</span>
+        </div>
+        <div class="pp-air-landing-from">From: ${combatTerritory}</div>
+
+        <div class="pp-air-landing-units">`;
+
+    // Show all air units with their landing status
+    for (let i = 0; i < airUnitsToLand.length; i++) {
+      const unit = airUnitsToLand[i];
+      const unitKey = unit.id || `${unit.type}_${i}`;
+      const selectedLanding = this.airLandingSelections[unitKey];
+      const isCurrent = i === this.airLandingIndex && !selectedLanding;
+      const hasNoOptions = !unit.landingOptions || unit.landingOptions.length === 0;
+      const imageSrc = getUnitIconPath(unit.type, player.id);
+
+      html += `
+        <div class="pp-air-unit-row ${isCurrent ? 'current' : ''} ${selectedLanding ? 'landed' : ''} ${hasNoOptions ? 'crashed' : ''}"
+             data-action="select-air-unit" data-index="${i}">
+          <div class="pp-air-unit-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="pp-air-unit-icon" alt="${unit.type}">` : ''}
+            <span class="pp-air-unit-type">${unit.type}</span>
+          </div>
+          <div class="pp-air-unit-status">
+            ${hasNoOptions ? '<span class="crashed">No valid landing - CRASHED</span>' :
+              selectedLanding ? `<span class="landed">→ ${selectedLanding}</span>` :
+              isCurrent ? '<span class="selecting">Click map to land</span>' :
+              '<span class="pending">Waiting...</span>'}
+          </div>
+        </div>`;
+    }
+
+    html += `</div>`;
+
+    // Current unit landing options (dropdown as backup)
+    if (currentUnit && currentUnit.landingOptions?.length > 0 && !this.airLandingSelections[currentUnit.id || `${currentUnit.type}_${this.airLandingIndex}`]) {
+      html += `
+        <div class="pp-air-landing-dest">
+          <span class="pp-air-landing-label">Land at:</span>
+          <select class="pp-air-landing-dropdown" data-action="select-air-landing">
+            <option value="">-- Click map or select --</option>
+            ${currentUnit.landingOptions.map(opt => `
+              <option value="${opt.territory}">${opt.territory} (${opt.distance} moves)</option>
+            `).join('')}
+          </select>
+        </div>`;
+    }
+
+    // Confirm button
+    html += `
+      <div class="pp-air-landing-actions">
+        <button class="pp-action-btn primary ${allSelected ? '' : 'disabled'}"
+                data-action="confirm-air-landing" ${allSelected ? '' : 'disabled'}>
+          Confirm All Landings
+        </button>
+      </div>
+    </div>`;
+
+    return html;
+  }
+
   // Inline Mobilize UI - place purchased units (like buy phase with +/- controls)
   _renderInlineMobilize(player) {
     const pending = this.gameState.getPendingPurchases?.() || [];
@@ -1958,6 +2101,44 @@ export class PlayerPanel {
           return;
         }
 
+        // Handle air landing unit selection
+        if (action === 'select-air-unit') {
+          const index = parseInt(btn.dataset.index, 10);
+          if (!isNaN(index) && this.isAirLandingActive()) {
+            this.airLandingIndex = index;
+            this._render();
+          }
+          return;
+        }
+
+        // Handle confirm air landing
+        if (action === 'confirm-air-landing') {
+          if (this.isAirLandingActive() && this.onAirLandingComplete) {
+            // Build the landings map
+            const landings = {};
+            const crashes = [];
+            this.airLandingData.airUnitsToLand.forEach((unit, idx) => {
+              const unitKey = unit.id || `${unit.type}_${idx}`;
+              const dest = this.airLandingSelections[unitKey];
+              if (dest) {
+                landings[unitKey] = dest;
+              } else if (!unit.landingOptions || unit.landingOptions.length === 0) {
+                // Unit will crash
+                crashes.push({ id: unit.id, type: unit.type, quantity: unit.quantity });
+              }
+            });
+            // Pass result in expected format for combatUI.handleAirLandingComplete
+            this.onAirLandingComplete({
+              landings,
+              crashes,
+              isRetreating: this.airLandingData.isRetreating,
+              airUnitsToLand: this.airLandingData.airUnitsToLand,
+            });
+            this.clearAirLanding();
+          }
+          return;
+        }
+
         // Handle mobilize unit
         if (action === 'mobilize-unit') {
           const unitType = btn.dataset.unit;
@@ -1989,6 +2170,25 @@ export class PlayerPanel {
       destDropdown.addEventListener('change', (e) => {
         this.movePendingDest = e.target.value || null;
         this._render();
+      });
+    }
+
+    // Air landing dropdown
+    const airLandingDropdown = this.contentEl.querySelector('.pp-air-landing-dropdown');
+    if (airLandingDropdown) {
+      airLandingDropdown.addEventListener('change', (e) => {
+        if (e.target.value && this.isAirLandingActive()) {
+          const currentUnit = this.airLandingData.airUnitsToLand[this.airLandingIndex];
+          if (currentUnit) {
+            const unitKey = currentUnit.id || `${currentUnit.type}_${this.airLandingIndex}`;
+            this.airLandingSelections[unitKey] = e.target.value;
+            // Move to next unit
+            if (this.airLandingIndex < this.airLandingData.airUnitsToLand.length - 1) {
+              this.airLandingIndex++;
+            }
+            this._render();
+          }
+        }
       });
     }
 

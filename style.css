@@ -2934,6 +2934,155 @@ html, body {
   padding: 10px;
 }
 
+/* Inline Air Landing UI */
+.pp-inline-air-landing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pp-air-landing-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(100, 149, 237, 0.15);
+  border-radius: 8px;
+}
+
+.pp-air-landing-icon {
+  font-size: 18px;
+}
+
+.pp-air-landing-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.pp-air-landing-from {
+  font-size: 12px;
+  color: #888;
+  padding: 0 4px;
+}
+
+.pp-air-landing-units {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.pp-air-unit-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pp-air-unit-row:hover {
+  background: rgba(100, 149, 237, 0.1);
+}
+
+.pp-air-unit-row.current {
+  background: rgba(100, 149, 237, 0.2);
+  border-color: rgba(100, 149, 237, 0.5);
+}
+
+.pp-air-unit-row.landed {
+  background: rgba(50, 205, 50, 0.15);
+  border-color: rgba(50, 205, 50, 0.3);
+}
+
+.pp-air-unit-row.crashed {
+  background: rgba(220, 20, 60, 0.15);
+  border-color: rgba(220, 20, 60, 0.3);
+}
+
+.pp-air-unit-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-air-unit-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.pp-air-unit-type {
+  font-size: 13px;
+  color: #e0e0e0;
+  text-transform: capitalize;
+}
+
+.pp-air-unit-status {
+  font-size: 11px;
+}
+
+.pp-air-unit-status .selecting {
+  color: #6495ed;
+  font-style: italic;
+}
+
+.pp-air-unit-status .pending {
+  color: #666;
+}
+
+.pp-air-unit-status .landed {
+  color: #90ee90;
+}
+
+.pp-air-unit-status .crashed {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.pp-air-landing-dest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+}
+
+.pp-air-landing-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.pp-air-landing-dropdown {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(100, 149, 237, 0.3);
+  border-radius: 4px;
+  padding: 6px 8px;
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+.pp-air-landing-dropdown:focus {
+  outline: none;
+  border-color: #6495ed;
+}
+
+.pp-air-landing-actions {
+  padding-top: 8px;
+}
+
+.pp-air-landing-actions .pp-action-btn {
+  width: 100%;
+}
+
 .pp-purchase {
   margin-bottom: 16px;
 }
