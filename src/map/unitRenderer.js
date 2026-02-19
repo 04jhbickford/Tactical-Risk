@@ -350,7 +350,30 @@ export class UnitRenderer {
       return territory.center || [null, null];
     }
 
-    // Calculate weighted centroid based on polygon areas
+    // For sea zones, find the LARGEST polygon (most open water area)
+    // This avoids placing units on small islands
+    if (territory.isWater) {
+      let largestArea = 0;
+      let largestCx = null;
+      let largestCy = null;
+
+      for (const poly of territory.polygons) {
+        if (poly.length < 3) continue;
+        const { cx, cy, area } = this._getPolygonCentroid(poly);
+        if (area > largestArea) {
+          largestArea = area;
+          largestCx = cx;
+          largestCy = cy;
+        }
+      }
+
+      if (largestCx !== null) {
+        return [largestCx, largestCy];
+      }
+      return territory.center || [null, null];
+    }
+
+    // For land territories, calculate weighted centroid based on polygon areas
     let totalArea = 0;
     let sumX = 0;
     let sumY = 0;
