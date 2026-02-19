@@ -983,36 +983,94 @@ export class PlayerPanel {
     return Object.values(movable);
   }
 
-  // Get valid destinations for selected units
+  // Get valid destinations for selected units based on their movement range
   _getValidDestinations(fromTerritory, player, isCombatMove) {
-    if (!fromTerritory || !this.territories) return [];
+    if (!fromTerritory || !this.territories || !this.gameState) return [];
     const from = this.territories[fromTerritory.name];
     if (!from) return [];
 
-    const destinations = [];
-    for (const connName of from.connections || []) {
-      const conn = this.territories[connName];
-      if (!conn) continue;
+    const destinations = new Map(); // name -> { name, isEnemy, isWater, distance }
 
-      const owner = this.gameState.getOwner(connName);
-      const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
-      const isFriendly = owner === player.id || this.gameState.areAllies(player.id, owner);
+    // Get selected units and their movement ranges
+    const selectedUnits = Object.entries(this.moveSelectedUnits)
+      .filter(([_, qty]) => qty > 0)
+      .map(([type, qty]) => ({ type, quantity: qty, def: this.unitDefs?.[type] }))
+      .filter(u => u.def);
 
-      // Combat move: can attack enemies, non-combat: friendly only
-      if (isCombatMove) {
-        // Land units can attack enemies, all units can move to sea zones
-        if (isEnemy || conn.isWater || !owner) {
-          destinations.push({ name: connName, isEnemy, isWater: conn.isWater });
+    // If no units selected, show adjacent territories as preview
+    if (selectedUnits.length === 0) {
+      for (const connName of from.connections || []) {
+        const conn = this.territories[connName];
+        if (!conn) continue;
+        const owner = this.gameState.getOwner(connName);
+        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        if (isCombatMove || !isEnemy) {
+          destinations.set(connName, { name: connName, isEnemy, isWater: conn.isWater, distance: 1 });
         }
-      } else {
-        // Non-combat: friendly or neutral only
-        if (!isEnemy) {
-          destinations.push({ name: connName, isEnemy: false, isWater: conn.isWater });
+      }
+      return Array.from(destinations.values());
+    }
+
+    // Calculate reachable destinations based on unit types
+    const landUnits = selectedUnits.filter(u => u.def.isLand);
+    const airUnits = selectedUnits.filter(u => u.def.isAir);
+    const seaUnits = selectedUnits.filter(u => u.def.isSea);
+
+    // Land units - use land reachability
+    if (landUnits.length > 0 && !from.isWater) {
+      // Use minimum movement of all land units (they move together)
+      const minMovement = Math.min(...landUnits.map(u => u.def.movement || 1));
+      const reachable = this.gameState.getReachableTerritoriesForLand(
+        fromTerritory.name, minMovement, player.id, isCombatMove
+      );
+      for (const [terrName, info] of reachable) {
+        const conn = this.territories[terrName];
+        if (!conn) continue;
+        const owner = this.gameState.getOwner(terrName);
+        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        destinations.set(terrName, { name: terrName, isEnemy, isWater: false, distance: info.distance });
+      }
+    }
+
+    // Air units - use air reachability
+    if (airUnits.length > 0) {
+      // Use minimum movement of all air units
+      const minMovement = Math.min(...airUnits.map(u => u.def.movement || 4));
+      const reachable = this.gameState.getReachableTerritoriesForAir(
+        fromTerritory.name, minMovement, player.id, isCombatMove
+      );
+      for (const [terrName, info] of reachable) {
+        const conn = this.territories[terrName];
+        if (!conn) continue;
+        const owner = this.gameState.getOwner(terrName);
+        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        if (!destinations.has(terrName)) {
+          destinations.set(terrName, { name: terrName, isEnemy, isWater: conn.isWater, distance: info.distance });
         }
       }
     }
 
-    return destinations;
+    // Sea units - use sea reachability
+    if (seaUnits.length > 0 && from.isWater) {
+      // Use minimum movement of all sea units
+      const minMovement = Math.min(...seaUnits.map(u => u.def.movement || 2));
+      const reachable = this.gameState.getReachableTerritoriesForSea(
+        fromTerritory.name, minMovement, player.id, isCombatMove
+      );
+      for (const [terrName, info] of reachable) {
+        const conn = this.territories[terrName];
+        if (!conn) continue;
+        const owner = this.gameState.getOwner(terrName);
+        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        if (!destinations.has(terrName)) {
+          destinations.set(terrName, { name: terrName, isEnemy, isWater: true, distance: info.distance });
+        }
+      }
+    }
+
+    // Sort by distance, then by name
+    return Array.from(destinations.values())
+      .sort((a, b) => a.distance - b.distance || a.name.localeCompare(b.name));
   }
 
   _renderInlineMovement(player, turnPhase) {
@@ -1071,7 +1129,8 @@ export class PlayerPanel {
 
       for (const dest of destinations) {
         const isSelected = this.movePendingDest === dest.name;
-        html += `<option value="${dest.name}" ${isSelected ? 'selected' : ''}>${dest.name}${dest.isEnemy ? ' ⚔ (Attack)' : ''}</option>`;
+        const distLabel = dest.distance > 1 ? ` (${dest.distance} spaces)` : '';
+        html += `<option value="${dest.name}" ${isSelected ? 'selected' : ''}>${dest.name}${dest.isEnemy ? ' ⚔ Attack' : ''}${distLabel}</option>`;
       }
 
       html += `</select>

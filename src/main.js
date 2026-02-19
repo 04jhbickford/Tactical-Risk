@@ -724,6 +724,15 @@ async function init() {
         }
       }
 
+      // Check if clicking during mobilize phase - set selected territory for inline mobilize UI
+      if (hit && gameState && gameState.turnPhase === TURN_PHASES.MOBILIZE) {
+        // Always update selected territory during mobilize, playerPanel will validate
+        selectedTerritory = hit;
+        playerPanel.setSelectedTerritory(hit);
+        camera.dirty = true;
+        return;
+      }
+
       if (hit) {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);
         selectedTerritory = hit;
