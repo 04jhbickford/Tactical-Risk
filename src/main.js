@@ -329,13 +329,15 @@ async function init() {
       case 'execute-move':
         // Execute a move from inline movement UI
         if (data.from && data.to && data.units && data.units.length > 0) {
-          const result = gameState.moveUnits(data.from, data.to, data.units);
+          const result = gameState.moveUnits(data.from, data.to, data.units, unitDefs);
           if (result.success) {
             actionLog.logMove(data.from, data.to, data.units, gameState.currentPlayer);
             camera.dirty = true;
             // Clear selection after successful move
             selectedTerritory = null;
             playerPanel.setSelectedTerritory(null);
+          } else {
+            console.warn('Move failed:', result.error);
           }
         }
         break;
