@@ -277,12 +277,10 @@ async function init() {
         break;
 
       case 'roll-tech':
-        // Inline tech roll
+        // Inline tech roll - show centered dice result instead of modal
         if (data.diceCount > 0) {
-          techUI.diceCount = data.diceCount;
-          techUI.show();
-          // Auto-roll after showing
-          techUI._performRoll();
+          techUI.performInlineRoll(data.diceCount);
+          camera.dirty = true;
         }
         break;
 

@@ -272,4 +272,115 @@ export class TechUI {
       this.onComplete();
     }
   }
+
+  // Inline roll - shows centered dice result instead of full modal
+  async performInlineRoll(diceCount) {
+    if (diceCount <= 0) return;
+
+    const player = this.gameState.currentPlayer;
+    if (!player) return;
+
+    // Purchase the dice first
+    this.gameState.purchaseTechDice(player.id, diceCount);
+
+    // Create centered dice result overlay
+    this._showCenteredDiceResult(diceCount, null, true); // Show rolling state
+
+    // Wait for rolling animation
+    await new Promise(resolve => setTimeout(resolve, 1200));
+
+    // Perform the actual roll
+    const result = this.gameState.rollTechDice(player.id);
+
+    // Show final result
+    this._showCenteredDiceResult(diceCount, result, false);
+
+    // If breakthrough, wait then show tech selection modal
+    if (result.success) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      this._hideCenteredDiceResult();
+      this.breakthrough = true;
+      this.lastRolls = result.rolls;
+      this._render();
+      this.el.classList.remove('hidden');
+    } else {
+      // Auto-hide after 2 seconds if no breakthrough
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      this._hideCenteredDiceResult();
+      if (this.onComplete) {
+        this.onComplete();
+      }
+    }
+  }
+
+  _showCenteredDiceResult(diceCount, result, isRolling) {
+    // Create or reuse overlay element
+    let overlay = document.getElementById('techDiceOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'techDiceOverlay';
+      overlay.className = 'tech-dice-overlay';
+      document.body.appendChild(overlay);
+    }
+
+    let html = `<div class="tech-dice-result-box">`;
+
+    if (isRolling) {
+      html += `
+        <div class="tech-dice-result-title">Rolling Research Dice...</div>
+        <div class="dice-display tech-dice-centered">`;
+      for (let i = 0; i < diceCount; i++) {
+        const delay = i * 50;
+        html += `<div class="die die-3d rolling" style="animation-delay: ${delay}ms">${Math.floor(Math.random() * 6) + 1}</div>`;
+      }
+      html += `</div></div>`;
+
+      // Start rolling animation
+      overlay.innerHTML = html;
+      overlay.classList.remove('hidden');
+
+      // Animate dice values
+      const animateInterval = setInterval(() => {
+        const dice = overlay.querySelectorAll('.die');
+        dice.forEach(die => {
+          die.textContent = Math.floor(Math.random() * 6) + 1;
+        });
+      }, 80);
+
+      // Store interval for cleanup
+      overlay.dataset.animateInterval = animateInterval;
+    } else {
+      // Clear any animation interval
+      if (overlay.dataset.animateInterval) {
+        clearInterval(parseInt(overlay.dataset.animateInterval));
+      }
+
+      const hasBreakthrough = result?.success;
+      html += `
+        <div class="tech-dice-result-title">${hasBreakthrough ? '🔬 BREAKTHROUGH!' : 'Research Results'}</div>
+        <div class="dice-display tech-dice-centered">
+          ${result.rolls.map(roll => `
+            <div class="die ${roll === 6 ? 'hit' : 'miss'}">${roll}</div>
+          `).join('')}
+        </div>
+        <div class="tech-dice-result-msg ${hasBreakthrough ? 'success' : 'fail'}">
+          ${hasBreakthrough ? 'Rolled a 6! Choose your technology...' : 'No breakthrough this time'}
+        </div>
+      </div>`;
+
+      overlay.innerHTML = html;
+      overlay.classList.remove('hidden');
+      overlay.classList.toggle('breakthrough', hasBreakthrough);
+    }
+  }
+
+  _hideCenteredDiceResult() {
+    const overlay = document.getElementById('techDiceOverlay');
+    if (overlay) {
+      if (overlay.dataset.animateInterval) {
+        clearInterval(parseInt(overlay.dataset.animateInterval));
+      }
+      overlay.classList.add('hidden');
+    }
+  }
 }
