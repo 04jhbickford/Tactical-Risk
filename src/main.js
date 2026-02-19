@@ -87,6 +87,11 @@ async function init() {
   let gameState = null;
   let unitRenderer = null;
 
+  // Hover tooltip delay state
+  let hoverTooltipTimeout = null;
+  let lastHoverPos = { x: 0, y: 0 };
+  const TOOLTIP_DELAY = 400; // ms before showing tooltip
+
   // Territory tooltip (shows on hover)
   const tooltip = new TerritoryTooltip(continents);
   tooltip.setUnitDefs(unitDefs);
@@ -238,6 +243,38 @@ async function init() {
         camera.dirty = true;
         break;
 
+      case 'buy-unit':
+        // Inline purchase - add or remove unit from pending purchases
+        if (data.unitType && data.delta) {
+          const def = unitDefs[data.unitType];
+          if (!def) break;
+
+          if (data.delta > 0) {
+            // Add unit
+            const ipcs = gameState.getIPCs(gameState.currentPlayer.id);
+            const pending = gameState.getPendingPurchases?.() || [];
+            const pendingCost = pending.reduce((sum, p) => sum + (p.cost || 0) * p.quantity, 0);
+            if (ipcs - pendingCost >= def.cost) {
+              gameState.addToPendingPurchases(data.unitType, 1, unitDefs);
+            }
+          } else {
+            // Remove unit
+            gameState.removeFromPendingPurchases(data.unitType, unitDefs);
+          }
+          camera.dirty = true;
+        }
+        break;
+
+      case 'roll-tech':
+        // Inline tech roll
+        if (data.diceCount > 0) {
+          techUI.diceCount = data.diceCount;
+          techUI.show();
+          // Auto-roll after showing
+          techUI._performRoll();
+        }
+        break;
+
       case 'undo-placement':
         if (gameState.undoPlacement()) {
           camera.dirty = true;
@@ -372,6 +409,7 @@ async function init() {
     bugTracker.setActionLog(actionLog);
     playerPanel.setGameState(gameState);
     playerPanel.setContinents(continents);
+    playerPanel.setTerritories(territories);
     playerPanel.setActionLog(actionLog);
     tooltip.setGameState(gameState);
     unitTooltip.setGameState(gameState);
@@ -562,12 +600,28 @@ async function init() {
           hoverTerritory = hit;
           camera.dirty = true;
           canvas.classList.toggle('hovering', !!hit);
-        }
-        // Show tooltip for hovered territory
-        if (hit && gameState) {
-          tooltip.show(hit, e.clientX, e.clientY);
-        } else {
+
+          // Clear any pending tooltip show
+          if (hoverTooltipTimeout) {
+            clearTimeout(hoverTooltipTimeout);
+            hoverTooltipTimeout = null;
+          }
           tooltip.hide();
+
+          // Start delayed tooltip show for new territory
+          if (hit && gameState) {
+            lastHoverPos = { x: e.clientX, y: e.clientY };
+            hoverTooltipTimeout = setTimeout(() => {
+              tooltip.show(hit, lastHoverPos.x, lastHoverPos.y);
+            }, TOOLTIP_DELAY);
+          }
+        } else if (hit && gameState) {
+          // Same territory - update position for pending tooltip
+          lastHoverPos = { x: e.clientX, y: e.clientY };
+          // If tooltip is already visible, update position
+          if (tooltip.isVisible) {
+            tooltip.show(hit, e.clientX, e.clientY);
+          }
         }
       }
     }
@@ -648,6 +702,11 @@ async function init() {
     unitTooltip.hide();
     hoverTerritory = null;
     camera.dirty = true;
+    // Clear hover tooltip timeout
+    if (hoverTooltipTimeout) {
+      clearTimeout(hoverTooltipTimeout);
+      hoverTooltipTimeout = null;
+    }
   });
 
   window.addEventListener('mouseup', () => {

@@ -1332,6 +1332,11 @@ html, body {
   50% { box-shadow: 0 0 10px rgba(76, 175, 80, 0.6); }
 }
 
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; background: rgba(76, 175, 80, 0.4); }
+  50% { opacity: 0.7; background: rgba(76, 175, 80, 0.7); }
+}
+
 /* --- HUD Flags & Instructions --- */
 .hud-flag {
   width: 28px;
@@ -1730,6 +1735,236 @@ html, body {
   font-weight: 700;
   color: #ffd700;
   min-width: 24px;
+}
+
+/* Inline Purchase UI */
+.pp-inline-purchase {
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.pp-budget-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(255,215,0,0.1);
+  border: 1px solid rgba(255,215,0,0.3);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.pp-budget-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.pp-budget-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.pp-budget-value.low {
+  color: #f44336;
+}
+
+.pp-budget-sep {
+  color: #555;
+}
+
+.pp-budget-total {
+  font-size: 12px;
+  color: #888;
+}
+
+.pp-unit-category-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #666;
+  margin: 8px 0 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-buy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.pp-buy-row.has-qty {
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.pp-buy-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-buy-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.pp-buy-name {
+  font-size: 11px;
+  color: #ccc;
+  text-transform: capitalize;
+}
+
+.pp-buy-cost {
+  font-size: 10px;
+  color: #ffd700;
+  background: rgba(0,0,0,0.3);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.pp-buy-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-qty-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-qty-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.15);
+  border-color: rgba(255,255,255,0.4);
+}
+
+.pp-qty-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pp-buy-qty {
+  min-width: 20px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff;
+}
+
+.pp-cart-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 8px;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+}
+
+.pp-cart-items {
+  font-size: 11px;
+  color: #4caf50;
+}
+
+/* Inline Tech UI */
+.pp-inline-tech {
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.pp-tech-budget {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #ccc;
+  margin-bottom: 12px;
+}
+
+.pp-tech-cost-note {
+  font-size: 10px;
+  color: #888;
+}
+
+.pp-tech-dice-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.pp-tech-dice-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.pp-tech-dice-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pp-tech-dice-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.pp-tech-dice-btn.selected {
+  background: rgba(65, 105, 225, 0.4);
+  border-color: #4169e1;
+  color: #fff;
+}
+
+.pp-tech-cost {
+  font-size: 11px;
+  color: #ffd700;
+}
+
+.pp-tech-available {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-tech-avail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.pp-tech-item-small {
+  font-size: 11px;
+  color: #aaa;
+  padding: 3px 0;
+}
+
+.pp-tech-more {
+  font-size: 10px;
+  color: #666;
+  font-style: italic;
 }
 
 .pp-purchase-type {
@@ -2432,6 +2667,22 @@ html, body {
   border: 1px solid rgba(76, 175, 80, 0.3);
   border-radius: 6px;
   padding: 8px;
+}
+
+/* Risk Cards list in Players tab */
+.pp-card-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pp-card-item {
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #ffc107;
 }
 
 .pp-tech-name {
@@ -4492,6 +4743,65 @@ html, body {
   padding: 2px 6px;
   border-radius: 3px;
   margin-top: 2px;
+}
+
+/* Paired Infantry + Artillery display */
+.combat-unit-row.paired-row {
+  background: linear-gradient(90deg, rgba(76, 175, 80, 0.15) 0%, transparent 50%, transparent 100%);
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.combat-unit-side.paired {
+  flex: 1.5;
+}
+
+.combat-paired-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  border-left: 3px solid var(--player-color, #888);
+}
+
+.paired-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paired-unit .combat-unit-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.paired-unit .combat-unit-qty {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.paired-unit .combat-unit-stat {
+  font-size: 10px;
+  padding: 2px 4px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 3px;
+}
+
+.paired-unit .combat-unit-stat.supported {
+  background: rgba(76, 175, 80, 0.4);
+  color: #4caf50;
+  animation: pulse-green 1.5s ease-in-out infinite;
+}
+
+.paired-plus {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4caf50;
+  padding: 0 2px;
 }
 
 .combat-unit-stats {

@@ -2,6 +2,7 @@
 // Tabs: Actions, Stats, Territory, Log
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES } from '../state/gameState.js';
+import { getUnitIconPath } from '../utils/unitIcons.js';
 
 // Compact phase hints
 const PHASE_HINTS = {
@@ -28,12 +29,20 @@ export class PlayerPanel {
     this.gameState = null;
     this.unitDefs = null;
     this.continents = null;
+    this.territories = null;
     this.onAction = null;
     this.actionLog = null;
     this.selectedTerritory = null;
     this.activeTab = 'actions';
     this.cardsCollapsed = false;
     this.validCardSets = [];
+
+    // Inline purchase state
+    this.purchaseCart = {};
+    this.purchaseCartCost = 0;
+
+    // Inline tech state
+    this.techDiceCount = 0;
 
     // Create panel element
     this.el = document.getElementById('sidebar');
@@ -58,6 +67,13 @@ export class PlayerPanel {
 
   setContinents(continents) {
     this.continents = continents;
+  }
+
+  setTerritories(territories) {
+    this.territories = {};
+    for (const t of territories) {
+      this.territories[t.name] = t;
+    }
   }
 
   setActionLog(actionLog) {
@@ -258,32 +274,14 @@ export class PlayerPanel {
 
     // Playing phase actions
     if (phase === GAME_PHASES.PLAYING) {
+      // Tech phase - inline research
       if (turnPhase === TURN_PHASES.DEVELOP_TECH) {
-        html += `<button class="pp-action-btn primary" data-action="open-tech">🔬 Research Technology</button>`;
+        html += this._renderInlineTech(player);
       }
 
+      // Purchase phase - inline unit purchasing
       if (turnPhase === TURN_PHASES.PURCHASE) {
-        html += `<button class="pp-action-btn primary" data-action="open-purchase">🛒 Purchase Units</button>`;
-
-        // Show current purchases with individual undo buttons
-        const purchases = this.gameState.getPendingPurchases?.() || [];
-        if (purchases.length > 0) {
-          const totalCost = purchases.reduce((sum, p) => sum + (p.cost || 0) * p.quantity, 0);
-          html += `
-            <div class="pp-purchase-list">
-              <div class="pp-purchase-header">Current Purchases (${totalCost} IPCs)</div>`;
-          for (const p of purchases) {
-            html += `
-              <div class="pp-purchase-item">
-                <span class="pp-purchase-qty">${p.quantity}×</span>
-                <span class="pp-purchase-type">${p.type}</span>
-                <button class="pp-undo-btn" data-action="undo-purchase" data-type="${p.type}">✕</button>
-              </div>`;
-          }
-          html += `
-              <button class="pp-action-btn secondary small" data-action="clear-purchases">Clear All</button>
-            </div>`;
-        }
+        html += this._renderInlinePurchase(player);
       }
 
       if (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
@@ -358,6 +356,7 @@ export class PlayerPanel {
       const capital = this.gameState.capitals?.[p.id];
       const capitalOwner = capital ? this.gameState.getOwner(capital) : null;
       const hasCapital = capitalOwner === p.id;
+      const riskCards = this.gameState.riskCards?.[p.id] || [];
 
       return {
         player: p,
@@ -368,7 +367,9 @@ export class PlayerPanel {
         techs: techs.length,
         ipcs,
         hasCapital,
-        isCurrentTurn: p.id === currentPlayer.id
+        isCurrentTurn: p.id === currentPlayer.id,
+        cardCount: riskCards.length,
+        cards: riskCards // Full card list for current player display
       };
     });
 
@@ -409,8 +410,8 @@ export class PlayerPanel {
               <span class="pp-pstat-label">Units</span>
             </div>
             <div class="pp-pstat">
-              <span class="pp-pstat-value">${stats.techs}</span>
-              <span class="pp-pstat-label">Techs</span>
+              <span class="pp-pstat-value">${stats.cardCount}</span>
+              <span class="pp-pstat-label">Cards</span>
             </div>
           </div>
         </div>`;
@@ -443,6 +444,28 @@ export class PlayerPanel {
       }
 
       html += `</div></div>`;
+
+      // Risk Cards for current player
+      if (currentStats.cards.length > 0) {
+        const cardCounts = { infantry: 0, cavalry: 0, artillery: 0, wild: 0 };
+        for (const card of currentStats.cards) {
+          cardCounts[card] = (cardCounts[card] || 0) + 1;
+        }
+
+        html += `
+          <div class="pp-stat-section">
+            <div class="pp-stat-header">🃏 Your Risk Cards (${currentStats.cards.length})</div>
+            <div class="pp-card-list">`;
+
+        const cardTypes = ['infantry', 'cavalry', 'artillery', 'wild'];
+        const cardIcons = { infantry: '🚶', cavalry: '🐎', artillery: '💣', wild: '⭐' };
+        for (const type of cardTypes) {
+          if (cardCounts[type] > 0) {
+            html += `<span class="pp-card-item">${cardIcons[type]} ${cardCounts[type]}× ${type}</span>`;
+          }
+        }
+        html += `</div></div>`;
+      }
 
       // Technologies for current player
       const techs = this.gameState.playerTechs?.[currentPlayer.id]?.unlockedTechs || [];
@@ -630,6 +653,180 @@ export class PlayerPanel {
     return luminance > 0.5 ? '#000000' : '#ffffff';
   }
 
+  // Inline Purchase UI
+  _renderInlinePurchase(player) {
+    const ipcs = this.gameState.getIPCs(player.id);
+    const pending = this.gameState.getPendingPurchases?.() || [];
+    const pendingCost = pending.reduce((sum, p) => sum + (p.cost || 0) * p.quantity, 0);
+    const remaining = ipcs - pendingCost;
+
+    // Get available units to purchase
+    const factoryTerritories = this._getFactoryTerritories(player.id);
+    const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
+    const hasFactories = factoryTerritories.length > 0;
+    const hasSeaZones = adjacentSeaZones.length > 0;
+
+    const purchasableUnits = Object.entries(this.unitDefs || {})
+      .filter(([type, def]) => {
+        if (type === 'aaGun') return false;
+        if ((def.isLand || def.isAir) && hasFactories) return true;
+        if (def.isSea && hasSeaZones) return true;
+        if (def.isBuilding) return true;
+        return false;
+      })
+      .sort((a, b) => (a[1].cost || 0) - (b[1].cost || 0));
+
+    let html = `
+      <div class="pp-inline-purchase">
+        <div class="pp-budget-bar">
+          <span class="pp-budget-label">Budget:</span>
+          <span class="pp-budget-value ${remaining < 5 ? 'low' : ''}">${remaining}</span>
+          <span class="pp-budget-sep">/</span>
+          <span class="pp-budget-total">${ipcs} IPCs</span>
+        </div>
+
+        <div class="pp-unit-grid">`;
+
+    // Group units by category
+    const landUnits = purchasableUnits.filter(([_, def]) => def.isLand);
+    const navalUnits = purchasableUnits.filter(([_, def]) => def.isSea);
+    const airUnits = purchasableUnits.filter(([_, def]) => def.isAir);
+    const buildingUnits = purchasableUnits.filter(([_, def]) => def.isBuilding);
+
+    const renderUnitRow = ([unitType, def]) => {
+      const pendingUnit = pending.find(p => p.type === unitType);
+      const qty = pendingUnit?.quantity || 0;
+      const canAfford = remaining >= def.cost;
+      const imageSrc = getUnitIconPath(unitType, player.id);
+
+      return `
+        <div class="pp-buy-row ${qty > 0 ? 'has-qty' : ''}" data-unit="${unitType}">
+          <div class="pp-buy-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unitType}">` : ''}
+            <span class="pp-buy-name">${unitType}</span>
+            <span class="pp-buy-cost">$${def.cost}</span>
+          </div>
+          <div class="pp-buy-controls">
+            <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>
+            <span class="pp-buy-qty">${qty}</span>
+            <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="1" ${!canAfford ? 'disabled' : ''}>+</button>
+          </div>
+        </div>`;
+    };
+
+    if (landUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Land</div>`;
+      html += landUnits.map(renderUnitRow).join('');
+    }
+    if (airUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Air</div>`;
+      html += airUnits.map(renderUnitRow).join('');
+    }
+    if (navalUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Naval</div>`;
+      html += navalUnits.map(renderUnitRow).join('');
+    }
+    if (buildingUnits.length > 0) {
+      html += `<div class="pp-unit-category-label">Buildings</div>`;
+      html += buildingUnits.map(renderUnitRow).join('');
+    }
+
+    html += `</div>`;
+
+    // Cart summary
+    if (pending.length > 0) {
+      const cartItems = pending.map(p => `${p.quantity}× ${p.type}`).join(', ');
+      html += `
+        <div class="pp-cart-summary">
+          <span class="pp-cart-items">${cartItems}</span>
+          <button class="pp-action-btn secondary small" data-action="clear-purchases">Clear</button>
+        </div>`;
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+  // Inline Tech Research UI
+  _renderInlineTech(player) {
+    const ipcs = this.gameState.getIPCs(player.id);
+    const maxDice = Math.floor(ipcs / 5);
+    const techState = this.gameState.playerTechs?.[player.id] || { techTokens: 0, unlockedTechs: [] };
+    const unlockedTechs = techState.unlockedTechs || [];
+    const availableTechs = Object.entries(TECHNOLOGIES)
+      .filter(([id, _]) => !unlockedTechs.includes(id));
+
+    let html = `
+      <div class="pp-inline-tech">
+        <div class="pp-tech-budget">
+          <span>IPCs: ${ipcs}</span>
+          <span class="pp-tech-cost-note">(5 per research die)</span>
+        </div>
+
+        <div class="pp-tech-dice-select">
+          <span>Research Dice:</span>
+          <div class="pp-tech-dice-btns">`;
+
+    for (let i = 0; i <= Math.min(maxDice, 5); i++) {
+      html += `<button class="pp-tech-dice-btn ${this.techDiceCount === i ? 'selected' : ''}" data-action="set-tech-dice" data-count="${i}">${i}</button>`;
+    }
+
+    html += `
+          </div>
+          <span class="pp-tech-cost">${this.techDiceCount * 5} IPCs</span>
+        </div>`;
+
+    if (this.techDiceCount > 0) {
+      html += `
+        <button class="pp-action-btn primary" data-action="roll-tech">
+          Roll ${this.techDiceCount} Dice (cost: ${this.techDiceCount * 5} IPCs)
+        </button>`;
+    }
+
+    // Show available techs
+    if (availableTechs.length > 0) {
+      html += `<div class="pp-tech-available"><div class="pp-tech-avail-label">Available Technologies:</div>`;
+      for (const [id, tech] of availableTechs.slice(0, 4)) {
+        html += `<div class="pp-tech-item-small">${tech.name}</div>`;
+      }
+      if (availableTechs.length > 4) {
+        html += `<div class="pp-tech-more">+${availableTechs.length - 4} more</div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+  _getFactoryTerritories(playerId) {
+    const factories = [];
+    for (const [name, state] of Object.entries(this.gameState.territoryState || {})) {
+      if (state.owner !== playerId) continue;
+      const units = this.gameState.units[name] || [];
+      if (units.some(u => u.type === 'factory' && u.owner === playerId)) {
+        factories.push(name);
+      }
+    }
+    return factories;
+  }
+
+  _getAdjacentSeaZones(factoryTerritories) {
+    if (!this.territories) return [];
+    const seaZones = new Set();
+    for (const terrName of factoryTerritories) {
+      const territory = this.territories[terrName];
+      if (!territory) continue;
+      for (const conn of territory.connections || []) {
+        const connT = this.territories[conn];
+        if (connT?.isWater) {
+          seaZones.add(conn);
+        }
+      }
+    }
+    return Array.from(seaZones);
+  }
+
   _bindEvents() {
     // Tab switching
     this.contentEl.querySelectorAll('.pp-tab').forEach(tab => {
@@ -656,6 +853,32 @@ export class PlayerPanel {
           const cardSet = this.validCardSets[parseInt(setIndex)];
           if (this.onAction && cardSet) {
             this.onAction('trade-set', { cardSet });
+          }
+          return;
+        }
+
+        // Handle buy-unit action
+        if (action === 'buy-unit') {
+          const unitType = btn.dataset.unit;
+          const delta = parseInt(btn.dataset.delta, 10);
+          if (this.onAction && unitType) {
+            this.onAction('buy-unit', { unitType, delta });
+          }
+          return;
+        }
+
+        // Handle tech dice selection
+        if (action === 'set-tech-dice') {
+          this.techDiceCount = parseInt(btn.dataset.count, 10);
+          this._render();
+          return;
+        }
+
+        // Handle tech roll
+        if (action === 'roll-tech') {
+          if (this.onAction && this.techDiceCount > 0) {
+            this.onAction('roll-tech', { diceCount: this.techDiceCount });
+            this.techDiceCount = 0; // Reset after rolling
           }
           return;
         }

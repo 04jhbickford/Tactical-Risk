@@ -85,21 +85,18 @@ export class HUD {
       }
     }
 
-    // Player legend - shows all players with active indicator
+    // Player legend - compact, shows turn order only (detailed stats in Players tab)
     html += `<div class="hud-legend">`;
     if (this.gameState && this.gameState.players.length > 0) {
       for (const p of this.gameState.players) {
         const isActive = this.gameState.currentPlayer?.id === p.id;
         const activeClass = isActive ? ' active' : '';
-        const ipcs = this.gameState.getIPCs(p.id);
-        const territories = this.gameState.getPlayerTerritories(p.id).length;
         const flagSrc = p.flag ? `assets/flags/${p.flag}` : null;
 
         html += `
           <span class="legend-item${activeClass}">
             ${flagSrc ? `<img src="${flagSrc}" class="legend-flag" alt="${p.name}">` : `<span class="legend-dot" style="background:${p.color}"></span>`}
             <span class="legend-name">${p.name}</span>
-            <span class="legend-stats">${territories}T / ${ipcs}$</span>
           </span>`;
       }
     }

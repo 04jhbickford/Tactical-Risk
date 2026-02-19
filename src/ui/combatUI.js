@@ -1496,19 +1496,62 @@ export class CombatUI {
       return '<div class="no-units">No units remaining</div>';
     }
 
-    // Sort unit types by cost (most expensive first for visual prominence)
+    // Calculate artillery support pairing for attackers
+    const attackerArtillery = attackers.find(u => u.type === 'artillery')?.quantity || 0;
+    const attackerInfantry = attackers.find(u => u.type === 'infantry')?.quantity || 0;
+    const pairedCount = Math.min(attackerArtillery, attackerInfantry);
+    const extraInfantry = attackerInfantry - pairedCount;
+    const extraArtillery = attackerArtillery - pairedCount;
+
+    // Build custom sorted list: paired units first, then other units
+    let html = '';
+
+    // Render paired Infantry + Artillery first (if any)
+    if (pairedCount > 0) {
+      const infantryIcon = attackerPlayer ? getUnitIconPath('infantry', attackerPlayer.id) : null;
+      const artilleryIcon = attackerPlayer ? getUnitIconPath('artillery', attackerPlayer.id) : null;
+      const defInfantry = defenders.find(u => u.type === 'infantry')?.quantity || 0;
+      const defArtillery = defenders.find(u => u.type === 'artillery')?.quantity || 0;
+      const infantryDef = this.unitDefs['infantry'];
+      const artilleryDef = this.unitDefs['artillery'];
+
+      html += `
+        <div class="combat-unit-row paired-row">
+          <div class="combat-unit-side attacker paired">
+            <div class="combat-paired-group" style="--player-color: ${attackerPlayer.color}">
+              <div class="paired-unit">
+                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry">` : ''}
+                <span class="combat-unit-qty">${pairedCount}</span>
+                <span class="combat-unit-stat supported">A2</span>
+              </div>
+              <span class="paired-plus">+</span>
+              <div class="paired-unit">
+                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery">` : ''}
+                <span class="combat-unit-qty">${pairedCount}</span>
+                <span class="combat-unit-stat">A2</span>
+              </div>
+            </div>
+          </div>
+          <div class="combat-unit-type">
+            <span class="combat-type-name">Infantry + Artillery</span>
+            <span class="support-note">${pairedCount} paired (bonus)</span>
+          </div>
+          <div class="combat-unit-side defender empty"></div>
+        </div>`;
+    }
+
+    // Sort remaining unit types by cost (most expensive first)
     const sortedTypes = [...allUnitTypes].sort((a, b) => {
       const costA = this.unitDefs[a]?.cost || 0;
       const costB = this.unitDefs[b]?.cost || 0;
       return costB - costA;
     });
 
-    // Calculate artillery support for attackers
-    const attackerArtillery = attackers.find(u => u.type === 'artillery')?.quantity || 0;
-    const attackerInfantry = attackers.find(u => u.type === 'infantry')?.quantity || 0;
-    const supportedInfantryCount = Math.min(attackerArtillery, attackerInfantry);
+    for (const unitType of sortedTypes) {
+      // Skip infantry and artillery if they're fully paired
+      if (unitType === 'infantry' && extraInfantry <= 0 && pairedCount > 0) continue;
+      if (unitType === 'artillery' && extraArtillery <= 0 && pairedCount > 0) continue;
 
-    return sortedTypes.map(unitType => {
       const attackerUnit = attackers.find(u => u.type === unitType);
       const defenderUnit = defenders.find(u => u.type === unitType);
       const def = this.unitDefs[unitType];
@@ -1517,66 +1560,61 @@ export class CombatUI {
       const attackerIcon = attackerPlayer ? getUnitIconPath(unitType, attackerPlayer.id) : null;
       const defenderIcon = defenderPlayer ? getUnitIconPath(unitType, defenderPlayer.id) : null;
 
-      const attackQty = attackerUnit?.quantity || 0;
+      let attackQty = attackerUnit?.quantity || 0;
       const defendQty = defenderUnit?.quantity || 0;
 
-      // Special handling for infantry with artillery support
+      // Adjust for unpaired infantry/artillery
+      if (unitType === 'infantry' && pairedCount > 0) {
+        attackQty = extraInfantry;
+      }
+      if (unitType === 'artillery' && pairedCount > 0) {
+        attackQty = extraArtillery;
+      }
+
+      // Build attacker HTML
       let attackerHtml = '';
       if (attackQty > 0) {
-        if (unitType === 'infantry' && supportedInfantryCount > 0) {
-          const unsupportedCount = attackQty - supportedInfantryCount;
-          // Show supported infantry (attack 2) and unsupported infantry (attack 1) separately
-          attackerHtml = `
-            <div class="combat-unit-side attacker">
-              <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-                ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
-                <span class="combat-unit-qty">${supportedInfantryCount}</span>
-              </div>
-              <span class="combat-unit-stat supported">A2*</span>
-            </div>`;
-          if (unsupportedCount > 0) {
-            attackerHtml += `
-            <div class="combat-unit-side attacker secondary">
-              <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-                ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon small" alt="${unitType}">` : ''}
-                <span class="combat-unit-qty">${unsupportedCount}</span>
-              </div>
-              <span class="combat-unit-stat">A1</span>
-            </div>`;
-          }
-        } else {
-          attackerHtml = `
-            <div class="combat-unit-side attacker">
-              <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-                ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
-                <span class="combat-unit-qty">${attackQty}</span>
-              </div>
-              <span class="combat-unit-stat">A${def?.attack || 0}</span>
-            </div>`;
-        }
+        const attackValue = def?.attack || 0;
+        const label = unitType === 'infantry' && pairedCount > 0 ? 'unpaired' : '';
+
+        attackerHtml = `
+          <div class="combat-unit-side attacker">
+            <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
+              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
+              <span class="combat-unit-qty">${attackQty}</span>
+            </div>
+            <span class="combat-unit-stat">A${attackValue}</span>
+          </div>`;
       } else {
         attackerHtml = `<div class="combat-unit-side attacker empty"></div>`;
       }
 
-      return `
-        <div class="combat-unit-row ${unitType === 'infantry' && supportedInfantryCount > 0 ? 'has-support' : ''}">
-          ${attackerHtml}
-          <div class="combat-unit-type">
-            <span class="combat-type-name">${unitType}</span>
-            ${unitType === 'infantry' && supportedInfantryCount > 0 ? '<span class="support-note">+artillery</span>' : ''}
+      // Only show row if there are units on either side
+      if (attackQty > 0 || defendQty > 0) {
+        const rowLabel = unitType === 'infantry' && pairedCount > 0 && extraInfantry > 0 ? ' (unpaired)' : '';
+        const artilleryLabel = unitType === 'artillery' && pairedCount > 0 && extraArtillery > 0 ? ' (unpaired)' : '';
+
+        html += `
+          <div class="combat-unit-row">
+            ${attackerHtml}
+            <div class="combat-unit-type">
+              <span class="combat-type-name">${unitType}${rowLabel}${artilleryLabel}</span>
+            </div>
+            <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'}">
+              ${defendQty > 0 ? `
+                <span class="combat-unit-stat">D${def?.defense || 0}</span>
+                <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
+                  <span class="combat-unit-qty">${defendQty}</span>
+                  ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                </div>
+              ` : ''}
+            </div>
           </div>
-          <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'}">
-            ${defendQty > 0 ? `
-              <span class="combat-unit-stat">D${def?.defense || 0}</span>
-              <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
-                <span class="combat-unit-qty">${defendQty}</span>
-                ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
-              </div>
-            ` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
+        `;
+      }
+    }
+
+    return html || '<div class="no-units">No units remaining</div>';
   }
 
   // Render loss summary for battle end display
