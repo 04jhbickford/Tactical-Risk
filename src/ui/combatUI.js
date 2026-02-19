@@ -540,7 +540,7 @@ export class CombatUI {
       for (let i = 0; i < unit.quantity; i++) {
         const roll = Math.floor(Math.random() * 6) + 1;
         const hit = roll <= def.defense;
-        defenseRolls.push({ roll, hit, unitType: unit.type });
+        defenseRolls.push({ roll, hit, unitType: unit.type, defenseValue: def.defense });
         if (hit) defenseHits++;
       }
     }
@@ -1555,13 +1555,16 @@ export class CombatUI {
       const def = this.unitDefs[u.type];
       const imageSrc = def?.image ? `assets/units/${def.image}` : null;
       const stat = side === 'attacker' ? def?.attack : def?.defense;
+      const hitRange = stat > 0 ? (stat === 1 ? '1' : `1-${stat}`) : '-';
 
       return `
         <div class="combat-unit">
           ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${u.type}">` : ''}
           <span class="combat-unit-qty">×${u.quantity}</span>
           <span class="combat-unit-name">${u.type}</span>
-          <span class="combat-unit-stat">${side === 'attacker' ? 'A' : 'D'}${stat || 0}</span>
+          <span class="combat-unit-stat" title="Hits on ${hitRange}">
+            ${side === 'attacker' ? '⚔' : '🛡'}${stat || 0}
+          </span>
         </div>
       `;
     }).join('');
@@ -1570,23 +1573,53 @@ export class CombatUI {
   _renderDiceResults() {
     const { attackRolls, defenseRolls, attackHits, defenseHits } = this.lastRolls;
 
+    // Group rolls by unit type for clearer display
+    const groupRolls = (rolls, valueKey) => {
+      const groups = {};
+      for (const r of rolls) {
+        const key = r.unitType;
+        if (!groups[key]) {
+          groups[key] = { rolls: [], needed: r[valueKey] || r.attackValue || r.defenseValue };
+        }
+        groups[key].rolls.push(r);
+      }
+      return groups;
+    };
+
+    const attackGroups = groupRolls(attackRolls, 'attackValue');
+    const defenseGroups = groupRolls(defenseRolls, 'defenseValue');
+
+    const renderGroupedDice = (groups) => {
+      return Object.entries(groups).map(([unitType, data]) => {
+        const hits = data.rolls.filter(r => r.hit).length;
+        return `
+          <div class="dice-unit-group">
+            <span class="dice-unit-label">${unitType} (≤${data.needed}):</span>
+            <span class="dice-unit-hits">${hits}/${data.rolls.length}</span>
+            <div class="dice-unit-rolls">
+              ${data.rolls.slice(0, 8).map(r => `<span class="die-small ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}
+              ${data.rolls.length > 8 ? `<span class="dice-more-small">+${data.rolls.length - 8}</span>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    };
+
     return `
       <div class="dice-results">
-        <div class="dice-result-row">
-          <span class="dice-result-label">Attack Hits:</span>
-          <span class="dice-result-value hits">${attackHits}</span>
-          <div class="dice-display">
-            ${attackRolls.slice(0, 12).map(r => `<div class="die ${r.hit ? 'hit' : 'miss'}">${r.roll}</div>`).join('')}
-            ${attackRolls.length > 12 ? `<span class="dice-more">+${attackRolls.length - 12}</span>` : ''}
+        <div class="dice-result-section">
+          <div class="dice-result-header">
+            <span class="dice-result-label">⚔ Attack:</span>
+            <span class="dice-result-total">${attackHits} hits</span>
           </div>
+          ${renderGroupedDice(attackGroups)}
         </div>
-        <div class="dice-result-row">
-          <span class="dice-result-label">Defense Hits:</span>
-          <span class="dice-result-value hits">${defenseHits}</span>
-          <div class="dice-display">
-            ${defenseRolls.slice(0, 12).map(r => `<div class="die ${r.hit ? 'hit' : 'miss'}">${r.roll}</div>`).join('')}
-            ${defenseRolls.length > 12 ? `<span class="dice-more">+${defenseRolls.length - 12}</span>` : ''}
+        <div class="dice-result-section">
+          <div class="dice-result-header">
+            <span class="dice-result-label">🛡 Defense:</span>
+            <span class="dice-result-total">${defenseHits} hits</span>
           </div>
+          ${renderGroupedDice(defenseGroups)}
         </div>
       </div>
     `;

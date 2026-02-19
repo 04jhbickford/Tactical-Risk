@@ -4262,6 +4262,102 @@ html, body {
   font-size: 12px;
 }
 
+/* Grouped Dice Results by Unit Type */
+.dice-result-section {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.dice-result-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.dice-unit-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+}
+
+.dice-unit-group:last-child {
+  margin-bottom: 0;
+}
+
+.dice-unit-type {
+  font-size: 11px;
+  color: #aaa;
+  min-width: 70px;
+  font-weight: 500;
+}
+
+.dice-unit-hits {
+  font-size: 10px;
+  color: #666;
+  margin-left: auto;
+}
+
+.die-small {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.die-small.hit {
+  background: rgba(76, 175, 80, 0.3);
+  color: #4caf50;
+}
+
+.die-small.miss {
+  color: #666;
+}
+
+.dice-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.dice-result-total {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ff6b6b;
+}
+
+.dice-unit-label {
+  font-size: 11px;
+  color: #aaa;
+  min-width: 90px;
+  font-weight: 500;
+}
+
+.dice-unit-rolls {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.dice-more-small {
+  font-size: 10px;
+  color: #666;
+  align-self: center;
+  margin-left: 2px;
+}
+
 /* Casualty Selection */
 .casualty-selection {
   margin-bottom: 10px;
