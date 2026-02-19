@@ -109,8 +109,9 @@ export class MobilizeUI {
       return;
     }
 
-    // Auto-show when active
-    this.el.classList.remove('hidden');
+    // Don't auto-show - inline mobilize UI in Actions tab is now used instead
+    // Keep this hidden unless explicitly shown
+    // this.el.classList.remove('hidden');
 
     const player = this.gameState.currentPlayer;
     if (!player) return;
@@ -210,7 +211,8 @@ export class MobilizeUI {
     }
 
     this.el.innerHTML = html;
-    this.el.classList.remove('hidden');
+    // Don't auto-show - inline mobilize UI in Actions tab is now used
+    // this.el.classList.remove('hidden');
     this._bindEvents();
   }
 

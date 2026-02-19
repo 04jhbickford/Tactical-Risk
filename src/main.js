@@ -340,6 +340,17 @@ async function init() {
         }
         break;
 
+      case 'mobilize-unit':
+        // Mobilize a purchased unit to a territory
+        if (data.unitType && data.territory) {
+          const result = gameState.mobilizeUnit(data.unitType, data.territory, unitDefs);
+          if (result.success) {
+            actionLog.logMobilize(gameState.currentPlayer, [{ type: data.unitType, quantity: 1 }], data.territory);
+            camera.dirty = true;
+          }
+        }
+        break;
+
       case 'next-phase':
         const prevPlayer = gameState.currentPlayer;
         const prevRound = gameState.round;

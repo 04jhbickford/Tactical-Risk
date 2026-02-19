@@ -317,13 +317,7 @@ export class PlayerPanel {
       }
 
       if (turnPhase === TURN_PHASES.MOBILIZE) {
-        const pending = this.gameState.getPendingPurchases?.() || [];
-        const totalPending = pending.reduce((sum, u) => sum + u.quantity, 0);
-        if (totalPending > 0) {
-          html += `<div class="pp-hint">Click a factory territory to place ${totalPending} unit${totalPending !== 1 ? 's' : ''}</div>`;
-        } else {
-          html += `<div class="pp-hint">No units to mobilize</div>`;
-        }
+        html += this._renderInlineMobilize(player);
       }
 
       if (turnPhase === TURN_PHASES.COLLECT_INCOME) {
@@ -650,10 +644,12 @@ export class PlayerPanel {
 
   // Inline Purchase UI
   _renderInlinePurchase(player) {
-    const ipcs = this.gameState.getIPCs(player.id);
+    // getIPCs returns remaining IPCs (already has pending costs subtracted)
+    const remaining = this.gameState.getIPCs(player.id);
     const pending = this.gameState.getPendingPurchases?.() || [];
     const pendingCost = pending.reduce((sum, p) => sum + (p.cost || 0) * p.quantity, 0);
-    const remaining = ipcs - pendingCost;
+    // Calculate original budget by adding back pending costs
+    const totalBudget = remaining + pendingCost;
 
     // Get available units to purchase
     const factoryTerritories = this._getFactoryTerritories(player.id);
@@ -676,7 +672,7 @@ export class PlayerPanel {
           <span class="pp-budget-label">Budget:</span>
           <span class="pp-budget-value ${remaining < 5 ? 'low' : ''}">${remaining}</span>
           <span class="pp-budget-sep">/</span>
-          <span class="pp-budget-total">${ipcs} IPCs</span>
+          <span class="pp-budget-total">${totalBudget} IPCs</span>
         </div>
 
         <div class="pp-unit-list">`;
@@ -1107,6 +1103,231 @@ export class PlayerPanel {
     return html;
   }
 
+  // Inline Mobilize UI - place purchased units
+  _renderInlineMobilize(player) {
+    const pending = this.gameState.getPendingPurchases?.() || [];
+    const totalPending = pending.reduce((sum, p) => sum + p.quantity, 0);
+
+    // Get valid placement locations
+    const factoriesAtStart = this.gameState.factoriesAtTurnStart || new Set();
+    const currentFactories = this._getFactoryTerritories(player.id);
+    const validFactories = factoriesAtStart.size > 0
+      ? Array.from(factoriesAtStart)
+      : currentFactories;
+    const validSeaZones = this._getValidNavalPlacementZones(player.id);
+
+    // Categorize pending units
+    const landUnits = pending.filter(p => {
+      const def = this.unitDefs?.[p.type];
+      return def && (def.isLand || def.isAir) && p.quantity > 0;
+    });
+    const navalUnits = pending.filter(p => {
+      const def = this.unitDefs?.[p.type];
+      return def?.isSea && p.quantity > 0;
+    });
+    const buildingUnits = pending.filter(p => {
+      const def = this.unitDefs?.[p.type];
+      return def?.isBuilding && p.quantity > 0;
+    });
+
+    let html = `<div class="pp-inline-mobilize">`;
+
+    if (totalPending === 0) {
+      html += `
+        <div class="pp-mobilize-done">
+          <div class="pp-mobilize-msg">All units deployed!</div>
+          <button class="pp-action-btn primary" data-action="next-phase">Complete Mobilization →</button>
+        </div>
+      </div>`;
+      return html;
+    }
+
+    // Show pending units summary
+    html += `
+      <div class="pp-mobilize-pending">
+        <div class="pp-mobilize-header">Units to Deploy (${totalPending})</div>`;
+
+    if (landUnits.length > 0) {
+      html += `<div class="pp-mobilize-group"><span class="pp-mob-label">Land/Air:</span>`;
+      for (const unit of landUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        html += `<span class="pp-mob-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-mob-icon">` : ''}${unit.quantity}× ${unit.type}</span>`;
+      }
+      html += `</div>`;
+    }
+    if (navalUnits.length > 0) {
+      html += `<div class="pp-mobilize-group"><span class="pp-mob-label">Naval:</span>`;
+      for (const unit of navalUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        html += `<span class="pp-mob-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-mob-icon">` : ''}${unit.quantity}× ${unit.type}</span>`;
+      }
+      html += `</div>`;
+    }
+    if (buildingUnits.length > 0) {
+      html += `<div class="pp-mobilize-group"><span class="pp-mob-label">Buildings:</span>`;
+      for (const unit of buildingUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        html += `<span class="pp-mob-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-mob-icon">` : ''}${unit.quantity}× ${unit.type}</span>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+
+    // Show valid placement locations
+    html += `<div class="pp-mobilize-locations">`;
+    html += `<div class="pp-mob-loc-label">Factory Territories:</div>`;
+    html += `<div class="pp-mob-loc-list">`;
+    for (const loc of validFactories) {
+      const isSelected = this.selectedTerritory?.name === loc;
+      html += `<button class="pp-mob-loc-btn ${isSelected ? 'selected' : ''}" data-action="select-mob-location" data-territory="${loc}">${loc}</button>`;
+    }
+    html += `</div>`;
+
+    if (validSeaZones.length > 0 && navalUnits.length > 0) {
+      html += `<div class="pp-mob-loc-label">Sea Zones:</div>`;
+      html += `<div class="pp-mob-loc-list">`;
+      for (const loc of validSeaZones) {
+        const isSelected = this.selectedTerritory?.name === loc;
+        html += `<button class="pp-mob-loc-btn sea ${isSelected ? 'selected' : ''}" data-action="select-mob-location" data-territory="${loc}">${loc}</button>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+
+    // If a valid territory is selected, show placeable units
+    const isValidPlacement = this._isValidMobilizeLocation(this.selectedTerritory, player);
+    if (isValidPlacement && this.selectedTerritory) {
+      const isWater = this.selectedTerritory.isWater;
+      const isFactoryTerritory = !isWater && validFactories.includes(this.selectedTerritory.name);
+      const isOwnedLand = !isWater && this.gameState.getOwner(this.selectedTerritory.name) === player.id;
+
+      html += `
+        <div class="pp-mobilize-selected">
+          <span class="pp-mob-sel-label">Deploying to:</span>
+          <span class="pp-mob-sel-name">${this.selectedTerritory.name}</span>
+        </div>
+        <div class="pp-mobilize-units">`;
+
+      // Show appropriate units based on territory type
+      if (isWater) {
+        // Naval placement
+        for (const unit of navalUnits) {
+          const imageSrc = getUnitIconPath(unit.type, player.id);
+          html += `
+            <button class="pp-mob-unit-btn" data-action="mobilize-unit" data-unit="${unit.type}">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-mob-btn-icon" alt="${unit.type}">` : ''}
+              <span class="pp-mob-btn-name">${unit.type}</span>
+              <span class="pp-mob-btn-qty">×${unit.quantity}</span>
+            </button>`;
+        }
+      } else if (isOwnedLand && !isFactoryTerritory) {
+        // Non-factory territory - only buildings (factories) can be placed here
+        for (const unit of buildingUnits) {
+          const imageSrc = getUnitIconPath(unit.type, player.id);
+          html += `
+            <button class="pp-mob-unit-btn" data-action="mobilize-unit" data-unit="${unit.type}">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-mob-btn-icon" alt="${unit.type}">` : ''}
+              <span class="pp-mob-btn-name">${unit.type}</span>
+              <span class="pp-mob-btn-qty">×${unit.quantity}</span>
+            </button>`;
+        }
+        if (buildingUnits.length === 0) {
+          html += `<div class="pp-mob-hint">Only factories can be placed on non-factory territories</div>`;
+        }
+      } else if (isFactoryTerritory) {
+        // Factory territory - land/air units can be placed
+        for (const unit of landUnits) {
+          const imageSrc = getUnitIconPath(unit.type, player.id);
+          html += `
+            <button class="pp-mob-unit-btn" data-action="mobilize-unit" data-unit="${unit.type}">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-mob-btn-icon" alt="${unit.type}">` : ''}
+              <span class="pp-mob-btn-name">${unit.type}</span>
+              <span class="pp-mob-btn-qty">×${unit.quantity}</span>
+            </button>`;
+        }
+      }
+
+      html += `</div>`;
+    } else if (this.selectedTerritory) {
+      html += `<div class="pp-hint">Select a valid factory territory or sea zone</div>`;
+    } else {
+      html += `<div class="pp-hint">Click a territory above or on the map to place units</div>`;
+    }
+
+    html += `</div>`;
+    return html;
+  }
+
+  // Get valid sea zones for naval placement (adjacent to factory territories)
+  _getValidNavalPlacementZones(playerId) {
+    const validZones = [];
+    const factoryTerritories = this._getFactoryTerritories(playerId);
+
+    for (const terrName of factoryTerritories) {
+      const t = this.territories?.[terrName];
+      if (!t) continue;
+
+      for (const conn of t.connections || []) {
+        const ct = this.territories?.[conn];
+        if (ct?.isWater && !validZones.includes(conn)) {
+          validZones.push(conn);
+        }
+      }
+    }
+
+    return validZones;
+  }
+
+  // Check if territory is valid for mobilization placement
+  _isValidMobilizeLocation(territory, player) {
+    if (!territory || !player) return false;
+
+    const pending = this.gameState.getPendingPurchases?.() || [];
+    if (pending.length === 0) return false;
+
+    // Sea zones: valid if adjacent to factory and we have naval units
+    if (territory.isWater) {
+      const navalUnits = pending.filter(p => {
+        const def = this.unitDefs?.[p.type];
+        return def?.isSea && p.quantity > 0;
+      });
+      if (navalUnits.length === 0) return false;
+
+      const validSeaZones = this._getValidNavalPlacementZones(player.id);
+      return validSeaZones.includes(territory.name);
+    }
+
+    // Land territories: check if owned by player
+    const owner = this.gameState.getOwner(territory.name);
+    if (owner !== player.id) return false;
+
+    // Check if it's a factory territory (for land/air units)
+    const factoriesAtStart = this.gameState.factoriesAtTurnStart || new Set();
+    const currentFactories = this._getFactoryTerritories(player.id);
+    const validFactories = factoriesAtStart.size > 0
+      ? Array.from(factoriesAtStart)
+      : currentFactories;
+
+    if (validFactories.includes(territory.name)) {
+      return true; // Can place land/air units
+    }
+
+    // Non-factory territory: can only place factories (buildings)
+    const buildingUnits = pending.filter(p => {
+      const def = this.unitDefs?.[p.type];
+      return def?.isBuilding && p.quantity > 0;
+    });
+    if (buildingUnits.length > 0) {
+      // Check if territory doesn't already have a factory
+      const units = this.gameState.getUnitsAt(territory.name);
+      const hasFactory = units.some(u => u.type === 'factory');
+      return !hasFactory;
+    }
+
+    return false;
+  }
+
   _bindEvents() {
     // Tab switching
     this.contentEl.querySelectorAll('.pp-tab').forEach(tab => {
@@ -1273,6 +1494,28 @@ export class PlayerPanel {
           this.moveSelectedUnits = {};
           this.movePendingDest = null;
           this._render();
+          return;
+        }
+
+        // Handle mobilize location selection
+        if (action === 'select-mob-location') {
+          const terrName = btn.dataset.territory;
+          if (terrName && this.territories) {
+            const terr = this.territories[terrName];
+            if (terr) {
+              this.selectedTerritory = terr;
+              this._render();
+            }
+          }
+          return;
+        }
+
+        // Handle mobilize unit
+        if (action === 'mobilize-unit') {
+          const unitType = btn.dataset.unit;
+          if (this.onAction && unitType && this.selectedTerritory) {
+            this.onAction('mobilize-unit', { unitType, territory: this.selectedTerritory.name });
+          }
           return;
         }
 

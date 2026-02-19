@@ -1014,9 +1014,9 @@ export class GameState {
     return this.players.every(p => this.getTotalUnitsToPlace(p.id) <= 7);
   }
 
-  // Get the units per round limit (7 for final round, 6 otherwise)
+  // Get the units per round limit (always 6)
   getUnitsPerRoundLimit() {
-    return this.isFinalPlacementRound() ? 7 : 6;
+    return 6;
   }
 
   // Place an initial unit during Risk setup (6-unit rounds)
@@ -1410,10 +1410,15 @@ export class GameState {
         return { success: false, error: 'Territory already has a factory' };
       }
     } else {
-      // Land/air units: placed on territories with factories (capital always has one)
-      const factoryTerritories = this._getFactoryTerritories(player.id);
-      if (!factoryTerritories.includes(territoryName)) {
-        return { success: false, error: 'Units must be placed on territories with factories' };
+      // Land/air units: placed on territories with factories that existed at turn START
+      // Newly built factories cannot accept units in the same turn (A&A rule)
+      const factoriesAtStart = this.factoriesAtTurnStart || new Set();
+      // Fallback to current factories if tracking not available (old saves)
+      const validFactories = factoriesAtStart.size > 0
+        ? factoriesAtStart
+        : new Set(this._getFactoryTerritories(player.id));
+      if (!validFactories.has(territoryName)) {
+        return { success: false, error: 'Units must be placed on territories with factories (factories built this turn cannot accept units)' };
       }
     }
 
@@ -1579,11 +1584,17 @@ export class GameState {
   _initFriendlyTerritoriesAtTurnStart() {
     const player = this.currentPlayer;
     this.friendlyTerritoriesAtTurnStart = new Set();
+    this.factoriesAtTurnStart = new Set();
     if (player) {
       for (const [terrName, state] of Object.entries(this.territoryState)) {
         if (state.owner === player.id || this.areAllies(player.id, state.owner)) {
           this.friendlyTerritoriesAtTurnStart.add(terrName);
         }
+      }
+      // Track factories at turn start for mobilization rules
+      const factories = this._getFactoryTerritories(player.id);
+      for (const terrName of factories) {
+        this.factoriesAtTurnStart.add(terrName);
       }
     }
   }
