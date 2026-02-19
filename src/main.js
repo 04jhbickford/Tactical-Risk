@@ -250,16 +250,27 @@ async function init() {
           if (!def) break;
 
           if (data.delta > 0) {
-            // Add unit
-            const ipcs = gameState.getIPCs(gameState.currentPlayer.id);
-            const pending = gameState.getPendingPurchases?.() || [];
-            const pendingCost = pending.reduce((sum, p) => sum + (p.cost || 0) * p.quantity, 0);
-            if (ipcs - pendingCost >= def.cost) {
-              gameState.addToPendingPurchases(data.unitType, 1, unitDefs);
-            }
+            // Add unit - function signature is addToPendingPurchases(unitType, unitDefs, territory)
+            gameState.addToPendingPurchases(data.unitType, unitDefs, null);
           } else {
             // Remove unit
             gameState.removeFromPendingPurchases(data.unitType, unitDefs);
+          }
+          camera.dirty = true;
+        }
+        break;
+
+      case 'buy-max':
+        // Buy maximum affordable units of this type
+        if (data.unitType) {
+          const def = unitDefs[data.unitType];
+          if (!def) break;
+
+          const ipcs = gameState.getIPCs(gameState.currentPlayer.id);
+          const maxQty = Math.floor(ipcs / def.cost);
+          for (let i = 0; i < maxQty; i++) {
+            const result = gameState.addToPendingPurchases(data.unitType, unitDefs, null);
+            if (!result.success) break;
           }
           camera.dirty = true;
         }
@@ -272,6 +283,17 @@ async function init() {
           techUI.show();
           // Auto-roll after showing
           techUI._performRoll();
+        }
+        break;
+
+      case 'place-unit':
+        // Inline placement - place a unit on the selected territory
+        if (data.unitType && data.territory) {
+          const result = gameState.placeInitialUnit(data.territory, data.unitType, unitDefs);
+          if (result.success) {
+            actionLog.logInitialPlacement(gameState.currentPlayer, data.unitType, data.territory);
+            camera.dirty = true;
+          }
         }
         break;
 
@@ -544,8 +566,8 @@ async function init() {
       }
     });
 
-    // Show panels
-    continentPanel.show();
+    // Show panels (continentPanel hidden - info now in Players/Territory tabs)
+    continentPanel.hide();
     playerPanel.show();
 
     // Start with map overview - no auto-pan

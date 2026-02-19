@@ -1394,12 +1394,17 @@ export class MovementUI {
     }
 
     if ((hasUnitsSelected || hasShipsSelected) && validDests.length > 0) {
-      // Show warning if any air units can't land
-      if (airWarningDests.size > 0) {
+      // Only show warning if:
+      // 1. All destinations have landing problems, OR
+      // 2. A destination with landing problems is selected
+      const allDestsHaveLandingProblems = airWarningDests.size > 0 && airWarningDests.size === validDests.length;
+      const selectedDestHasLandingProblem = this.pendingDestination && airWarningDests.has(this.pendingDestination);
+
+      if (allDestsHaveLandingProblems || selectedDestHasLandingProblem) {
         html += `
           <div class="mp-air-warning">
             <span class="mp-warning-icon">⚠️</span>
-            <span>WARNING: Air unit cannot land after attacking marked destinations. Unit will crash!</span>
+            <span>WARNING: Air unit cannot land after attacking this destination. Unit will crash!</span>
           </div>
         `;
       }
@@ -1414,7 +1419,7 @@ export class MovementUI {
               const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
               const cantLand = airWarningDests.has(dest);
               const isSelected = this.pendingDestination === dest;
-              const label = cantLand ? `${dest} ⚠️ NO LANDING` : `${dest}${isEnemy ? ' (Enemy)' : ''}`;
+              const label = cantLand ? `${dest} ⚠️` : `${dest}${isEnemy ? ' (Enemy)' : ''}`;
               return `<option value="${dest}" ${isSelected ? 'selected' : ''} data-territory="${dest}" class="${isEnemy ? 'enemy' : ''} ${cantLand ? 'no-landing' : ''}">${label}</option>`;
             }).join('')}
           </select>

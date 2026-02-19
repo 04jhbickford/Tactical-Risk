@@ -248,28 +248,7 @@ export class PlayerPanel {
 
     // Unit placement
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
-      const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
-      const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
-      const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
-      const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
-      const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
-
-      html += `
-        <div class="pp-placement-info">
-          <div class="pp-placement-progress">
-            <span class="pp-placement-count">${placedThisRound}/${limit}</span>
-            <span class="pp-placement-label">placed this round</span>
-          </div>
-          <div class="pp-placement-remaining">${totalRemaining} units remaining</div>
-        </div>`;
-
-      if (canUndo) {
-        html += `<button class="pp-action-btn secondary" data-action="undo-placement">Undo Last</button>`;
-      }
-      if (canFinish) {
-        html += `<button class="pp-action-btn primary" data-action="finish-placement">Done</button>`;
-      }
+      html += this._renderInlinePlacement(player);
     }
 
     // Playing phase actions
@@ -697,6 +676,7 @@ export class PlayerPanel {
       const pendingUnit = pending.find(p => p.type === unitType);
       const qty = pendingUnit?.quantity || 0;
       const canAfford = remaining >= def.cost;
+      const maxQty = Math.floor(remaining / def.cost);
       const imageSrc = getUnitIconPath(unitType, player.id);
 
       return `
@@ -709,7 +689,10 @@ export class PlayerPanel {
           <div class="pp-buy-controls">
             <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>
             <span class="pp-buy-qty">${qty}</span>
-            <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="1" ${!canAfford ? 'disabled' : ''}>+</button>
+            <div class="pp-buy-plus-stack">
+              <button class="pp-qty-btn max" data-action="buy-max" data-unit="${unitType}" ${!canAfford ? 'disabled' : ''} title="Buy max">^</button>
+              <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="1" ${!canAfford ? 'disabled' : ''}>+</button>
+            </div>
           </div>
         </div>`;
     };
@@ -799,6 +782,86 @@ export class PlayerPanel {
     return html;
   }
 
+  // Inline Placement UI
+  _renderInlinePlacement(player) {
+    const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+    const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
+    const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+    const unitsToPlace = this.gameState.getUnitsToPlace?.(player.id) || [];
+    const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
+    const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
+    const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
+    const needMore = limit - placedThisRound;
+
+    let html = `
+      <div class="pp-inline-placement">
+        <div class="pp-placement-progress-bar">
+          <span class="pp-placement-count">${placedThisRound}/${limit}</span>
+          <span class="pp-placement-label">placed this round</span>
+        </div>`;
+
+    // Show selected territory
+    if (this.selectedTerritory) {
+      html += `
+        <div class="pp-placement-selected">
+          <span class="pp-selected-label">Placing on:</span>
+          <span class="pp-selected-name">${this.selectedTerritory.name}</span>
+        </div>`;
+
+      // Show unit buttons for units that can be placed
+      const landUnits = unitsToPlace.filter(u => {
+        const def = this.unitDefs?.[u.type];
+        return def && (def.isLand || def.isAir) && u.quantity > 0;
+      });
+      const navalUnits = unitsToPlace.filter(u => {
+        const def = this.unitDefs?.[u.type];
+        return def?.isSea && u.quantity > 0;
+      });
+
+      // Show appropriate units based on territory type
+      const isWater = this.selectedTerritory.isWater;
+      const unitsForTerritory = isWater ? navalUnits : landUnits;
+
+      if (unitsForTerritory.length > 0 && needMore > 0) {
+        html += `<div class="pp-placement-units">`;
+        for (const unit of unitsForTerritory) {
+          const imageSrc = getUnitIconPath(unit.type, player.id);
+          html += `
+            <button class="pp-place-btn" data-action="place-unit" data-unit="${unit.type}">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-place-icon" alt="${unit.type}">` : ''}
+              <span class="pp-place-qty">${unit.quantity}</span>
+              <span class="pp-place-name">${unit.type}</span>
+            </button>`;
+        }
+        html += `</div>`;
+      } else if (needMore <= 0) {
+        html += `<div class="pp-placement-done-msg">Round limit reached</div>`;
+      } else {
+        html += `<div class="pp-placement-done-msg">No ${isWater ? 'naval' : 'land'} units to place</div>`;
+      }
+    } else {
+      html += `<div class="pp-hint">Click a territory to place units</div>`;
+    }
+
+    // Remaining units summary
+    if (totalRemaining > 0) {
+      html += `<div class="pp-placement-remaining">${totalRemaining} units left to place</div>`;
+    }
+
+    // Action buttons
+    html += `<div class="pp-placement-actions">`;
+    if (canUndo) {
+      html += `<button class="pp-action-btn secondary small" data-action="undo-placement">Undo</button>`;
+    }
+    if (canFinish) {
+      html += `<button class="pp-action-btn primary" data-action="finish-placement">Done</button>`;
+    }
+    html += `</div>`;
+
+    html += `</div>`;
+    return html;
+  }
+
   _getFactoryTerritories(playerId) {
     const factories = [];
     for (const [name, state] of Object.entries(this.gameState.territoryState || {})) {
@@ -863,6 +926,24 @@ export class PlayerPanel {
           const delta = parseInt(btn.dataset.delta, 10);
           if (this.onAction && unitType) {
             this.onAction('buy-unit', { unitType, delta });
+          }
+          return;
+        }
+
+        // Handle buy-max action
+        if (action === 'buy-max') {
+          const unitType = btn.dataset.unit;
+          if (this.onAction && unitType) {
+            this.onAction('buy-max', { unitType });
+          }
+          return;
+        }
+
+        // Handle place-unit action
+        if (action === 'place-unit') {
+          const unitType = btn.dataset.unit;
+          if (this.onAction && unitType && this.selectedTerritory) {
+            this.onAction('place-unit', { unitType, territory: this.selectedTerritory.name });
           }
           return;
         }

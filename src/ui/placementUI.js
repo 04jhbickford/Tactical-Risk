@@ -62,7 +62,8 @@ export class PlacementUI {
   show() {
     this.selectedTerritory = null;
     this._render();
-    this.el.classList.remove('hidden');
+    // Keep hidden - placement now handled inline in player panel Actions tab
+    // this.el.classList.remove('hidden');
   }
 
   hide() {
@@ -298,7 +299,8 @@ export class PlacementUI {
     `;
 
     this.el.innerHTML = html;
-    this.el.classList.remove('hidden');
+    // Keep hidden - placement now handled inline in player panel Actions tab
+    // this.el.classList.remove('hidden');
     this._bindEvents();
   }
 
