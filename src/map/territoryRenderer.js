@@ -31,6 +31,11 @@ const LAND_BRIDGES = [
 ];
 
 export class TerritoryRenderer {
+  // Per-territory offsets for flags/labels/units (shared across render functions)
+  static TERRITORY_OFFSETS = {
+    'Finland Norway': { x: 0, y: -60 },
+  };
+
   constructor(territories, continents) {
     this.territories = territories;
     this.continents = continents;
@@ -277,8 +282,15 @@ export class TerritoryRenderer {
       if (this.gameState.isCapital(t.name)) continue;
 
       // Calculate center from all polygons for proper placement on merged territories
-      const [cx, cy] = this._getTerritoryCenter(t);
+      let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
+
+      // Apply per-territory offset if defined
+      const offset = TerritoryRenderer.TERRITORY_OFFSETS[t.name];
+      if (offset) {
+        cx += offset.x;
+        cy += offset.y;
+      }
 
       // Position to upper-right of center
       const x = cx + 15;
@@ -822,8 +834,15 @@ export class TerritoryRenderer {
       if (!this.gameState.isCapital(t.name)) continue;
 
       // Calculate center from all polygons for proper placement on merged territories
-      const [cx, cy] = this._getTerritoryCenter(t);
+      let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
+
+      // Apply per-territory offset if defined
+      const offset = TerritoryRenderer.TERRITORY_OFFSETS[t.name];
+      if (offset) {
+        cx += offset.x;
+        cy += offset.y;
+      }
 
       const owner = this.gameState.getOwner(t.name);
       const player = this.gameState.getPlayer(owner);
@@ -1283,8 +1302,8 @@ export class TerritoryRenderer {
     ctx.textBaseline = 'middle';
 
     // Per-territory label offsets to avoid unit overlap
-    const LABEL_OFFSETS = {
-      'Finland Norway': { x: 0, y: -60 },  // Move label up into Finland area (away from Sweden)
+    // Additional label-specific offsets (on top of TERRITORY_OFFSETS)
+    const LABEL_EXTRA_OFFSETS = {
       'Eire': { x: 0, y: -15 },
       'United Kingdom': { x: 0, y: -15 },
     };
@@ -1296,11 +1315,18 @@ export class TerritoryRenderer {
       let [cx, cy] = this._getTerritoryCenter(t);
       if (cx === null) continue;
 
-      // Apply per-territory label offset if defined
-      const offset = LABEL_OFFSETS[t.name];
-      if (offset) {
-        cx += offset.x;
-        cy += offset.y;
+      // Apply shared territory offset first
+      const territoryOffset = TerritoryRenderer.TERRITORY_OFFSETS[t.name];
+      if (territoryOffset) {
+        cx += territoryOffset.x;
+        cy += territoryOffset.y;
+      }
+
+      // Apply additional label-specific offset
+      const labelOffset = LABEL_EXTRA_OFFSETS[t.name];
+      if (labelOffset) {
+        cx += labelOffset.x;
+        cy += labelOffset.y;
       }
 
       // Background for readability
