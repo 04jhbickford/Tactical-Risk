@@ -357,6 +357,8 @@ async function init() {
     bugTracker.setGameState(gameState);
     bugTracker.setActionLog(actionLog);
     playerPanel.setGameState(gameState);
+    playerPanel.setContinents(continents);
+    playerPanel.setActionLog(actionLog);
     tooltip.setGameState(gameState);
     unitTooltip.setGameState(gameState);
     territoryRenderer.setGameState(gameState);

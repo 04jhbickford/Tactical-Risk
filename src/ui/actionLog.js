@@ -25,37 +25,10 @@ export class ActionLog {
   }
 
   _create() {
-    this.el = document.createElement('div');
-    this.el.id = 'actionLog';
-    this.el.className = 'action-log-integrated info-section hidden collapsed'; // Start collapsed
-    this.el.innerHTML = `
-      <div class="info-section-header" data-toggle="game-log">
-        <span class="info-section-title">Game Log</span>
-        <span class="info-section-toggle">▶</span>
-      </div>
-      <div class="info-section-content action-log-content"></div>
-    `;
-
-    // Append to sidebar instead of body
-    const sidebar = document.getElementById('sidebar');
-    if (sidebar) {
-      sidebar.appendChild(this.el);
-    } else {
-      document.body.appendChild(this.el);
-    }
-
-    // Toggle visibility - persist collapsed state
-    this.el.querySelector('.info-section-header').addEventListener('click', () => {
-      this.isCollapsed = !this.isCollapsed;
-      this.el.classList.toggle('collapsed', this.isCollapsed);
-      // Update toggle icon
-      const toggleIcon = this.el.querySelector('.info-section-toggle');
-      if (toggleIcon) {
-        toggleIcon.textContent = this.isCollapsed ? '▶' : '▼';
-      }
-    });
-
-    this.contentEl = this.el.querySelector('.action-log-content');
+    // Note: Visual display is now handled by PlayerPanel's Log tab
+    // This class just stores entries and provides logging methods
+    this.el = null;
+    this.contentEl = null;
   }
 
   setGameState(gameState) {
@@ -65,17 +38,15 @@ export class ActionLog {
 
     this.gameState = gameState;
     this.entries = [];
-    this._render();
-
-    // Don't subscribe to changes - log is updated via explicit calls
+    // Note: Visual rendering is handled by PlayerPanel
   }
 
   show() {
-    this.el.classList.remove('hidden');
+    // No-op: display handled by PlayerPanel
   }
 
   hide() {
-    this.el.classList.add('hidden');
+    // No-op: display handled by PlayerPanel
   }
 
   // Log a game action
@@ -96,8 +67,8 @@ export class ActionLog {
       this.entries = this.entries.slice(-this.maxEntries);
     }
 
-    this._appendEntry(entry);
-    this._scrollToBottom();
+    // Note: Visual rendering is handled by PlayerPanel's Log tab
+    // which reads this.entries directly
   }
 
   // Convenience methods for common actions
@@ -258,207 +229,7 @@ export class ActionLog {
     });
   }
 
-  _appendEntry(entry) {
-    const div = document.createElement('div');
-    div.className = `log-entry log-${entry.type}`;
-
-    const time = entry.timestamp.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    const colorStyle = entry.data.color ? `border-left: 3px solid ${entry.data.color}` : '';
-
-    // Build summary (max 2 lines) and full details
-    const summary = this._buildSummary(entry);
-    const details = this._buildDetails(entry);
-    const hasDetails = details.length > 0;
-
-    div.innerHTML = `
-      <span class="log-time">${time}</span>
-      <span class="log-message" style="${colorStyle}">
-        <span class="log-summary">${summary}</span>
-        ${hasDetails ? `<span class="log-details hidden">${details}</span>` : ''}
-      </span>
-      ${hasDetails ? '<span class="log-expand-icon">▶</span>' : ''}
-    `;
-
-    // Toggle expand/collapse on click
-    if (hasDetails) {
-      div.classList.add('expandable');
-      div.addEventListener('click', (e) => {
-        e.stopPropagation();
-        div.classList.toggle('expanded');
-        const detailsEl = div.querySelector('.log-details');
-        const iconEl = div.querySelector('.log-expand-icon');
-        if (detailsEl) {
-          detailsEl.classList.toggle('hidden');
-        }
-        if (iconEl) {
-          iconEl.textContent = div.classList.contains('expanded') ? '▼' : '▶';
-        }
-      });
-    }
-
-    // Extract territory names and movement info for hover highlighting
-    const territories = this._extractTerritories(entry);
-    const hasMovement = entry.data.from && entry.data.to;
-    // Determine if this is a combat entry (for yellow arrow) or regular move (cyan arrow)
-    const isCombat = entry.type === 'attack' || entry.type === 'combat' || entry.type === 'combat-summary';
-
-    // All entries with territories should highlight on hover
-    if (territories.length > 0 && this.onHighlightTerritory) {
-      div.classList.add('has-territory');
-
-      div.addEventListener('mouseenter', () => {
-        this.onHighlightTerritory(territories, true);
-        // Also trigger movement arrow if available (pass isCombat for color)
-        if (hasMovement && this.onHighlightMovement) {
-          this.onHighlightMovement(entry.data.from, entry.data.to, true, isCombat);
-        }
-        // Auto-expand on hover
-        if (hasDetails && !div.classList.contains('expanded')) {
-          div.classList.add('hover-expanded');
-          const detailsEl = div.querySelector('.log-details');
-          if (detailsEl) detailsEl.classList.remove('hidden');
-        }
-      });
-
-      div.addEventListener('mouseleave', () => {
-        this.onHighlightTerritory(territories, false);
-        if (hasMovement && this.onHighlightMovement) {
-          this.onHighlightMovement(entry.data.from, entry.data.to, false, isCombat);
-        }
-        // Collapse on mouse leave (unless permanently expanded)
-        if (div.classList.contains('hover-expanded') && !div.classList.contains('expanded')) {
-          div.classList.remove('hover-expanded');
-          const detailsEl = div.querySelector('.log-details');
-          if (detailsEl) detailsEl.classList.add('hidden');
-        }
-      });
-    }
-
-    this.contentEl.appendChild(div);
-  }
-
-  // Build short summary (max ~50 chars)
-  _buildSummary(entry) {
-    const data = entry.data;
-    switch (entry.type) {
-      case 'move':
-        return `Moved to ${data.to}`;
-      case 'attack':
-        return `Attacking ${data.to}`;
-      case 'combat-summary':
-        return `⚔️ ${data.territory}: ${data.winner} wins`;
-      case 'capture':
-        return `Captured ${data.territory}`;
-      case 'purchase':
-        const total = data.units?.reduce((sum, u) => sum + u.quantity, 0) || 0;
-        return `Purchased ${total} units`;
-      case 'capital':
-        return `Capital: ${data.territory}`;
-      case 'income':
-        return `+${data.amount} IPCs`;
-      case 'tech':
-        return data.tech ? `Tech: ${data.tech}` : 'Research failed';
-      case 'turn':
-        return data.message;
-      case 'phase':
-        return data.message;
-      case 'cards':
-        return `Traded cards: +${data.value} IPCs`;
-      case 'card-earned':
-        return `Earned Risk card: ${data.cardType}`;
-      case 'placement':
-        return `Placed ${data.unitType} in ${data.territory}`;
-      case 'ncm':
-        return `NCM to ${data.to}`;
-      case 'mobilize':
-        return `Deployed to ${data.territory}`;
-      default:
-        return data.message || entry.type;
-    }
-  }
-
-  // Build expanded details
-  _buildDetails(entry) {
-    const data = entry.data;
-    const parts = [];
-
-    switch (entry.type) {
-      case 'move':
-        parts.push(`From: ${data.from}`);
-        parts.push(`To: ${data.to}`);
-        if (data.units) {
-          parts.push(`Units: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
-        }
-        break;
-      case 'attack':
-        parts.push(`From: ${data.from}`);
-        parts.push(`Target: ${data.to}`);
-        parts.push('Combat pending...');
-        break;
-      case 'combat-summary':
-        parts.push(`${data.attacker} vs ${data.defender}`);
-        if (data.detail) parts.push(data.detail);
-        parts.push(`Result: ${data.conquered ? 'Territory conquered' : 'Attack repelled'}`);
-        break;
-      case 'purchase':
-        if (data.units) {
-          data.units.forEach(u => parts.push(`${u.quantity}x ${u.type}`));
-        }
-        break;
-      case 'income':
-        parts.push(`Round ${entry.round} income`);
-        break;
-      case 'ncm':
-        parts.push(`From: ${data.from}`);
-        parts.push(`To: ${data.to}`);
-        if (data.units) {
-          parts.push(`Units: ${data.units.map(u => `${u.quantity} ${u.type}`).join(', ')}`);
-        }
-        break;
-      case 'mobilize':
-        if (data.units) {
-          data.units.forEach(u => parts.push(`${u.quantity || 1}x ${u.type}`));
-        }
-        break;
-      default:
-        // No extra details
-        break;
-    }
-
-    return parts.join('<br>');
-  }
-
-  // Extract territory names from entry data
-  _extractTerritories(entry) {
-    const territories = [];
-    const data = entry.data;
-
-    // Direct territory references
-    if (data.territory) territories.push(data.territory);
-    if (data.from) territories.push(data.from);
-    if (data.to) territories.push(data.to);
-
-    return territories.filter(t => t && typeof t === 'string');
-  }
-
-  _render() {
-    this.contentEl.innerHTML = '';
-    for (const entry of this.entries) {
-      this._appendEntry(entry);
-    }
-    this._scrollToBottom();
-  }
-
-  _scrollToBottom() {
-    // Only scroll if not collapsed
-    if (!this.isCollapsed) {
-      this.contentEl.scrollTop = this.contentEl.scrollHeight;
-    }
-  }
+  // Note: Visual rendering methods removed - display is handled by PlayerPanel's Log tab
 
   // Get entries for save/load
   toJSON() {

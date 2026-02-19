@@ -2022,6 +2022,360 @@ html, body {
   border-color: rgba(255,255,255,0.2);
 }
 
+/* --- Player Panel Tabs --- */
+.pp-tabs {
+  display: flex;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.2);
+}
+
+.pp-tab {
+  flex: 1;
+  padding: 10px 8px;
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-tab:hover {
+  background: rgba(255,255,255,0.05);
+  color: #ccc;
+}
+
+.pp-tab.active {
+  background: rgba(65, 105, 225, 0.15);
+  color: #fff;
+  border-bottom: 2px solid #4169e1;
+}
+
+.pp-tab-icon {
+  font-size: 16px;
+}
+
+.pp-tab-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pp-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* Actions Tab */
+.pp-actions-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pp-end-phase {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-action-btn.end-phase {
+  background: linear-gradient(135deg, #4caf50, #388e3c);
+}
+
+.pp-action-btn.end-phase:hover {
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+}
+
+.pp-action-btn.primary {
+  background: linear-gradient(135deg, #4169e1, #3457b0);
+}
+
+.pp-placement-info {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.pp-placement-progress {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.pp-placement-count {
+  font-size: 24px;
+  font-weight: 700;
+  color: #4fc3f7;
+}
+
+.pp-placement-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.pp-placement-remaining {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* Stats Tab */
+.pp-stats-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pp-stat-section {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.pp-stat-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.pp-stat-item {
+  text-align: center;
+  padding: 10px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+}
+
+.pp-stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.pp-stat-label {
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pp-unit-counts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-unit-category {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.pp-unit-cat-label {
+  color: #888;
+  margin-right: 4px;
+}
+
+.pp-unit-count {
+  color: #aaa;
+}
+
+.pp-unit-total {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-tech-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-tech-item {
+  background: rgba(76, 175, 80, 0.1);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.pp-tech-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4caf50;
+  margin-bottom: 2px;
+}
+
+.pp-tech-desc {
+  font-size: 10px;
+  color: #888;
+}
+
+.pp-no-tech {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+}
+
+/* Territory Tab */
+.pp-territory-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pp-territory-count {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+}
+
+.pp-continent-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-continent-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  border-left: 3px solid rgba(255,255,255,0.2);
+}
+
+.pp-continent-row.has-bonus {
+  background: rgba(76, 175, 80, 0.1);
+  border-left-color: #4caf50;
+}
+
+.pp-continent-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pp-continent-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.pp-continent-bonus {
+  font-size: 11px;
+  color: #ffd700;
+  font-weight: 600;
+}
+
+.pp-continent-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-continent-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pp-continent-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4169e1, #5179f1);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.pp-continent-row.has-bonus .pp-continent-fill {
+  background: linear-gradient(90deg, #4caf50, #66bb6a);
+}
+
+.pp-continent-count {
+  font-size: 11px;
+  color: #888;
+  min-width: 35px;
+  text-align: right;
+}
+
+.pp-no-continents {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 10px;
+}
+
+/* Log Tab */
+.pp-log-tab {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.pp-log-entries {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pp-log-entry {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 4px;
+  border-left: 3px solid rgba(255,255,255,0.2);
+  font-size: 11px;
+}
+
+.pp-log-time {
+  color: #666;
+  flex-shrink: 0;
+}
+
+.pp-log-msg {
+  color: #aaa;
+  flex: 1;
+  word-break: break-word;
+}
+
+.pp-log-empty {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
 /* --- Purchase Popup Overlay --- */
 .purchase-popup {
   position: fixed;

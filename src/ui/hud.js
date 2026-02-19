@@ -105,18 +105,8 @@ export class HUD {
     }
     html += `</div>`;
 
-    // Phase control buttons (during PLAYING phase)
-    const currentPlayer = this.gameState?.currentPlayer;
-    if (this.gameState && this.gameState.phase === GAME_PHASES.PLAYING && currentPlayer && !currentPlayer.isAI) {
-      html += `
-        <div class="hud-phase-controls">
-          <button class="hud-btn end-phase-btn" data-action="next-phase" title="End current phase">
-            End ${TURN_PHASE_NAMES[this.gameState.turnPhase] || 'Phase'} →
-          </button>
-        </div>`;
-    }
-
     // Rules button (top right)
+    // Note: End Phase button moved to player panel Actions tab
     html += `<button class="hud-btn rules-btn" data-action="rules" title="Game Rules">📖 Rules</button>`;
 
     this.el.innerHTML = html;
@@ -131,13 +121,7 @@ export class HUD {
       }
     });
 
-    const nextPhaseBtn = this.el.querySelector('[data-action="next-phase"]');
-    nextPhaseBtn?.addEventListener('click', () => {
-      if (this.onNextPhase) {
-        this.onNextPhase();
-      }
-    });
-  }
+    }
 
   _getPhaseName(phase) {
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Place Capital';
