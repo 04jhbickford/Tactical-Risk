@@ -203,8 +203,7 @@ export class PlayerPanel {
         }
       }
 
-      // End phase button
-      html += `<button class="pp-action-btn secondary" data-action="next-phase">End Phase →</button>`;
+      // Note: End Phase button moved to HUD top bar
     }
 
     return html;

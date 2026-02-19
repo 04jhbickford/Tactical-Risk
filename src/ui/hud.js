@@ -105,6 +105,16 @@ export class HUD {
     }
     html += `</div>`;
 
+    // Phase control buttons (during PLAYING phase)
+    if (this.gameState && this.gameState.phase === GAME_PHASES.PLAYING && player && !player.isAI) {
+      html += `
+        <div class="hud-phase-controls">
+          <button class="hud-btn end-phase-btn" data-action="next-phase" title="End current phase">
+            End ${TURN_PHASE_NAMES[this.gameState.turnPhase] || 'Phase'} →
+          </button>
+        </div>`;
+    }
+
     // Rules button (top right)
     html += `<button class="hud-btn rules-btn" data-action="rules" title="Game Rules">📖 Rules</button>`;
 
@@ -117,6 +127,13 @@ export class HUD {
     rulesBtn?.addEventListener('click', () => {
       if (this.onRulesToggle) {
         this.onRulesToggle();
+      }
+    });
+
+    const nextPhaseBtn = this.el.querySelector('[data-action="next-phase"]');
+    nextPhaseBtn?.addEventListener('click', () => {
+      if (this.onNextPhase) {
+        this.onNextPhase();
       }
     });
   }

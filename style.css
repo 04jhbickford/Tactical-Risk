@@ -1290,6 +1290,33 @@ html, body {
   transform: translateY(-1px);
 }
 
+/* Phase controls in HUD */
+.hud-phase-controls {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 10px;
+}
+
+.hud-btn.end-phase-btn {
+  background: linear-gradient(135deg, #4caf50, #388e3c);
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+}
+
+.hud-btn.end-phase-btn:hover {
+  background: linear-gradient(135deg, #66bb6a, #43a047);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
 /* --- Combat Indicator --- */
 .territory-combat {
   animation: combatPulse 1s infinite;

@@ -326,8 +326,28 @@ async function init() {
     // Wire up components
     hud.setGameState(gameState);
     hud.setNextPhaseCallback(() => {
+      const prevPlayer = gameState.currentPlayer;
+      const prevRound = gameState.round;
       gameState.nextPhase();
       camera.dirty = true;
+
+      // Log phase change or turn start
+      if (gameState.round !== prevRound || gameState.currentPlayer !== prevPlayer) {
+        actionLog.logTurnStart(gameState.currentPlayer, gameState.round);
+      } else {
+        actionLog.logPhaseChange(gameState.getTurnPhaseName(), gameState.currentPlayer);
+      }
+
+      // Close all modals on phase change
+      purchasePopup.hide();
+      techUI.hide();
+
+      // If entering combat phase, show combat UI
+      if (gameState.turnPhase === TURN_PHASES.COMBAT && combatUI.hasCombats()) {
+        combatUI.showNextCombat();
+      }
+      // Cancel any movement selection when phase changes
+      movementUI.cancel();
     });
     hud.setOnRulesToggle(() => {
       rulesPanel.toggle();
