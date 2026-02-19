@@ -1248,12 +1248,30 @@ export class MovementUI {
       (s.cargo && s.cargo.length > 0) || (s.aircraft && s.aircraft.length > 0)
     ).length > 1;
 
+    // Build confirm section HTML if destination is pending (will show at top)
+    let confirmHtml = '';
+    if (this.pendingDestination) {
+      const destOwner = this.gameState.getOwner(this.pendingDestination);
+      const isEnemyDest = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
+      confirmHtml = `
+        <div class="mp-confirm-section sticky">
+          <div class="mp-confirm-info">
+            Moving to: <strong>${this.pendingDestination}</strong>
+            ${isEnemyDest ? '<span class="mp-enemy-tag">ATTACK</span>' : ''}
+          </div>
+          <button class="mp-confirm-btn primary" data-action="confirm-move">Confirm Move</button>
+        </div>
+      `;
+    }
+
     let html = `
       <div class="mp-drag-handle"></div>
       <div class="mp-header">
         <div class="mp-title">Move Units</div>
         <div class="mp-phase">${phaseLabel}</div>
       </div>
+
+      ${confirmHtml}
 
       <div class="mp-from">
         <span class="mp-label">From:</span>
@@ -1383,21 +1401,7 @@ export class MovementUI {
         </div>
       `;
 
-      // Show confirm button if destination is selected
-      if (this.pendingDestination) {
-        const destOwner = this.gameState.getOwner(this.pendingDestination);
-        const isEnemyDest = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
-        html += `
-          <div class="mp-confirm-section">
-            <div class="mp-confirm-info">
-              Moving to: <strong>${this.pendingDestination}</strong>
-              ${isEnemyDest ? '<span class="mp-enemy-tag">ENEMY</span>' : ''}
-            </div>
-            <button class="mp-confirm-btn" data-action="confirm-move">Confirm Move</button>
-          </div>
-        `;
       }
-    }
 
     html += `
       <div class="mp-actions">

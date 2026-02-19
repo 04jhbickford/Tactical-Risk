@@ -3156,11 +3156,26 @@ html, body {
 
 /* Confirm Move section */
 .mp-confirm-section {
-  background: rgba(76, 175, 80, 0.1);
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  background: rgba(76, 175, 80, 0.15);
+  border: 2px solid rgba(76, 175, 80, 0.5);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 12px;
+}
+
+.mp-confirm-section.sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(56, 142, 60, 0.25));
+  border: 2px solid rgba(76, 175, 80, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: pulse-confirm 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-confirm {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
+  50% { box-shadow: 0 4px 20px rgba(76, 175, 80, 0.4); }
 }
 
 .mp-confirm-info {
