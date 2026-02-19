@@ -328,14 +328,68 @@ async function init() {
 
       case 'execute-move':
         // Execute a move from inline movement UI
-        if (data.from && data.to && (data.units?.length > 0 || data.shipIds?.length > 0)) {
+        if (data.from && data.to && (data.units?.length > 0 || data.shipIds?.length > 0 || data.cargoUnloads?.length > 0)) {
           // Handle amphibious unload (from sea zone to coastal territory)
-          if (data.isAmphibiousUnload && data.shipIds?.length > 0) {
+          if (data.isAmphibiousUnload && (data.shipIds?.length > 0 || data.cargoUnloads?.length > 0)) {
             const seaUnits = gameState.getUnitsAt(data.from) || [];
             const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === gameState.currentPlayer.id);
             let anySuccess = false;
+            const unloadedUnits = [];
 
-            for (const shipId of data.shipIds) {
+            // Handle cargo unloads (specific units selected for amphibious assault)
+            if (data.cargoUnloads?.length > 0) {
+              for (const cargoUnload of data.cargoUnloads) {
+                const transport = transports.find(t => t.id === cargoUnload.transportId);
+                if (transport && transport.cargo) {
+                  // Find and unload the specific units from this transport
+                  const cargoIdx = transport.cargo.findIndex(c => c.type === cargoUnload.unitType);
+                  if (cargoIdx >= 0) {
+                    const cargoItem = transport.cargo[cargoIdx];
+                    const unloadQty = Math.min(cargoUnload.quantity, cargoItem.quantity || 1);
+
+                    // Remove from transport
+                    if (unloadQty >= (cargoItem.quantity || 1)) {
+                      transport.cargo.splice(cargoIdx, 1);
+                    } else {
+                      cargoItem.quantity -= unloadQty;
+                    }
+
+                    // Mark transport as moved (can't move again this turn)
+                    transport.moved = true;
+
+                    // Add to destination
+                    const destUnits = gameState.units[data.to] || [];
+                    const existingUnit = destUnits.find(u => u.type === cargoUnload.unitType && u.owner === gameState.currentPlayer.id);
+                    if (existingUnit) {
+                      existingUnit.quantity = (existingUnit.quantity || 1) + unloadQty;
+                    } else {
+                      destUnits.push({
+                        type: cargoUnload.unitType,
+                        owner: gameState.currentPlayer.id,
+                        quantity: unloadQty
+                      });
+                    }
+                    gameState.units[data.to] = destUnits;
+
+                    // Track for move history (for undo)
+                    if (!gameState.moveHistory) gameState.moveHistory = [];
+                    gameState.moveHistory.push({
+                      from: data.from,
+                      to: data.to,
+                      units: [{ type: cargoUnload.unitType, quantity: unloadQty }],
+                      transportId: cargoUnload.transportId,
+                      isAmphibious: true
+                    });
+
+                    unloadedUnits.push({ type: cargoUnload.unitType, quantity: unloadQty });
+                    anySuccess = true;
+                  }
+                }
+              }
+            }
+
+            // Handle ship-based unloads (whole transport cargo)
+            for (const shipId of data.shipIds || []) {
               // Find transport index by ID
               const transportIdx = transports.findIndex(t => t.id === shipId);
               if (transportIdx >= 0) {
@@ -347,7 +401,8 @@ async function init() {
             }
 
             if (anySuccess) {
-              actionLog.logMove(data.from, data.to, [{ type: 'amphibious', quantity: 1 }], gameState.currentPlayer);
+              const logUnits = unloadedUnits.length > 0 ? unloadedUnits : [{ type: 'amphibious', quantity: 1 }];
+              actionLog.logMove(data.from, data.to, logUnits, gameState.currentPlayer);
               camera.dirty = true;
               selectedTerritory = null;
               playerPanel.setSelectedTerritory(null);

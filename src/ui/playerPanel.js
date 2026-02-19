@@ -1105,6 +1105,7 @@ export class PlayerPanel {
     const units = this.gameState.getUnitsAt(territory.name);
     const movable = {};
     const individualShips = []; // Track transports/carriers with cargo separately
+    const cargoUnits = []; // Track cargo units for amphibious assault
 
     for (const u of units) {
       if (u.owner !== player.id) continue;
@@ -1126,6 +1127,26 @@ export class PlayerPanel {
           displayName: `${u.type}${cargoDesc}`,
           isIndividual: true
         });
+
+        // Also add cargo units as separately selectable for amphibious assault
+        if (territory.isWater && u.type === 'transport' && cargo.length > 0) {
+          for (const cargoUnit of cargo) {
+            const cargoKey = `cargo:${u.id}:${cargoUnit.type}`;
+            const existing = cargoUnits.find(c => c.cargoKey === cargoKey);
+            if (existing) {
+              existing.quantity += cargoUnit.quantity || 1;
+            } else {
+              cargoUnits.push({
+                type: cargoUnit.type,
+                quantity: cargoUnit.quantity || 1,
+                transportId: u.id,
+                isCargo: true,
+                cargoKey: cargoKey,
+                displayName: `${cargoUnit.type} (on transport)`
+              });
+            }
+          }
+        }
         continue;
       }
 
@@ -1135,8 +1156,8 @@ export class PlayerPanel {
       movable[u.type].quantity += u.quantity || 1;
     }
 
-    // Combine: aggregated units first, then individual ships
-    return [...Object.values(movable), ...individualShips];
+    // Combine: aggregated units first, then individual ships, then cargo units for amphibious
+    return [...Object.values(movable), ...individualShips, ...cargoUnits];
   }
 
   // Get valid destinations for selected units based on their movement range
@@ -1151,10 +1172,22 @@ export class PlayerPanel {
     // Handle both regular unit types and individual ships (ship:ID format)
     const selectedUnits = [];
     const selectedShipIds = [];
+    const selectedCargoUnits = []; // Track cargo units selected for amphibious assault
+
     for (const [key, qty] of Object.entries(this.moveSelectedUnits)) {
       if (qty <= 0) continue;
       if (key.startsWith('ship:')) {
         selectedShipIds.push(key.replace('ship:', ''));
+      } else if (key.startsWith('cargo:')) {
+        // Format: cargo:transportId:unitType
+        const parts = key.split(':');
+        if (parts.length >= 3) {
+          selectedCargoUnits.push({
+            transportId: parts[1],
+            unitType: parts[2],
+            quantity: qty
+          });
+        }
       } else {
         const def = this.unitDefs?.[key];
         if (def) {
@@ -1176,7 +1209,7 @@ export class PlayerPanel {
     }
 
     // If no units selected, show adjacent territories as preview
-    if (selectedUnits.length === 0 && selectedShipIds.length === 0) {
+    if (selectedUnits.length === 0 && selectedShipIds.length === 0 && selectedCargoUnits.length === 0) {
       for (const connName of from.connections || []) {
         const conn = this.territories[connName];
         if (!conn) continue;
@@ -1278,6 +1311,26 @@ export class PlayerPanel {
       }
     }
 
+    // Cargo units selected directly for amphibious assault - add adjacent coastal territories
+    if (selectedCargoUnits.length > 0 && from.isWater) {
+      for (const connName of from.connections || []) {
+        const conn = this.territories[connName];
+        if (!conn || conn.isWater) continue; // Only coastal (land) territories
+        const owner = this.gameState.getOwner(connName);
+        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        // During combat move, can unload to attack enemy; during non-combat, only friendly
+        if (isCombatMove || !isEnemy) {
+          destinations.set(connName, {
+            name: connName,
+            isEnemy,
+            isWater: false,
+            distance: 1,
+            isAmphibious: true
+          });
+        }
+      }
+    }
+
     // Sort by distance, then by name
     return Array.from(destinations.values())
       .sort((a, b) => a.distance - b.distance || a.name.localeCompare(b.name));
@@ -1298,8 +1351,12 @@ export class PlayerPanel {
 
         <div class="pp-move-units">`;
 
-    // Show movable units with +/- controls
-    for (const unit of movableUnits) {
+    // Separate cargo units from other movable units for clearer display
+    const regularUnits = movableUnits.filter(u => !u.isCargo);
+    const cargoUnitsForAssault = movableUnits.filter(u => u.isCargo);
+
+    // Show regular movable units with +/- controls
+    for (const unit of regularUnits) {
       // Use ship ID as key for individual ships, otherwise use type
       const unitKey = unit.isIndividual ? `ship:${unit.id}` : unit.type;
       const selected = this.moveSelectedUnits[unitKey] || 0;
@@ -1320,6 +1377,35 @@ export class PlayerPanel {
             <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unitKey}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
           </div>
         </div>`;
+    }
+
+    // Show cargo units for amphibious assault (if in sea zone)
+    if (cargoUnitsForAssault.length > 0) {
+      html += `<div class="pp-cargo-section">
+        <div class="pp-cargo-header">Amphibious Assault Units</div>`;
+
+      for (const unit of cargoUnitsForAssault) {
+        const unitKey = unit.cargoKey;
+        const selected = this.moveSelectedUnits[unitKey] || 0;
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        const displayName = unit.displayName || unit.type;
+
+        html += `
+          <div class="pp-move-unit-row cargo-unit">
+            <div class="pp-move-unit-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="pp-move-icon" alt="${unit.type}">` : ''}
+              <span class="pp-move-name">${displayName}</span>
+              <span class="pp-move-avail">(${unit.quantity})</span>
+            </div>
+            <div class="pp-move-controls">
+              <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
+              <span class="pp-move-qty">${selected}</span>
+              <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="1" ${selected >= unit.quantity ? 'disabled' : ''}>+</button>
+              <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unitKey}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
+            </div>
+          </div>`;
+      }
+      html += `</div>`;
     }
 
     html += `</div>`;
@@ -1687,14 +1773,19 @@ export class PlayerPanel {
 
         // Handle movement unit selection (+/-)
         if (action === 'move-unit') {
-          const unitKey = btn.dataset.unit; // Can be "infantry" or "ship:12345"
+          const unitKey = btn.dataset.unit; // Can be "infantry", "ship:12345", or "cargo:12345:infantry"
           const delta = parseInt(btn.dataset.delta, 10);
           const current = this.moveSelectedUnits[unitKey] || 0;
           const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
-          // Find max qty - match by key (type for regular, "ship:id" for individual)
+          // Find max qty - match by key (type for regular, "ship:id" for individual, "cargoKey" for cargo)
           const unitEntry = movable.find(u => {
-            const key = u.isIndividual ? `ship:${u.id}` : u.type;
-            return key === unitKey;
+            if (u.isCargo) {
+              return u.cargoKey === unitKey;
+            } else if (u.isIndividual) {
+              return `ship:${u.id}` === unitKey;
+            } else {
+              return u.type === unitKey;
+            }
           });
           const maxQty = unitEntry?.quantity || 0;
           const newQty = Math.max(0, Math.min(maxQty, current + delta));
@@ -1716,7 +1807,14 @@ export class PlayerPanel {
         if (action === 'move-select-all') {
           const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
           for (const unit of movable) {
-            const unitKey = unit.isIndividual ? `ship:${unit.id}` : unit.type;
+            let unitKey;
+            if (unit.isCargo) {
+              unitKey = unit.cargoKey;
+            } else if (unit.isIndividual) {
+              unitKey = `ship:${unit.id}`;
+            } else {
+              unitKey = unit.type;
+            }
             this.moveSelectedUnits[unitKey] = unit.quantity;
           }
           this._render();
@@ -1744,8 +1842,9 @@ export class PlayerPanel {
           if (this.onAction && this.movePendingDest && this.selectedTerritory) {
             const units = [];
             const shipIds = [];
+            const cargoUnloads = []; // Track cargo units to unload for amphibious assault
 
-            // Separate regular units from individual ships
+            // Separate regular units from individual ships and cargo units
             for (const [key, qty] of Object.entries(this.moveSelectedUnits)) {
               if (qty <= 0) continue;
 
@@ -1753,23 +1852,35 @@ export class PlayerPanel {
                 // Individual ship with cargo - extract ID
                 const shipId = key.replace('ship:', '');
                 shipIds.push(shipId);
+              } else if (key.startsWith('cargo:')) {
+                // Cargo unit for amphibious assault - format: cargo:transportId:unitType
+                const parts = key.split(':');
+                if (parts.length >= 3) {
+                  cargoUnloads.push({
+                    transportId: parts[1],
+                    unitType: parts[2],
+                    quantity: qty
+                  });
+                }
               } else {
                 // Regular unit type
                 units.push({ type: key, quantity: qty });
               }
             }
 
-            if (units.length > 0 || shipIds.length > 0) {
+            if (units.length > 0 || shipIds.length > 0 || cargoUnloads.length > 0) {
               // Check if this is an amphibious unload (from sea zone to land)
               const fromTerritory = this.territories?.[this.selectedTerritory.name];
               const toTerritory = this.territories?.[this.movePendingDest];
-              const isAmphibiousUnload = fromTerritory?.isWater && !toTerritory?.isWater && shipIds.length > 0;
+              const isAmphibiousUnload = fromTerritory?.isWater && !toTerritory?.isWater &&
+                (shipIds.length > 0 || cargoUnloads.length > 0);
 
               this.onAction('execute-move', {
                 from: this.selectedTerritory.name,
                 to: this.movePendingDest,
                 units,
                 shipIds,
+                cargoUnloads,
                 isAmphibiousUnload
               });
               // Reset movement state after confirming

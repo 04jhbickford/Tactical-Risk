@@ -2396,6 +2396,31 @@ html, body {
   font-size: 11px;
 }
 
+.pp-cargo-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,200,0,0.3);
+}
+
+.pp-cargo-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffa500;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pp-move-unit-row.cargo-unit {
+  background: rgba(255,140,0,0.15);
+  border: 1px solid rgba(255,140,0,0.3);
+}
+
+.pp-move-unit-row.cargo-unit .pp-move-name {
+  color: #ffa500;
+  font-size: 11px;
+}
+
 .pp-move-unit-info {
   display: flex;
   align-items: center;
