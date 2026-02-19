@@ -816,8 +816,11 @@ export class PlayerPanel {
           <span class="pp-placement-label">placed this round</span>
         </div>`;
 
-    // Show selected territory
-    if (this.selectedTerritory) {
+    // Check if selected territory is valid for placement
+    const isValidPlacement = this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player);
+
+    // Show selected territory if valid
+    if (isValidPlacement) {
       html += `
         <div class="pp-placement-selected">
           <span class="pp-selected-label">Placing on:</span>
@@ -855,6 +858,9 @@ export class PlayerPanel {
       } else {
         html += `<div class="pp-placement-done-msg">No ${isWater ? 'naval' : 'land'} units to place</div>`;
       }
+    } else if (this.selectedTerritory) {
+      // Territory selected but not valid for placement
+      html += `<div class="pp-hint">Select one of your territories to place units</div>`;
     } else {
       html += `<div class="pp-hint">Click a territory to place units</div>`;
     }
@@ -876,6 +882,29 @@ export class PlayerPanel {
 
     html += `</div>`;
     return html;
+  }
+
+  // Check if territory is valid for initial unit placement
+  _isValidPlacementTerritory(territory, player) {
+    if (!territory || !player) return false;
+
+    // Land territories: must be owned by player
+    if (!territory.isWater) {
+      return this.gameState.getOwner(territory.name) === player.id;
+    }
+
+    // Sea zones: must be adjacent to player-owned coastal territory
+    if (!this.territories) return false;
+    const seaZone = this.territories[territory.name];
+    if (!seaZone) return false;
+
+    for (const connName of seaZone.connections || []) {
+      const conn = this.territories[connName];
+      if (conn && !conn.isWater && this.gameState.getOwner(connName) === player.id) {
+        return true;
+      }
+    }
+    return false;
   }
 
   _getFactoryTerritories(playerId) {
