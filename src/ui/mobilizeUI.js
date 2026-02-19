@@ -81,11 +81,13 @@ export class MobilizeUI {
     const pendingUnits = this.gameState.getPendingPurchases();
     const hasPendingFactory = pendingUnits.some(u => u.type === 'factory');
 
-    // For factory placement, allow any owned land territory without existing factory
-    const isOwnedLand = this.gameState.getOwner(territory.name) === player.id && !territory.isWater;
+    // For factory placement, allow any territory owned at START of turn (A&A rule)
+    // This prevents placing factories in territories captured this turn
+    const friendlyAtStart = this.gameState.friendlyTerritoriesAtTurnStart || new Set();
+    const wasOwnedAtTurnStart = friendlyAtStart.has(territory.name) && !territory.isWater;
     const hasExistingFactory = (this.gameState.units[territory.name] || [])
       .some(u => u.type === 'factory' && u.owner === player.id);
-    const isValidForFactory = hasPendingFactory && isOwnedLand && !hasExistingFactory;
+    const isValidForFactory = hasPendingFactory && wasOwnedAtTurnStart && !hasExistingFactory;
 
     if (isValidLand || isValidSea || isValidForFactory) {
       this.selectedTerritory = territory;
