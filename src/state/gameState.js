@@ -3520,6 +3520,11 @@ export class GameState {
       return { success: false, error: 'Transport has no cargo' };
     }
 
+    // Ensure transport has a unique ID for undo tracking
+    if (!transport.id) {
+      transport.id = this._generateShipId('transport');
+    }
+
     // Check adjacency
     const seaT = this.territoryByName[seaZone];
     if (!seaT || !seaT.connections.includes(coastalTerritory)) {
@@ -3594,6 +3599,11 @@ export class GameState {
     const transport = transports[transportIndex];
     if (!transport.cargo || transport.cargo.length === 0) {
       return { success: false, error: 'Transport has no cargo' };
+    }
+
+    // Ensure transport has a unique ID for undo tracking
+    if (!transport.id) {
+      transport.id = this._generateShipId('transport');
     }
 
     // Find the unit in cargo
