@@ -2267,6 +2267,10 @@ export class GameState {
         if (shipIdx >= 0) {
           const ship = toUnits.splice(shipIdx, 1)[0];
           delete ship.moved;
+          // Reset movement counter - reduce by 1 for this undone move
+          if (ship.movementUsed) {
+            ship.movementUsed = Math.max(0, ship.movementUsed - 1);
+          }
           fromUnits.push(ship);
         }
       }
@@ -2304,6 +2308,20 @@ export class GameState {
     // If territory was captured by this move, restore previous owner
     if (lastMove.captured && lastMove.previousOwner) {
       this.territoryState[lastMove.to].owner = lastMove.previousOwner;
+    }
+
+    // Restore air unit origins - remove tracking for destination, could restore to source
+    // For simplicity, just clear the destination tracking (air unit is back at source)
+    if (this.airUnitOrigins && this.airUnitOrigins[lastMove.to]) {
+      for (const moveUnit of lastMove.units) {
+        if (this.airUnitOrigins[lastMove.to][moveUnit.type]) {
+          delete this.airUnitOrigins[lastMove.to][moveUnit.type];
+        }
+      }
+      // Clean up empty objects
+      if (Object.keys(this.airUnitOrigins[lastMove.to]).length === 0) {
+        delete this.airUnitOrigins[lastMove.to];
+      }
     }
 
     this._notify();

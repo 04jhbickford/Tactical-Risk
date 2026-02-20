@@ -2503,6 +2503,15 @@ html, body {
   color: #888;
 }
 
+.pp-unit-stats-mini {
+  font-size: 9px;
+  color: #6495ed;
+  background: rgba(100, 149, 237, 0.15);
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
 .pp-move-controls {
   display: flex;
   align-items: center;
@@ -7494,6 +7503,25 @@ html, body {
 .tech-dice-result-msg.fail {
   background: rgba(255,255,255,0.05);
   color: #888;
+}
+
+.tech-dice-close-btn {
+  display: block;
+  margin: 16px auto 0;
+  padding: 10px 30px;
+  background: linear-gradient(135deg, #4169e1, #3457b0);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tech-dice-close-btn:hover {
+  background: linear-gradient(135deg, #5179f1, #4467c0);
+  transform: translateY(-1px);
 }
 
 /* Tech Selection in Centered Overlay */

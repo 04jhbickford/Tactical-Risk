@@ -362,11 +362,22 @@ export class TechUI {
         <div class="tech-dice-result-msg ${hasBreakthrough ? 'success' : 'fail'}">
           ${hasBreakthrough ? 'Rolled a 6! Choose your technology...' : 'No breakthrough this time'}
         </div>
+        ${!hasBreakthrough ? `<button class="tech-dice-close-btn">Continue</button>` : ''}
       </div>`;
 
       overlay.innerHTML = html;
       overlay.classList.remove('hidden');
       overlay.classList.toggle('breakthrough', hasBreakthrough);
+
+      // Add click handler for close button
+      if (!hasBreakthrough) {
+        overlay.querySelector('.tech-dice-close-btn')?.addEventListener('click', () => {
+          this._hideCenteredDiceResult();
+          if (this.onComplete) {
+            this.onComplete();
+          }
+        });
+      }
     }
   }
 

@@ -1482,12 +1482,26 @@ export class PlayerPanel {
       const imageSrc = getUnitIconPath(unit.type, player.id);
       const displayName = unit.displayName || unit.type;
 
+      // Get unit stats for tooltip
+      const unitDef = this.unitDefs?.[unit.type];
+      let statsTooltip = '';
+      if (unitDef) {
+        const hasLongRange = unitDef.isAir && this.gameState?.hasTech(player.id, 'longRangeAircraft');
+        const hasJets = unitDef.type === 'fighter' && this.gameState?.hasTech(player.id, 'jets');
+        const hasSuperSubs = unitDef.type === 'submarine' && this.gameState?.hasTech(player.id, 'superSubs');
+        const attack = (unitDef.attack || 0) + (hasJets ? 1 : 0) + (hasSuperSubs ? 1 : 0);
+        const defense = (unitDef.defense || 0) + (hasJets ? 1 : 0);
+        const movement = (unitDef.movement || 1) + (hasLongRange ? 2 : 0);
+        statsTooltip = `Attack: ${attack} | Defense: ${defense} | Movement: ${movement}`;
+      }
+
       html += `
-        <div class="pp-move-unit-row ${unit.isIndividual ? 'individual-ship' : ''}">
+        <div class="pp-move-unit-row ${unit.isIndividual ? 'individual-ship' : ''}" title="${statsTooltip}">
           <div class="pp-move-unit-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-move-icon" alt="${unit.type}">` : ''}
             <span class="pp-move-name">${displayName}</span>
             ${!unit.isIndividual ? `<span class="pp-move-avail">(${unit.quantity})</span>` : ''}
+            ${unitDef ? `<span class="pp-unit-stats-mini">A${unitDef.attack || 0}/D${unitDef.defense || 0}/M${(unitDef.movement || 1) + (unitDef.isAir && this.gameState?.hasTech(player.id, 'longRangeAircraft') ? 2 : 0)}</span>` : ''}
           </div>
           <div class="pp-move-controls">
             <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
@@ -1573,14 +1587,45 @@ export class PlayerPanel {
           }
 
           if (selectedAirUnits.length > 0 && this.gameState) {
-            // Simulate landing options from the destination
+            // Calculate distance to destination
+            const distanceToTarget = destInfo?.distance || 1;
+            const hasLongRange = this.gameState.hasTech(player.id, 'longRangeAircraft');
+
             for (const airUnit of selectedAirUnits) {
-              const landingOptions = this.gameState.getAirLandingOptions(
-                this.movePendingDest, airUnit.type, this.unitDefs
-              );
-              if (landingOptions.length === 0) {
-                airLandingWarning = `⚠️ Warning: ${airUnit.type} may not have valid landing options and could crash!`;
-                break;
+              const unitDef = this.unitDefs[airUnit.type];
+              if (!unitDef) continue;
+
+              // Calculate remaining movement after reaching destination
+              const baseMovement = unitDef.movement || 4;
+              const totalMovement = hasLongRange ? baseMovement + 2 : baseMovement;
+              const remainingMovement = totalMovement - distanceToTarget;
+
+              if (remainingMovement <= 0) {
+                // No movement left - can only stay if destination was friendly at turn start
+                const friendlyAtStart = this.gameState.friendlyTerritoriesAtTurnStart || new Set();
+                if (!friendlyAtStart.has(this.movePendingDest)) {
+                  airLandingWarning = `⚠️ Warning: ${airUnit.type} at max range - no valid landing, will crash!`;
+                  break;
+                }
+              } else {
+                // Check if there are any friendly territories within remaining movement
+                const reachable = this.gameState.getReachableTerritoriesForAir(
+                  this.movePendingDest, remainingMovement, player.id, false
+                );
+                const friendlyAtStart = this.gameState.friendlyTerritoriesAtTurnStart || new Set();
+                let hasValidLanding = false;
+
+                for (const [terrName] of reachable) {
+                  if (friendlyAtStart.has(terrName)) {
+                    hasValidLanding = true;
+                    break;
+                  }
+                }
+
+                if (!hasValidLanding) {
+                  airLandingWarning = `⚠️ Warning: ${airUnit.type} may not have valid landing options!`;
+                  break;
+                }
               }
             }
           }
