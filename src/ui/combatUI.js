@@ -1059,13 +1059,18 @@ export class CombatUI {
       }
     }
 
-    // Handle factory capture - transfer ownership to attacker
+    // Handle factory and AA gun capture - transfer ownership to attacker (A&A Anniversary rules)
     if (this.combatState.winner === 'attacker') {
       const existingUnits = this.gameState.units[this.currentTerritory] || [];
+      // Capture factories
       const factory = existingUnits.find(u => u.type === 'factory');
       if (factory) {
-        // Transfer factory to attacker
         units.push({ ...factory, owner: player.id });
+      }
+      // Capture AA guns (they have 0 combat value, so they're captured not destroyed)
+      const aaGuns = existingUnits.filter(u => u.type === 'aaGun' && u.owner !== player.id);
+      for (const aa of aaGuns) {
+        units.push({ ...aa, owner: player.id });
       }
     }
 

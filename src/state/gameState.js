@@ -1424,10 +1424,9 @@ export class GameState {
     } else {
       // Land/air units: placed on territories with factories that existed at turn START
       // Newly built factories cannot accept units in the same turn (A&A rule)
-      const factoriesAtStart = this.factoriesAtTurnStart || new Set();
-      // Fallback to current factories if tracking not available (old saves)
-      const validFactories = factoriesAtStart.size > 0
-        ? factoriesAtStart
+      // Only use fallback if factoriesAtTurnStart was never initialized (old saves)
+      const validFactories = (this.factoriesAtTurnStart instanceof Set)
+        ? this.factoriesAtTurnStart
         : new Set(this._getFactoryTerritories(player.id));
       if (!validFactories.has(territoryName)) {
         return { success: false, error: 'Units must be placed on territories with factories (factories built this turn cannot accept units)' };
