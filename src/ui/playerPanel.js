@@ -1328,8 +1328,15 @@ export class PlayerPanel {
       for (const connName of from.connections || []) {
         const conn = this.territories[connName];
         if (!conn) continue;
-        const owner = this.gameState.getOwner(connName);
-        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        // For sea zones, check for enemy units; for land, check ownership
+        let isEnemy = false;
+        if (conn.isWater) {
+          const seaUnits = this.gameState.getUnitsAt(connName) || [];
+          isEnemy = seaUnits.some(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner));
+        } else {
+          const owner = this.gameState.getOwner(connName);
+          isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        }
         if (isCombatMove || !isEnemy) {
           destinations.set(connName, { name: connName, isEnemy, isWater: conn.isWater, distance: 1 });
         }
@@ -1385,8 +1392,16 @@ export class PlayerPanel {
       for (const [terrName, info] of reachable) {
         const conn = this.territories[terrName];
         if (!conn) continue;
-        const owner = this.gameState.getOwner(terrName);
-        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        // For sea zones, check for enemy units; for land, check ownership
+        let isEnemy = false;
+        if (conn.isWater) {
+          // Sea zone: check for enemy naval units
+          const seaUnits = this.gameState.getUnitsAt(terrName) || [];
+          isEnemy = seaUnits.some(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner));
+        } else {
+          const owner = this.gameState.getOwner(terrName);
+          isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        }
         if (!destinations.has(terrName)) {
           destinations.set(terrName, { name: terrName, isEnemy, isWater: conn.isWater, distance: info.distance });
         }
@@ -1403,8 +1418,9 @@ export class PlayerPanel {
       for (const [terrName, info] of reachable) {
         const conn = this.territories[terrName];
         if (!conn) continue;
-        const owner = this.gameState.getOwner(terrName);
-        const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
+        // Sea zones: check for enemy naval units (sea zones don't have ownership)
+        const seaUnits = this.gameState.getUnitsAt(terrName) || [];
+        const isEnemy = seaUnits.some(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner));
         if (!destinations.has(terrName)) {
           destinations.set(terrName, { name: terrName, isEnemy, isWater: true, distance: info.distance });
         }
