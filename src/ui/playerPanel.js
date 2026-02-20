@@ -1176,8 +1176,23 @@ export class PlayerPanel {
     const isValidPlacement = this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player);
     const isWater = this.selectedTerritory?.isWater;
 
+    // Calculate total queued early so we can show Done button at top
+    const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
+    const showDoneButton = canFinish && totalQueued === 0;
+
     let html = `
-      <div class="pp-inline-placement">
+      <div class="pp-inline-placement">`;
+
+    // Show prominent "Done - Next Player" at TOP when all units deployed
+    if (showDoneButton) {
+      html += `
+        <div class="pp-placement-complete">
+          <div class="pp-complete-message">✓ All ${limit} units deployed!</div>
+          <button class="pp-action-btn complete large" data-action="finish-placement">Done - Next Player</button>
+        </div>`;
+    }
+
+    html += `
         <div class="pp-budget-bar">
           <span class="pp-budget-label">Deployed:</span>
           <span class="pp-budget-value ${slotsRemaining <= 0 ? 'full' : ''}">${placedThisRound}</span>
@@ -1189,15 +1204,17 @@ export class PlayerPanel {
           <span class="pp-remaining-value">${actualRemaining} units</span>
         </div>`;
 
-    // Show selected territory
-    if (isValidPlacement) {
-      html += `
-        <div class="pp-placement-selected">
-          <span class="pp-selected-icon">${isWater ? '🌊' : '🏔'}</span>
-          <span class="pp-selected-name">${this.selectedTerritory.name}</span>
-        </div>`;
-    } else {
-      html += `<div class="pp-hint">Click a territory you own to place units</div>`;
+    // Show selected territory (only if still placing)
+    if (!showDoneButton) {
+      if (isValidPlacement) {
+        html += `
+          <div class="pp-placement-selected">
+            <span class="pp-selected-icon">${isWater ? '🌊' : '🏔'}</span>
+            <span class="pp-selected-name">${this.selectedTerritory.name}</span>
+          </div>`;
+      } else {
+        html += `<div class="pp-hint">Click a territory you own to place units</div>`;
+      }
     }
 
     // Unit list with +/- controls (like buy phase)
@@ -1283,23 +1300,17 @@ export class PlayerPanel {
 
     html += `</div>`;
 
-    // Calculate total queued
-    const totalQueued = Object.values(this.placementQueue).reduce((sum, q) => sum + q, 0);
-
-    // Action buttons
-    html += `<div class="pp-placement-actions">`;
-    if (canUndo) {
-      html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
+    // Action buttons (only show if not already showing Done button at top)
+    if (!showDoneButton) {
+      html += `<div class="pp-placement-actions">`;
+      if (canUndo) {
+        html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
+      }
+      if (totalQueued > 0 && isValidPlacement) {
+        html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
+      }
+      html += `</div>`;
     }
-    if (totalQueued > 0 && isValidPlacement) {
-      html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
-    }
-    // Show "Done - Next Player" button when all slots are used (committed, can't undo)
-    // Use green "complete" style to indicate this is a commit action
-    if (canFinish && totalQueued === 0) {
-      html += `<button class="pp-action-btn complete" data-action="finish-placement">✓ Done - Next Player</button>`;
-    }
-    html += `</div>`;
 
     html += `</div>`;
     return html;
