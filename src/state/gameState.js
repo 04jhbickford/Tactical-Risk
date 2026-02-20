@@ -2667,6 +2667,9 @@ export class GameState {
           const cardType = this.awardRiskCard(player.id);
           result.cardAwarded = cardType;
         }
+
+        // Handle capital capture (IPC transfer, victory check)
+        this.handleCapitalCapture(territory, player.id, defender);
       }
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);
