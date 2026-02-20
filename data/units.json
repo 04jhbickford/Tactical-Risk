@@ -10,7 +10,7 @@
   "armour": {
     "cost": 5,
     "attack": 3,
-    "defense": 2,
+    "defense": 3,
     "movement": 2,
     "isLand": true,
     "image": "Tank.png"

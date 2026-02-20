@@ -166,6 +166,9 @@ export class GameState {
     // Placement history for undo: [{ territory, unitType, owner }]
     this.placementHistory = [];
 
+    // Mobilization history for undo during MOBILIZE phase: [{ territory, unitType, owner, cost }]
+    this.mobilizationHistory = [];
+
     // Initial setup state for Risk mode
     this.unitsToPlace = {}; // { playerId: [{ type, quantity }] }
     this.unitsPlacedThisRound = 0;
@@ -1432,6 +1435,7 @@ export class GameState {
     }
 
     // Place the unit
+    const cost = pending.cost || unitDef.cost;
     pending.quantity--;
     if (pending.quantity <= 0) {
       const idx = this.pendingPurchases.indexOf(pending);
@@ -1446,6 +1450,65 @@ export class GameState {
       units.push({ type: unitType, quantity: 1, owner: player.id });
     }
     this.units[territoryName] = units;
+
+    // Track for undo
+    this.mobilizationHistory.push({
+      territory: territoryName,
+      unitType,
+      owner: player.id,
+      cost,
+    });
+
+    this._notify();
+    return { success: true };
+  }
+
+  // Undo last mobilization (during MOBILIZE phase)
+  undoMobilization(unitDefs) {
+    if (this.turnPhase !== TURN_PHASES.MOBILIZE) {
+      return { success: false, error: 'Can only undo during mobilize phase' };
+    }
+
+    if (this.mobilizationHistory.length === 0) {
+      return { success: false, error: 'No placements to undo' };
+    }
+
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const lastPlacement = this.mobilizationHistory.pop();
+    if (lastPlacement.owner !== player.id) {
+      // Shouldn't happen, but restore and return
+      this.mobilizationHistory.push(lastPlacement);
+      return { success: false, error: 'Cannot undo other player placements' };
+    }
+
+    // Remove unit from territory
+    const units = this.units[lastPlacement.territory] || [];
+    const unitEntry = units.find(u => u.type === lastPlacement.unitType && u.owner === player.id);
+    if (unitEntry) {
+      unitEntry.quantity--;
+      if (unitEntry.quantity <= 0) {
+        const idx = units.indexOf(unitEntry);
+        units.splice(idx, 1);
+      }
+    }
+
+    // Add back to pending purchases
+    const existing = this.pendingPurchases.find(p =>
+      p.type === lastPlacement.unitType && p.owner === player.id
+    );
+    if (existing) {
+      existing.quantity++;
+    } else {
+      const unitDef = unitDefs[lastPlacement.unitType];
+      this.pendingPurchases.push({
+        type: lastPlacement.unitType,
+        quantity: 1,
+        owner: player.id,
+        cost: lastPlacement.cost || unitDef?.cost || 0,
+      });
+    }
 
     this._notify();
     return { success: true };
@@ -1574,6 +1637,7 @@ export class GameState {
     this.combatQueue = [];
     this.moveHistory = [];
     this.placementHistory = [];
+    this.mobilizationHistory = []; // Reset mobilization undo history for new turn
     this.airUnitOrigins = {}; // Reset air unit tracking for new turn
 
     // Track territories that are friendly at the START of this turn (for air landing)
@@ -1853,13 +1917,25 @@ export class GameState {
         return { success: false, error: `${airUnit.type} cannot reach ${toTerritory} (movement: ${movementRange})` };
       }
 
-      // Check if landing on water (needs carrier)
+      // Check if landing on water (needs carrier OR attacking enemy naval units)
       if (toT?.isWater) {
         const seaUnits = this.units[toTerritory] || [];
         const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
         const carrierDef = unitDefs.carrier;
 
-        if (carrierDef && carrierDef.canCarry?.includes(airUnit.type)) {
+        // Check if there are enemy naval units to attack (combat move)
+        const enemyNaval = seaUnits.filter(u =>
+          u.owner !== player.id && !this.areAllies(player.id, u.owner)
+        );
+        const hasEnemyNaval = enemyNaval.some(u => u.quantity > 0);
+
+        if (isCombatMove && hasEnemyNaval) {
+          // During combat move, air units can attack naval units without landing
+          // They will need to land after combat (validated separately)
+          // Just ensure they have enough movement to return somewhere
+          // This check is done later during air landing phase
+          landingOnCarrier = false; // Not landing on carrier, attacking then returning
+        } else if (carrierDef && carrierDef.canCarry?.includes(airUnit.type)) {
           // Calculate total capacity available
           let availableCapacity = 0;
           for (const carrier of carriers) {
@@ -3645,7 +3721,7 @@ export class GameState {
 
   toJSON() {
     return {
-      version: 8,
+      version: 9,
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
       players: this.players,
@@ -3669,6 +3745,8 @@ export class GameState {
       // v8: Save air unit origin tracking for proper landing calculation after load
       airUnitOrigins: this.airUnitOrigins,
       friendlyTerritoriesAtTurnStart: Array.from(this.friendlyTerritoriesAtTurnStart || []),
+      // v9: Save factories at turn start for mobilization validation
+      factoriesAtTurnStart: Array.from(this.factoriesAtTurnStart || []),
     };
   }
 
@@ -3703,6 +3781,15 @@ export class GameState {
       // Older saves (v7 and below): Re-initialize friendly territories
       // This is approximate but better than empty - includes all currently owned territories
       this._initFriendlyTerritoriesAtTurnStart();
+    }
+
+    // v9: Restore factories at turn start for mobilization validation
+    if (data.factoriesAtTurnStart) {
+      this.factoriesAtTurnStart = new Set(data.factoriesAtTurnStart);
+    } else {
+      // Older saves (v8 and below): Initialize from current factories
+      // This allows placing on any currently owned factory (less restrictive, but better than broken)
+      this.factoriesAtTurnStart = new Set(this._getFactoryTerritories(this.currentPlayer?.id));
     }
 
     this._notify();

@@ -423,7 +423,8 @@ export class PlayerPanel {
       const totalUnits = Object.values(units).reduce((a, b) => a + b, 0);
       const techs = this.gameState.playerTechs?.[p.id]?.unlockedTechs || [];
       const ipcs = this.gameState.getIPCs(p.id);
-      const capital = this.gameState.capitals?.[p.id];
+      // Capital is stored in playerState, not a separate capitals object
+      const capital = this.gameState.playerState?.[p.id]?.capitalTerritory;
       const capitalOwner = capital ? this.gameState.getOwner(capital) : null;
       const hasCapital = capitalOwner === p.id;
       const riskCards = this.gameState.riskCards?.[p.id] || [];
@@ -1875,6 +1876,18 @@ export class PlayerPanel {
     // Remaining units indicator
     html += `<div class="pp-mobilize-remaining">${totalPending} unit${totalPending !== 1 ? 's' : ''} remaining</div>`;
 
+    // Undo button (if there are any placements to undo)
+    const canUndo = this.gameState.mobilizationHistory && this.gameState.mobilizationHistory.length > 0;
+    if (canUndo) {
+      html += `
+        <div class="pp-mobilize-undo">
+          <button class="pp-undo-btn" data-action="undo-mobilize">
+            <span class="undo-icon">↩</span>
+            <span class="undo-text">Undo Last</span>
+          </button>
+        </div>`;
+    }
+
     // Territory type hint
     if (this.selectedTerritory && !isValidPlacement) {
       html += `<div class="pp-hint">Click a territory above or on the map to place units</div>`;
@@ -2257,6 +2270,14 @@ export class PlayerPanel {
           const unitType = btn.dataset.unit;
           if (this.onAction && unitType && this.selectedTerritory) {
             this.onAction('mobilize-all', { unitType, territory: this.selectedTerritory.name });
+          }
+          return;
+        }
+
+        // Handle undo mobilize
+        if (action === 'undo-mobilize') {
+          if (this.onAction) {
+            this.onAction('undo-mobilize', {});
           }
           return;
         }

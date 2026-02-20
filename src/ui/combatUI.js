@@ -1739,13 +1739,22 @@ export class CombatUI {
   _renderDiceResults() {
     const { attackRolls, defenseRolls, attackHits, defenseHits } = this.lastRolls;
 
-    // Group rolls by unit type for clearer display
+    // Group rolls by unit type AND attack value for clearer display
+    // This separates supported infantry (attack 2) from unsupported (attack 1)
     const groupRolls = (rolls, valueKey) => {
       const groups = {};
       for (const r of rolls) {
-        const key = r.unitType;
+        const statValue = r[valueKey] || r.attackValue || r.defenseValue;
+        // Create unique key combining unit type and stat value
+        const key = `${r.unitType}_${statValue}`;
         if (!groups[key]) {
-          groups[key] = { rolls: [], needed: r[valueKey] || r.attackValue || r.defenseValue };
+          groups[key] = {
+            rolls: [],
+            needed: statValue,
+            unitType: r.unitType,
+            // Track if this is a supported infantry group
+            isSupported: r.unitType === 'infantry' && statValue === 2
+          };
         }
         groups[key].rolls.push(r);
       }
@@ -1756,11 +1765,23 @@ export class CombatUI {
     const defenseGroups = groupRolls(defenseRolls, 'defenseValue');
 
     const renderGroupedDice = (groups) => {
-      return Object.entries(groups).map(([unitType, data]) => {
+      // Sort so supported infantry appears before regular infantry
+      const sortedEntries = Object.entries(groups).sort((a, b) => {
+        // Supported infantry first
+        if (a[1].isSupported && !b[1].isSupported) return -1;
+        if (!a[1].isSupported && b[1].isSupported) return 1;
+        return 0;
+      });
+
+      return sortedEntries.map(([key, data]) => {
         const hits = data.rolls.filter(r => r.hit).length;
+        // Label supported infantry clearly
+        const label = data.isSupported
+          ? `${data.unitType} (supported)`
+          : data.unitType;
         return `
-          <div class="dice-unit-group">
-            <span class="dice-unit-label">${unitType} (≤${data.needed}):</span>
+          <div class="dice-unit-group ${data.isSupported ? 'supported' : ''}">
+            <span class="dice-unit-label">${label} (≤${data.needed}):</span>
             <span class="dice-unit-hits">${hits}/${data.rolls.length}</span>
             <div class="dice-unit-rolls">
               ${data.rolls.slice(0, 8).map(r => `<span class="die-small ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}

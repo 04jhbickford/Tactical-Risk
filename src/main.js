@@ -483,6 +483,16 @@ async function init() {
         }
         break;
 
+      case 'undo-mobilize':
+        // Undo the last mobilization placement
+        {
+          const result = gameState.undoMobilization(unitDefs);
+          if (result.success) {
+            camera.dirty = true;
+          }
+        }
+        break;
+
       case 'next-phase':
         const prevPlayer = gameState.currentPlayer;
         const prevRound = gameState.round;
