@@ -3520,12 +3520,21 @@ export class GameState {
     // Unload all cargo to coastal territory
     // IMPORTANT: Don't merge with unmoved units - keep them separate so they can still move
     const coastalUnits = this.units[coastalTerritory] || [];
+    const unloadedUnits = []; // Track for move history
+
     for (const cargo of transport.cargo) {
       const existing = coastalUnits.find(u => u.type === cargo.type && u.owner === cargo.owner && u.moved);
       if (existing) {
         existing.quantity++;
       } else {
         coastalUnits.push({ type: cargo.type, quantity: 1, owner: cargo.owner, moved: true });
+      }
+      // Track each unit for undo
+      const tracked = unloadedUnits.find(u => u.type === cargo.type);
+      if (tracked) {
+        tracked.quantity++;
+      } else {
+        unloadedUnits.push({ type: cargo.type, quantity: 1 });
       }
     }
     this.units[coastalTerritory] = coastalUnits;
@@ -3536,6 +3545,18 @@ export class GameState {
       if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
         this.amphibiousTerritories.add(coastalTerritory);
       }
+    }
+
+    // Track in move history for undo - mark as amphibious unload
+    if (unloadedUnits.length > 0) {
+      this.moveHistory.push({
+        from: seaZone,
+        to: coastalTerritory,
+        units: unloadedUnits,
+        player: player.id,
+        isAmphibious: true,
+        transportId: transport.id,
+      });
     }
 
     // Clear transport cargo
@@ -3599,6 +3620,16 @@ export class GameState {
         this.amphibiousTerritories.add(coastalTerritory);
       }
     }
+
+    // Track in move history for undo - mark as amphibious unload
+    this.moveHistory.push({
+      from: seaZone,
+      to: coastalTerritory,
+      units: [{ type: unitType, quantity: 1 }],
+      player: player.id,
+      isAmphibious: true,
+      transportId: transport.id,
+    });
 
     this._notify();
     return { success: true };
