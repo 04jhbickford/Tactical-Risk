@@ -216,15 +216,21 @@ export class Sidebar {
           ? Object.entries(this.unitDefs).filter(([_, u]) => u.isLand || u.isAir)
           : Object.entries(this.unitDefs).filter(([_, u]) => u.isSea);
 
+        // Check for industrial tech discount
+        const hasIndustrialTech = this.gameState.hasTech?.(this.gameState.currentPlayer?.id, 'industrialTech') || false;
+
         for (const [unitType, def] of unitList) {
           if (def.isBuilding) continue; // Can't buy factories
-          const canAfford = ipcs >= def.cost;
+          // Apply industrial tech discount
+          const actualCost = hasIndustrialTech ? Math.max(1, def.cost - 1) : def.cost;
+          const canAfford = ipcs >= actualCost;
           const disabledClass = canAfford ? '' : ' disabled';
+          const costDisplay = hasIndustrialTech && def.cost > 1 ? `${actualCost}$ <s>${def.cost}$</s>` : `${actualCost}$`;
 
           html += `
             <button class="sb-buy-btn${disabledClass}" data-action="buy-unit" data-unit="${unitType}" data-territory="${territory.name}" ${canAfford ? '' : 'disabled'}>
               <span class="buy-name">${unitType}</span>
-              <span class="buy-cost">${def.cost}$</span>
+              <span class="buy-cost">${costDisplay}</span>
             </button>`;
         }
 
