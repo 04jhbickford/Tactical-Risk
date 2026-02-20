@@ -2690,6 +2690,10 @@ html, body {
   gap: 8px;
 }
 
+.pp-selected-icon {
+  font-size: 16px;
+}
+
 .pp-selected-label {
   font-size: 10px;
   color: #888;
@@ -2705,6 +2709,42 @@ html, body {
 .pp-selected-type {
   font-size: 10px;
   color: #888;
+}
+
+/* Placement remaining counter */
+.pp-placement-remaining {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  margin-bottom: 10px;
+  padding: 4px 8px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+
+.pp-remaining-label {
+  color: #888;
+}
+
+.pp-remaining-value {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+/* Budget bar full state */
+.pp-budget-value.full {
+  color: #4caf50;
+}
+
+/* Disabled buy row */
+.pp-buy-row.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.pp-buy-row.disabled .pp-buy-info {
+  flex: 1;
 }
 
 .pp-placement-deselect {

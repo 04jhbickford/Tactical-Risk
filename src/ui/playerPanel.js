@@ -100,6 +100,7 @@ export class PlayerPanel {
       this.moveSelectedUnits = {};
       this.movePendingDest = null;
       this.moveUnitTab = 'land'; // Reset to default tab
+      this.placementQueue = {}; // Reset placement queue
     }
     this.selectedTerritory = territory;
     this._render();
@@ -1106,7 +1107,7 @@ export class PlayerPanel {
     return html;
   }
 
-  // Inline Placement UI
+  // Inline Placement UI - mimics buy phase style
   _renderInlinePlacement(player) {
     const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
     const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
@@ -1115,94 +1116,151 @@ export class PlayerPanel {
     const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
     const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
     const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
-    const needMore = limit - placedThisRound;
+    const slotsRemaining = limit - placedThisRound;
 
     // Calculate actual total remaining from unit quantities
     const actualRemaining = unitsToPlace.reduce((sum, u) => sum + u.quantity, 0);
 
-    let html = `
-      <div class="pp-inline-placement">
-        <div class="pp-placement-progress-bar">
-          <span class="pp-placement-count">${placedThisRound}/${limit}</span>
-          <span class="pp-placement-label">placed this round</span>
-        </div>`;
-
-    // Show all remaining units summary (both land and naval)
+    // Separate units by category
     const landUnits = unitsToPlace.filter(u => {
       const def = this.unitDefs?.[u.type];
-      return def && (def.isLand || def.isAir) && u.quantity > 0;
+      return def && def.isLand && u.quantity > 0;
+    });
+    const airUnits = unitsToPlace.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def && def.isAir && u.quantity > 0;
     });
     const navalUnits = unitsToPlace.filter(u => {
       const def = this.unitDefs?.[u.type];
       return def?.isSea && u.quantity > 0;
     });
 
-    html += `<div class="pp-placement-inventory">`;
-    html += `<div class="pp-placement-inv-header">Units to Deploy (${actualRemaining} total)</div>`;
-
-    if (landUnits.length > 0) {
-      html += `<div class="pp-placement-inv-group"><span class="pp-inv-label">Land/Air:</span>`;
-      for (const unit of landUnits) {
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        html += `<span class="pp-inv-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-inv-icon">` : ''}${unit.quantity}</span>`;
-      }
-      html += `</div>`;
-    }
-    if (navalUnits.length > 0) {
-      html += `<div class="pp-placement-inv-group"><span class="pp-inv-label">Naval:</span>`;
-      for (const unit of navalUnits) {
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        html += `<span class="pp-inv-unit">${imageSrc ? `<img src="${imageSrc}" class="pp-inv-icon">` : ''}${unit.quantity}</span>`;
-      }
-      html += `</div>`;
-    }
-    html += `</div>`;
+    // Initialize placement queue if not exists
+    if (!this.placementQueue) this.placementQueue = {};
 
     // Check if selected territory is valid for placement
     const isValidPlacement = this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player);
+    const isWater = this.selectedTerritory?.isWater;
 
-    // Show selected territory if valid
-    if (isValidPlacement) {
-      const isWater = this.selectedTerritory.isWater;
-      html += `
-        <div class="pp-placement-selected">
-          <span class="pp-selected-label">Placing on:</span>
-          <span class="pp-selected-name">${this.selectedTerritory.name}</span>
-          <span class="pp-selected-type">(${isWater ? 'Sea Zone' : 'Land'})</span>
+    let html = `
+      <div class="pp-inline-placement">
+        <div class="pp-budget-bar">
+          <span class="pp-budget-label">Deployed:</span>
+          <span class="pp-budget-value ${slotsRemaining <= 0 ? 'full' : ''}">${placedThisRound}</span>
+          <span class="pp-budget-sep">/</span>
+          <span class="pp-budget-total">${limit} this round</span>
+        </div>
+        <div class="pp-placement-remaining">
+          <span class="pp-remaining-label">Remaining to deploy:</span>
+          <span class="pp-remaining-value">${actualRemaining} units</span>
         </div>`;
 
-      // Show appropriate units based on territory type
-      const unitsForTerritory = isWater ? navalUnits : landUnits;
-
-      if (unitsForTerritory.length > 0 && needMore > 0) {
-        html += `<div class="pp-placement-units">`;
-        for (const unit of unitsForTerritory) {
-          const imageSrc = getUnitIconPath(unit.type, player.id);
-          html += `
-            <button class="pp-place-btn" data-action="place-unit" data-unit="${unit.type}">
-              ${imageSrc ? `<img src="${imageSrc}" class="pp-place-icon" alt="${unit.type}">` : ''}
-              <span class="pp-place-name">${unit.type}</span>
-              <span class="pp-place-qty">×${unit.quantity}</span>
-            </button>`;
-        }
-        html += `</div>`;
-      } else if (needMore <= 0) {
-        html += `<div class="pp-placement-done-msg">Round limit reached (${limit} units)</div>`;
-      } else {
-        html += `<div class="pp-placement-done-msg">No ${isWater ? 'naval' : 'land/air'} units to place</div>`;
-      }
-    } else if (this.selectedTerritory) {
-      html += `<div class="pp-hint">Select one of your territories to place units</div>`;
+    // Show selected territory
+    if (isValidPlacement) {
+      html += `
+        <div class="pp-placement-selected">
+          <span class="pp-selected-icon">${isWater ? '🌊' : '🏔'}</span>
+          <span class="pp-selected-name">${this.selectedTerritory.name}</span>
+        </div>`;
     } else {
       html += `<div class="pp-hint">Click a territory you own to place units</div>`;
     }
 
+    // Unit list with +/- controls (like buy phase)
+    html += `<div class="pp-unit-list">`;
+
+    const renderPlacementRow = (unit) => {
+      const def = this.unitDefs?.[unit.type];
+      const imageSrc = getUnitIconPath(unit.type, player.id);
+      const queued = this.placementQueue[unit.type] || 0;
+      const available = unit.quantity;
+      const canAdd = available > 0 && slotsRemaining > queued && isValidPlacement;
+      const canRemove = queued > 0;
+
+      // Build tooltip
+      let tooltip = `${unit.type.charAt(0).toUpperCase() + unit.type.slice(1)}`;
+      if (def) {
+        tooltip += `\nAttack: ${def.attack || 0} | Defense: ${def.defense || 0}`;
+        tooltip += `\nMovement: ${def.movement || 0}`;
+      }
+
+      return `
+        <div class="pp-buy-row ${queued > 0 ? 'has-qty' : ''}" title="${tooltip}">
+          <div class="pp-buy-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
+            <span class="pp-buy-name">${unit.type}</span>
+            <span class="pp-buy-cost">${available} left</span>
+          </div>
+          <div class="pp-buy-controls">
+            <button class="pp-qty-btn" data-action="place-queue" data-unit="${unit.type}" data-delta="-1" ${!canRemove ? 'disabled' : ''}>−</button>
+            <span class="pp-buy-qty">${queued}</span>
+            <button class="pp-qty-btn" data-action="place-queue" data-unit="${unit.type}" data-delta="1" ${!canAdd ? 'disabled' : ''}>+</button>
+            <button class="pp-qty-btn max-btn" data-action="place-queue-max" data-unit="${unit.type}" ${!canAdd ? 'disabled' : ''}>Max</button>
+          </div>
+        </div>`;
+    };
+
+    // Show units appropriate for selected territory type
+    if (isValidPlacement) {
+      if (!isWater) {
+        // Land territory - show land and air units
+        if (landUnits.length > 0) {
+          html += `<div class="pp-unit-category-label">Land</div>`;
+          html += landUnits.map(renderPlacementRow).join('');
+        }
+        if (airUnits.length > 0) {
+          html += `<div class="pp-unit-category-label">Air</div>`;
+          html += airUnits.map(renderPlacementRow).join('');
+        }
+        if (landUnits.length === 0 && airUnits.length === 0) {
+          html += `<div class="pp-placement-done-msg">No land/air units to place</div>`;
+        }
+      } else {
+        // Sea zone - show naval units
+        if (navalUnits.length > 0) {
+          html += `<div class="pp-unit-category-label">Naval</div>`;
+          html += navalUnits.map(renderPlacementRow).join('');
+        } else {
+          html += `<div class="pp-placement-done-msg">No naval units to place</div>`;
+        }
+      }
+    } else {
+      // Show summary of all remaining units when no territory selected
+      html += `<div class="pp-unit-category-label">Land (${landUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
+      for (const unit of landUnits) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        html += `<div class="pp-buy-row disabled"><div class="pp-buy-info">${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon">` : ''}<span class="pp-buy-name">${unit.type}</span><span class="pp-buy-cost">×${unit.quantity}</span></div></div>`;
+      }
+      if (airUnits.length > 0) {
+        html += `<div class="pp-unit-category-label">Air (${airUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
+        for (const unit of airUnits) {
+          const imageSrc = getUnitIconPath(unit.type, player.id);
+          html += `<div class="pp-buy-row disabled"><div class="pp-buy-info">${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon">` : ''}<span class="pp-buy-name">${unit.type}</span><span class="pp-buy-cost">×${unit.quantity}</span></div></div>`;
+        }
+      }
+      if (navalUnits.length > 0) {
+        html += `<div class="pp-unit-category-label">Naval (${navalUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
+        for (const unit of navalUnits) {
+          const imageSrc = getUnitIconPath(unit.type, player.id);
+          html += `<div class="pp-buy-row disabled"><div class="pp-buy-info">${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon">` : ''}<span class="pp-buy-name">${unit.type}</span><span class="pp-buy-cost">×${unit.quantity}</span></div></div>`;
+        }
+      }
+    }
+
+    html += `</div>`;
+
+    // Calculate total queued
+    const totalQueued = Object.values(this.placementQueue).reduce((sum, q) => sum + q, 0);
+
     // Action buttons
     html += `<div class="pp-placement-actions">`;
     if (canUndo) {
-      html += `<button class="pp-action-btn secondary small" data-action="undo-placement">Undo</button>`;
+      html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
     }
-    if (canFinish) {
+    if (totalQueued > 0 && isValidPlacement) {
+      html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
+    }
+    if (canFinish && totalQueued === 0) {
       html += `<button class="pp-action-btn primary" data-action="finish-placement">Done - Next Player</button>`;
     }
     html += `</div>`;
@@ -2114,11 +2172,63 @@ export class PlayerPanel {
           return;
         }
 
-        // Handle place-unit action
+        // Handle place-unit action (legacy - single unit placement)
         if (action === 'place-unit') {
           const unitType = btn.dataset.unit;
           if (this.onAction && unitType && this.selectedTerritory) {
             this.onAction('place-unit', { unitType, territory: this.selectedTerritory.name });
+          }
+          return;
+        }
+
+        // Handle placement queue +/- delta
+        if (action === 'place-queue') {
+          const unitType = btn.dataset.unit;
+          const delta = parseInt(btn.dataset.delta, 10);
+          if (!this.placementQueue) this.placementQueue = {};
+          const current = this.placementQueue[unitType] || 0;
+          const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
+          const available = unitsToPlace.find(u => u.type === unitType)?.quantity || 0;
+          const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+          const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+          const slotsRemaining = limit - placedThisRound;
+          const totalQueued = Object.values(this.placementQueue).reduce((sum, q) => sum + q, 0);
+          const maxCanQueue = Math.min(available, slotsRemaining - totalQueued + current);
+          const newQty = Math.max(0, Math.min(maxCanQueue, current + delta));
+          this.placementQueue[unitType] = newQty;
+          this._render();
+          return;
+        }
+
+        // Handle placement queue max
+        if (action === 'place-queue-max') {
+          const unitType = btn.dataset.unit;
+          if (!this.placementQueue) this.placementQueue = {};
+          const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
+          const available = unitsToPlace.find(u => u.type === unitType)?.quantity || 0;
+          const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+          const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+          const slotsRemaining = limit - placedThisRound;
+          const totalQueued = Object.values(this.placementQueue).reduce((sum, q) => sum + q, 0);
+          const currentQueued = this.placementQueue[unitType] || 0;
+          const maxCanQueue = Math.min(available, slotsRemaining - totalQueued + currentQueued);
+          this.placementQueue[unitType] = maxCanQueue;
+          this._render();
+          return;
+        }
+
+        // Handle confirm placement (deploy all queued units)
+        if (action === 'confirm-placement') {
+          if (this.onAction && this.selectedTerritory && this.placementQueue) {
+            const territory = this.selectedTerritory.name;
+            for (const [unitType, qty] of Object.entries(this.placementQueue)) {
+              if (qty > 0) {
+                for (let i = 0; i < qty; i++) {
+                  this.onAction('place-unit', { unitType, territory });
+                }
+              }
+            }
+            this.placementQueue = {}; // Clear queue after placement
           }
           return;
         }
