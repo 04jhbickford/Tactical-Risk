@@ -2247,6 +2247,7 @@ export class GameState {
       player: player.id,
       captured, // Track if territory was captured for undo
       previousOwner: isEnemy ? toOwner : null,
+      loadedOntoTransport: loadingOntoTransport, // Track for undo - remove from cargo
     });
 
     // Track air unit origins for post-combat landing (combat move only)
@@ -2379,29 +2380,61 @@ export class GameState {
       }
     }
 
-    // Handle regular units (aggregated by type)
-    for (const moveUnit of lastMove.units) {
-      // Remove from destination
-      const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
-      if (destUnit) {
-        destUnit.quantity -= moveUnit.quantity;
-        if (destUnit.quantity <= 0) {
-          const idx = toUnits.indexOf(destUnit);
-          toUnits.splice(idx, 1);
+    // Handle units loaded onto transports - remove from cargo
+    if (lastMove.loadedOntoTransport) {
+      for (const moveUnit of lastMove.units) {
+        let remaining = moveUnit.quantity;
+        // Find transports at destination and remove cargo
+        const transports = toUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+        for (const transport of transports) {
+          if (remaining <= 0) break;
+          const cargo = transport.cargo || [];
+          for (let i = cargo.length - 1; i >= 0 && remaining > 0; i--) {
+            if (cargo[i].type === moveUnit.type && cargo[i].owner === player.id) {
+              cargo.splice(i, 1);
+              remaining--;
+            }
+          }
+        }
+
+        // Add back to source (without moved flag)
+        const sourceUnit = fromUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
+        if (sourceUnit) {
+          sourceUnit.quantity += moveUnit.quantity;
+          delete sourceUnit.moved;
+        } else {
+          fromUnits.push({
+            type: moveUnit.type,
+            quantity: moveUnit.quantity,
+            owner: player.id,
+          });
         }
       }
+    } else {
+      // Handle regular units (aggregated by type)
+      for (const moveUnit of lastMove.units) {
+        // Remove from destination
+        const destUnit = toUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
+        if (destUnit) {
+          destUnit.quantity -= moveUnit.quantity;
+          if (destUnit.quantity <= 0) {
+            const idx = toUnits.indexOf(destUnit);
+            toUnits.splice(idx, 1);
+          }
+        }
 
-      // Add back to source (without moved flag)
-      const sourceUnit = fromUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
-      if (sourceUnit) {
-        sourceUnit.quantity += moveUnit.quantity;
-        delete sourceUnit.moved;
-      } else {
-        fromUnits.push({
-          type: moveUnit.type,
-          quantity: moveUnit.quantity,
-          owner: player.id,
-        });
+        // Add back to source (without moved flag)
+        const sourceUnit = fromUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
+        if (sourceUnit) {
+          sourceUnit.quantity += moveUnit.quantity;
+          delete sourceUnit.moved;
+        } else {
+          fromUnits.push({
+            type: moveUnit.type,
+            quantity: moveUnit.quantity,
+            owner: player.id,
+          });
+        }
       }
     }
 
@@ -2493,6 +2526,77 @@ export class GameState {
     return { success: true };
   }
 
+  // Get valid retreat destinations for a combat territory (A&A rule: territories units came from)
+  getRetreatDestinations(combatTerritory) {
+    const player = this.currentPlayer;
+    if (!player) return [];
+
+    // Find all moves that went TO this combat territory
+    const movesToRetreat = this.moveHistory.filter(m =>
+      m.to === combatTerritory && m.player === player.id
+    );
+
+    // Get unique origin territories
+    const destinations = new Set();
+    for (const move of movesToRetreat) {
+      // Only include friendly/allied territories as retreat options
+      const owner = this.getOwner(move.from);
+      if (move.from && (owner === player.id || this.areAllies(player.id, owner) || !owner)) {
+        destinations.add(move.from);
+      }
+    }
+
+    return Array.from(destinations);
+  }
+
+  // Retreat ALL units from combat to a SINGLE destination (A&A rule)
+  retreatToTerritory(combatTerritory, destination) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    const validDestinations = this.getRetreatDestinations(combatTerritory);
+    if (!validDestinations.includes(destination)) {
+      return { success: false, error: 'Invalid retreat destination' };
+    }
+
+    const combatUnits = this.units[combatTerritory] || [];
+    const destUnits = this.units[destination] || [];
+
+    // Move all player's land/sea units to the destination
+    // (Air units are handled separately via air landing)
+    const unitsToRetreat = combatUnits.filter(u =>
+      u.owner === player.id && u.type !== 'factory'
+    );
+
+    for (const unit of unitsToRetreat) {
+      const unitDef = this.territoryByName[destination]?.isWater
+        ? { isSea: true } // Simplified check
+        : { isLand: true };
+
+      // Move unit to destination
+      const destUnit = destUnits.find(u => u.type === unit.type && u.owner === player.id);
+      if (destUnit) {
+        destUnit.quantity += unit.quantity;
+      } else {
+        destUnits.push({
+          type: unit.type,
+          quantity: unit.quantity,
+          owner: player.id,
+        });
+      }
+
+      // Remove from combat territory
+      unit.quantity = 0;
+    }
+
+    // Clean up empty units
+    this.units[combatTerritory] = combatUnits.filter(u => u.quantity > 0);
+    this.units[destination] = destUnits;
+
+    this._notify();
+    return { success: true };
+  }
+
   // Detect territories where combat should occur
   // Per A&A rules: Naval battles are resolved before land battles (amphibious assaults)
   _detectCombats() {
@@ -2532,13 +2636,16 @@ export class GameState {
   }
 
   // Check if a sea zone is clear for shore bombardment
+  // Per A&A rules: If there was a naval battle, NO bombardment is allowed (even if you won)
   isSeaZoneClearedForBombardment(seaZone) {
-    // A sea zone is cleared if:
-    // 1. It has no enemy combat units, OR
-    // 2. We won the naval battle there (marked as cleared)
     const units = this.units[seaZone] || [];
     const player = this.currentPlayer;
     if (!player) return false;
+
+    // If a naval battle occurred here this turn, no bombardment allowed
+    if (this.clearedSeaZones?.has(seaZone)) {
+      return false; // Had naval battle - no bombardment per A&A rules
+    }
 
     // Check for enemy combat units (anything that isn't ours or an ally's)
     const hasEnemyCombatUnits = units.some(u => {
@@ -2548,8 +2655,8 @@ export class GameState {
       return true;
     });
 
-    if (!hasEnemyCombatUnits) return true;
-    return this.clearedSeaZones?.has(seaZone) || false;
+    // Only allow bombardment if no enemy ships and no naval battle
+    return !hasEnemyCombatUnits;
   }
 
   // Check if a territory has amphibious attackers (units unloaded from transports)

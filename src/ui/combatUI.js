@@ -1524,6 +1524,21 @@ export class CombatUI {
         </button>
         <button class="combat-btn retreat" data-action="retreat">Retreat</button>
       `;
+    } else if (phase === 'selectRetreat') {
+      // Select retreat destination (A&A rule: all units go to one territory)
+      const { retreatOptions } = this.combatState;
+      html += `
+        <div class="retreat-selection">
+          <div class="retreat-header">Select Retreat Destination</div>
+          <div class="retreat-options">
+            ${retreatOptions.map(dest => `
+              <button class="retreat-dest-btn" data-action="confirm-retreat" data-destination="${dest}">
+                ${dest}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `;
     } else if (phase === 'selectCasualties') {
       html += `
         <button class="combat-btn confirm" data-action="confirm-casualties">
@@ -2003,6 +2018,12 @@ export class CombatUI {
           case 'retreat':
             this._retreat();
             break;
+          case 'confirm-retreat':
+            const destination = btn.dataset.destination;
+            if (destination) {
+              this._executeRetreat(destination);
+            }
+            break;
           case 'confirm-casualties':
             this._applyCasualties();
             break;
@@ -2114,12 +2135,32 @@ export class CombatUI {
   }
 
   _retreat() {
-    // Retreating attacker - move all land/sea units back to origin territories
-    // Air units still need to select landing locations
+    // Per A&A rules: Player selects ONE retreat destination for all units
+    // Get valid retreat destinations (territories units came from)
+    const retreatOptions = this.gameState.getRetreatDestinations(this.currentTerritory);
+
+    if (retreatOptions.length === 0) {
+      // No valid retreat - shouldn't happen but handle gracefully
+      console.warn('No retreat destinations available');
+      return;
+    }
+
+    if (retreatOptions.length === 1) {
+      // Only one option - retreat there directly
+      this._executeRetreat(retreatOptions[0]);
+    } else {
+      // Multiple options - show selection phase
+      this.combatState.phase = 'selectRetreat';
+      this.combatState.retreatOptions = retreatOptions;
+      this._render();
+    }
+  }
+
+  _executeRetreat(destination) {
     this.combatState.isRetreating = true;
 
-    // Move retreating units back to their origin territories
-    const retreatResult = this.gameState.retreatFromCombat(this.currentTerritory);
+    // Move all units to the selected retreat destination
+    const retreatResult = this.gameState.retreatToTerritory(this.currentTerritory, destination);
     if (!retreatResult.success) {
       console.warn('Retreat failed:', retreatResult.error);
     }

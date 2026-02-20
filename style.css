@@ -6327,6 +6327,45 @@ html, body {
   color: #fff;
 }
 
+/* Retreat destination selection */
+.retreat-selection {
+  padding: 12px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.retreat-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffd700;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.retreat-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.retreat-dest-btn {
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retreat-dest-btn:hover {
+  background: rgba(100,149,237,0.3);
+  border-color: #6495ed;
+}
+
 .combat-btn.next {
   background: linear-gradient(135deg, #4169e1, #3457b0);
   color: #fff;
