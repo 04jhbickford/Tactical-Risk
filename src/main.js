@@ -277,8 +277,14 @@ async function init() {
           const def = unitDefs[data.unitType];
           if (!def) break;
 
+          // Apply industrial tech discount for max calculation
+          let unitCost = def.cost;
+          if (gameState.hasTech(gameState.currentPlayer.id, 'industrialTech')) {
+            unitCost = Math.max(1, unitCost - 1);
+          }
+
           const ipcs = gameState.getIPCs(gameState.currentPlayer.id);
-          const maxQty = Math.floor(ipcs / def.cost);
+          const maxQty = Math.floor(ipcs / unitCost);
           for (let i = 0; i < maxQty; i++) {
             const result = gameState.addToPendingPurchases(data.unitType, unitDefs, null);
             if (!result.success) break;

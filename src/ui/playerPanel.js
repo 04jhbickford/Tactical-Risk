@@ -937,18 +937,26 @@ export class PlayerPanel {
     const airUnits = purchasableUnits.filter(([_, def]) => def.isAir);
     const navalUnits = purchasableUnits.filter(([_, def]) => def.isSea);
 
+    // Check for industrial tech discount
+    const hasIndustrialTech = this.gameState.hasTech?.(player.id, 'industrialTech') || false;
+
     const renderUnitRow = ([unitType, def]) => {
       const pendingUnit = pending.find(p => p.type === unitType);
       const qty = pendingUnit?.quantity || 0;
-      const canAfford = remaining >= def.cost;
+      // Apply industrial tech discount (-1 IPC, min 1)
+      const actualCost = hasIndustrialTech ? Math.max(1, def.cost - 1) : def.cost;
+      const canAfford = remaining >= actualCost;
       const imageSrc = getUnitIconPath(unitType, player.id);
+      const costDisplay = hasIndustrialTech && def.cost > 1
+        ? `<span class="pp-cost-discounted">$${actualCost}</span> <span class="pp-cost-original">$${def.cost}</span>`
+        : `$${actualCost}`;
 
       return `
         <div class="pp-buy-row ${qty > 0 ? 'has-qty' : ''}">
           <div class="pp-buy-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unitType}">` : ''}
             <span class="pp-buy-name">${unitType}</span>
-            <span class="pp-buy-cost">$${def.cost}</span>
+            <span class="pp-buy-cost">${costDisplay}</span>
           </div>
           <div class="pp-buy-controls">
             <button class="pp-qty-btn" data-action="buy-unit" data-unit="${unitType}" data-delta="-1" ${qty <= 0 ? 'disabled' : ''}>−</button>

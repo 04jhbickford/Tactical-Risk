@@ -1302,7 +1302,12 @@ export class GameState {
     const unitDef = unitDefs[unitType];
     if (!unitDef) return { success: false, error: 'Unknown unit type' };
 
-    const cost = unitDef.cost;
+    // Apply industrial tech discount (-1 IPC, min 1)
+    let cost = unitDef.cost;
+    if (this.hasTech(player.id, 'industrialTech')) {
+      cost = Math.max(1, cost - 1);
+    }
+
     if (this.playerState[player.id].ipcs < cost) {
       return { success: false, error: 'Not enough IPCs' };
     }
@@ -1310,7 +1315,7 @@ export class GameState {
     // Deduct IPCs
     this.playerState[player.id].ipcs -= cost;
 
-    // Add to pending purchases - track territory if specified
+    // Add to pending purchases - track territory if specified (store actual cost paid)
     const existing = this.pendingPurchases.find(p =>
       p.type === unitType && p.owner === player.id && p.territory === territory
     );
@@ -1337,8 +1342,8 @@ export class GameState {
       return { success: false, error: 'No units to remove' };
     }
 
-    // Refund IPCs
-    this.playerState[player.id].ipcs += unitDef.cost;
+    // Refund IPCs (use stored cost which includes any tech discounts)
+    this.playerState[player.id].ipcs += existing.cost || unitDef.cost;
 
     // Remove from pending
     existing.quantity--;
@@ -2330,6 +2335,13 @@ export class GameState {
 
       this.units[lastMove.from] = fromUnits;
       this.units[lastMove.to] = toUnits;
+
+      // Check if any friendly units remain in destination - if not, remove from amphibiousTerritories
+      const remainingFriendly = toUnits.filter(u => u.owner === player.id);
+      if (remainingFriendly.length === 0 && this.amphibiousTerritories) {
+        this.amphibiousTerritories.delete(lastMove.to);
+      }
+
       this._notify();
       return { success: true };
     }
