@@ -187,17 +187,7 @@ async function init() {
           selectedTerritory = null;
           playerPanel.setSelectedTerritory(null);
 
-          // If we just entered unit placement phase, pan to current player's capital
-          if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
-            const player = gameState.currentPlayer;
-            const capital = gameState.playerState[player.id]?.capitalTerritory;
-            if (capital) {
-              const t = territoryRenderer.territoryByName[capital];
-              if (t && t.center) {
-                camera.panTo(t.center[0], t.center[1]);
-              }
-            }
-          }
+          // Don't auto-pan during initial deployment - let player explore the map
         }
         break;
 
@@ -368,17 +358,7 @@ async function init() {
       case 'finish-placement':
         gameState.finishPlacementRound(unitDefs);
         camera.dirty = true;
-        // Move to next player's capital if in placement phase
-        const nextPlayer = gameState.currentPlayer;
-        if (nextPlayer && gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
-          const capital = gameState.playerState[nextPlayer.id]?.capitalTerritory;
-          if (capital) {
-            const t = territoryRenderer.territoryByName[capital];
-            if (t && t.center) {
-              camera.panTo(t.center[0], t.center[1]);
-            }
-          }
-        }
+        // Don't recenter camera during initial deployment - let player explore freely
         break;
 
       case 'execute-move':

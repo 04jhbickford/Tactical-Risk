@@ -1011,22 +1011,30 @@ export class TerritoryRenderer {
   renderHover(ctx, territory) {
     if (!territory) return;
 
-    // Fill with highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.save();
+
+    // Add glow effect
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 20;
+
+    // Fill with brighter highlight
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     for (const poly of territory.polygons) {
       if (!poly || poly.length < 3) continue;
       this._fillPoly(ctx, poly);
     }
 
-    // Stroke outline - use external edges only to hide internal borders
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 2;
+    // Stroke outline with glow - use external edges only to hide internal borders
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 3;
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
       const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons, territory.name);
       this._strokeEdges(ctx, externalEdges);
     }
+
+    ctx.restore();
   }
 
   /** Draw selection highlight */

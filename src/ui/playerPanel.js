@@ -1294,8 +1294,10 @@ export class PlayerPanel {
     if (totalQueued > 0 && isValidPlacement) {
       html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
     }
+    // Show "Done - Next Player" button when all slots are used (committed, can't undo)
+    // Use green "complete" style to indicate this is a commit action
     if (canFinish && totalQueued === 0) {
-      html += `<button class="pp-action-btn primary" data-action="finish-placement">Done - Next Player</button>`;
+      html += `<button class="pp-action-btn complete" data-action="finish-placement">✓ Done - Next Player</button>`;
     }
     html += `</div>`;
 
@@ -1703,7 +1705,7 @@ export class PlayerPanel {
           ${hasLand ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'land' ? 'active' : ''}" data-action="move-tab" data-tab="land">🏃 Land (${landUnits.length})</button>` : ''}
           ${hasNaval ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'naval' ? 'active' : ''}" data-action="move-tab" data-tab="naval">⚓ Naval (${navalUnits.length})</button>` : ''}
           ${hasAir ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'air' ? 'active' : ''}" data-action="move-tab" data-tab="air">✈ Air (${airUnits.length})</button>` : ''}
-          ${hasCargo ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'cargo' ? 'active' : ''}" data-action="move-tab" data-tab="cargo">📦 Cargo (${cargoUnitsForAssault.length})</button>` : ''}
+          ${hasCargo ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'cargo' ? 'active' : ''}" data-action="move-tab" data-tab="cargo">🚶 Land (${cargoUnitsForAssault.length})</button>` : ''}
         </div>
 
         <div class="pp-move-units">`;
