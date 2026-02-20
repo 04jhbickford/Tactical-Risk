@@ -363,9 +363,9 @@ export class PlayerPanel {
           html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
         }
 
-        // Show recent moves with individual undo option
+        // Show recent moves with individual undo option (only during combat move phase)
         const moveHistory = this.gameState.moveHistory || [];
-        if (moveHistory.length > 0) {
+        if (turnPhase === TURN_PHASES.COMBAT_MOVE && moveHistory.length > 0) {
           html += `
             <div class="pp-move-history">
               <div class="pp-move-header">Recent Moves</div>`;
@@ -881,7 +881,7 @@ export class PlayerPanel {
 
     const purchasableUnits = Object.entries(this.unitDefs || {})
       .filter(([type, def]) => {
-        if (type === 'aaGun') return false;
+        // AA guns can now be purchased
         if ((def.isLand || def.isAir || def.isBuilding) && hasFactories) return true;
         if (def.isSea && hasSeaZones) return true;
         return false;

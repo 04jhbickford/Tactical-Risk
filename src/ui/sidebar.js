@@ -101,6 +101,35 @@ export class Sidebar {
               ${continent.name} (+${continent.bonus} bonus)
             </div>
           </div>`;
+
+        // Show all players' progress in this continent
+        if (this.gameState) {
+          const continentOwnership = this._getContinentOwnership(continent);
+          if (continentOwnership.length > 0) {
+            html += `
+              <div class="sb-section">
+                <div class="sb-label">Continent Control</div>
+                <div class="sb-continent-ownership">`;
+
+            for (const { player, count, total, hasBonus } of continentOwnership) {
+              const pct = Math.round((count / total) * 100);
+              html += `
+                <div class="sb-continent-player ${hasBonus ? 'has-bonus' : ''}">
+                  <div class="sb-continent-player-info">
+                    ${player.flag ? `<img src="assets/flags/${player.flag}" class="sb-player-flag" alt="">` : ''}
+                    <span class="sb-player-name" style="color:${player.color}">${player.name}</span>
+                    <span class="sb-player-count">${count}/${total}</span>
+                    ${hasBonus ? `<span class="sb-bonus-indicator">+${continent.bonus}</span>` : ''}
+                  </div>
+                  <div class="sb-progress-bar">
+                    <div class="sb-progress-fill" style="width:${pct}%;background:${player.color}"></div>
+                  </div>
+                </div>`;
+            }
+
+            html += `</div></div>`;
+          }
+        }
       }
     } else {
       html += `
@@ -267,6 +296,35 @@ export class Sidebar {
         }
       });
     });
+  }
+
+  // Get ownership breakdown for a continent
+  _getContinentOwnership(continent) {
+    const ownership = {};
+    const total = continent.territories.length;
+
+    // Count territories per player
+    for (const terrName of continent.territories) {
+      const owner = this.gameState.getOwner(terrName);
+      if (owner) {
+        ownership[owner] = (ownership[owner] || 0) + 1;
+      }
+    }
+
+    // Convert to array with player info, sorted by count (descending)
+    const result = Object.entries(ownership)
+      .map(([playerId, count]) => {
+        const player = this.gameState.getPlayer(playerId);
+        return {
+          player: player || { id: playerId, name: playerId, color: '#888' },
+          count,
+          total,
+          hasBonus: count === total
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    return result;
   }
 
   hide() {

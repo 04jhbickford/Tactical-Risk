@@ -110,6 +110,7 @@ export class GameState {
     this.continents = continents;
     this.gameMode = null;
     this.alliancesEnabled = false;
+    this.teamsEnabled = false;
 
     this.players = [];
     this.currentPlayerIndex = 0;
@@ -314,6 +315,7 @@ export class GameState {
   initGame(mode, selectedPlayers, options = {}) {
     this.gameMode = mode;
     this.alliancesEnabled = options.alliancesEnabled || (mode === 'classic');
+    this.teamsEnabled = options.teamsEnabled || false;
 
     if (mode === 'classic') {
       this._initClassicMode(selectedPlayers);
@@ -324,13 +326,27 @@ export class GameState {
     this._notify();
   }
 
-  // Check if two players are allies
+  // Check if two players are allies (same team or same alliance)
   areAllies(playerId1, playerId2) {
-    if (!this.alliancesEnabled) return false;
     const p1 = this.players.find(p => p.id === playerId1);
     const p2 = this.players.find(p => p.id === playerId2);
     if (!p1 || !p2) return false;
-    return p1.alliance && p1.alliance === p2.alliance;
+
+    // Check team membership first (team mode)
+    if (this.teamsEnabled) {
+      if (p1.teamId && p2.teamId && p1.teamId === p2.teamId) {
+        return true;
+      }
+    }
+
+    // Check alliance (classic alliance system)
+    if (this.alliancesEnabled) {
+      if (p1.alliance && p1.alliance === p2.alliance) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   // Get alliance for a player
@@ -3048,8 +3064,93 @@ export class GameState {
 
     if (this.gameMode === 'classic' || this.alliancesEnabled) {
       this._checkAllianceVictory();
+    } else if (this.teamsEnabled) {
+      this._checkTeamVictory();
     } else {
       this._checkCapitalVictory();
+    }
+  }
+
+  // Team victory: a team wins when they control all enemy capitals
+  _checkTeamVictory() {
+    // Group players by team
+    const teams = {};
+    const noTeamPlayers = [];
+
+    for (const player of this.players) {
+      if (player.teamId) {
+        if (!teams[player.teamId]) {
+          teams[player.teamId] = [];
+        }
+        teams[player.teamId].push(player.id);
+      } else {
+        noTeamPlayers.push(player.id);
+      }
+    }
+
+    // Count capitals controlled by each team
+    const teamCapitals = {};
+    const totalCapitals = {};
+
+    for (const [territory, state] of Object.entries(this.territoryState)) {
+      if (state.isCapital) {
+        const owner = state.owner;
+        if (!owner) continue;
+
+        const ownerPlayer = this.getPlayer(owner);
+        const teamId = ownerPlayer?.teamId;
+
+        if (teamId) {
+          teamCapitals[teamId] = (teamCapitals[teamId] || 0) + 1;
+        }
+
+        // Count total capitals per original owner's team for victory threshold
+        const originalOwnerId = state.originalOwner || owner;
+        const originalPlayer = this.getPlayer(originalOwnerId);
+        const originalTeam = originalPlayer?.teamId;
+
+        if (originalTeam) {
+          totalCapitals[originalTeam] = (totalCapitals[originalTeam] || 0) + 1;
+        }
+      }
+    }
+
+    // Check if any team controls all enemy capitals
+    const teamIds = Object.keys(teams);
+
+    for (const teamId of teamIds) {
+      // Calculate enemy capitals (capitals belonging to other teams)
+      let enemyCapitals = 0;
+      let enemyCapitalsControlled = 0;
+
+      for (const [territory, state] of Object.entries(this.territoryState)) {
+        if (state.isCapital) {
+          const originalOwnerId = state.originalOwner || state.owner;
+          const originalPlayer = this.getPlayer(originalOwnerId);
+          const originalTeam = originalPlayer?.teamId;
+
+          // If this capital belongs to a different team
+          if (originalTeam && originalTeam !== parseInt(teamId)) {
+            enemyCapitals++;
+            // Check if current owner is on our team
+            const currentOwner = state.owner;
+            const currentPlayer = this.getPlayer(currentOwner);
+            if (currentPlayer?.teamId === parseInt(teamId)) {
+              enemyCapitalsControlled++;
+            }
+          }
+        }
+      }
+
+      // Team wins if they control all enemy capitals
+      if (enemyCapitals > 0 && enemyCapitalsControlled === enemyCapitals) {
+        const teamPlayers = teams[teamId].map(id => this.getPlayer(id)?.name).join(', ');
+        this.gameOver = true;
+        this.winner = `Team ${teamId}`;
+        this.winCondition = `Team Victory - ${teamPlayers} captured all enemy capitals`;
+        this._notify();
+        return;
+      }
     }
   }
 
@@ -3779,6 +3880,7 @@ export class GameState {
       version: 9,
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
+      teamsEnabled: this.teamsEnabled,
       players: this.players,
       currentPlayerIndex: this.currentPlayerIndex,
       round: this.round,
@@ -3809,6 +3911,7 @@ export class GameState {
     if (data.version < 3) throw new Error('Incompatible save version');
     this.gameMode = data.gameMode;
     this.alliancesEnabled = data.alliancesEnabled ?? (data.gameMode === 'classic');
+    this.teamsEnabled = data.teamsEnabled ?? false;
     this.players = data.players;
     this.currentPlayerIndex = data.currentPlayerIndex;
     this.round = data.round;

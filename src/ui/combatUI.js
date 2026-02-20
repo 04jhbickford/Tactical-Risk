@@ -8,6 +8,7 @@ export class CombatUI {
     this.unitDefs = null;
     this.actionLog = null;
     this.onCombatComplete = null;
+    this.onCombatStart = null; // Callback when a combat starts (for camera centering)
     this.onAirLandingRequired = null; // Callback when air landing phase starts
 
     this.currentTerritory = null;
@@ -22,6 +23,10 @@ export class CombatUI {
 
   setOnAirLandingRequired(callback) {
     this.onAirLandingRequired = callback;
+  }
+
+  setOnCombatStart(callback) {
+    this.onCombatStart = callback;
   }
 
   _create() {
@@ -61,6 +66,11 @@ export class CombatUI {
     this._initCombatState();
     this._render();
     this.el.classList.remove('hidden');
+
+    // Notify main.js to center camera on combat territory
+    if (this.onCombatStart) {
+      this.onCombatStart(this.currentTerritory);
+    }
   }
 
   hide() {
@@ -1580,13 +1590,13 @@ export class CombatUI {
           <div class="combat-unit-side attacker paired">
             <div class="combat-paired-group" style="--player-color: ${attackerPlayer.color}">
               <div class="paired-unit">
-                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry">` : ''}
+                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2 (boosted from 1), Defense ${infantryDef?.defense || 0}, Cost ${infantryDef?.cost || 0}">` : ''}
                 <span class="combat-unit-qty">${pairedCount}</span>
                 <span class="combat-unit-stat supported">A2</span>
               </div>
               <span class="paired-plus">+</span>
               <div class="paired-unit">
-                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery">` : ''}
+                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack ${artilleryDef?.attack || 0}, Defense ${artilleryDef?.defense || 0}, Cost ${artilleryDef?.cost || 0}">` : ''}
                 <span class="combat-unit-qty">${pairedCount}</span>
                 <span class="combat-unit-stat">A2</span>
               </div>
@@ -1594,7 +1604,6 @@ export class CombatUI {
           </div>
           <div class="combat-unit-type">
             <span class="combat-type-name">Infantry + Artillery</span>
-            <span class="support-note">${pairedCount} paired (bonus)</span>
           </div>
           <div class="combat-unit-side defender empty"></div>
         </div>`;
@@ -1640,7 +1649,7 @@ export class CombatUI {
         attackerHtml = `
           <div class="combat-unit-side attacker">
             <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
+              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}" title="${unitType}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
               <span class="combat-unit-qty">${attackQty}</span>
             </div>
             <span class="combat-unit-stat">A${attackValue}</span>
@@ -1665,7 +1674,7 @@ export class CombatUI {
                 <span class="combat-unit-stat">D${def?.defense || 0}</span>
                 <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
                   <span class="combat-unit-qty">${defendQty}</span>
-                  ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                  ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}" title="${unitType}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
                 </div>
               ` : ''}
             </div>
@@ -1730,7 +1739,7 @@ export class CombatUI {
 
       return `
         <div class="combat-unit">
-          ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${u.type}">` : ''}
+          ${imageSrc ? `<img src="${imageSrc}" class="combat-unit-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
           <span class="combat-unit-qty">×${u.quantity}</span>
           <span class="combat-unit-name">${u.type}</span>
           <span class="combat-unit-stat" title="Hits on ${hitRange}">
@@ -1879,7 +1888,7 @@ export class CombatUI {
       return `
         <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
           <div class="casualty-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : ''}
+            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
             <span class="casualty-name">${u.type}</span>
             <span class="casualty-avail">(${u.quantity})</span>
           </div>
@@ -1915,7 +1924,7 @@ export class CombatUI {
       return `
         <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
           <div class="casualty-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : ''}
+            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
             <span class="casualty-name">${u.type}</span>
             <span class="casualty-avail">(${u.quantity})</span>
           </div>
@@ -1942,7 +1951,7 @@ export class CombatUI {
       return `
         <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
           <div class="casualty-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : ''}
+            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
             <span class="casualty-name">${u.type}</span>
             <span class="casualty-avail">(${u.quantity})</span>
           </div>
@@ -2137,6 +2146,11 @@ export class CombatUI {
       this._render();
       // Make sure popup is visible for next combat
       this.el.classList.remove('hidden');
+
+      // Notify main.js to center camera on combat territory
+      if (this.onCombatStart) {
+        this.onCombatStart(this.currentTerritory);
+      }
     } else {
       this.hide();
       if (this.onCombatComplete) {

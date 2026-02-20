@@ -118,12 +118,14 @@ export class UnitRenderer {
     'East Mediteranean Sea Zone': { x: 40, y: 30 },   // Move away from Egypt
     'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
     'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
-    'North Sea Zone': { x: -30, y: 0 },               // Move west into water
+    'North Sea Zone': { x: -50, y: 50 },              // Bottom-left, away from UK islands
+    'Gulf of Mexico Sea Zone': { x: 30, y: 0 },       // Distinguish from Mexico Sea Zone
   };
 
   // Custom offsets for land territories where units appear in wrong location
   static TERRITORY_CENTER_OFFSETS = {
     'Finland Norway': { x: 0, y: -60 },  // Move units north into Finland area
+    'East Canada': { x: 60, y: 0 },      // Right, over land mass
   };
 
   // Adjust sea zone center to avoid island/land overlap

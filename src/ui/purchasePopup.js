@@ -265,8 +265,7 @@ export class PurchasePopup {
     // Show all units that can be placed somewhere
     const units = Object.entries(this.unitDefs)
       .filter(([type, u]) => {
-        // Exclude AA guns from purchase
-        if (type === 'aaGun') return false;
+        // AA guns can now be purchased
 
         // Can buy land/air units if player has factories
         if ((u.isLand || u.isAir) && hasFactories) return true;

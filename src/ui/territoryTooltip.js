@@ -1,5 +1,7 @@
 // Territory tooltip that appears on hover over the map
 
+import { getUnitIconPath } from '../utils/unitIcons.js';
+
 export class TerritoryTooltip {
   constructor(continents) {
     this.continents = continents;
@@ -62,6 +64,13 @@ export class TerritoryTooltip {
       if (this.gameState.isCapital(t.name)) {
         html += `<div class="tt-capital">★ Capital</div>`;
       }
+
+      // Factory indicator
+      const units = this.gameState.getUnitsAt(t.name);
+      const hasFactory = units.some(u => u.type === 'factory');
+      if (hasFactory) {
+        html += `<div class="tt-factory">🏭 Factory</div>`;
+      }
     }
 
     // Production & Continent
@@ -76,15 +85,78 @@ export class TerritoryTooltip {
       html += `<div class="tt-type">Sea Zone</div>`;
     }
 
-    // Units
+    // Units with icons and power totals
     if (this.gameState) {
       const units = this.gameState.getUnitsAt(t.name);
       if (units && units.length > 0) {
-        html += `<div class="tt-units">`;
+        // Calculate total attack and defense power
+        let totalAttack = 0;
+        let totalDefense = 0;
+
+        html += `<div class="tt-units-section">`;
+        html += `<div class="tt-units-grid">`;
+
         for (const u of units) {
-          const color = this.gameState.getPlayerColor(u.owner);
-          html += `<span class="tt-unit" style="border-color:${color}">${u.quantity}x ${u.type}</span>`;
+          const player = this.gameState.getPlayer(u.owner);
+          const color = player?.color || '#888';
+          const def = this.unitDefs?.[u.type];
+          const iconPath = getUnitIconPath(u.type, u.owner);
+
+          // Accumulate power totals
+          if (def) {
+            totalAttack += (def.attack || 0) * u.quantity;
+            totalDefense += (def.defense || 0) * u.quantity;
+          }
+
+          html += `<div class="tt-unit-icon-row">`;
+          if (iconPath) {
+            html += `<img src="${iconPath}" class="tt-unit-icon" style="border-color:${color}" alt="${u.type}">`;
+          } else {
+            html += `<span class="tt-unit-badge" style="background:${color}"></span>`;
+          }
+          html += `<span class="tt-unit-qty">${u.quantity}</span>`;
+          html += `<span class="tt-unit-name">${u.type}</span>`;
+          if (def) {
+            html += `<span class="tt-unit-stats-mini">A${def.attack}/D${def.defense}</span>`;
+          }
+          html += `</div>`;
         }
+
+        html += `</div>`;
+
+        // Power totals row
+        if (totalAttack > 0 || totalDefense > 0) {
+          html += `<div class="tt-power-totals">`;
+          html += `<span class="tt-power-attack">⚔ ${totalAttack}</span>`;
+          html += `<span class="tt-power-defense">🛡 ${totalDefense}</span>`;
+          html += `</div>`;
+        }
+
+        html += `</div>`;
+      }
+    }
+
+    // Continent progress for owner
+    if (this.gameState && continent && isLand) {
+      const owner = this.gameState.getOwner(t.name);
+      if (owner) {
+        const owned = continent.territories.filter(tName =>
+          this.gameState.getOwner(tName) === owner
+        ).length;
+        const total = continent.territories.length;
+        const pct = Math.round((owned / total) * 100);
+        const player = this.gameState.getPlayer(owner);
+        const hasBonus = owned === total;
+
+        html += `<div class="tt-continent-progress ${hasBonus ? 'has-bonus' : ''}">`;
+        html += `<div class="tt-continent-header">`;
+        html += `<span class="tt-continent-name" style="color:${continent.color}">${continent.name}</span>`;
+        html += `<span class="tt-continent-bonus">+${continent.bonus}</span>`;
+        html += `</div>`;
+        html += `<div class="tt-progress-bar">`;
+        html += `<div class="tt-progress-fill" style="width:${pct}%;background:${player?.color || continent.color}"></div>`;
+        html += `</div>`;
+        html += `<span class="tt-progress-text">${owned}/${total} territories</span>`;
         html += `</div>`;
       }
     }

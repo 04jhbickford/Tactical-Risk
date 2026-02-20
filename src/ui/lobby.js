@@ -1,6 +1,6 @@
 // Lobby UI for player selection - Risk Style only
 
-export const GAME_VERSION = 'V1.27';
+export const GAME_VERSION = 'V1.28';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
@@ -24,6 +24,12 @@ const FACTION_COLORS = [
   { id: 'pink', color: '#C71585', light: '#FF69B4', name: 'Pink' },
 ];
 
+// Team colors
+const TEAM_COLORS = {
+  1: { color: '#1E90FF', name: 'Team 1 (Blue)' },
+  2: { color: '#DC143C', name: 'Team 2 (Red)' },
+};
+
 export class Lobby {
   constructor(setup, onStart) {
     this.setup = setup;
@@ -32,6 +38,8 @@ export class Lobby {
     this.playerNames = {};
     this.playerColors = {};
     this.playerAI = {};
+    this.playerTeams = {}; // Track team assignments: playerId -> 1, 2, or null (no team)
+    this.teamsEnabled = false;
     this.startingIPCs = 80;
     this.el = null;
     this._create();
@@ -92,8 +100,12 @@ export class Lobby {
               const isSelected = this.selectedPlayers.includes(p.id);
               const currentColor = this.playerColors[p.id];
               const currentAI = this.playerAI[p.id] || 'human';
+              const currentTeam = this.playerTeams[p.id] || null;
+              const teamBorderStyle = this.teamsEnabled && currentTeam
+                ? `border-color: ${TEAM_COLORS[currentTeam].color}; border-width: 3px;`
+                : '';
               return `
-              <div class="player-card ${isSelected ? 'selected' : ''}" data-player="${p.id}">
+              <div class="player-card ${isSelected ? 'selected' : ''} ${currentTeam ? `team-${currentTeam}` : ''}" data-player="${p.id}" style="${teamBorderStyle}">
                 <div class="player-card-header">
                   <img src="assets/flags/${p.flag}" alt="${p.name}" class="player-flag">
                   <div class="player-check-indicator">${isSelected ? '&#10003;' : ''}</div>
@@ -119,12 +131,26 @@ export class Lobby {
                     `).join('')}
                   </select>
                 </div>
+                ${this.teamsEnabled && isSelected ? `
+                  <div class="player-team-row">
+                    <button class="team-btn ${currentTeam === 1 ? 'active' : ''}" data-player="${p.id}" data-team="1" style="background: ${TEAM_COLORS[1].color}">Team 1</button>
+                    <button class="team-btn ${currentTeam === 2 ? 'active' : ''}" data-player="${p.id}" data-team="2" style="background: ${TEAM_COLORS[2].color}">Team 2</button>
+                    <button class="team-btn no-team ${!currentTeam ? 'active' : ''}" data-player="${p.id}" data-team="0">No Team</button>
+                  </div>
+                ` : ''}
               </div>
             `}).join('')}
           </div>
         </div>
 
         <div class="lobby-options">
+          <div class="option-item">
+            <label class="option-checkbox">
+              <input type="checkbox" id="teams-enabled" ${this.teamsEnabled ? 'checked' : ''}>
+              <span class="option-label">Team Mode</span>
+            </label>
+            <span class="option-hint">Allied players share victory</span>
+          </div>
           <div class="option-item">
             <span class="option-label">Starting IPCs:</span>
             <select id="starting-ipcs" class="starting-ipcs-select">
@@ -219,6 +245,27 @@ export class Lobby {
       this.startingIPCs = parseInt(e.target.value, 10);
     });
 
+    // Teams enabled toggle
+    this.el.querySelector('#teams-enabled')?.addEventListener('change', (e) => {
+      this.teamsEnabled = e.target.checked;
+      // Clear team assignments when toggling off
+      if (!this.teamsEnabled) {
+        this.playerTeams = {};
+      }
+      this._render();
+    });
+
+    // Team buttons
+    this.el.querySelectorAll('.team-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const playerId = btn.dataset.player;
+        const team = parseInt(btn.dataset.team, 10);
+        this.playerTeams[playerId] = team === 0 ? null : team;
+        this._render();
+      });
+    });
+
     // Continue game button
     this.el.querySelector('.continue-game-btn')?.addEventListener('click', () => {
       this._continueGame();
@@ -269,6 +316,7 @@ export class Lobby {
       const factionDef = factions.find(p => p.id === id);
       const customColor = this.playerColors[id];
       const aiDifficulty = this.playerAI[id] || 'human';
+      const teamId = this.teamsEnabled ? (this.playerTeams[id] || null) : null;
       return {
         ...factionDef,
         name: this.playerNames[id]?.trim() || factionDef.name,
@@ -276,11 +324,13 @@ export class Lobby {
         lightColor: customColor?.lightColor || factionDef.lightColor,
         isAI: aiDifficulty !== 'human',
         aiDifficulty: aiDifficulty,
+        teamId: teamId,
       };
     });
 
     const options = {
       alliancesEnabled: false,
+      teamsEnabled: this.teamsEnabled,
       startingIPCs: this.startingIPCs,
     };
 

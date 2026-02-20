@@ -665,6 +665,13 @@ async function init() {
     combatUI.setOnComplete(() => {
       camera.dirty = true;
     });
+    combatUI.setOnCombatStart((territory) => {
+      // Center camera on the combat territory
+      const t = territoryRenderer.territoryByName[territory];
+      if (t && t.center) {
+        camera.panTo(t.center[0], t.center[1]);
+      }
+    });
     combatUI.setOnAirLandingRequired((data) => {
       // Use inline air landing UI in player panel
       playerPanel.setAirLanding(
