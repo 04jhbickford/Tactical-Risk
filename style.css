@@ -1725,6 +1725,174 @@ html, body {
   color: #888;
 }
 
+/* Enhanced tooltip indicators */
+.tt-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.tt-indicator {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.tt-indicator.capital {
+  background: rgba(255, 215, 0, 0.2);
+  color: #ffd700;
+}
+
+.tt-indicator.factory {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.tt-indicator.aa {
+  background: rgba(156, 39, 176, 0.2);
+  color: #ce93d8;
+}
+
+/* Player units section in tooltip */
+.tt-player-units {
+  margin-bottom: 8px;
+}
+
+.tt-player-units:last-child {
+  margin-bottom: 0;
+}
+
+.tt-player-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tt-player-flag {
+  width: 16px;
+  height: 12px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.tt-player-name {
+  flex: 1;
+}
+
+/* Grid layout for unit icons */
+.tt-units-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tt-unit-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 3px;
+  cursor: default;
+}
+
+.tt-unit-icon-row:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.tt-unit-icon {
+  width: 20px;
+  height: 20px;
+  border: 2px solid;
+  border-radius: 4px;
+  object-fit: contain;
+  background: rgba(0,0,0,0.4);
+}
+
+.tt-unit-qty {
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Continent section in tooltip */
+.tt-continent-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+.tt-continent-title {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.tt-continent-row {
+  margin-bottom: 4px;
+}
+
+.tt-continent-row.has-bonus {
+  background: rgba(76, 175, 80, 0.15);
+  padding: 3px 6px;
+  border-radius: 3px;
+  margin: 0 -6px 4px;
+}
+
+.tt-continent-player {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.tt-micro-flag {
+  width: 14px;
+  height: 10px;
+  border-radius: 1px;
+  object-fit: cover;
+}
+
+.tt-continent-count {
+  margin-left: auto;
+  color: #888;
+}
+
+.tt-continent-bonus-badge {
+  background: rgba(255, 215, 0, 0.3);
+  color: #ffd700;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 600;
+  font-size: 9px;
+}
+
+/* Adjacent territories info */
+.tt-adjacent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(255,255,255,0.1);
+  font-size: 10px;
+}
+
+.tt-adjacent-label {
+  color: #666;
+}
+
+.tt-adjacent-count {
+  color: #888;
+}
+
 /* --- Player Panel (replaces territory sidebar) --- */
 .player-panel {
   position: absolute;
@@ -2765,13 +2933,87 @@ html, body {
   color: #888;
 }
 
+/* Unit stats mini - now hidden, shown via title/tooltip on hover */
 .pp-unit-stats-mini {
-  font-size: 9px;
-  color: #6495ed;
-  background: rgba(100, 149, 237, 0.15);
-  padding: 2px 5px;
-  border-radius: 3px;
-  margin-left: 4px;
+  display: none; /* Hidden by default - stats shown on hover via title attribute */
+}
+
+/* Movement category tabs */
+.pp-move-category-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.pp-move-cat-tab {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.pp-move-cat-tab:hover {
+  background: rgba(255,255,255,0.1);
+  color: #ccc;
+  border-color: rgba(255,255,255,0.2);
+}
+
+.pp-move-cat-tab.active {
+  background: rgba(65, 105, 225, 0.2);
+  border-color: rgba(65, 105, 225, 0.5);
+  color: #fff;
+}
+
+/* Naval tab specific color */
+.pp-move-cat-tab[data-tab="naval"].active {
+  background: rgba(0, 128, 255, 0.2);
+  border-color: rgba(0, 128, 255, 0.5);
+}
+
+/* Air tab specific color */
+.pp-move-cat-tab[data-tab="air"].active {
+  background: rgba(138, 43, 226, 0.2);
+  border-color: rgba(138, 43, 226, 0.5);
+}
+
+/* Cargo tab specific color */
+.pp-move-cat-tab[data-tab="cargo"].active {
+  background: rgba(255, 140, 0, 0.2);
+  border-color: rgba(255, 140, 0, 0.5);
+}
+
+/* Unit row tooltip on hover */
+.pp-move-unit-row {
+  position: relative;
+}
+
+.pp-move-unit-row[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  padding: 6px 10px;
+  background: rgba(20, 20, 40, 0.95);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fff;
+  white-space: pre-line;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  min-width: 120px;
 }
 
 .pp-move-controls {

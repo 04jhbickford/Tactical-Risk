@@ -99,6 +99,7 @@ export class PlayerPanel {
     if (this.selectedTerritory?.name !== territory?.name) {
       this.moveSelectedUnits = {};
       this.movePendingDest = null;
+      this.moveUnitTab = 'land'; // Reset to default tab
     }
     this.selectedTerritory = territory;
     this._render();
@@ -1538,6 +1539,38 @@ export class PlayerPanel {
     const totalSelected = Object.values(this.moveSelectedUnits).reduce((sum, q) => sum + q, 0);
     const destinations = this._getValidDestinations(this.selectedTerritory, player, isCombatMove);
 
+    // Separate units into categories
+    const regularUnits = movableUnits.filter(u => !u.isCargo);
+    const cargoUnitsForAssault = movableUnits.filter(u => u.isCargo);
+
+    // Categorize regular units
+    const landUnits = regularUnits.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def?.isLand;
+    });
+    const navalUnits = regularUnits.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def?.isSea || u.isIndividual; // Individual ships (transports/carriers with cargo)
+    });
+    const airUnits = regularUnits.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def?.isAir;
+    });
+
+    // Initialize move tab if not set
+    if (!this.moveUnitTab) this.moveUnitTab = 'land';
+
+    // Determine which tabs have units
+    const hasLand = landUnits.length > 0;
+    const hasNaval = navalUnits.length > 0;
+    const hasAir = airUnits.length > 0;
+    const hasCargo = cargoUnitsForAssault.length > 0;
+
+    // Auto-select first available tab if current is empty
+    if (this.moveUnitTab === 'land' && !hasLand) {
+      this.moveUnitTab = hasNaval ? 'naval' : (hasAir ? 'air' : 'cargo');
+    }
+
     let html = `
       <div class="pp-inline-movement">
         <div class="pp-move-from">
@@ -1545,40 +1578,51 @@ export class PlayerPanel {
           <span class="pp-move-territory">${this.selectedTerritory.name}</span>
         </div>
 
+        <div class="pp-move-category-tabs">
+          ${hasLand ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'land' ? 'active' : ''}" data-action="move-tab" data-tab="land">🏃 Land (${landUnits.length})</button>` : ''}
+          ${hasNaval ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'naval' ? 'active' : ''}" data-action="move-tab" data-tab="naval">⚓ Naval (${navalUnits.length})</button>` : ''}
+          ${hasAir ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'air' ? 'active' : ''}" data-action="move-tab" data-tab="air">✈ Air (${airUnits.length})</button>` : ''}
+          ${hasCargo ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'cargo' ? 'active' : ''}" data-action="move-tab" data-tab="cargo">📦 Cargo (${cargoUnitsForAssault.length})</button>` : ''}
+        </div>
+
         <div class="pp-move-units">`;
 
-    // Separate cargo units from other movable units for clearer display
-    const regularUnits = movableUnits.filter(u => !u.isCargo);
-    const cargoUnitsForAssault = movableUnits.filter(u => u.isCargo);
+    // Get units for current tab
+    let currentUnits = [];
+    if (this.moveUnitTab === 'land') currentUnits = landUnits;
+    else if (this.moveUnitTab === 'naval') currentUnits = navalUnits;
+    else if (this.moveUnitTab === 'air') currentUnits = airUnits;
+    else if (this.moveUnitTab === 'cargo') currentUnits = cargoUnitsForAssault;
 
-    // Show regular movable units with +/- controls
-    for (const unit of regularUnits) {
-      // Use ship ID as key for individual ships, otherwise use type
-      const unitKey = unit.isIndividual ? `ship:${unit.id}` : unit.type;
+    // Show units for selected category
+    for (const unit of currentUnits) {
+      const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
       const selected = this.moveSelectedUnits[unitKey] || 0;
       const imageSrc = getUnitIconPath(unit.type, player.id);
       const displayName = unit.displayName || unit.type;
 
-      // Get unit stats for tooltip
+      // Get unit stats for hover tooltip (not inline display)
       const unitDef = this.unitDefs?.[unit.type];
       let statsTooltip = '';
       if (unitDef) {
         const hasLongRange = unitDef.isAir && this.gameState?.hasTech(player.id, 'longRangeAircraft');
-        const hasJets = unitDef.type === 'fighter' && this.gameState?.hasTech(player.id, 'jets');
-        const hasSuperSubs = unitDef.type === 'submarine' && this.gameState?.hasTech(player.id, 'superSubs');
+        const hasJets = unit.type === 'fighter' && this.gameState?.hasTech(player.id, 'jets');
+        const hasSuperSubs = unit.type === 'submarine' && this.gameState?.hasTech(player.id, 'superSubs');
         const attack = (unitDef.attack || 0) + (hasJets ? 1 : 0) + (hasSuperSubs ? 1 : 0);
         const defense = (unitDef.defense || 0) + (hasJets ? 1 : 0);
         const movement = (unitDef.movement || 1) + (hasLongRange ? 2 : 0);
-        statsTooltip = `Attack: ${attack} | Defense: ${defense} | Movement: ${movement}`;
+        const cost = unitDef.cost || 0;
+        statsTooltip = `${unit.type.charAt(0).toUpperCase() + unit.type.slice(1)}\nAttack: ${attack} | Defense: ${defense}\nMovement: ${movement} | Cost: ${cost} IPCs`;
       }
 
+      const rowClass = unit.isCargo ? 'cargo-unit' : (unit.isIndividual ? 'individual-ship' : '');
+
       html += `
-        <div class="pp-move-unit-row ${unit.isIndividual ? 'individual-ship' : ''}" title="${statsTooltip}">
+        <div class="pp-move-unit-row ${rowClass}" title="${statsTooltip}">
           <div class="pp-move-unit-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-move-icon" alt="${unit.type}">` : ''}
             <span class="pp-move-name">${displayName}</span>
             ${!unit.isIndividual ? `<span class="pp-move-avail">(${unit.quantity})</span>` : ''}
-            ${unitDef ? `<span class="pp-unit-stats-mini">A${unitDef.attack || 0}/D${unitDef.defense || 0}/M${(unitDef.movement || 1) + (unitDef.isAir && this.gameState?.hasTech(player.id, 'longRangeAircraft') ? 2 : 0)}</span>` : ''}
           </div>
           <div class="pp-move-controls">
             <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
@@ -1587,35 +1631,6 @@ export class PlayerPanel {
             <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unitKey}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
           </div>
         </div>`;
-    }
-
-    // Show cargo units for amphibious assault (if in sea zone)
-    if (cargoUnitsForAssault.length > 0) {
-      html += `<div class="pp-cargo-section">
-        <div class="pp-cargo-header">Amphibious Assault Units</div>`;
-
-      for (const unit of cargoUnitsForAssault) {
-        const unitKey = unit.cargoKey;
-        const selected = this.moveSelectedUnits[unitKey] || 0;
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        const displayName = unit.displayName || unit.type;
-
-        html += `
-          <div class="pp-move-unit-row cargo-unit">
-            <div class="pp-move-unit-info">
-              ${imageSrc ? `<img src="${imageSrc}" class="pp-move-icon" alt="${unit.type}">` : ''}
-              <span class="pp-move-name">${displayName}</span>
-              <span class="pp-move-avail">(${unit.quantity})</span>
-            </div>
-            <div class="pp-move-controls">
-              <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="-1" ${selected <= 0 ? 'disabled' : ''}>−</button>
-              <span class="pp-move-qty">${selected}</span>
-              <button class="pp-qty-btn" data-action="move-unit" data-unit="${unitKey}" data-delta="1" ${selected >= unit.quantity ? 'disabled' : ''}>+</button>
-              <button class="pp-qty-btn max-btn" data-action="move-all" data-unit="${unitKey}" data-qty="${unit.quantity}" ${selected >= unit.quantity ? 'disabled' : ''}>All</button>
-            </div>
-          </div>`;
-      }
-      html += `</div>`;
     }
 
     html += `</div>`;
@@ -2182,6 +2197,16 @@ export class PlayerPanel {
           const qty = parseInt(btn.dataset.qty, 10);
           this.moveSelectedUnits[unitKey] = qty;
           this._render();
+          return;
+        }
+
+        // Handle move category tab switch
+        if (action === 'move-tab') {
+          const tab = btn.dataset.tab;
+          if (tab) {
+            this.moveUnitTab = tab;
+            this._render();
+          }
           return;
         }
 
