@@ -10755,3 +10755,79 @@ html, body {
   padding-top: 6px;
   border-top: 1px solid rgba(255,255,255,0.1);
 }
+
+/* === Rockets Technology UI === */
+.pp-rockets-section {
+  margin-top: 12px;
+  padding: 10px;
+  background: linear-gradient(135deg, rgba(255,100,0,0.15), rgba(255,50,0,0.1));
+  border: 1px solid rgba(255,100,0,0.3);
+  border-radius: 8px;
+}
+
+.pp-rockets-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #ff8c00;
+  margin-bottom: 4px;
+}
+
+.pp-rockets-icon {
+  font-size: 16px;
+}
+
+.pp-rockets-hint {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+
+.pp-rockets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pp-rocket-aa {
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.pp-rocket-source {
+  font-size: 12px;
+  font-weight: 500;
+  color: #ddd;
+  margin-bottom: 6px;
+}
+
+.pp-rocket-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pp-rocket-btn {
+  background: linear-gradient(135deg, #d35400, #c0392b);
+  color: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pp-rocket-btn:hover {
+  background: linear-gradient(135deg, #e67e22, #e74c3c);
+  transform: scale(1.02);
+}
+
+/* Game notification animation */
+@keyframes notifFadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

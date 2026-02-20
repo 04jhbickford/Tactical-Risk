@@ -363,6 +363,11 @@ export class PlayerPanel {
           html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
         }
 
+        // Show rockets option during combat move phase (if player has tech)
+        if (turnPhase === TURN_PHASES.COMBAT_MOVE) {
+          html += this._renderRocketsUI(player);
+        }
+
         // Show recent moves with individual undo option (only during combat move phase)
         const moveHistory = this.gameState.moveHistory || [];
         if (turnPhase === TURN_PHASES.COMBAT_MOVE && moveHistory.length > 0) {
@@ -1050,6 +1055,53 @@ export class PlayerPanel {
     html += `</div>`;
 
     html += `</div>`;
+    return html;
+  }
+
+  // Rockets UI for launching rocket attacks during combat move
+  _renderRocketsUI(player) {
+    // Check if player has rockets tech
+    if (!this.gameState.hasTech(player.id, 'rockets')) return '';
+
+    const availableAA = this.gameState.getAvailableRocketAAguns(player.id);
+    if (availableAA.length === 0) return '';
+
+    // Check if any AA guns have valid targets
+    const aaWithTargets = [];
+    for (const aa of availableAA) {
+      const targets = this.gameState.getRocketTargets(aa.territory);
+      if (targets.length > 0) {
+        aaWithTargets.push({ ...aa, targets });
+      }
+    }
+
+    if (aaWithTargets.length === 0) return '';
+
+    let html = `
+      <div class="pp-rockets-section">
+        <div class="pp-rockets-header">
+          <span class="pp-rockets-icon">🚀</span>
+          <span>Rocket Attacks</span>
+        </div>
+        <div class="pp-rockets-hint">AA guns can bombard enemy factories</div>
+        <div class="pp-rockets-list">`;
+
+    for (const aa of aaWithTargets) {
+      html += `
+        <div class="pp-rocket-aa">
+          <div class="pp-rocket-source">${aa.territory} (${aa.availableCount} AA available)</div>
+          <div class="pp-rocket-targets">`;
+
+      for (const target of aa.targets) {
+        html += `
+          <button class="pp-rocket-btn" data-action="launch-rocket" data-from="${aa.territory}" data-target="${target.territory}">
+            🎯 ${target.territory} (${target.ownerName}: ${target.ownerIPCs} IPCs)
+          </button>`;
+      }
+      html += `</div></div>`;
+    }
+
+    html += `</div></div>`;
     return html;
   }
 
@@ -2079,6 +2131,16 @@ export class PlayerPanel {
           if (this.onAction && this.techDiceCount > 0) {
             this.onAction('roll-tech', { diceCount: this.techDiceCount });
             this.techDiceCount = 0; // Reset after rolling
+          }
+          return;
+        }
+
+        // Handle rocket launch
+        if (action === 'launch-rocket') {
+          const from = btn.dataset.from;
+          const target = btn.dataset.target;
+          if (this.onAction && from && target) {
+            this.onAction('launch-rocket', { from, target });
           }
           return;
         }

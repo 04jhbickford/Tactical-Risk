@@ -164,6 +164,10 @@ export class GameState {
     // Territories with amphibious assault this turn (for shore bombardment - only bombard with amphibious units)
     this.amphibiousTerritories = new Set();
 
+    // Track AA guns that have fired rockets this turn (Rockets tech)
+    // Format: { 'territoryName': count } - how many AA guns at this territory have fired
+    this.rocketsUsedThisTurn = {};
+
     // Placement history for undo: [{ territory, unitType, owner }]
     this.placementHistory = [];
 
@@ -1663,6 +1667,10 @@ export class GameState {
     // Track territories that are friendly at the START of this turn (for air landing)
     this._initFriendlyTerritoriesAtTurnStart();
 
+    // Reset per-turn state
+    this.amphibiousTerritories = new Set();
+    this.rocketsUsedThisTurn = {};
+
     // Reset conquered flag for Risk card (one card per turn)
     const player = this.currentPlayer;
     if (player) {
@@ -1888,18 +1896,16 @@ export class GameState {
           const transportDef = unitDefs.transport;
 
           if (transportDef && transportDef.canCarry?.includes(landUnit.type)) {
-            // Calculate total capacity available
-            let availableCapacity = 0;
+            // Calculate total slots available for this unit type across all transports
+            let availableSlots = 0;
             for (const transport of transports) {
               const currentCargo = transport.cargo || [];
-              if (this._canLoadOnTransport(currentCargo, landUnit.type)) {
-                availableCapacity++;
-              }
+              availableSlots += this._countAvailableSlotsForType(currentCargo, landUnit.type);
             }
-            if (availableCapacity >= landUnit.quantity) {
+            if (availableSlots >= landUnit.quantity) {
               loadingOntoTransport = true;
             } else {
-              return { success: false, error: 'Not enough transport capacity' };
+              return { success: false, error: `Not enough transport capacity (need ${landUnit.quantity}, have ${availableSlots} slots)` };
             }
           } else {
             return { success: false, error: 'Land units cannot enter water without transport' };
@@ -3712,6 +3718,23 @@ export class GameState {
     }
   }
 
+  // Count how many units of a given type can fit on a transport
+  _countAvailableSlotsForType(cargo, unitType) {
+    const totalCount = cargo.length;
+    const otherCount = cargo.filter(c => c.type !== 'infantry').length;
+
+    if (totalCount >= 2) return 0; // Full
+
+    if (unitType === 'infantry') {
+      // Infantry can fill all remaining slots (max 2 total on transport)
+      return 2 - totalCount;
+    } else {
+      // Non-infantry can only be added if no other non-infantry present
+      // And only 1 slot is available for non-infantry per transport
+      return otherCount === 0 ? 1 : 0;
+    }
+  }
+
   // Unload units from transport to coastal territory
   unloadTransport(seaZone, transportIndex, coastalTerritory) {
     const player = this.currentPlayer;
@@ -3969,6 +3992,145 @@ export class GameState {
     }));
   }
 
+  // === ROCKETS TECHNOLOGY ===
+
+  // Get available AA guns for rocket attacks (ones that haven't fired this turn)
+  getAvailableRocketAAguns(playerId) {
+    if (!this.hasTech(playerId, 'rockets')) return [];
+
+    const available = [];
+    for (const [terrName, units] of Object.entries(this.units)) {
+      const territory = this.territoryByName[terrName];
+      if (!territory || territory.isWater) continue;
+      if (this.getOwner(terrName) !== playerId) continue;
+
+      const aaGuns = units.filter(u => u.type === 'aaGun' && u.owner === playerId);
+      const totalAA = aaGuns.reduce((sum, u) => sum + (u.quantity || 1), 0);
+      const usedCount = this.rocketsUsedThisTurn[terrName] || 0;
+      const availableCount = totalAA - usedCount;
+
+      if (availableCount > 0) {
+        available.push({
+          territory: terrName,
+          aaCount: totalAA,
+          availableCount,
+          usedCount
+        });
+      }
+    }
+    return available;
+  }
+
+  // Get valid rocket targets from a territory (adjacent enemy factories)
+  getRocketTargets(fromTerritory) {
+    const player = this.currentPlayer;
+    if (!player) return [];
+
+    const territory = this.territoryByName[fromTerritory];
+    if (!territory) return [];
+
+    const targets = [];
+    for (const connName of territory.connections || []) {
+      const conn = this.territoryByName[connName];
+      if (!conn || conn.isWater) continue;
+
+      const owner = this.getOwner(connName);
+      if (!owner || owner === player.id || this.areAllies(player.id, owner)) continue;
+
+      // Check for factory
+      const units = this.units[connName] || [];
+      const hasFactory = units.some(u => u.type === 'factory' && u.owner === owner);
+      if (hasFactory) {
+        const ownerPlayer = this.getPlayer(owner);
+        targets.push({
+          territory: connName,
+          owner,
+          ownerName: ownerPlayer?.name || owner,
+          ownerIPCs: this.getIPCs(owner)
+        });
+      }
+    }
+    return targets;
+  }
+
+  // Execute a rocket attack
+  // Returns: { success, damage, targetIPCs, message }
+  launchRocket(fromTerritory, targetTerritory) {
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+
+    // Verify rockets tech
+    if (!this.hasTech(player.id, 'rockets')) {
+      return { success: false, error: 'Rockets technology not researched' };
+    }
+
+    // Verify phase
+    if (this.turnPhase !== TURN_PHASES.COMBAT_MOVE) {
+      return { success: false, error: 'Rockets can only be launched during combat move phase' };
+    }
+
+    // Verify AA gun availability
+    const from = this.territoryByName[fromTerritory];
+    if (!from || from.isWater) {
+      return { success: false, error: 'Invalid source territory' };
+    }
+    if (this.getOwner(fromTerritory) !== player.id) {
+      return { success: false, error: 'You do not control the source territory' };
+    }
+
+    const aaUnits = (this.units[fromTerritory] || []).filter(u => u.type === 'aaGun' && u.owner === player.id);
+    const totalAA = aaUnits.reduce((sum, u) => sum + (u.quantity || 1), 0);
+    const usedCount = this.rocketsUsedThisTurn[fromTerritory] || 0;
+    if (usedCount >= totalAA) {
+      return { success: false, error: 'All AA guns at this territory have already fired rockets' };
+    }
+
+    // Verify target
+    const target = this.territoryByName[targetTerritory];
+    if (!target || target.isWater) {
+      return { success: false, error: 'Invalid target territory' };
+    }
+    if (!from.connections?.includes(targetTerritory)) {
+      return { success: false, error: 'Target not adjacent' };
+    }
+
+    const targetOwner = this.getOwner(targetTerritory);
+    if (!targetOwner || targetOwner === player.id || this.areAllies(player.id, targetOwner)) {
+      return { success: false, error: 'Target must be enemy territory' };
+    }
+
+    const targetUnits = this.units[targetTerritory] || [];
+    const hasFactory = targetUnits.some(u => u.type === 'factory' && u.owner === targetOwner);
+    if (!hasFactory) {
+      return { success: false, error: 'Target must have a factory' };
+    }
+
+    // Roll for damage (1d6)
+    const damage = Math.floor(Math.random() * 6) + 1;
+    const targetIPCs = this.getIPCs(targetOwner);
+    const actualDamage = Math.min(damage, targetIPCs);
+
+    // Apply damage
+    this.playerState[targetOwner].ipcs -= actualDamage;
+
+    // Mark AA gun as used
+    this.rocketsUsedThisTurn[fromTerritory] = usedCount + 1;
+
+    const targetPlayer = this.getPlayer(targetOwner);
+    const message = `Rocket attack on ${targetTerritory}! Rolled ${damage}, ${targetPlayer?.name || targetOwner} loses ${actualDamage} IPCs.`;
+
+    this._notify();
+
+    return {
+      success: true,
+      damage,
+      actualDamage,
+      targetIPCs,
+      targetOwner,
+      message
+    };
+  }
+
   subscribe(callback) {
     this._listeners.push(callback);
     return () => {
@@ -4056,6 +4218,12 @@ export class GameState {
       // This allows placing on any currently owned factory (less restrictive, but better than broken)
       this.factoriesAtTurnStart = new Set(this._getFactoryTerritories(this.currentPlayer?.id));
     }
+
+    // Reset per-turn state on load (fresh state for the turn)
+    this.rocketsUsedThisTurn = {};
+    this.amphibiousTerritories = new Set();
+    this.moveHistory = [];
+    this.conqueredThisTurn = {};
 
     this._notify();
   }

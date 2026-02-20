@@ -47,6 +47,29 @@ function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
 }
 
+// Simple notification display for game events
+function showNotification(message, duration = 3000) {
+  let container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    container.style.cssText = 'position:fixed;top:80px;left:50%;transform:translateX(-50%);z-index:1000;pointer-events:none;';
+    document.body.appendChild(container);
+  }
+
+  const notif = document.createElement('div');
+  notif.className = 'game-notification';
+  notif.textContent = message;
+  notif.style.cssText = 'background:rgba(0,0,0,0.85);color:#fff;padding:12px 24px;border-radius:8px;margin-bottom:8px;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,0.3);animation:notifFadeIn 0.3s ease;';
+  container.appendChild(notif);
+
+  setTimeout(() => {
+    notif.style.opacity = '0';
+    notif.style.transition = 'opacity 0.3s';
+    setTimeout(() => notif.remove(), 300);
+  }, duration);
+}
+
 async function init() {
   // Load data
   const [territoriesRes, continentsRes, setupRes, unitsRes] = await Promise.all([
@@ -297,6 +320,21 @@ async function init() {
         // Inline tech roll - show centered dice result instead of modal
         if (data.diceCount > 0) {
           techUI.performInlineRoll(data.diceCount);
+          camera.dirty = true;
+        }
+        break;
+
+      case 'launch-rocket':
+        // Rocket attack using rockets technology
+        if (data.from && data.target) {
+          const result = gameState.launchRocket(data.from, data.target);
+          if (result.success) {
+            actionLog.log(`🚀 ${result.message}`);
+            // Show a brief notification
+            showNotification(result.message);
+          } else {
+            console.warn('Rocket launch failed:', result.error);
+          }
           camera.dirty = true;
         }
         break;
