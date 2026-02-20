@@ -2317,6 +2317,8 @@ export class PlayerPanel {
               }
             }
             this.placementQueue = {}; // Clear queue after placement
+            // Force re-render to show Done button immediately
+            this._render();
           }
           return;
         }
