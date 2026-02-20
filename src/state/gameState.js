@@ -2254,6 +2254,7 @@ export class GameState {
       captured, // Track if territory was captured for undo
       previousOwner: isEnemy ? toOwner : null,
       loadedOntoTransport: loadingOntoTransport, // Track for undo - remove from cargo
+      loadedOntoCarrier: landingOnCarrier, // Track for undo - remove from aircraft
     });
 
     // Track air unit origins for post-combat landing (combat move only)
@@ -2398,6 +2399,36 @@ export class GameState {
           for (let i = cargo.length - 1; i >= 0 && remaining > 0; i--) {
             if (cargo[i].type === moveUnit.type && cargo[i].owner === player.id) {
               cargo.splice(i, 1);
+              remaining--;
+            }
+          }
+        }
+
+        // Add back to source (without moved flag)
+        const sourceUnit = fromUnits.find(u => u.type === moveUnit.type && u.owner === player.id && !u.id);
+        if (sourceUnit) {
+          sourceUnit.quantity += moveUnit.quantity;
+          delete sourceUnit.moved;
+        } else {
+          fromUnits.push({
+            type: moveUnit.type,
+            quantity: moveUnit.quantity,
+            owner: player.id,
+          });
+        }
+      }
+    } else if (lastMove.loadedOntoCarrier) {
+      // Handle aircraft loaded onto carriers - remove from carrier.aircraft
+      for (const moveUnit of lastMove.units) {
+        let remaining = moveUnit.quantity;
+        // Find carriers at destination and remove aircraft
+        const carriers = toUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        for (const carrier of carriers) {
+          if (remaining <= 0) break;
+          const aircraft = carrier.aircraft || [];
+          for (let i = aircraft.length - 1; i >= 0 && remaining > 0; i--) {
+            if (aircraft[i].type === moveUnit.type && aircraft[i].owner === player.id) {
+              aircraft.splice(i, 1);
               remaining--;
             }
           }

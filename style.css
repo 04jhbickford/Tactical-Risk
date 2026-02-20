@@ -3549,12 +3549,134 @@ html, body {
   font-size: 14px;
   font-weight: 600;
   color: #e0e0e0;
+  flex: 1;
+}
+
+.pp-air-landing-counter {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  background: rgba(100, 149, 237, 0.3);
+  border-radius: 10px;
+  color: #fff;
 }
 
 .pp-air-landing-from {
   font-size: 12px;
   color: #888;
   padding: 0 4px;
+}
+
+.pp-air-landing-hint {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+  padding: 0 4px;
+}
+
+/* Air Landing Card Grid */
+.pp-air-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 8px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+}
+
+.pp-air-landing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 70px;
+}
+
+.pp-air-landing-card:hover {
+  background: rgba(100, 149, 237, 0.15);
+  transform: translateY(-2px);
+}
+
+.pp-air-landing-card.current {
+  background: rgba(100, 149, 237, 0.25);
+  border-color: #6495ed;
+  box-shadow: 0 0 10px rgba(100, 149, 237, 0.3);
+}
+
+.pp-air-landing-card.landed {
+  background: rgba(50, 205, 50, 0.15);
+  border-color: rgba(50, 205, 50, 0.5);
+}
+
+.pp-air-landing-card.crashed {
+  background: rgba(220, 20, 60, 0.2);
+  border-color: rgba(220, 20, 60, 0.5);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.pp-air-card-icon {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 4px;
+}
+
+.pp-air-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.pp-air-card-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: #e0e0e0;
+  text-transform: capitalize;
+  text-align: center;
+}
+
+.pp-air-card-stats {
+  font-size: 9px;
+  color: #888;
+  margin-top: 2px;
+}
+
+.pp-air-card-status {
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.pp-air-card-status .status-selecting {
+  color: #6495ed;
+  animation: pulse-blue 1s ease-in-out infinite;
+}
+
+.pp-air-card-status .status-pending {
+  color: #555;
+}
+
+.pp-air-card-status .status-landed {
+  color: #90ee90;
+  max-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-air-card-status .status-crashed {
+  color: #ff6b6b;
+}
+
+@keyframes pulse-blue {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .pp-air-landing-units {
@@ -4464,6 +4586,114 @@ html, body {
   font-style: italic;
   text-align: center;
   padding: 10px;
+}
+
+/* All Players Continent Display */
+.pp-continent-table-all {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pp-continent-block {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 10px;
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.pp-continent-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pp-continent-header .pp-continent-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.pp-continent-header .pp-continent-bonus {
+  font-size: 11px;
+  color: #666;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.pp-continent-header .pp-continent-bonus.active {
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.2);
+  font-weight: 600;
+}
+
+.pp-continent-players {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pp-continent-player-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.pp-continent-player-row.has-bonus {
+  background: rgba(76, 175, 80, 0.15);
+  border-left: 2px solid #4caf50;
+}
+
+.pp-continent-player-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-continent-flag {
+  width: 16px;
+  height: 12px;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.pp-continent-player-name {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.pp-continent-player-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-continent-player-bar {
+  width: 60px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pp-continent-player-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.pp-continent-player-count {
+  font-size: 10px;
+  color: #888;
+  min-width: 32px;
+  text-align: right;
 }
 
 /* Log Tab */
@@ -7148,13 +7378,14 @@ html, body {
 }
 
 .casualty-btn {
-  width: 22px;
-  height: 22px;
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 4px;
-  background: rgba(255,255,255,0.05);
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 5px;
+  background: rgba(255,255,255,0.08);
   color: #fff;
-  font-size: 12px;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
   display: flex;

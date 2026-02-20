@@ -577,32 +577,66 @@ export class PlayerPanel {
         <div class="pp-territory-count">${territories.length} territories controlled</div>
       </div>`;
 
-    // Continent control
+    // Continent control - show all players' progress
     html += `
       <div class="pp-stat-section">
-        <div class="pp-stat-header">🌍 Continent Bonuses</div>
-        <div class="pp-continent-table">`;
+        <div class="pp-stat-header">🌍 Continent Control</div>
+        <div class="pp-continent-table-all">`;
 
     if (this.continents && this.continents.length > 0) {
+      const players = this.gameState.getPlayers?.() || [];
+
       for (const continent of this.continents) {
-        const controlled = continent.territories.filter(t =>
-          this.gameState.getOwner(t) === player.id
-        ).length;
         const total = continent.territories.length;
-        const hasBonus = controlled === total;
-        const progress = Math.round((controlled / total) * 100);
+
+        // Get ownership breakdown for all players
+        const ownership = {};
+        for (const terrName of continent.territories) {
+          const owner = this.gameState.getOwner(terrName);
+          if (owner) {
+            ownership[owner] = (ownership[owner] || 0) + 1;
+          }
+        }
+
+        // Sort players by count (highest first)
+        const sortedPlayers = Object.entries(ownership)
+          .map(([playerId, count]) => ({
+            player: this.gameState.getPlayer(playerId),
+            count,
+            hasBonus: count === total
+          }))
+          .sort((a, b) => b.count - a.count);
+
+        // Find who has the bonus
+        const bonusHolder = sortedPlayers.find(p => p.hasBonus);
 
         html += `
-          <div class="pp-continent-row ${hasBonus ? 'has-bonus' : ''}">
-            <div class="pp-continent-info">
+          <div class="pp-continent-block">
+            <div class="pp-continent-header">
               <span class="pp-continent-name">${continent.name}</span>
-              <span class="pp-continent-bonus">+${continent.bonus} IPCs</span>
+              <span class="pp-continent-bonus ${bonusHolder ? 'active' : ''}">+${continent.bonus} IPCs</span>
             </div>
-            <div class="pp-continent-progress">
-              <div class="pp-continent-bar">
-                <div class="pp-continent-fill" style="width: ${progress}%"></div>
-              </div>
-              <span class="pp-continent-count">${controlled}/${total}</span>
+            <div class="pp-continent-players">`;
+
+        for (const { player: p, count, hasBonus } of sortedPlayers) {
+          if (!p) continue;
+          const pct = Math.round((count / total) * 100);
+          html += `
+              <div class="pp-continent-player-row ${hasBonus ? 'has-bonus' : ''}">
+                <div class="pp-continent-player-info">
+                  ${p.flag ? `<img src="assets/flags/${p.flag}" class="pp-continent-flag" alt="">` : ''}
+                  <span class="pp-continent-player-name" style="color: ${p.color}">${p.name}</span>
+                </div>
+                <div class="pp-continent-player-progress">
+                  <div class="pp-continent-player-bar">
+                    <div class="pp-continent-player-fill" style="width: ${pct}%; background: ${p.color}"></div>
+                  </div>
+                  <span class="pp-continent-player-count">${count}/${total}</span>
+                </div>
+              </div>`;
+        }
+
+        html += `
             </div>
           </div>`;
       }
@@ -1340,6 +1374,7 @@ export class PlayerPanel {
     const movable = {};
     const individualShips = []; // Track transports/carriers with cargo separately
     const cargoUnits = []; // Track cargo units for amphibious assault
+    const carrierAircraft = []; // Track aircraft on carriers
 
     for (const u of units) {
       if (u.owner !== player.id) continue;
@@ -1349,20 +1384,23 @@ export class PlayerPanel {
 
       // Individual ships (transports/carriers with cargo) are tracked separately
       if (u.id) {
-        const cargo = u.cargo || u.aircraft || [];
-        const cargoDesc = cargo.length > 0
-          ? ` (${cargo.map(c => c.type).join(', ')})`
+        const cargo = u.cargo || [];
+        const aircraft = u.aircraft || [];
+        const allCargo = [...cargo, ...aircraft];
+        const cargoDesc = allCargo.length > 0
+          ? ` (${allCargo.map(c => c.type).join(', ')})`
           : ' (empty)';
         individualShips.push({
           type: u.type,
           id: u.id,
           quantity: 1,
           cargo: cargo,
+          aircraft: aircraft,
           displayName: `${u.type}${cargoDesc}`,
           isIndividual: true
         });
 
-        // Also add cargo units as separately selectable for amphibious assault
+        // Add cargo units as separately selectable for amphibious assault
         if (territory.isWater && u.type === 'transport' && cargo.length > 0) {
           for (const cargoUnit of cargo) {
             const cargoKey = `cargo:${u.id}:${cargoUnit.type}`;
@@ -1381,6 +1419,26 @@ export class PlayerPanel {
             }
           }
         }
+
+        // Add aircraft on carriers as separately selectable
+        if (territory.isWater && u.type === 'carrier' && aircraft.length > 0) {
+          for (const airUnit of aircraft) {
+            const airKey = `aircraft:${u.id}:${airUnit.type}`;
+            const existing = carrierAircraft.find(c => c.cargoKey === airKey);
+            if (existing) {
+              existing.quantity += airUnit.quantity || 1;
+            } else {
+              carrierAircraft.push({
+                type: airUnit.type,
+                quantity: airUnit.quantity || 1,
+                carrierId: u.id,
+                isCarrierAircraft: true,
+                cargoKey: airKey,
+                displayName: `${airUnit.type} (on carrier)`
+              });
+            }
+          }
+        }
         continue;
       }
 
@@ -1390,8 +1448,8 @@ export class PlayerPanel {
       movable[u.type].quantity += u.quantity || 1;
     }
 
-    // Combine: aggregated units first, then individual ships, then cargo units for amphibious
-    return [...Object.values(movable), ...individualShips, ...cargoUnits];
+    // Combine: aggregated units first, then individual ships, then cargo/aircraft
+    return [...Object.values(movable), ...individualShips, ...cargoUnits, ...carrierAircraft];
   }
 
   // Get valid destinations for selected units based on their movement range
@@ -1598,8 +1656,9 @@ export class PlayerPanel {
     const destinations = this._getValidDestinations(this.selectedTerritory, player, isCombatMove);
 
     // Separate units into categories
-    const regularUnits = movableUnits.filter(u => !u.isCargo);
+    const regularUnits = movableUnits.filter(u => !u.isCargo && !u.isCarrierAircraft);
     const cargoUnitsForAssault = movableUnits.filter(u => u.isCargo);
+    const carrierAircraftUnits = movableUnits.filter(u => u.isCarrierAircraft);
 
     // Categorize regular units
     const landUnits = regularUnits.filter(u => {
@@ -1610,10 +1669,14 @@ export class PlayerPanel {
       const def = this.unitDefs?.[u.type];
       return def?.isSea || u.isIndividual; // Individual ships (transports/carriers with cargo)
     });
-    const airUnits = regularUnits.filter(u => {
-      const def = this.unitDefs?.[u.type];
-      return def?.isAir;
-    });
+    // Air units include both standalone air units AND aircraft on carriers
+    const airUnits = [
+      ...regularUnits.filter(u => {
+        const def = this.unitDefs?.[u.type];
+        return def?.isAir;
+      }),
+      ...carrierAircraftUnits
+    ];
 
     // Initialize move tab if not set
     if (!this.moveUnitTab) this.moveUnitTab = 'land';
@@ -1804,7 +1867,7 @@ export class PlayerPanel {
     return html;
   }
 
-  // Inline Air Landing UI
+  // Inline Air Landing UI - styled like buy/movement UI
   _renderInlineAirLanding(player) {
     const { airUnitsToLand, combatTerritory, isRetreating } = this.airLandingData;
     const currentUnit = airUnitsToLand[this.airLandingIndex];
@@ -1815,17 +1878,24 @@ export class PlayerPanel {
       return u.landingOptions?.length === 0 || this.airLandingSelections[unitKey];
     });
 
+    // Count selected vs total
+    const totalUnits = airUnitsToLand.length;
+    const selectedCount = Object.keys(this.airLandingSelections).length;
+    const crashedCount = airUnitsToLand.filter(u => !u.landingOptions || u.landingOptions.length === 0).length;
+
     let html = `
       <div class="pp-inline-air-landing">
         <div class="pp-air-landing-header" style="border-left: 4px solid ${player.color}">
           <span class="pp-air-landing-icon">✈️</span>
           <span class="pp-air-landing-title">${isRetreating ? 'Retreat - ' : ''}Air Unit Landing</span>
+          <span class="pp-air-landing-counter">${selectedCount}/${totalUnits - crashedCount}</span>
         </div>
-        <div class="pp-air-landing-from">From: ${combatTerritory}</div>
+        <div class="pp-air-landing-from">From: <strong>${combatTerritory}</strong></div>
+        <div class="pp-air-landing-hint">Click unit to select, then click map to assign landing</div>
 
-        <div class="pp-air-landing-units">`;
+        <div class="pp-air-landing-grid">`;
 
-    // Show all air units with their landing status
+    // Show all air units as cards (similar to buy UI)
     for (let i = 0; i < airUnitsToLand.length; i++) {
       const unit = airUnitsToLand[i];
       const unitKey = unit.id || `${unit.type}_${i}`;
@@ -1833,19 +1903,24 @@ export class PlayerPanel {
       const isCurrent = i === this.airLandingIndex && !selectedLanding;
       const hasNoOptions = !unit.landingOptions || unit.landingOptions.length === 0;
       const imageSrc = getUnitIconPath(unit.type, player.id);
+      const def = this.unitDefs?.[unit.type];
 
       html += `
-        <div class="pp-air-unit-row ${isCurrent ? 'current' : ''} ${selectedLanding ? 'landed' : ''} ${hasNoOptions ? 'crashed' : ''}"
+        <div class="pp-air-landing-card ${isCurrent ? 'current' : ''} ${selectedLanding ? 'landed' : ''} ${hasNoOptions ? 'crashed' : ''}"
              data-action="select-air-unit" data-index="${i}">
-          <div class="pp-air-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="pp-air-unit-icon" alt="${unit.type}">` : ''}
-            <span class="pp-air-unit-type">${unit.type}</span>
+          <div class="pp-air-card-icon">
+            ${imageSrc ? `<img src="${imageSrc}" alt="${unit.type}">` : ''}
           </div>
-          <div class="pp-air-unit-status">
-            ${hasNoOptions ? '<span class="crashed">No valid landing - CRASHED</span>' :
-              selectedLanding ? `<span class="landed">→ ${selectedLanding}</span>` :
-              isCurrent ? '<span class="selecting">Click map to land</span>' :
-              '<span class="pending">Waiting...</span>'}
+          <div class="pp-air-card-name">${unit.type}</div>
+          <div class="pp-air-card-stats">M${def?.movement || 0}</div>
+          <div class="pp-air-card-status">
+            ${hasNoOptions
+              ? '<span class="status-crashed">CRASH</span>'
+              : selectedLanding
+                ? `<span class="status-landed">${selectedLanding}</span>`
+                : isCurrent
+                  ? '<span class="status-selecting">SELECT</span>'
+                  : '<span class="status-pending">...</span>'}
           </div>
         </div>`;
     }
@@ -2320,10 +2395,25 @@ export class PlayerPanel {
           return;
         }
 
-        // Handle select-all units for movement
+        // Handle select-all units for movement (only for current tab)
         if (action === 'move-select-all') {
           const movable = this._getMovableUnits(this.selectedTerritory, this.gameState.currentPlayer);
-          for (const unit of movable) {
+          const regularUnits = movable.filter(u => !u.isCargo);
+          const cargoUnits = movable.filter(u => u.isCargo);
+
+          // Filter to only current tab's units
+          let unitsToSelect = [];
+          if (this.moveUnitTab === 'land') {
+            unitsToSelect = regularUnits.filter(u => this.unitDefs?.[u.type]?.isLand);
+          } else if (this.moveUnitTab === 'naval') {
+            unitsToSelect = regularUnits.filter(u => this.unitDefs?.[u.type]?.isSea || u.isIndividual);
+          } else if (this.moveUnitTab === 'air') {
+            unitsToSelect = regularUnits.filter(u => this.unitDefs?.[u.type]?.isAir);
+          } else if (this.moveUnitTab === 'cargo') {
+            unitsToSelect = cargoUnits;
+          }
+
+          for (const unit of unitsToSelect) {
             let unitKey;
             if (unit.isCargo) {
               unitKey = unit.cargoKey;
