@@ -164,6 +164,11 @@ export class GameState {
     // Territories with amphibious assault this turn (for shore bombardment - only bombard with amphibious units)
     this.amphibiousTerritories = new Set();
 
+    // Track amphibious assault details for naval combat dependency
+    // Maps land territory to { seaZone, units: [{ type, quantity, owner }] }
+    // If naval combat in seaZone is lost, these units are destroyed
+    this.amphibiousAssaultDetails = {};
+
     // Track AA guns that have fired rockets this turn (Rockets tech)
     // Format: { 'territoryName': count } - how many AA guns at this territory have fired
     this.rocketsUsedThisTurn = {};
@@ -1669,6 +1674,7 @@ export class GameState {
 
     // Reset per-turn state
     this.amphibiousTerritories = new Set();
+    this.amphibiousAssaultDetails = {};
     this.rocketsUsedThisTurn = {};
 
     // Reset conquered flag for Risk card (one card per turn)
@@ -2699,6 +2705,77 @@ export class GameState {
   // Check if a territory has amphibious attackers (units unloaded from transports)
   hasAmphibiousAssault(territory) {
     return this.amphibiousTerritories?.has(territory) || false;
+  }
+
+  // Get land territories dependent on a specific sea zone for amphibious assault
+  getAmphibiousAssaultsFromSeaZone(seaZone) {
+    const dependent = [];
+    for (const [landTerritory, details] of Object.entries(this.amphibiousAssaultDetails || {})) {
+      if (details.seaZone === seaZone) {
+        dependent.push(landTerritory);
+      }
+    }
+    return dependent;
+  }
+
+  // Cancel amphibious assault when naval combat is lost
+  // Per A&A rules: if you lose the naval battle, troops on transports are destroyed
+  cancelAmphibiousAssault(landTerritory) {
+    const details = this.amphibiousAssaultDetails?.[landTerritory];
+    if (!details) return { cancelled: false };
+
+    const player = this.currentPlayer;
+    if (!player) return { cancelled: false };
+
+    const units = this.units[landTerritory] || [];
+    const destroyedUnits = [];
+
+    // Remove the amphibious units from the land territory
+    for (const amphibUnit of details.units) {
+      const landUnit = units.find(u =>
+        u.type === amphibUnit.type &&
+        u.owner === amphibUnit.owner
+      );
+      if (landUnit) {
+        const toRemove = Math.min(landUnit.quantity, amphibUnit.quantity);
+        landUnit.quantity -= toRemove;
+        destroyedUnits.push({ type: amphibUnit.type, quantity: toRemove });
+      }
+    }
+
+    // Clean up units with 0 quantity
+    this.units[landTerritory] = units.filter(u => u.quantity > 0);
+
+    // Remove from amphibious tracking
+    this.amphibiousTerritories.delete(landTerritory);
+    delete this.amphibiousAssaultDetails[landTerritory];
+
+    // Remove from combat queue if no attackers remain
+    const remainingAttackers = (this.units[landTerritory] || [])
+      .filter(u => u.owner === player.id);
+    if (remainingAttackers.length === 0) {
+      this.combatQueue = this.combatQueue.filter(t => t !== landTerritory);
+    }
+
+    this._notify();
+    return { cancelled: true, destroyedUnits };
+  }
+
+  // Check if a sea zone has a contested naval battle blocking amphibious assault
+  hasContestedSeaZoneForAmphibious(landTerritory) {
+    const details = this.amphibiousAssaultDetails?.[landTerritory];
+    if (!details) return false;
+
+    const seaZone = details.seaZone;
+    const player = this.currentPlayer;
+    if (!player) return false;
+
+    const seaUnits = this.units[seaZone] || [];
+    const hasEnemyShips = seaUnits.some(u =>
+      u.owner !== player.id && !this.areAllies(player.id, u.owner)
+    );
+
+    return hasEnemyShips;
   }
 
   // Resolve combat in a territory (dice combat with naval rules)
@@ -3825,6 +3902,22 @@ export class GameState {
       const owner = this.getOwner(coastalTerritory);
       if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
         this.amphibiousTerritories.add(coastalTerritory);
+
+        // Track amphibious assault details for naval combat dependency
+        // If naval combat in this sea zone is lost, these units will be destroyed
+        if (!this.amphibiousAssaultDetails[coastalTerritory]) {
+          this.amphibiousAssaultDetails[coastalTerritory] = {
+            seaZone: seaZone,
+            units: []
+          };
+        }
+        for (const unit of unloadedUnits) {
+          this.amphibiousAssaultDetails[coastalTerritory].units.push({
+            type: unit.type,
+            quantity: unit.quantity,
+            owner: player.id
+          });
+        }
       }
     }
 
@@ -3904,6 +3997,20 @@ export class GameState {
       const owner = this.getOwner(coastalTerritory);
       if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
         this.amphibiousTerritories.add(coastalTerritory);
+
+        // Track amphibious assault details for naval combat dependency
+        // If naval combat in this sea zone is lost, these units will be destroyed
+        if (!this.amphibiousAssaultDetails[coastalTerritory]) {
+          this.amphibiousAssaultDetails[coastalTerritory] = {
+            seaZone: seaZone,
+            units: []
+          };
+        }
+        this.amphibiousAssaultDetails[coastalTerritory].units.push({
+          type: unitType,
+          quantity: 1,
+          owner: player.id
+        });
       }
     }
 
@@ -4253,6 +4360,7 @@ export class GameState {
     // Reset per-turn state on load (fresh state for the turn)
     this.rocketsUsedThisTurn = {};
     this.amphibiousTerritories = new Set();
+    this.amphibiousAssaultDetails = {};
     this.moveHistory = [];
     this.conqueredThisTurn = {};
 

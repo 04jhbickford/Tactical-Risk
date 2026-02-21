@@ -1129,6 +1129,39 @@ export class CombatUI {
 
     // Remove from combat queue
     this.gameState.combatQueue = this.gameState.combatQueue.filter(t => t !== this.currentTerritory);
+
+    // A&A Rule: If this was a naval battle and the attacker LOST, cancel dependent amphibious assaults
+    // Units that unloaded from transports are destroyed (go down with the transport)
+    const t = this.gameState.territoryByName[this.currentTerritory];
+    if (t?.isWater) {
+      // This was a naval battle - mark the sea zone
+      this.gameState.markSeaZoneCleared(this.currentTerritory);
+
+      if (this.combatState.winner === 'defender') {
+        // Attacker lost the naval battle - cancel all dependent amphibious assaults
+        const dependentAssaults = this.gameState.getAmphibiousAssaultsFromSeaZone(this.currentTerritory);
+        for (const landTerritory of dependentAssaults) {
+          const result = this.gameState.cancelAmphibiousAssault(landTerritory);
+          if (result.cancelled) {
+            console.log(`Amphibious assault to ${landTerritory} cancelled - naval battle lost`);
+            // Log the cancellation
+            if (this.actionLog) {
+              const player = this.gameState.currentPlayer;
+              this.actionLog.add({
+                type: 'combat-cancelled',
+                data: {
+                  territory: landTerritory,
+                  reason: 'Naval battle lost',
+                  unitsDestroyed: result.destroyedUnits,
+                  color: player?.color
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+
     this.gameState._notify();
   }
 
