@@ -309,7 +309,7 @@ export class PlayerPanel {
       } else {
         html += `
           <div class="pp-end-phase">
-            <button class="pp-action-btn end-phase" data-action="next-phase">
+            <button class="pp-action-btn complete end-phase" data-action="next-phase">
               End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
             </button>
           </div>`;
@@ -329,7 +329,7 @@ export class PlayerPanel {
         const owner = this.gameState.getOwner(this.selectedTerritory.name);
         if (owner === player.id) {
           html += `
-            <button class="pp-action-btn primary" data-action="place-capital" data-territory="${this.selectedTerritory.name}">
+            <button class="pp-action-btn complete" data-action="place-capital" data-territory="${this.selectedTerritory.name}">
               Place Capital: ${this.selectedTerritory.name}
             </button>`;
         }
@@ -1176,26 +1176,18 @@ export class PlayerPanel {
     const isValidPlacement = this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player);
     const isWater = this.selectedTerritory?.isWater;
 
-    // Calculate total queued early so we can show Done button at top
+    // Calculate total queued early so we can show Done button
     const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
     const showDoneButton = canFinish && totalQueued === 0;
 
+    // Calculate current + queued for display
+    const effectiveDeployed = placedThisRound + totalQueued;
+
     let html = `
-      <div class="pp-inline-placement">`;
-
-    // Show prominent "Done - Next Player" at TOP when all units deployed
-    if (showDoneButton) {
-      html += `
-        <div class="pp-placement-complete">
-          <div class="pp-complete-message">✓ All ${limit} units deployed!</div>
-          <button class="pp-action-btn complete large" data-action="finish-placement">Done - Next Player</button>
-        </div>`;
-    }
-
-    html += `
+      <div class="pp-inline-placement">
         <div class="pp-budget-bar">
           <span class="pp-budget-label">Deployed:</span>
-          <span class="pp-budget-value ${slotsRemaining <= 0 ? 'full' : ''}">${placedThisRound}</span>
+          <span class="pp-budget-value ${effectiveDeployed >= limit ? 'full' : ''}">${placedThisRound}${totalQueued > 0 ? `+${totalQueued}` : ''}</span>
           <span class="pp-budget-sep">/</span>
           <span class="pp-budget-total">${limit} this round</span>
         </div>
@@ -1300,17 +1292,23 @@ export class PlayerPanel {
 
     html += `</div>`;
 
-    // Action buttons (only show if not already showing Done button at top)
-    if (!showDoneButton) {
-      html += `<div class="pp-placement-actions">`;
-      if (canUndo) {
-        html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
-      }
-      if (totalQueued > 0 && isValidPlacement) {
-        html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
-      }
-      html += `</div>`;
+    // Action buttons - always at the bottom
+    html += `<div class="pp-placement-actions">`;
+    if (canUndo) {
+      html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
     }
+    if (totalQueued > 0 && isValidPlacement) {
+      html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
+    }
+    // Show prominent "Done - Next Player" at BOTTOM when all units deployed
+    if (showDoneButton) {
+      html += `
+        <div class="pp-placement-complete">
+          <div class="pp-complete-message">✓ All ${limit} units deployed!</div>
+          <button class="pp-action-btn complete large" data-action="finish-placement">Done - Next Player</button>
+        </div>`;
+    }
+    html += `</div>`;
 
     html += `</div>`;
     return html;
@@ -1393,6 +1391,35 @@ export class PlayerPanel {
       if (u.owner !== player.id) continue;
       const def = this.unitDefs?.[u.type];
       if (!def || def.movement <= 0 || def.isBuilding) continue;
+
+      // Aircraft on carriers can move independently - check them even if carrier has moved
+      // This allows aircraft to fly off during non-combat even if carrier moved during combat
+      if (u.id && u.type === 'carrier') {
+        const aircraft = u.aircraft || [];
+        // Always add carrier aircraft as selectable (they have their own movement)
+        if (territory.isWater && aircraft.length > 0) {
+          for (const airUnit of aircraft) {
+            // Aircraft can move if they haven't moved yet (tracked per aircraft, not per carrier)
+            if (airUnit.moved) continue;
+            const airKey = `aircraft:${u.id}:${airUnit.type}`;
+            const existing = carrierAircraft.find(c => c.cargoKey === airKey);
+            if (existing) {
+              existing.quantity += airUnit.quantity || 1;
+            } else {
+              carrierAircraft.push({
+                type: airUnit.type,
+                quantity: airUnit.quantity || 1,
+                carrierId: u.id,
+                isCarrierAircraft: true,
+                cargoKey: airKey,
+                displayName: `${airUnit.type} (on carrier)`
+              });
+            }
+          }
+        }
+      }
+
+      // Skip units that have already moved (for non-aircraft handling)
       if (u.moved) continue;
 
       // Individual ships (transports/carriers with cargo) are tracked separately
@@ -1433,8 +1460,11 @@ export class PlayerPanel {
           }
         }
 
-        // Add aircraft on carriers as separately selectable
-        if (territory.isWater && u.type === 'carrier' && aircraft.length > 0) {
+        // Skip the duplicate aircraft handling below since we already handled it above
+        if (u.type === 'carrier') continue;
+
+        // Add aircraft on carriers as separately selectable (for non-carriers with aircraft, if any)
+        if (territory.isWater && aircraft.length > 0) {
           for (const airUnit of aircraft) {
             const airKey = `aircraft:${u.id}:${airUnit.type}`;
             const existing = carrierAircraft.find(c => c.cargoKey === airKey);

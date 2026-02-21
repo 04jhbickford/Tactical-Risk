@@ -1770,7 +1770,8 @@ export class CombatUI {
 
     // Group rolls by unit type AND attack value for clearer display
     // This separates supported infantry (attack 2) from unsupported (attack 1)
-    const groupRolls = (rolls, valueKey) => {
+    // isAttackRolls parameter: only attackers can have artillery support
+    const groupRolls = (rolls, valueKey, isAttackRolls = false) => {
       const groups = {};
       for (const r of rolls) {
         const statValue = r[valueKey] || r.attackValue || r.defenseValue;
@@ -1781,8 +1782,8 @@ export class CombatUI {
             rolls: [],
             needed: statValue,
             unitType: r.unitType,
-            // Track if this is a supported infantry group
-            isSupported: r.unitType === 'infantry' && statValue === 2
+            // Track if this is a supported infantry group - ONLY on attack (artillery support is attack only)
+            isSupported: isAttackRolls && r.unitType === 'infantry' && statValue === 2
           };
         }
         groups[key].rolls.push(r);
@@ -1790,8 +1791,8 @@ export class CombatUI {
       return groups;
     };
 
-    const attackGroups = groupRolls(attackRolls, 'attackValue');
-    const defenseGroups = groupRolls(defenseRolls, 'defenseValue');
+    const attackGroups = groupRolls(attackRolls, 'attackValue', true);
+    const defenseGroups = groupRolls(defenseRolls, 'defenseValue', false);
 
     const renderGroupedDice = (groups) => {
       // Sort so supported infantry appears before regular infantry
