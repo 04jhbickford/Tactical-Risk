@@ -1324,8 +1324,8 @@ export class CombatUI {
             </div>
           </div>
         `;
-      } else if (this.combatState.bombardmentFired) {
-        // Show bombardment results
+      } else if (this.combatState.bombardmentFired && phase === 'selectBombardmentCasualties') {
+        // Show bombardment results only during casualty selection phase
         const { bombardmentRolls, bombardmentHits } = this.combatState;
         html += `
           <div class="bombardment-results">
@@ -1716,14 +1716,14 @@ export class CombatUI {
             ${showDice ? renderInlineDice(pairedDice) : ''}
             <div class="combat-paired-group" style="--player-color: ${attackerPlayer.color}">
               <div class="paired-unit">
-                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2">` : ''}
                 <span class="combat-unit-qty">${pairedCount}</span>
+                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2">` : ''}
                 <span class="combat-unit-stat supported">A2</span>
               </div>
               <span class="paired-plus">+</span>
               <div class="paired-unit">
-                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack 2">` : ''}
                 <span class="combat-unit-qty">${pairedCount}</span>
+                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack 2">` : ''}
                 <span class="combat-unit-stat">A2</span>
               </div>
             </div>
@@ -1795,8 +1795,8 @@ export class CombatUI {
           <div class="combat-unit-side attacker ${showDice ? 'with-dice' : ''}">
             ${showDice ? renderInlineDice(attackerDice) : ''}
             <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
               <span class="combat-unit-qty">${attackQty}</span>
+              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
             </div>
             <span class="combat-unit-stat">A${attackValue}</span>
           </div>`;

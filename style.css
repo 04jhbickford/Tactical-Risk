@@ -8005,7 +8005,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 6px;
@@ -8017,10 +8017,11 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   opacity: 0.4;
   transition: all 0.2s ease;
+  min-width: 50px;
 }
 
 .phase-step.current {
@@ -8056,7 +8057,8 @@ html, body {
 
 .phase-connector {
   color: #444;
-  font-size: 12px;
+  font-size: 10px;
+  margin: 0 2px;
   margin: 0 2px;
 }
 
