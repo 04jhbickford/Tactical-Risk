@@ -6504,14 +6504,14 @@ html, body {
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(25, 25, 50, 0.98);
-  border: 2px solid rgba(255, 215, 0, 0.4);
-  border-radius: 12px;
+  border: 2px solid rgba(100, 149, 237, 0.4);
+  border-radius: 10px;
   z-index: 200;
-  width: 90%;
-  max-width: 700px;
+  width: 92%;
+  max-width: 850px;
   max-height: 85vh;
   overflow-y: auto;
-  box-shadow: 0 0 40px rgba(0,0,0,0.7), 0 0 80px rgba(255, 215, 0, 0.15);
+  box-shadow: 0 0 40px rgba(0,0,0,0.7), 0 0 60px rgba(100, 149, 237, 0.15);
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
@@ -6553,14 +6553,14 @@ html, body {
 }
 
 .combat-content {
-  padding: 20px;
+  padding: 14px 16px;
 }
 
 .combat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .combat-title {
@@ -6577,15 +6577,15 @@ html, body {
 
 .combat-forces {
   display: flex;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .force {
   flex: 1;
   background: rgba(255,255,255,0.03);
-  border-radius: 6px;
-  padding: 8px;
+  border-radius: 5px;
+  padding: 6px;
 }
 
 .force-header {
@@ -6694,15 +6694,15 @@ html, body {
 
 .combat-forces-expanded {
   background: rgba(255,255,255,0.02);
-  border-radius: 8px;
-  padding: 8px;
-  margin-bottom: 12px;
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 8px;
 }
 
 .combat-unit-row {
   display: flex;
   align-items: center;
-  padding: 6px 0;
+  padding: 4px 0;
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
 
@@ -6714,8 +6714,8 @@ html, body {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
+  gap: 6px;
+  min-height: 28px;
 }
 
 .combat-unit-side.attacker {
@@ -6962,13 +6962,14 @@ html, body {
 
 .combat-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   justify-content: center;
+  margin-top: 10px;
 }
 
 .combat-btn {
-  padding: 12px 24px;
-  font-size: 15px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 600;
   border: none;
   border-radius: 6px;
@@ -7816,11 +7817,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 10px 16px;
-  margin: 8px 0;
+  gap: 12px;
+  padding: 8px 12px;
+  margin: 6px 0;
   background: rgba(0,0,0,0.3);
-  border-radius: 6px;
+  border-radius: 5px;
   border-top: 1px solid rgba(255,255,255,0.1);
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
@@ -8104,11 +8105,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 4px;
+  padding: 6px 10px;
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  border-radius: 5px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 
@@ -8125,8 +8126,8 @@ html, body {
 
 .phase-step.current {
   opacity: 1;
-  background: rgba(255, 215, 0, 0.2);
-  border: 1px solid rgba(255, 215, 0, 0.4);
+  background: rgba(100, 149, 237, 0.2);
+  border: 1px solid rgba(100, 149, 237, 0.4);
 }
 
 .phase-step.complete {
@@ -8150,7 +8151,7 @@ html, body {
 }
 
 .phase-step.current .phase-label {
-  color: #ffd700;
+  color: #6495ED;
   font-weight: 600;
 }
 
