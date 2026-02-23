@@ -1410,9 +1410,9 @@ export class CombatUI {
       `;
     }
 
-    // Show dice results
+    // Show hits summary (dice are now shown inline with forces above)
     if (this.lastRolls && phase === 'selectCasualties') {
-      html += this._renderDiceResults();
+      html += this._renderHitsSummary();
     }
 
     // Casualty selection
@@ -1640,6 +1640,39 @@ export class CombatUI {
   }
 
   _renderExpandedForces(attackers, defenders, attackerPlayer, defenderPlayer) {
+    // Get dice rolls if available (for inline display)
+    const diceRolls = this.lastRolls;
+    const showDice = diceRolls && this.combatState.phase === 'selectCasualties';
+
+    // Group dice rolls by unit type if available
+    const attackDiceByType = {};
+    const defenseDiceByType = {};
+    if (showDice) {
+      for (const r of diceRolls.attackRolls || []) {
+        if (!attackDiceByType[r.unitType]) attackDiceByType[r.unitType] = [];
+        attackDiceByType[r.unitType].push(r);
+      }
+      for (const r of diceRolls.defenseRolls || []) {
+        if (!defenseDiceByType[r.unitType]) defenseDiceByType[r.unitType] = [];
+        defenseDiceByType[r.unitType].push(r);
+      }
+    }
+
+    // Helper to render inline dice
+    const renderInlineDice = (rolls) => {
+      if (!rolls || rolls.length === 0) return '';
+      const hits = rolls.filter(r => r.hit).length;
+      return `
+        <div class="inline-dice-group">
+          <div class="inline-dice">
+            ${rolls.slice(0, 8).map(r => `<span class="die-mini ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}
+            ${rolls.length > 8 ? `<span class="dice-overflow">+${rolls.length - 8}</span>` : ''}
+          </div>
+          <span class="inline-dice-hits ${hits > 0 ? 'has-hits' : ''}">${hits} hit${hits !== 1 ? 's' : ''}</span>
+        </div>
+      `;
+    };
+
     // Get all unit types present in either army
     const allUnitTypes = new Set();
     attackers.forEach(u => { if (u.quantity > 0) allUnitTypes.add(u.type); });
@@ -1663,23 +1696,27 @@ export class CombatUI {
     if (pairedCount > 0) {
       const infantryIcon = attackerPlayer ? getUnitIconPath('infantry', attackerPlayer.id) : null;
       const artilleryIcon = attackerPlayer ? getUnitIconPath('artillery', attackerPlayer.id) : null;
-      const defInfantry = defenders.find(u => u.type === 'infantry')?.quantity || 0;
-      const defArtillery = defenders.find(u => u.type === 'artillery')?.quantity || 0;
       const infantryDef = this.unitDefs['infantry'];
       const artilleryDef = this.unitDefs['artillery'];
 
+      // Get dice for supported infantry (attack value 2) and artillery
+      const supportedInfDice = showDice ? (diceRolls.attackRolls || []).filter(r => r.unitType === 'infantry' && r.attackValue === 2) : [];
+      const artilleryDice = showDice ? attackDiceByType['artillery'] || [] : [];
+      const pairedDice = [...supportedInfDice, ...artilleryDice];
+
       html += `
-        <div class="combat-unit-row paired-row">
+        <div class="combat-unit-row paired-row ${showDice ? 'with-dice' : ''}">
           <div class="combat-unit-side attacker paired">
+            ${showDice ? renderInlineDice(pairedDice) : ''}
             <div class="combat-paired-group" style="--player-color: ${attackerPlayer.color}">
               <div class="paired-unit">
-                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2 (boosted from 1), Defense ${infantryDef?.defense || 0}, Cost ${infantryDef?.cost || 0}">` : ''}
+                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2">` : ''}
                 <span class="combat-unit-qty">${pairedCount}</span>
                 <span class="combat-unit-stat supported">A2</span>
               </div>
               <span class="paired-plus">+</span>
               <div class="paired-unit">
-                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack ${artilleryDef?.attack || 0}, Defense ${artilleryDef?.defense || 0}, Cost ${artilleryDef?.cost || 0}">` : ''}
+                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack 2">` : ''}
                 <span class="combat-unit-qty">${pairedCount}</span>
                 <span class="combat-unit-stat">A2</span>
               </div>
@@ -1723,16 +1760,32 @@ export class CombatUI {
         attackQty = extraArtillery;
       }
 
+      // Get dice for this unit type (excluding paired infantry which was handled above)
+      let attackerDice = [];
+      let defenderDice = [];
+      if (showDice) {
+        if (unitType === 'infantry' && pairedCount > 0) {
+          // Only unsupported infantry dice (attack value 1)
+          attackerDice = (diceRolls.attackRolls || []).filter(r => r.unitType === 'infantry' && r.attackValue === 1);
+        } else if (unitType === 'artillery' && pairedCount > 0) {
+          // Artillery dice already shown in paired row
+          attackerDice = [];
+        } else {
+          attackerDice = attackDiceByType[unitType] || [];
+        }
+        defenderDice = defenseDiceByType[unitType] || [];
+      }
+
       // Build attacker HTML
       let attackerHtml = '';
       if (attackQty > 0) {
         const attackValue = def?.attack || 0;
-        const label = unitType === 'infantry' && pairedCount > 0 ? 'unpaired' : '';
 
         attackerHtml = `
-          <div class="combat-unit-side attacker">
+          <div class="combat-unit-side attacker ${showDice ? 'with-dice' : ''}">
+            ${showDice ? renderInlineDice(attackerDice) : ''}
             <div class="combat-unit-icons" style="--player-color: ${attackerPlayer.color}">
-              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}" title="${unitType}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
+              ${attackerIcon ? `<img src="${attackerIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
               <span class="combat-unit-qty">${attackQty}</span>
             </div>
             <span class="combat-unit-stat">A${attackValue}</span>
@@ -1747,18 +1800,19 @@ export class CombatUI {
         const artilleryLabel = unitType === 'artillery' && pairedCount > 0 && extraArtillery > 0 ? ' (unpaired)' : '';
 
         html += `
-          <div class="combat-unit-row">
+          <div class="combat-unit-row ${showDice ? 'with-dice' : ''}">
             ${attackerHtml}
             <div class="combat-unit-type">
               <span class="combat-type-name">${unitType}${rowLabel}${artilleryLabel}</span>
             </div>
-            <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'}">
+            <div class="combat-unit-side defender ${defendQty > 0 ? '' : 'empty'} ${showDice ? 'with-dice' : ''}">
               ${defendQty > 0 ? `
                 <span class="combat-unit-stat">D${def?.defense || 0}</span>
                 <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
                   <span class="combat-unit-qty">${defendQty}</span>
-                  ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}" title="${unitType}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
+                  ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
                 </div>
+                ${showDice ? renderInlineDice(defenderDice) : ''}
               ` : ''}
             </div>
           </div>
@@ -1769,7 +1823,30 @@ export class CombatUI {
     return html || '<div class="no-units">No units remaining</div>';
   }
 
-  // Render loss summary for battle end display
+  // Render compact hits summary below forces (dice are inline above)
+  _renderHitsSummary() {
+    if (!this.lastRolls) return '';
+
+    const { attackHits, defenseHits } = this.lastRolls;
+    const player = this.gameState.currentPlayer;
+    const defenderOwner = this.combatState.defenders[0]?.owner;
+    const defenderPlayer = this.gameState.getPlayer(defenderOwner);
+
+    return `
+      <div class="hits-summary">
+        <div class="hits-side attacker" style="--side-color: ${player.color}">
+          <span class="hits-label">${player.name}</span>
+          <span class="hits-count ${attackHits > 0 ? 'has-hits' : ''}">${attackHits} hit${attackHits !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="hits-divider">vs</div>
+        <div class="hits-side defender" style="--side-color: ${defenderPlayer?.color || '#888'}">
+          <span class="hits-count ${defenseHits > 0 ? 'has-hits' : ''}">${defenseHits} hit${defenseHits !== 1 ? 's' : ''}</span>
+          <span class="hits-label">${defenderPlayer?.name || 'Defender'}</span>
+        </div>
+      </div>
+    `;
+  }
+
   // Render phase progress indicator
   _renderPhaseIndicator(currentPhase) {
     // Define the possible phases in order
