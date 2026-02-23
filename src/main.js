@@ -936,7 +936,8 @@ async function init() {
       return;
     }
 
-    if (!camera.isDragging) {
+    // Hover detection - runs when not actively panning the camera
+    if (!camera.isDragging || !camera.hasDragged) {
       const world = camera.screenToWorld(e.clientX, e.clientY);
       const wrappedX = wrapX(world.x);
 
@@ -951,33 +952,43 @@ async function init() {
         unitTooltip.show(unitHit, e.clientX, e.clientY);
         tooltip.hide();
         canvas.classList.add('hovering');
+        hoverTerritory = null; // Clear territory hover when over unit
+        camera.dirty = true;
       } else {
         // Check for territory hover
         unitTooltip.hide();
         const hit = territoryMap.hitTest(wrappedX, world.y);
+
+        // Always update hover territory for highlight
         if (hit !== hoverTerritory) {
           hoverTerritory = hit;
           camera.dirty = true;
-          canvas.classList.toggle('hovering', !!hit);
+        }
 
-          // Clear any pending tooltip show
+        canvas.classList.toggle('hovering', !!hit);
+
+        // Handle tooltip timing
+        if (hit !== hoverTerritory || !hit) {
+          // Clear any pending tooltip show when territory changes
           if (hoverTooltipTimeout) {
             clearTimeout(hoverTooltipTimeout);
             hoverTooltipTimeout = null;
           }
           tooltip.hide();
+        }
 
-          // Start delayed tooltip show for new territory
-          if (hit && gameState) {
-            lastHoverPos = { x: e.clientX, y: e.clientY };
-            hoverTooltipTimeout = setTimeout(() => {
-              tooltip.show(hit, lastHoverPos.x, lastHoverPos.y);
-            }, TOOLTIP_DELAY);
-          }
-        } else if (hit && gameState) {
-          // Same territory - update position for pending tooltip
+        // Start delayed tooltip show for territory
+        if (hit && gameState && !hoverTooltipTimeout && !tooltip.isVisible) {
           lastHoverPos = { x: e.clientX, y: e.clientY };
-          // If tooltip is already visible, update position
+          hoverTooltipTimeout = setTimeout(() => {
+            if (hoverTerritory === hit) {
+              tooltip.show(hit, lastHoverPos.x, lastHoverPos.y);
+            }
+            hoverTooltipTimeout = null;
+          }, TOOLTIP_DELAY);
+        } else if (hit && gameState) {
+          // Update position for pending/visible tooltip
+          lastHoverPos = { x: e.clientX, y: e.clientY };
           if (tooltip.isVisible) {
             tooltip.show(hit, e.clientX, e.clientY);
           }

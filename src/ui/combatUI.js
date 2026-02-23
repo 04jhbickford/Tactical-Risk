@@ -1863,6 +1863,53 @@ export class CombatUI {
         </div>
       `;
     } else if (phase === 'ready') {
+      // Show submarine first strike result if just fired
+      const { subFirstStrikeRolls, submarineFirstStrikeFired } = this.combatState;
+      if (submarineFirstStrikeFired && subFirstStrikeRolls && subFirstStrikeRolls.length > 0) {
+        const attackerRolls = subFirstStrikeRolls.filter(r => r.side === 'attacker');
+        const defenderRolls = subFirstStrikeRolls.filter(r => r.side === 'defender');
+        const attackerHits = attackerRolls.filter(r => r.hit).length;
+        const defenderHits = defenderRolls.filter(r => r.hit).length;
+        const totalHits = attackerHits + defenderHits;
+
+        html += `
+          <div class="sub-strike-result" style="background: rgba(100,149,237,0.15); padding: 10px; border-radius: 6px; margin-bottom: 12px; border-left: 3px solid #6495ED;">
+            <div style="font-weight: 600; color: #7ab3ff; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <span>🔱</span> Submarine First Strike Result
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+              ${attackerRolls.length > 0 ? `
+                <div style="flex: 1; min-width: 100px;">
+                  <div style="font-size: 11px; color: #4caf50; margin-bottom: 4px;">Attacker Subs</div>
+                  <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 4px;">
+                    ${attackerRolls.map(r => `<span class="die-mini ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${attackerHits > 0 ? '#81c784' : '#666'};">
+                    ${attackerHits > 0 ? `${attackerHits} hit${attackerHits > 1 ? 's' : ''}` : 'No hits'}
+                  </div>
+                </div>
+              ` : ''}
+              ${defenderRolls.length > 0 ? `
+                <div style="flex: 1; min-width: 100px;">
+                  <div style="font-size: 11px; color: #f44336; margin-bottom: 4px;">Defender Subs</div>
+                  <div style="display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 4px;">
+                    ${defenderRolls.map(r => `<span class="die-mini ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: ${defenderHits > 0 ? '#81c784' : '#666'};">
+                    ${defenderHits > 0 ? `${defenderHits} hit${defenderHits > 1 ? 's' : ''}` : 'No hits'}
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+            ${totalHits === 0 ? `
+              <div style="text-align: center; margin-top: 8px; padding: 6px; background: rgba(0,0,0,0.2); border-radius: 4px; color: #888; font-size: 12px;">
+                ✓ No casualties from submarine first strike
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
       // Check if submarines can submerge during this round
       const { attackerSubsCanSubmerge, defenderSubsCanSubmerge, attackers, defenders } = this.combatState;
       const attackerSubs = attackers.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
