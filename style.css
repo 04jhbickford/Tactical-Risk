@@ -6799,25 +6799,26 @@ html, body {
 }
 
 .combat-unit-icons.paired-icons {
-  gap: 0;
-  padding: 4px 6px;
+  gap: 2px;
+  /* Same padding as regular icons to maintain box size */
+  padding: 4px 8px;
 }
 
 .combat-unit-icons.paired-icons .combat-unit-icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
 
 .combat-unit-icons.paired-icons .combat-unit-icon:nth-child(3) {
-  /* Artillery icon overlaps infantry */
-  margin-left: -10px;
+  /* Artillery icon overlaps infantry slightly */
+  margin-left: -6px;
   position: relative;
   z-index: 1;
 }
 
 .combat-unit-icons.paired-icons .combat-unit-qty {
-  font-size: 14px;
-  min-width: 18px;
+  font-size: 16px;
+  min-width: 20px;
 }
 
 .combat-unit-stat {
@@ -8136,33 +8137,32 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 10px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 5px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
+  gap: 0;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  margin-bottom: 10px;
 }
 
 .phase-step {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 4px;
-  opacity: 0.4;
+  opacity: 0.35;
   transition: all 0.2s ease;
-  min-width: 50px;
+  min-width: 54px;
 }
 
 .phase-step.current {
   opacity: 1;
-  background: rgba(100, 149, 237, 0.2);
-  border: 1px solid rgba(100, 149, 237, 0.4);
+  background: rgba(100, 149, 237, 0.25);
+  box-shadow: 0 0 8px rgba(100, 149, 237, 0.3);
 }
 
 .phase-step.complete {
-  opacity: 0.7;
+  opacity: 0.65;
 }
 
 .phase-step.complete .phase-icon {
@@ -8170,27 +8170,31 @@ html, body {
 }
 
 .phase-icon {
-  font-size: 16px;
-  margin-bottom: 2px;
+  font-size: 18px;
+  margin-bottom: 3px;
 }
 
 .phase-label {
-  font-size: 9px;
-  color: #aaa;
+  font-size: 10px;
+  color: #888;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
+  font-weight: 500;
 }
 
 .phase-step.current .phase-label {
-  color: #6495ED;
+  color: #7ab3ff;
   font-weight: 600;
+}
+
+.phase-step.complete .phase-label {
+  color: #6a6a6a;
 }
 
 .phase-connector {
   color: #444;
-  font-size: 10px;
-  margin: 0 2px;
-  margin: 0 2px;
+  font-size: 12px;
+  margin: 0 -2px;
 }
 
 /* Compact Probability Bar */

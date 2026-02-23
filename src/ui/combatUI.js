@@ -2171,7 +2171,6 @@ export class CombatUI {
       { id: 'aaFire', label: 'AA Fire', icon: '🎯' },
       { id: 'submarineFirstStrike', label: 'Sub Strike', icon: '🔱' },
       { id: 'ready', label: 'Combat', icon: '⚔️' },
-      { id: 'rolling', label: 'Rolling', icon: '🎲' },
       { id: 'selectCasualties', label: 'Casualties', icon: '💀' },
       { id: 'resolved', label: 'Result', icon: '🏆' },
     ];
