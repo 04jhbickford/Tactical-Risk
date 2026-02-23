@@ -259,6 +259,25 @@ export class PlayerPanel {
         });
       }
     }
+    // Initial unit placement - Done button
+    else if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+      const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+      const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
+      const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+      const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
+      const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
+      const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
+      const showDoneButton = canFinish && totalQueued === 0;
+
+      if (showDoneButton) {
+        buttons.push({
+          action: 'finish-placement',
+          label: 'Done - Next Player →',
+          disabled: false,
+          primary: true
+        });
+      }
+    }
 
     // End Phase button (always visible during PLAYING phase, unless in special modes)
     if (phase === GAME_PHASES.PLAYING && !this.isAirLandingActive() && !this.movePendingDest) {
@@ -1361,12 +1380,11 @@ export class PlayerPanel {
     if (totalQueued > 0 && isValidPlacement) {
       html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
     }
-    // Show prominent "Done - Next Player" at BOTTOM when all units deployed
+    // "Done - Next Player" button is now in the fixed bottom actions bar
     if (showDoneButton) {
       html += `
         <div class="pp-placement-complete">
           <div class="pp-complete-message">✓ All ${limit} units deployed!</div>
-          <button class="pp-action-btn complete large" data-action="finish-placement">Done - Next Player</button>
         </div>`;
     }
     html += `</div>`;
