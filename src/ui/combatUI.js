@@ -1571,12 +1571,14 @@ export class CombatUI {
       if (attackerSubsHaveFirstStrike) subDesc.push('Attacking subs');
       if (defenderSubsHaveFirstStrike) subDesc.push('Defending subs');
       html += `
-        <div class="submarine-info" style="text-align: center; margin-bottom: 10px; color: #aaa; font-size: 12px;">
-          🚢 ${subDesc.join(' and ')} have first strike (enemy has no destroyer)
+        <div class="submarine-strike-section" style="text-align: center;">
+          <div class="submarine-info" style="margin-bottom: 10px; color: #aaa; font-size: 12px;">
+            🚢 ${subDesc.join(' and ')} have first strike (enemy has no destroyer)
+          </div>
+          <button class="combat-btn roll" data-action="submarine-first-strike">
+            Fire Submarine First Strike
+          </button>
         </div>
-        <button class="combat-btn roll" data-action="submarine-first-strike">
-          <span class="btn-icon">🚢</span> Fire Submarine First Strike
-        </button>
       `;
     } else if (phase === 'ready') {
       html += `
@@ -1711,25 +1713,18 @@ export class CombatUI {
       const pairedDice = [...supportedInfDice, ...artilleryDice];
 
       html += `
-        <div class="combat-unit-row paired-row ${showDice ? 'with-dice' : ''}">
-          <div class="combat-unit-side attacker paired">
+        <div class="combat-unit-row ${showDice ? 'with-dice' : ''}">
+          <div class="combat-unit-side attacker ${showDice ? 'with-dice' : ''}">
             ${showDice ? renderInlineDice(pairedDice) : ''}
-            <div class="combat-paired-group" style="--player-color: ${attackerPlayer.color}">
-              <div class="paired-unit">
-                <span class="combat-unit-qty">${pairedCount}</span>
-                ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2">` : ''}
-                <span class="combat-unit-stat supported">A2</span>
-              </div>
-              <span class="paired-plus">+</span>
-              <div class="paired-unit">
-                <span class="combat-unit-qty">${pairedCount}</span>
-                ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack 2">` : ''}
-                <span class="combat-unit-stat">A2</span>
-              </div>
+            <div class="combat-unit-icons paired-icons" style="--player-color: ${attackerPlayer.color}">
+              <span class="combat-unit-qty">${pairedCount}</span>
+              ${infantryIcon ? `<img src="${infantryIcon}" class="combat-unit-icon" alt="infantry" title="Infantry (supported): Attack 2">` : ''}
+              ${artilleryIcon ? `<img src="${artilleryIcon}" class="combat-unit-icon" alt="artillery" title="Artillery: Attack 2">` : ''}
             </div>
+            <span class="combat-unit-stat supported">A2</span>
           </div>
           <div class="combat-unit-type">
-            <span class="combat-type-name">Infantry + Artillery</span>
+            <span class="combat-type-name">Inf + Art</span>
           </div>
           <div class="combat-unit-side defender empty"></div>
         </div>`;

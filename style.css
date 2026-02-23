@@ -6697,6 +6697,15 @@ html, body {
   text-align: center;
 }
 
+.combat-unit-icons.paired-icons {
+  gap: 2px;
+}
+
+.combat-unit-icons.paired-icons .combat-unit-icon {
+  width: 24px;
+  height: 24px;
+}
+
 .combat-unit-stat {
   font-size: 10px;
   color: #888;
@@ -7709,7 +7718,7 @@ html, body {
 }
 
 .combat-unit-side.defender.with-dice {
-  flex-direction: row-reverse;
+  flex-direction: row;
 }
 
 /* Hits Summary Section */
