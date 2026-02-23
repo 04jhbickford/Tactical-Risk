@@ -201,8 +201,109 @@ export class PlayerPanel {
     html += this._renderTabContent(phase, turnPhase, player);
     html += `</div>`;
 
+    // Fixed bottom actions bar
+    const bottomActions = this._renderBottomActions(phase, turnPhase, player);
+    if (bottomActions) {
+      html += bottomActions;
+    }
+
     this.contentEl.innerHTML = html;
     this._bindEvents();
+  }
+
+  _renderBottomActions(phase, turnPhase, player) {
+    // Don't show for AI
+    if (player.isAI) return '';
+
+    let buttons = [];
+    let warningHtml = '';
+
+    // Air landing confirm button
+    if (this.isAirLandingActive()) {
+      const { airUnitsToLand } = this.airLandingData;
+      const allSelected = airUnitsToLand.every((u, idx) => {
+        const unitKey = u.id || `${u.type}_${idx}`;
+        return u.landingOptions?.length === 0 || this.airLandingSelections[unitKey];
+      });
+
+      buttons.push({
+        action: 'confirm-air-landing',
+        label: 'Confirm All Landings',
+        disabled: !allSelected,
+        primary: true
+      });
+    }
+    // Movement confirm button
+    else if (this.movePendingDest && this.activeTab === 'actions') {
+      const destOwner = this.gameState.getOwner(this.movePendingDest);
+      const isAttack = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
+
+      buttons.push({
+        action: 'confirm-move',
+        label: isAttack ? 'Confirm Attack' : 'Confirm Move',
+        disabled: false,
+        primary: true,
+        isAttack: isAttack
+      });
+    }
+    // Capital placement
+    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT && this.selectedTerritory && !this.selectedTerritory.isWater) {
+      const owner = this.gameState.getOwner(this.selectedTerritory.name);
+      if (owner === player.id) {
+        buttons.push({
+          action: 'place-capital',
+          label: `Place Capital: ${this.selectedTerritory.name}`,
+          disabled: false,
+          primary: true,
+          territory: this.selectedTerritory.name
+        });
+      }
+    }
+
+    // End Phase button (always visible during PLAYING phase, unless in special modes)
+    if (phase === GAME_PHASES.PLAYING && !this.isAirLandingActive() && !this.movePendingDest) {
+      const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
+        this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
+
+      const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
+      const unplacedUnits = pendingPurchases.reduce((sum, p) => sum + p.quantity, 0);
+      const hasUnplacedUnits = turnPhase === TURN_PHASES.MOBILIZE && unplacedUnits > 0;
+
+      if (hasUnresolvedCombats) {
+        warningHtml = `<div class="pp-bottom-warning">⚠️ Resolve all battles before advancing</div>`;
+      } else if (hasUnplacedUnits) {
+        warningHtml = `<div class="pp-bottom-warning">⚠️ Place all ${unplacedUnits} unit${unplacedUnits > 1 ? 's' : ''} before advancing</div>`;
+      }
+
+      buttons.push({
+        action: 'next-phase',
+        label: `End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →`,
+        disabled: hasUnresolvedCombats || hasUnplacedUnits,
+        primary: true
+      });
+    }
+
+    // No buttons to show
+    if (buttons.length === 0) return '';
+
+    let html = `<div class="pp-bottom-actions">`;
+    html += warningHtml;
+    html += `<div class="pp-bottom-buttons">`;
+
+    for (const btn of buttons) {
+      const disabledClass = btn.disabled ? 'disabled' : '';
+      const attackClass = btn.isAttack ? 'attack' : '';
+      const dataAttrs = btn.territory ? `data-territory="${btn.territory}"` : '';
+
+      html += `
+        <button class="pp-confirm-btn ${disabledClass} ${attackClass}"
+                data-action="${btn.action}" ${dataAttrs} ${btn.disabled ? 'disabled' : ''}>
+          ${btn.label}
+        </button>`;
+    }
+
+    html += `</div></div>`;
+    return html;
   }
 
   _renderHeader(player) {
@@ -279,42 +380,7 @@ export class PlayerPanel {
     // Phase-specific actions
     html += this._renderPhaseActions(phase, turnPhase, player);
 
-    // End Phase button (always visible during PLAYING phase)
-    if (phase === GAME_PHASES.PLAYING) {
-      // Check if we need to block advancing due to unresolved combats
-      const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
-        this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
-
-      // Check if we need to block advancing due to unplaced units in mobilize phase
-      const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
-      const unplacedUnits = pendingPurchases.reduce((sum, p) => sum + p.quantity, 0);
-      const hasUnplacedUnits = turnPhase === TURN_PHASES.MOBILIZE && unplacedUnits > 0;
-
-      if (hasUnresolvedCombats) {
-        html += `
-          <div class="pp-end-phase">
-            <div class="pp-combat-warning">⚠️ Resolve all battles before advancing</div>
-            <button class="pp-action-btn end-phase disabled" disabled>
-              End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
-            </button>
-          </div>`;
-      } else if (hasUnplacedUnits) {
-        html += `
-          <div class="pp-end-phase">
-            <div class="pp-mobilize-warning">⚠️ Place all ${unplacedUnits} unit${unplacedUnits > 1 ? 's' : ''} before advancing</div>
-            <button class="pp-action-btn end-phase disabled" disabled>
-              End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
-            </button>
-          </div>`;
-      } else {
-        html += `
-          <div class="pp-end-phase">
-            <button class="pp-action-btn complete end-phase" data-action="next-phase">
-              End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →
-            </button>
-          </div>`;
-      }
-    }
+    // End Phase button is now in the fixed bottom actions bar
 
     html += '</div>';
     return html;
@@ -323,17 +389,9 @@ export class PlayerPanel {
   _renderPhaseActions(phase, turnPhase, player) {
     let html = '';
 
-    // Capital placement
+    // Capital placement - hint only, button is in bottom actions bar
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      if (this.selectedTerritory && !this.selectedTerritory.isWater) {
-        const owner = this.gameState.getOwner(this.selectedTerritory.name);
-        if (owner === player.id) {
-          html += `
-            <button class="pp-action-btn complete" data-action="place-capital" data-territory="${this.selectedTerritory.name}">
-              Place Capital: ${this.selectedTerritory.name}
-            </button>`;
-        }
-      } else {
+      if (!this.selectedTerritory || this.selectedTerritory.isWater) {
         html += `<div class="pp-hint">Click one of your territories to place your capital</div>`;
       }
     }
@@ -1919,15 +1977,13 @@ export class PlayerPanel {
           }
         }
 
+        // Show destination info and warning - button is in bottom actions bar
         html += `
           <div class="pp-move-confirm-area">
             <div class="pp-move-dest-info ${isAttack ? 'attack' : ''}">
               ${isAttack ? '⚔ Attack: ' : 'Moving to: '}${this.movePendingDest}
             </div>
             ${airLandingWarning ? `<div class="pp-air-warning">${airLandingWarning}</div>` : ''}
-            <button class="pp-action-btn primary" data-action="confirm-move">
-              ${isAttack ? 'Confirm Attack' : 'Confirm Move'}
-            </button>
           </div>`;
       } else {
         html += `<div class="pp-hint">Select destination above or click on the map</div>`;
@@ -2019,20 +2075,16 @@ export class PlayerPanel {
     // Check if any selections have been made (for undo button)
     const hasSelections = Object.keys(this.airLandingSelections).length > 0;
 
-    // Action buttons
-    html += `
-      <div class="pp-air-landing-actions">
-        ${hasSelections ? `
+    // Action buttons - Confirm button is in bottom actions bar
+    if (hasSelections) {
+      html += `
+        <div class="pp-air-landing-actions">
           <button class="pp-action-btn secondary" data-action="undo-air-landing">
             ↩ Undo Selections
           </button>
-        ` : ''}
-        <button class="pp-action-btn primary ${allSelected ? '' : 'disabled'}"
-                data-action="confirm-air-landing" ${allSelected ? '' : 'disabled'}>
-          Confirm All Landings
-        </button>
-      </div>
-    </div>`;
+        </div>`;
+    }
+    html += `</div>`;
 
     return html;
   }

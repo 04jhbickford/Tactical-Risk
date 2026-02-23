@@ -124,6 +124,15 @@ export class CombatUI {
       initialPhase = 'submarineFirstStrike';
     }
 
+    // Check if submarines should auto-submerge (facing only air units)
+    const attackerHasOnlyAir = attackers.length > 0 && attackers.every(u => this.unitDefs[u.type]?.isAir);
+    const defenderHasOnlyAir = defenders.filter(u => u.type !== 'aaGun').length > 0 &&
+      defenders.filter(u => u.type !== 'aaGun').every(u => this.unitDefs[u.type]?.isAir);
+
+    // Track submerged submarines (they exit combat but stay in the zone)
+    const attackerSubsCanSubmerge = attackerSubs.length > 0 && !defenderHasDestroyer;
+    const defenderSubsCanSubmerge = defenderSubs.length > 0 && !attackerHasDestroyer;
+
     this.combatState = {
       attackers,
       defenders,
@@ -144,6 +153,16 @@ export class CombatUI {
       defenderSubsHaveFirstStrike,
       hasSubmarineFirstStrike,
       submarineFirstStrikeFired: false,
+      // Submarine submerge tracking
+      attackerSubsCanSubmerge,
+      defenderSubsCanSubmerge,
+      attackerSubmergedSubs: 0, // Count of submerged attacking subs
+      defenderSubmergedSubs: 0, // Count of submerged defending subs
+      attackerHasOnlyAir,
+      defenderHasOnlyAir,
+      // Track submarine hits in regular combat (can't hit air)
+      attackerSubHits: 0,
+      defenderSubHits: 0,
       // Air landing tracking
       airUnitsToLand: [], // { type, quantity, landingOptions }
       selectedLandings: {}, // { unitType: territoryName }
@@ -355,9 +374,52 @@ export class CombatUI {
     }
   }
 
+  // A&A Submarine Rules: Submerge submarines (they exit combat but stay in zone)
+  _submergeSub(side, count) {
+    const { attackers, defenders, attackerSubmergedSubs, defenderSubmergedSubs, phase } = this.combatState;
+
+    let subsToSubmerge = 0;
+
+    if (side === 'attacker') {
+      const attackerSubCount = attackers.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+
+      if (count === 'all') {
+        subsToSubmerge = attackerSubCount;
+        this.combatState.attackerSubmergedSubs = attackerSubCount;
+      } else {
+        subsToSubmerge = Math.min(count, attackerSubCount - attackerSubmergedSubs);
+        this.combatState.attackerSubmergedSubs = Math.min(attackerSubmergedSubs + count, attackerSubCount);
+      }
+    } else if (side === 'defender') {
+      const defenderSubCount = defenders.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+
+      if (count === 'all') {
+        subsToSubmerge = defenderSubCount;
+        this.combatState.defenderSubmergedSubs = defenderSubCount;
+      } else {
+        subsToSubmerge = Math.min(count, defenderSubCount - defenderSubmergedSubs);
+        this.combatState.defenderSubmergedSubs = Math.min(defenderSubmergedSubs + count, defenderSubCount);
+      }
+    }
+
+    // If in ready phase (regular combat), immediately remove submerged subs
+    if (phase === 'ready' && subsToSubmerge > 0) {
+      this._removeSubmergedSubs(side, subsToSubmerge);
+      // Reset the counter since we've already removed them
+      if (side === 'attacker') {
+        this.combatState.attackerSubmergedSubs = 0;
+      } else {
+        this.combatState.defenderSubmergedSubs = 0;
+      }
+    }
+
+    this._render();
+  }
+
   // A&A Submarine Rules: Roll submarine first strike
   _rollSubmarineFirstStrike() {
     const { attackers, defenders, attackerSubsHaveFirstStrike, defenderSubsHaveFirstStrike,
+            attackerSubmergedSubs, defenderSubmergedSubs,
             totalAttackerLosses, totalDefenderLosses } = this.combatState;
 
     const subFirstStrikeRolls = [];
@@ -365,30 +427,46 @@ export class CombatUI {
     let defenderSubHits = 0;
 
     // Attacking submarines roll first strike (if defender has no destroyer)
+    // Only non-submerged subs fire
     if (attackerSubsHaveFirstStrike) {
       const attackerSubs = attackers.filter(u => u.type === 'submarine');
-      for (const sub of attackerSubs) {
-        const def = this.unitDefs[sub.type];
-        for (let i = 0; i < sub.quantity; i++) {
-          const roll = Math.floor(Math.random() * 6) + 1;
-          const hit = roll <= def.attack;
-          subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'attacker' });
-          if (hit) attackerSubHits++;
-        }
+      const totalAttackerSubs = attackerSubs.reduce((s, u) => s + u.quantity, 0);
+      const activeSubs = totalAttackerSubs - (attackerSubmergedSubs || 0);
+
+      // Roll for active (non-submerged) subs only
+      for (let i = 0; i < activeSubs; i++) {
+        const def = this.unitDefs['submarine'];
+        const roll = Math.floor(Math.random() * 6) + 1;
+        const hit = roll <= def.attack;
+        subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'attacker' });
+        if (hit) attackerSubHits++;
+      }
+
+      // Remove submerged subs from combat (they stay in the zone but exit battle)
+      if (attackerSubmergedSubs > 0) {
+        this._removeSubmergedSubs('attacker', attackerSubmergedSubs);
       }
     }
 
     // Defending submarines roll first strike (if attacker has no destroyer)
+    // Only non-submerged subs fire
     if (defenderSubsHaveFirstStrike) {
       const defenderSubs = defenders.filter(u => u.type === 'submarine');
-      for (const sub of defenderSubs) {
-        const def = this.unitDefs[sub.type];
-        for (let i = 0; i < sub.quantity; i++) {
-          const roll = Math.floor(Math.random() * 6) + 1;
-          const hit = roll <= def.defense;
-          subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'defender' });
-          if (hit) defenderSubHits++;
-        }
+      const totalDefenderSubs = defenderSubs.reduce((s, u) => s + u.quantity, 0);
+      const activeSubs = totalDefenderSubs - (defenderSubmergedSubs || 0);
+
+      // Roll for active (non-submerged) subs only
+      for (let i = 0; i < activeSubs; i++) {
+        const def = this.unitDefs['submarine'];
+        const roll = Math.floor(Math.random() * 6) + 1;
+        const hit = roll <= def.defense;
+        subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'defender' });
+        if (hit) defenderSubHits++;
+      }
+
+      // Remove submerged subs from combat (they stay in the zone but exit battle)
+      if (defenderSubmergedSubs > 0) {
+        this._removeSubmergedSubs('defender', defenderSubmergedSubs);
       }
     }
 
@@ -409,6 +487,29 @@ export class CombatUI {
   }
 
   // Apply submarine first strike casualties (they don't fire back)
+  // Remove submerged submarines from combat (they stay in the sea zone)
+  _removeSubmergedSubs(side, count) {
+    const units = side === 'attacker' ? this.combatState.attackers : this.combatState.defenders;
+    const subUnit = units.find(u => u.type === 'submarine');
+    if (subUnit && count > 0) {
+      // Store submerged subs to be restored to the zone after combat
+      if (!this.combatState.submergedSubsToRestore) {
+        this.combatState.submergedSubsToRestore = { attacker: 0, defender: 0 };
+      }
+      this.combatState.submergedSubsToRestore[side] += count;
+
+      // Remove from combat (reduce quantity)
+      subUnit.quantity = Math.max(0, subUnit.quantity - count);
+      if (subUnit.quantity === 0) {
+        if (side === 'attacker') {
+          this.combatState.attackers = this.combatState.attackers.filter(u => u.type !== 'submarine');
+        } else {
+          this.combatState.defenders = this.combatState.defenders.filter(u => u.type !== 'submarine');
+        }
+      }
+    }
+  }
+
   _applySubmarineFirstStrikeCasualties() {
     const { attackers, defenders, pendingSubFirstStrikeAttackerCasualties,
             pendingSubFirstStrikeDefenderCasualties, totalAttackerLosses, totalDefenderLosses } = this.combatState;
@@ -616,7 +717,15 @@ export class CombatUI {
       }
     }
 
-    this.lastRolls = { attackRolls, defenseRolls, attackHits, defenseHits };
+    // Track submarine hits separately (subs can only hit sea units, not air)
+    const attackerSubHits = attackRolls.filter(r => r.unitType === 'submarine' && r.hit).length;
+    const defenderSubHits = defenseRolls.filter(r => r.unitType === 'submarine' && r.hit).length;
+
+    // Store sub hits for casualty selection (defender takes attacker sub hits, etc.)
+    this.combatState.attackerSubHits = attackerSubHits;
+    this.combatState.defenderSubHits = defenderSubHits;
+
+    this.lastRolls = { attackRolls, defenseRolls, attackHits, defenseHits, attackerSubHits, defenderSubHits };
     return { attackHits, defenseHits };
   }
 
@@ -686,10 +795,57 @@ export class CombatUI {
 
   _autoSelectCasualties() {
     // Auto-select cheapest units as casualties
-    const { attackers, defenders, pendingAttackerCasualties, pendingDefenderCasualties } = this.combatState;
+    // A&A Rule: Submarine hits can only be assigned to sea units, not air units
+    const { attackers, defenders, pendingAttackerCasualties, pendingDefenderCasualties,
+            attackerSubHits, defenderSubHits } = this.combatState;
 
-    this.combatState.selectedAttackerCasualties = this._selectCheapestCasualties(attackers, pendingAttackerCasualties);
-    this.combatState.selectedDefenderCasualties = this._selectCheapestCasualties(defenders, pendingDefenderCasualties);
+    // Attacker casualties: defenderSubHits must go to non-air units
+    this.combatState.selectedAttackerCasualties = this._selectCasualtiesWithSubHits(
+      attackers, pendingAttackerCasualties, defenderSubHits || 0
+    );
+
+    // Defender casualties: attackerSubHits must go to non-air units
+    this.combatState.selectedDefenderCasualties = this._selectCasualtiesWithSubHits(
+      defenders, pendingDefenderCasualties, attackerSubHits || 0
+    );
+  }
+
+  // Select casualties accounting for submarine hits (which can't hit air)
+  _selectCasualtiesWithSubHits(units, totalHits, subHits) {
+    if (subHits === 0 || totalHits === 0) {
+      return this._selectCheapestCasualties(units, totalHits);
+    }
+
+    // First, assign submarine hits to non-air sea units only
+    const seaUnits = units.filter(u => {
+      const def = this.unitDefs[u.type];
+      return def && def.isSea && !def.isAir && u.quantity > 0;
+    });
+
+    const subCasualties = this._selectCheapestCasualties(seaUnits, subHits);
+
+    // Calculate remaining non-sub hits
+    const nonSubHits = totalHits - subHits;
+    if (nonSubHits <= 0) {
+      return subCasualties;
+    }
+
+    // For remaining hits, select from all units (including air)
+    // But account for units already selected as sub casualties
+    const remainingUnits = units.map(u => {
+      const alreadyTaken = subCasualties[u.type] || 0;
+      return { ...u, quantity: u.quantity - alreadyTaken };
+    }).filter(u => u.quantity > 0);
+
+    const nonSubCasualties = this._selectCheapestCasualties(remainingUnits, nonSubHits);
+
+    // Merge the two selections
+    const merged = { ...subCasualties };
+    for (const [type, count] of Object.entries(nonSubCasualties)) {
+      merged[type] = (merged[type] || 0) + count;
+    }
+
+    return merged;
   }
 
   _selectCheapestCasualties(units, count) {
@@ -1120,6 +1276,29 @@ export class CombatUI {
       }
     }
 
+    // Restore submerged submarines to the zone (they exited combat but stay in the zone)
+    const submergedSubs = this.combatState.submergedSubsToRestore;
+    if (submergedSubs) {
+      if (submergedSubs.attacker > 0) {
+        // Find existing attacker sub unit or create one
+        const existingSub = units.find(u => u.type === 'submarine' && u.owner === player.id);
+        if (existingSub) {
+          existingSub.quantity += submergedSubs.attacker;
+        } else {
+          units.push({ type: 'submarine', owner: player.id, quantity: submergedSubs.attacker, moved: true });
+        }
+      }
+      if (submergedSubs.defender > 0) {
+        // Find existing defender sub unit or create one
+        const existingSub = units.find(u => u.type === 'submarine' && u.owner === previousOwner);
+        if (existingSub) {
+          existingSub.quantity += submergedSubs.defender;
+        } else {
+          units.push({ type: 'submarine', owner: previousOwner, quantity: submergedSubs.defender });
+        }
+      }
+    }
+
     this.gameState.units[this.currentTerritory] = units;
 
     // Log combat result
@@ -1351,8 +1530,8 @@ export class CombatUI {
       `;
     }
 
-    // AA Results
-    if (this.combatState.aaFired && this.combatState.aaResults) {
+    // AA Results - only show during casualty selection phase (like bombardment)
+    if (this.combatState.aaFired && this.combatState.aaResults && phase === 'selectAACasualties') {
       const { rolls, hits } = this.combatState.aaResults;
       html += `
         <div class="aa-results">
@@ -1565,22 +1744,104 @@ export class CombatUI {
         </button>
       `;
     } else if (phase === 'submarineFirstStrike') {
-      // A&A Submarine Rules: Submarine First Strike
-      const { attackerSubsHaveFirstStrike, defenderSubsHaveFirstStrike } = this.combatState;
+      // A&A Submarine Rules: Submarine First Strike with Submerge Option
+      const { attackerSubsHaveFirstStrike, defenderSubsHaveFirstStrike,
+              attackerSubsCanSubmerge, defenderSubsCanSubmerge,
+              attackerSubmergedSubs, defenderSubmergedSubs, attackers, defenders } = this.combatState;
+
+      const attackerSubCount = attackers.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+      const defenderSubCount = defenders.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+
       const subDesc = [];
       if (attackerSubsHaveFirstStrike) subDesc.push('Attacking subs');
       if (defenderSubsHaveFirstStrike) subDesc.push('Defending subs');
+
       html += `
-        <div class="submarine-strike-section" style="text-align: center;">
-          <div class="submarine-info" style="margin-bottom: 10px; color: #aaa; font-size: 12px;">
+        <div class="submarine-strike-section">
+          <div class="submarine-info" style="margin-bottom: 10px; color: #aaa; font-size: 12px; text-align: center;">
             🚢 ${subDesc.join(' and ')} have first strike (enemy has no destroyer)
           </div>
-          <button class="combat-btn roll" data-action="submarine-first-strike">
-            Fire Submarine First Strike
-          </button>
+
+          <div class="submarine-options" style="display: flex; flex-direction: column; gap: 10px;">`;
+
+      // Attacker submarine options
+      if (attackerSubsHaveFirstStrike && attackerSubCount > 0) {
+        const activeSubs = attackerSubCount - attackerSubmergedSubs;
+        html += `
+          <div class="sub-option-group" style="background: rgba(76,175,80,0.1); padding: 8px; border-radius: 4px; border-left: 3px solid #4caf50;">
+            <div style="font-weight: bold; color: #4caf50; margin-bottom: 6px;">Attacking Submarines (${activeSubs} active${attackerSubmergedSubs > 0 ? `, ${attackerSubmergedSubs} submerged` : ''})</div>
+            ${attackerSubsCanSubmerge && activeSubs > 0 ? `
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="combat-btn submerge" data-action="submerge-sub" data-side="attacker" style="flex: 1;">
+                  🌊 Submerge 1 Sub
+                </button>
+                ${activeSubs > 1 ? `
+                  <button class="combat-btn submerge" data-action="submerge-all-subs" data-side="attacker" style="flex: 1;">
+                    🌊 Submerge All (${activeSubs})
+                  </button>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>`;
+      }
+
+      // Defender submarine options
+      if (defenderSubsHaveFirstStrike && defenderSubCount > 0) {
+        const activeSubs = defenderSubCount - defenderSubmergedSubs;
+        html += `
+          <div class="sub-option-group" style="background: rgba(244,67,54,0.1); padding: 8px; border-radius: 4px; border-left: 3px solid #f44336;">
+            <div style="font-weight: bold; color: #f44336; margin-bottom: 6px;">Defending Submarines (${activeSubs} active${defenderSubmergedSubs > 0 ? `, ${defenderSubmergedSubs} submerged` : ''})</div>
+            ${defenderSubsCanSubmerge && activeSubs > 0 ? `
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="combat-btn submerge" data-action="submerge-sub" data-side="defender" style="flex: 1;">
+                  🌊 Submerge 1 Sub
+                </button>
+                ${activeSubs > 1 ? `
+                  <button class="combat-btn submerge" data-action="submerge-all-subs" data-side="defender" style="flex: 1;">
+                    🌊 Submerge All (${activeSubs})
+                  </button>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>`;
+      }
+
+      html += `
+          </div>
+
+          <div style="text-align: center; margin-top: 12px;">
+            <button class="combat-btn roll" data-action="submarine-first-strike">
+              🔱 Fire First Strike (Remaining Subs)
+            </button>
+          </div>
         </div>
       `;
     } else if (phase === 'ready') {
+      // Check if submarines can submerge during this round
+      const { attackerSubsCanSubmerge, defenderSubsCanSubmerge, attackers, defenders } = this.combatState;
+      const attackerSubs = attackers.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+      const defenderSubs = defenders.filter(u => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+
+      // Show submerge option if subs can submerge (no enemy destroyer)
+      if ((attackerSubsCanSubmerge && attackerSubs > 0) || (defenderSubsCanSubmerge && defenderSubs > 0)) {
+        html += `<div class="submarine-submerge-options" style="margin-bottom: 10px; padding: 8px; background: rgba(100,149,237,0.1); border-radius: 4px;">`;
+        html += `<div style="font-size: 11px; color: #6495ED; margin-bottom: 6px;">🚢 Submarines can submerge instead of fighting:</div>`;
+        html += `<div style="display: flex; gap: 8px; flex-wrap: wrap;">`;
+
+        if (attackerSubsCanSubmerge && attackerSubs > 0) {
+          html += `<button class="combat-btn submerge small" data-action="submerge-all-subs" data-side="attacker">
+            🌊 Submerge Attacking (${attackerSubs})
+          </button>`;
+        }
+        if (defenderSubsCanSubmerge && defenderSubs > 0) {
+          html += `<button class="combat-btn submerge small" data-action="submerge-all-subs" data-side="defender">
+            🌊 Submerge Defending (${defenderSubs})
+          </button>`;
+        }
+
+        html += `</div></div>`;
+      }
+
       html += `
         <button class="combat-btn roll" data-action="roll">
           <span class="btn-icon">🎲</span> Roll Dice
@@ -2331,6 +2592,12 @@ export class CombatUI {
             break;
           case 'submarine-first-strike':
             this._rollSubmarineFirstStrike();
+            break;
+          case 'submerge-sub':
+            this._submergeSub(btn.dataset.side, 1);
+            break;
+          case 'submerge-all-subs':
+            this._submergeSub(btn.dataset.side, 'all');
             break;
           case 'roll':
             await this._animateDiceRoll();
