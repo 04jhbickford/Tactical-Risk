@@ -1652,4 +1652,55 @@ export class TerritoryRenderer {
 
     ctx.restore();
   }
+
+  // Drag-and-drop destination highlight
+  dragDestTerritory = null;
+  dragDestIsValid = false;
+  dragDestIsEnemy = false;
+
+  setDragDestination(territoryName, isValid, isEnemy) {
+    this.dragDestTerritory = territoryName;
+    this.dragDestIsValid = isValid;
+    this.dragDestIsEnemy = isEnemy;
+  }
+
+  /** Render drag destination highlight */
+  renderDragDestination(ctx) {
+    if (!this.dragDestTerritory) return;
+
+    const t = this.territoryByName[this.dragDestTerritory];
+    if (!t) return;
+
+    ctx.save();
+
+    if (this.dragDestIsValid) {
+      // Valid destination - green or red for enemy
+      const color = this.dragDestIsEnemy ? '#e74c3c' : '#4caf50';
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = this.dragDestIsEnemy ? 'rgba(231, 76, 60, 0.4)' : 'rgba(76, 175, 80, 0.4)';
+      ctx.strokeStyle = color;
+    } else {
+      // Invalid destination - gray
+      ctx.shadowColor = '#888';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
+      ctx.strokeStyle = '#888';
+    }
+
+    for (const poly of t.polygons) {
+      if (!poly || poly.length < 3) continue;
+      this._fillPoly(ctx, poly);
+    }
+
+    ctx.lineWidth = 3;
+    if (t.polygons.length === 1) {
+      this._strokePoly(ctx, t.polygons[0]);
+    } else {
+      const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+      this._strokeEdges(ctx, externalEdges);
+    }
+
+    ctx.restore();
+  }
 }

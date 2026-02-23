@@ -1,6 +1,6 @@
 // Lobby UI for player selection - Risk Style only
 
-export const GAME_VERSION = 'V1.56';
+export const GAME_VERSION = 'V1.57';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [

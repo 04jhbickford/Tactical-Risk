@@ -116,6 +116,14 @@ async function init() {
   let lastHoverPos = { x: 0, y: 0 };
   const TOOLTIP_DELAY = 400; // ms before showing tooltip
 
+  // Drag-and-drop state for unit movement
+  let isDraggingUnits = false;
+  let dragSourceTerritory = null;
+  let dragStartPos = { x: 0, y: 0 };
+  let dragCurrentPos = { x: 0, y: 0 };
+  let dragValidDestinations = [];
+  const DRAG_THRESHOLD = 5; // pixels before drag starts
+
   // Territory tooltip (shows on hover)
   const tooltip = new TerritoryTooltip(continents);
   tooltip.setUnitDefs(unitDefs);
@@ -816,14 +824,102 @@ async function init() {
   // Mouse events
   canvas.addEventListener('mousedown', (e) => {
     e.preventDefault();
+    tooltip.hide(); // Hide tooltip when starting interaction
+    unitTooltip.hide();
+
+    // Check if we should start a unit drag (during movement phases)
+    if (gameState && e.button === 0) {
+      const turnPhase = gameState.turnPhase;
+      const isMovementPhase = turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+
+      if (isMovementPhase && !gameState.currentPlayer?.isAI) {
+        const world = camera.screenToWorld(e.clientX, e.clientY);
+        const wrappedX = wrapX(world.x);
+        const hit = territoryMap.hitTest(wrappedX, world.y);
+
+        if (hit) {
+          const units = gameState.getUnitsAt(hit.name);
+          const playerUnits = units?.filter(u => u.owner === gameState.currentPlayer.id) || [];
+
+          if (playerUnits.length > 0) {
+            // Store potential drag start
+            dragStartPos = { x: e.clientX, y: e.clientY };
+            dragSourceTerritory = hit;
+            dragCurrentPos = { x: e.clientX, y: e.clientY };
+          }
+        }
+      }
+    }
+
     camera.onMouseDown(e);
     canvas.classList.add('panning');
-    tooltip.hide(); // Hide tooltip when starting to drag
   });
 
   canvas.addEventListener('mousemove', (e) => {
+    // Check for unit drag-and-drop
+    if (dragSourceTerritory && !isDraggingUnits) {
+      const dx = e.clientX - dragStartPos.x;
+      const dy = e.clientY - dragStartPos.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > DRAG_THRESHOLD) {
+        // Start dragging
+        isDraggingUnits = true;
+        canvas.classList.add('dragging-units');
+
+        // Calculate valid destinations for all units in source territory
+        const isCombatMove = gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+        dragValidDestinations = playerPanel._getValidDestinations(dragSourceTerritory, gameState.currentPlayer, isCombatMove);
+
+        // Select all player's units in the source territory for movement
+        const units = gameState.getUnitsAt(dragSourceTerritory.name) || [];
+        const playerUnits = units.filter(u => u.owner === gameState.currentPlayer.id);
+        playerPanel.setSelectedTerritory(dragSourceTerritory);
+
+        // Select all movable units
+        playerPanel.moveSelectedUnits = {};
+        for (const unit of playerUnits) {
+          const def = unitDefs[unit.type];
+          if (def && (def.movement || 0) > 0) {
+            playerPanel.moveSelectedUnits[unit.type] = unit.quantity || 1;
+          }
+        }
+
+        camera.dirty = true;
+      }
+    }
+
+    if (isDraggingUnits) {
+      // Update drag position
+      dragCurrentPos = { x: e.clientX, y: e.clientY };
+
+      // Get territory under cursor
+      const world = camera.screenToWorld(e.clientX, e.clientY);
+      const wrappedX = wrapX(world.x);
+      const hit = territoryMap.hitTest(wrappedX, world.y);
+
+      hoverTerritory = hit;
+      camera.dirty = true;
+
+      // Update highlighting based on valid destinations
+      if (hit) {
+        const isValid = dragValidDestinations.some(d => d.name === hit.name);
+        const isEnemy = dragValidDestinations.find(d => d.name === hit.name)?.isEnemy;
+        territoryRenderer.setDragDestination(hit.name, isValid, isEnemy);
+      } else {
+        territoryRenderer.setDragDestination(null, false, false);
+      }
+
+      return;
+    }
+
     const moved = camera.onMouseMove(e);
     if (moved) {
+      // Cancel any potential drag if camera is panning
+      dragSourceTerritory = null;
+      isDraggingUnits = false;
+      canvas.classList.remove('dragging-units');
+
       canvas.classList.add('panning');
       canvas.classList.remove('hovering');
       tooltip.hide();
@@ -884,6 +980,58 @@ async function init() {
   canvas.addEventListener('mouseup', (e) => {
     const wasDrag = camera.onMouseUp();
     canvas.classList.remove('panning');
+    canvas.classList.remove('dragging-units');
+
+    // Handle drag-and-drop unit movement completion
+    if (isDraggingUnits && dragSourceTerritory) {
+      const world = camera.screenToWorld(e.clientX, e.clientY);
+      const hit = territoryMap.hitTest(wrapX(world.x), world.y);
+
+      // Check if dropped on a valid destination
+      const validDest = hit && dragValidDestinations.find(d => d.name === hit.name);
+
+      if (validDest) {
+        // Execute the move
+        playerPanel.movePendingDest = hit.name;
+
+        // Confirm the move
+        const isCombatMove = gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
+        const result = gameState.moveUnits(
+          dragSourceTerritory.name,
+          hit.name,
+          playerPanel.moveSelectedUnits,
+          isCombatMove
+        );
+
+        if (result.success) {
+          actionLog.logMove(
+            gameState.currentPlayer,
+            dragSourceTerritory.name,
+            hit.name,
+            Object.entries(playerPanel.moveSelectedUnits)
+              .filter(([_, qty]) => qty > 0)
+              .map(([type, qty]) => ({ type, quantity: qty })),
+            result.isAttack
+          );
+        }
+
+        // Reset movement state
+        playerPanel.moveSelectedUnits = {};
+        playerPanel.movePendingDest = null;
+      }
+
+      // Clear drag state
+      isDraggingUnits = false;
+      dragSourceTerritory = null;
+      dragValidDestinations = [];
+      territoryRenderer.setDragDestination(null, false, false);
+      camera.dirty = true;
+      return;
+    }
+
+    // Clear potential drag state
+    dragSourceTerritory = null;
+
     console.log('[MouseUp] wasDrag:', wasDrag, 'Phase:', gameState?.phase);
 
     if (!wasDrag) {
@@ -1063,8 +1211,21 @@ async function init() {
         // Cross-water connection lines
         territoryRenderer.renderCrossWaterConnections(ctx, camera.zoom);
 
-        // Valid move destinations (highlight during movement phase)
-        if (movementUI.isMovementPhase() && movementUI.hasUnitsSelected()) {
+        // Valid move destinations (highlight during movement phase or drag-and-drop)
+        if (isDraggingUnits && dragValidDestinations.length > 0) {
+          // During drag-and-drop, show valid destinations
+          const destinations = dragValidDestinations.map(d => d.name);
+          const isEnemy = dragValidDestinations.reduce((acc, d) => {
+            acc[d.name] = d.isEnemy;
+            return acc;
+          }, {});
+          territoryRenderer.renderValidMoveDestinations(ctx, destinations, isEnemy);
+
+          // Also highlight source territory
+          if (dragSourceTerritory) {
+            territoryRenderer.renderSelected(ctx, dragSourceTerritory);
+          }
+        } else if (movementUI.isMovementPhase() && movementUI.hasUnitsSelected()) {
           const { destinations, isEnemy } = movementUI.getDestinationsWithEnemyFlags();
           territoryRenderer.renderValidMoveDestinations(ctx, destinations, isEnemy);
 
@@ -1106,6 +1267,11 @@ async function init() {
 
         // Programmatic hover highlight (from dropdown)
         territoryRenderer.renderHoverHighlight(ctx);
+
+        // Drag-and-drop destination highlight
+        if (isDraggingUnits) {
+          territoryRenderer.renderDragDestination(ctx);
+        }
 
         // Labels
         territoryRenderer.renderLabels(ctx, camera.zoom);

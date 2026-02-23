@@ -57,6 +57,10 @@ html, body {
   cursor: pointer;
 }
 
+#mapCanvas.dragging-units {
+  cursor: move;
+}
+
 /* --- HUD --- */
 #hud {
   position: absolute;
@@ -1533,13 +1537,15 @@ html, body {
 .territory-tooltip {
   position: fixed;
   z-index: 100;
-  background: rgba(20, 20, 40, 0.95);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(20, 20, 40, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 8px;
   padding: 10px 14px;
   min-width: 160px;
   max-width: 280px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   pointer-events: none;
   transition: opacity 0.15s ease;
 }
