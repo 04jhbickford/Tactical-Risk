@@ -1262,20 +1262,20 @@ export class PlayerPanel {
     const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
     const showDoneButton = canFinish && totalQueued === 0;
 
-    // Calculate current + queued for display
-    const effectiveDeployed = placedThisRound + totalQueued;
+    // Calculate deployed this round (confirmed + queued)
+    const deployedThisRound = placedThisRound + totalQueued;
 
     let html = `
       <div class="pp-inline-placement">
         <div class="pp-budget-bar">
           <span class="pp-budget-label">Deployed:</span>
-          <span class="pp-budget-value ${effectiveDeployed >= limit ? 'full' : ''}">${placedThisRound}${totalQueued > 0 ? `+${totalQueued}` : ''}</span>
+          <span class="pp-budget-value ${deployedThisRound >= limit ? 'full' : ''}">${deployedThisRound}</span>
           <span class="pp-budget-sep">/</span>
           <span class="pp-budget-total">${limit} this round</span>
         </div>
         <div class="pp-placement-remaining">
           <span class="pp-remaining-label">Remaining to deploy:</span>
-          <span class="pp-remaining-value">${actualRemaining - totalQueued} units</span>
+          <span class="pp-remaining-value">${actualRemaining} units</span>
         </div>`;
 
     // Show selected territory (only if still placing)
