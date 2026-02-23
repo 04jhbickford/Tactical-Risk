@@ -1948,10 +1948,14 @@ export class GameState {
 
           if (transportDef && transportDef.canCarry?.includes(landUnit.type)) {
             // Calculate total slots available for this unit type across all transports
+            // NOTE: Grouped transports (quantity > 1) have no cargo, individual transports have IDs
             let availableSlots = 0;
             for (const transport of transports) {
               const currentCargo = transport.cargo || [];
-              availableSlots += this._countAvailableSlotsForType(currentCargo, landUnit.type);
+              const slotsPerShip = this._countAvailableSlotsForType(currentCargo, landUnit.type);
+              // For grouped transports, multiply by quantity (grouped transports have no cargo)
+              const shipCount = transport.id ? 1 : (transport.quantity || 1);
+              availableSlots += slotsPerShip * shipCount;
             }
             if (availableSlots >= landUnit.quantity) {
               loadingOntoTransport = true;
