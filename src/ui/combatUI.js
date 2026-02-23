@@ -1236,31 +1236,31 @@ export class CombatUI {
     let html = `
       <div class="combat-content">
         <div class="combat-header">
-          <div class="combat-title">Battle for ${this.currentTerritory}</div>
+          <div class="combat-title">⚔ ${this.currentTerritory}</div>
           <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
         </div>
 
-        <!-- Probability Bar -->
-        <div class="probability-bar-container">
-          <div class="prob-label attacker">${player.name} (${Math.round(probability)}%)</div>
+        <!-- Phase Progress Indicator -->
+        ${this._renderPhaseIndicator(phase)}
+
+        <!-- Compact Probability Bar -->
+        <div class="probability-bar-compact">
+          <span class="prob-name" style="color: ${player.color}">${player.name}</span>
           <div class="probability-bar">
             <div class="prob-fill attacker" style="width: ${probability}%; background: ${player.color}"></div>
             <div class="prob-fill defender" style="width: ${100 - probability}%; background: ${defenderPlayer?.color || '#888'}"></div>
-            <div class="prob-marker" style="left: ${probability}%"></div>
           </div>
-          <div class="prob-label defender">${defenderPlayer?.name || 'Defender'} (${Math.round(100 - probability)}%)</div>
+          <span class="prob-name" style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Defender'}</span>
         </div>
 
-        <!-- Forces - Expanded View with Matching Unit Types -->
-        <div class="combat-forces-header">
+        <!-- Forces - Compact Header -->
+        <div class="combat-forces-header compact">
           <div class="force-header-col attacker" style="border-color: ${player.color}">
-            <span class="force-name" style="color: ${player.color}">${player.name}</span>
-            <span class="force-count">${this._getTotalUnits(attackers)} units</span>
+            <span class="force-count" style="color: ${player.color}">${this._getTotalUnits(attackers)} units</span>
           </div>
           <div class="force-header-col vs">VS</div>
           <div class="force-header-col defender" style="border-color: ${defenderPlayer?.color || '#888'}">
-            <span class="force-name" style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Unknown'}</span>
-            <span class="force-count">${this._getTotalUnits(defenders)} units</span>
+            <span class="force-count" style="color: ${defenderPlayer?.color || '#888'}">${this._getTotalUnits(defenders)} units</span>
           </div>
         </div>
 
@@ -1735,11 +1735,56 @@ export class CombatUI {
   }
 
   // Render loss summary for battle end display
+  // Render phase progress indicator
+  _renderPhaseIndicator(currentPhase) {
+    // Define the possible phases in order
+    const phases = [
+      { id: 'bombardment', label: 'Bombardment', icon: '⚓' },
+      { id: 'aaFire', label: 'AA Fire', icon: '🎯' },
+      { id: 'submarineFirstStrike', label: 'Sub Strike', icon: '🚢' },
+      { id: 'ready', label: 'Combat', icon: '⚔️' },
+      { id: 'rolling', label: 'Rolling', icon: '🎲' },
+      { id: 'selectCasualties', label: 'Casualties', icon: '💀' },
+      { id: 'resolved', label: 'Result', icon: '🏆' },
+    ];
+
+    // Find which phases are active in this battle
+    const { bombardmentRolls, hasAA, hasSubmarineFirstStrike } = this.combatState;
+    const activePhases = phases.filter(p => {
+      if (p.id === 'bombardment') return bombardmentRolls?.length > 0;
+      if (p.id === 'aaFire' || p.id === 'selectAACasualties') return hasAA;
+      if (p.id === 'submarineFirstStrike') return hasSubmarineFirstStrike;
+      return true;
+    });
+
+    // Map current phase to display phase
+    let displayPhase = currentPhase;
+    if (currentPhase === 'selectBombardmentCasualties') displayPhase = 'bombardment';
+    if (currentPhase === 'selectAACasualties') displayPhase = 'aaFire';
+
+    const currentIdx = activePhases.findIndex(p => p.id === displayPhase);
+
+    return `
+      <div class="combat-phase-indicator">
+        ${activePhases.map((p, i) => {
+          const isComplete = i < currentIdx;
+          const isCurrent = i === currentIdx;
+          return `
+            <div class="phase-step ${isComplete ? 'complete' : ''} ${isCurrent ? 'current' : ''}">
+              <span class="phase-icon">${p.icon}</span>
+              <span class="phase-label">${p.label}</span>
+            </div>
+          `;
+        }).join('<span class="phase-connector">›</span>')}
+      </div>
+    `;
+  }
+
   _renderLossSummary(losses, initialForces, playerId) {
     const lossEntries = Object.entries(losses || {});
 
     if (lossEntries.length === 0) {
-      return '<div class="summary-no-losses">No losses</div>';
+      return '<div class="summary-no-losses">✓ No losses</div>';
     }
 
     // Sort by unit cost (most expensive first)
@@ -1755,21 +1800,23 @@ export class CombatUI {
       return sum + (cost * count);
     }, 0);
 
-    let html = '<div class="summary-losses">';
+    // Visual icon-based display with crossed-out icons
+    let html = '<div class="summary-losses-visual">';
     for (const [type, count] of lossEntries) {
       const imageSrc = playerId ? getUnitIconPath(type, playerId) : null;
-      const initial = initialForces?.find(u => u.type === type)?.quantity || 0;
 
       html += `
-        <div class="summary-loss-item">
-          ${imageSrc ? `<img src="${imageSrc}" class="summary-loss-icon" alt="${type}">` : ''}
-          <span class="summary-loss-count">-${count}</span>
-          <span class="summary-loss-type">${type}</span>
+        <div class="summary-loss-unit">
+          <div class="loss-icon-wrapper">
+            ${imageSrc ? `<img src="${imageSrc}" class="summary-loss-icon crossed" alt="${type}">` : ''}
+            <span class="loss-x">✕</span>
+          </div>
+          <span class="loss-count">×${count}</span>
         </div>
       `;
     }
     html += '</div>';
-    html += `<div class="summary-total-ipc">Total IPC lost: ${totalIpcLost}</div>`;
+    html += `<div class="summary-ipc-badge">-${totalIpcLost} IPCs</div>`;
 
     return html;
   }

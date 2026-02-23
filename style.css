@@ -7593,6 +7593,166 @@ html, body {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Phase Progress Indicator */
+.combat-phase-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.phase-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0.4;
+  transition: all 0.2s ease;
+}
+
+.phase-step.current {
+  opacity: 1;
+  background: rgba(255, 215, 0, 0.2);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+}
+
+.phase-step.complete {
+  opacity: 0.7;
+}
+
+.phase-step.complete .phase-icon {
+  color: #4caf50;
+}
+
+.phase-icon {
+  font-size: 16px;
+  margin-bottom: 2px;
+}
+
+.phase-label {
+  font-size: 9px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.phase-step.current .phase-label {
+  color: #ffd700;
+  font-weight: 600;
+}
+
+.phase-connector {
+  color: #444;
+  font-size: 12px;
+  margin: 0 2px;
+}
+
+/* Compact Probability Bar */
+.probability-bar-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.probability-bar-compact .prob-name {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 60px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.probability-bar-compact .prob-name:first-child {
+  text-align: right;
+}
+
+.probability-bar-compact .probability-bar {
+  flex: 1;
+  height: 6px;
+}
+
+/* Compact Forces Header */
+.combat-forces-header.compact {
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+.combat-forces-header.compact .force-header-col {
+  padding: 4px 10px;
+}
+
+.combat-forces-header.compact .force-count {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Visual Loss Summary */
+.summary-losses-visual {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.summary-loss-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.loss-icon-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.summary-loss-icon.crossed {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  opacity: 0.5;
+  filter: grayscale(50%);
+}
+
+.loss-x {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ff4444;
+  font-size: 20px;
+  font-weight: bold;
+  text-shadow: 0 0 4px rgba(0,0,0,0.8);
+}
+
+.loss-count {
+  font-size: 11px;
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+.summary-ipc-badge {
+  display: inline-block;
+  background: rgba(255, 80, 80, 0.2);
+  color: #ff6b6b;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 8px;
+  text-align: center;
+}
+
 /* AA Fire */
 .aa-fire-section {
   background: rgba(255, 152, 0, 0.15);
