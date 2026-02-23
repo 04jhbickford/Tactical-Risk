@@ -1819,8 +1819,8 @@ export class CombatUI {
               ${defendQty > 0 ? `
                 <span class="combat-unit-stat">D${def?.defense || 0}</span>
                 <div class="combat-unit-icons" style="--player-color: ${defenderPlayer?.color || '#888'}">
-                  <span class="combat-unit-qty">${defendQty}</span>
                   ${defenderIcon ? `<img src="${defenderIcon}" class="combat-unit-icon" alt="${unitType}">` : ''}
+                  <span class="combat-unit-qty">${defendQty}</span>
                 </div>
                 ${showDice ? renderInlineDice(defenderDice) : ''}
               ` : ''}
