@@ -6781,12 +6781,25 @@ html, body {
 }
 
 .combat-unit-icons.paired-icons {
-  gap: 2px;
+  gap: 0;
+  padding: 4px 6px;
 }
 
 .combat-unit-icons.paired-icons .combat-unit-icon {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
+}
+
+.combat-unit-icons.paired-icons .combat-unit-icon:nth-child(3) {
+  /* Artillery icon overlaps infantry */
+  margin-left: -10px;
+  position: relative;
+  z-index: 1;
+}
+
+.combat-unit-icons.paired-icons .combat-unit-qty {
+  font-size: 14px;
+  min-width: 18px;
 }
 
 .combat-unit-stat {
