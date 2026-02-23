@@ -243,7 +243,8 @@ export class PlayerPanel {
         label: isAttack ? 'Confirm Attack' : 'Confirm Move',
         disabled: false,
         primary: true,
-        isAttack: isAttack
+        isAttack: isAttack,
+        undoable: !isAttack  // Non-attack moves can be undone
       });
     }
     // Capital placement
@@ -312,10 +313,11 @@ export class PlayerPanel {
     for (const btn of buttons) {
       const disabledClass = btn.disabled ? 'disabled' : '';
       const attackClass = btn.isAttack ? 'attack' : '';
+      const undoableClass = btn.undoable ? 'undoable' : '';
       const dataAttrs = btn.territory ? `data-territory="${btn.territory}"` : '';
 
       html += `
-        <button class="pp-confirm-btn ${disabledClass} ${attackClass}"
+        <button class="pp-confirm-btn ${disabledClass} ${attackClass} ${undoableClass}"
                 data-action="${btn.action}" ${dataAttrs} ${btn.disabled ? 'disabled' : ''}>
           ${btn.label}
         </button>`;
@@ -1751,6 +1753,38 @@ export class PlayerPanel {
         // Only allow enemy sea zones during combat move
         if (!destinations.has(terrName) && (isCombatMove || !isEnemy)) {
           destinations.set(terrName, { name: terrName, isEnemy, isWater: true, distance: info.distance });
+        }
+      }
+    }
+
+    // Ships selected by ID (transports, carriers, etc.) - calculate sea zone destinations
+    if (selectedShipIds.length > 0 && from.isWater) {
+      const allSeaUnits = this.gameState.getUnitsAt(fromTerritory.name) || [];
+      const selectedShips = selectedShipIds
+        .map(id => allSeaUnits.find(u => u.id === id))
+        .filter(Boolean);
+
+      if (selectedShips.length > 0) {
+        // Get minimum movement of all selected ships
+        const minMovement = Math.min(...selectedShips.map(ship => {
+          const def = this.unitDefs?.[ship.type];
+          return def?.movement || 2;
+        }));
+
+        const reachable = this.gameState.getReachableTerritoriesForSea(
+          fromTerritory.name, minMovement, player.id, isCombatMove
+        );
+
+        for (const [terrName, info] of reachable) {
+          const conn = this.territories[terrName];
+          if (!conn) continue;
+          // Sea zones: check for enemy naval units
+          const zoneUnits = this.gameState.getUnitsAt(terrName) || [];
+          const isEnemy = zoneUnits.some(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner));
+          // Only allow enemy sea zones during combat move
+          if (!destinations.has(terrName) && (isCombatMove || !isEnemy)) {
+            destinations.set(terrName, { name: terrName, isEnemy, isWater: true, distance: info.distance });
+          }
         }
       }
     }
