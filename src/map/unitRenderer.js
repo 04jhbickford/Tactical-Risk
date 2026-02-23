@@ -119,7 +119,13 @@ export class UnitRenderer {
     'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
     'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
     'North Sea Zone': { x: -50, y: 50 },              // Bottom-left, away from UK islands
-    'Gulf of Mexico Sea Zone': { x: 30, y: 0 },       // Distinguish from Mexico Sea Zone
+    'Gulf of Mexico Sea Zone': { x: 40, y: -30 },     // Move up-right, away from Cuba/Mexico
+    'Carribean Sea Zone': { x: -30, y: 40 },          // Move down-left, into open water
+    'Mexico Sea Zone': { x: -50, y: 0 },              // Move left, into Pacific
+    'West Panama Sea Zone': { x: -40, y: 30 },        // Move down-left, away from Central America
+    'East US Sea Zone': { x: 50, y: 0 },              // Move right, away from US coast
+    'West US Sea Zone': { x: -40, y: 0 },             // Move left, into Pacific
+    'Alaska Sea Zone': { x: 0, y: 50 },               // Move south, away from Alaska
   };
 
   // Custom offsets for land territories where units appear in wrong location

@@ -1140,13 +1140,25 @@ export class TerritoryRenderer {
     if (!t1 || !t2) return;
 
     const [x1, y1] = this._getTerritoryCenter(t1);
-    const [x2, y2] = this._getTerritoryCenter(t2);
+    let [x2, y2] = this._getTerritoryCenter(t2);
     if (x1 === null || x2 === null) return;
 
     ctx.save();
 
-    // Calculate arrow properties
-    const dx = x2 - x1;
+    // Handle map wrap-around: if the direct distance is > half the map width,
+    // the shorter path is across the wrap boundary
+    const MAP_WIDTH = 3500; // Must match camera.js MAP_WIDTH
+    let dx = x2 - x1;
+    if (Math.abs(dx) > MAP_WIDTH / 2) {
+      // Shorter path is across the wrap - adjust x2
+      if (dx > 0) {
+        x2 -= MAP_WIDTH; // Target is on right, wrap to left
+      } else {
+        x2 += MAP_WIDTH; // Target is on left, wrap to right
+      }
+      dx = x2 - x1;
+    }
+
     const dy = y2 - y1;
     const angle = Math.atan2(dy, dx);
     const length = Math.sqrt(dx * dx + dy * dy);

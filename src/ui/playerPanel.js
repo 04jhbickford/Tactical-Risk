@@ -1585,14 +1585,38 @@ export class PlayerPanel {
       }
 
       // Also add adjacent sea zones with friendly transports (for loading)
-      for (const connName of from.connections || []) {
-        const conn = this.territories[connName];
-        if (!conn?.isWater) continue;
-        // Check if there's a friendly transport in this sea zone
-        const seaUnits = this.gameState.getUnitsAt(connName) || [];
-        const hasTransport = seaUnits.some(u => u.type === 'transport' && u.owner === player.id);
-        if (hasTransport) {
-          destinations.set(connName, { name: connName, isEnemy: false, isWater: true, distance: 1, isTransportLoad: true });
+      // For units with movement > 1 (like armor), check sea zones adjacent to:
+      // 1. Starting territory
+      // 2. Any territory reachable within (movement - 1) steps
+      const territoriesForTransportCheck = new Set([fromTerritory.name]);
+
+      // Add territories reachable within (minMovement - 1) steps for multi-movement units
+      if (minMovement > 1) {
+        const intermediateReachable = this.gameState.getReachableTerritoriesForLand(
+          fromTerritory.name, minMovement - 1, player.id, false // non-combat to allow passing through friendly
+        );
+        for (const [terrName] of intermediateReachable) {
+          territoriesForTransportCheck.add(terrName);
+        }
+      }
+
+      // Check sea zones adjacent to all these territories
+      for (const terrName of territoriesForTransportCheck) {
+        const terr = this.territories[terrName];
+        if (!terr) continue;
+
+        for (const connName of terr.connections || []) {
+          const conn = this.territories[connName];
+          if (!conn?.isWater) continue;
+          // Check if there's a friendly transport in this sea zone
+          const seaUnits = this.gameState.getUnitsAt(connName) || [];
+          const hasTransport = seaUnits.some(u => u.type === 'transport' && u.owner === player.id);
+          if (hasTransport && !destinations.has(connName)) {
+            // Calculate distance: steps to reach terrName + 1 for loading
+            const distToTerr = reachable.get(terrName)?.distance || 0;
+            const totalDist = terrName === fromTerritory.name ? 1 : distToTerr + 1;
+            destinations.set(connName, { name: connName, isEnemy: false, isWater: true, distance: totalDist, isTransportLoad: true });
+          }
         }
       }
     }

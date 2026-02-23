@@ -1895,7 +1895,31 @@ export class GameState {
       // Check terrain - allow loading onto transport during movement phases
       // Combat move loading allowed for amphibious assaults (per A&A rules)
       if (toT?.isWater) {
-        if ((isNonCombatMove || isCombatMove) && isAdjacent) {
+        // For units with movement > 1, check if any territory adjacent to the sea zone
+        // is reachable within the unit's movement range
+        let canReachSeaZone = isAdjacent;
+
+        if (!canReachSeaZone && movementRange > 1 && (isNonCombatMove || isCombatMove)) {
+          // Find all land territories adjacent to the sea zone
+          const seaZoneConns = toT.connections || [];
+          for (const adjTerr of seaZoneConns) {
+            const adjT = this.territoryByName[adjTerr];
+            if (!adjT || adjT.isWater) continue;
+
+            // Check if this adjacent territory is reachable within (movementRange - 1) steps
+            // (we need 1 step left to load onto transport)
+            if (adjTerr === fromTerritory) {
+              canReachSeaZone = true;
+              break;
+            }
+            if (this.canLandUnitReach(fromTerritory, adjTerr, movementRange - 1, player.id, isCombatMove)) {
+              canReachSeaZone = true;
+              break;
+            }
+          }
+        }
+
+        if ((isNonCombatMove || isCombatMove) && canReachSeaZone) {
           // Check if there's a transport with capacity
           const seaUnits = this.units[toTerritory] || [];
           const transports = seaUnits.filter(u => u.type === 'transport' && u.owner === player.id);
