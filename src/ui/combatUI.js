@@ -114,11 +114,20 @@ export class CombatUI {
     // Calculate shore bombardment for amphibious assaults
     const bombardmentResult = this._calculateBombardment();
 
+    // Determine initial phase - check bombardment, AA fire, submarine first strike, then ready
+    let initialPhase = 'ready';
+    if (bombardmentResult.rolls.length > 0) {
+      initialPhase = 'bombardment';
+    } else if (aaGuns.length > 0 && attackingAir.length > 0) {
+      initialPhase = 'aaFire';
+    } else if (hasSubmarineFirstStrike) {
+      initialPhase = 'submarineFirstStrike';
+    }
+
     this.combatState = {
       attackers,
       defenders,
-      phase: bombardmentResult.rolls.length > 0 ? 'bombardment' :
-             (aaGuns.length > 0 && attackingAir.length > 0 ? 'aaFire' : 'ready'),
+      phase: initialPhase,
       pendingAttackerCasualties: 0,
       pendingDefenderCasualties: 0,
       selectedAttackerCasualties: {},
@@ -687,12 +696,30 @@ export class CombatUI {
     // A&A Anniversary Rule: Transports are defenseless and cannot be taken as casualties
     // They are automatically destroyed when all other combat units are eliminated
     // Factories are captured, not destroyed - exclude from casualties
-    // Battleship 2-hit system: Damage battleships first before destroying other units
+    // Default casualty priority: cheapest units first, then battleship damage (which is free)
     const selected = {};
     let remaining = count;
 
-    // First, try to damage undamaged battleships (2-hit system)
+    // Get battleships for later
     const battleships = units.filter(u => u.type === 'battleship' && u.quantity > 0);
+
+    // First, destroy cheapest units by IPC cost (excluding battleships, transports, factories)
+    const sorted = [...units]
+      .filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory' && u.type !== 'battleship')
+      .sort((a, b) => {
+        const costA = this.unitDefs[a.type]?.cost || 999;
+        const costB = this.unitDefs[b.type]?.cost || 999;
+        return costA - costB;
+      });
+
+    for (const unit of sorted) {
+      if (remaining <= 0) break;
+      const take = Math.min(unit.quantity, remaining);
+      selected[unit.type] = take;
+      remaining -= take;
+    }
+
+    // Then, damage undamaged battleships (2-hit system - this absorbs hits for free)
     for (const battleship of battleships) {
       if (remaining <= 0) break;
       const def = this.unitDefs[battleship.type];
@@ -716,22 +743,6 @@ export class CombatUI {
         selected['battleship'] = (selected['battleship'] || 0) + toDestroy;
         remaining -= toDestroy;
       }
-    }
-
-    // Then, apply to other units by cost
-    const sorted = [...units]
-      .filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory' && u.type !== 'battleship')
-      .sort((a, b) => {
-        const costA = this.unitDefs[a.type]?.cost || 999;
-        const costB = this.unitDefs[b.type]?.cost || 999;
-        return costA - costB;
-      });
-
-    for (const unit of sorted) {
-      if (remaining <= 0) break;
-      const take = Math.min(unit.quantity, remaining);
-      selected[unit.type] = take;
-      remaining -= take;
     }
 
     // Finally, destroy remaining undamaged battleships if still hits left
@@ -1410,12 +1421,7 @@ export class CombatUI {
       `;
     }
 
-    // Show hits summary (dice are now shown inline with forces above)
-    if (this.lastRolls && phase === 'selectCasualties') {
-      html += this._renderHitsSummary();
-    }
-
-    // Casualty selection
+    // Casualty selection (hits-to-assign counter is shown in each side's header)
     if (phase === 'selectCasualties') {
       html += this._renderCasualtySelection();
     }
@@ -1729,8 +1735,12 @@ export class CombatUI {
         </div>`;
     }
 
-    // Sort remaining unit types by cost (most expensive first)
+    // Sort remaining unit types by attack strength (highest probability on top)
     const sortedTypes = [...allUnitTypes].sort((a, b) => {
+      const attackA = this.unitDefs[a]?.attack || 0;
+      const attackB = this.unitDefs[b]?.attack || 0;
+      // Use attack value as primary sort, cost as secondary (for equal attack)
+      if (attackA !== attackB) return attackB - attackA;
       const costA = this.unitDefs[a]?.cost || 0;
       const costB = this.unitDefs[b]?.cost || 0;
       return costB - costA;
@@ -1849,11 +1859,15 @@ export class CombatUI {
 
   // Render phase progress indicator
   _renderPhaseIndicator(currentPhase) {
+    // Check if this is an amphibious assault
+    const isAmphibious = this.gameState.hasAmphibiousAssault(this.currentTerritory);
+
     // Define the possible phases in order
     const phases = [
+      { id: 'amphibious', label: 'Amphibious', icon: '🚢' },
       { id: 'bombardment', label: 'Bombardment', icon: '⚓' },
       { id: 'aaFire', label: 'AA Fire', icon: '🎯' },
-      { id: 'submarineFirstStrike', label: 'Sub Strike', icon: '🚢' },
+      { id: 'submarineFirstStrike', label: 'Sub Strike', icon: '🔱' },
       { id: 'ready', label: 'Combat', icon: '⚔️' },
       { id: 'rolling', label: 'Rolling', icon: '🎲' },
       { id: 'selectCasualties', label: 'Casualties', icon: '💀' },
@@ -1863,6 +1877,7 @@ export class CombatUI {
     // Find which phases are active in this battle
     const { bombardmentRolls, hasAA, hasSubmarineFirstStrike } = this.combatState;
     const activePhases = phases.filter(p => {
+      if (p.id === 'amphibious') return isAmphibious;
       if (p.id === 'bombardment') return bombardmentRolls?.length > 0;
       if (p.id === 'aaFire' || p.id === 'selectAACasualties') return hasAA;
       if (p.id === 'submarineFirstStrike') return hasSubmarineFirstStrike;

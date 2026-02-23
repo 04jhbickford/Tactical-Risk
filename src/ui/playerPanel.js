@@ -657,6 +657,9 @@ export class PlayerPanel {
       // Collapse consecutive placement entries into summaries
       const collapsedEntries = this._collapseLogEntries(entries);
 
+      // Reverse so newest entries appear at top
+      collapsedEntries.reverse();
+
       if (collapsedEntries.length === 0) {
         html += `<div class="pp-log-empty">No actions yet</div>`;
       } else {
