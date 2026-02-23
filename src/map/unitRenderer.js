@@ -55,7 +55,6 @@ export class UnitRenderer {
     const iconSize = Math.max(14, Math.min(24, 20 * zoom));
     const spacingX = iconSize + 4;
     const spacingY = iconSize + 8;
-    const maxPerRow = 5;
 
     for (const [territory, placements] of Object.entries(this.gameState.units)) {
       const t = this.territoryByName[territory];
@@ -83,6 +82,10 @@ export class UnitRenderer {
       const grouped = this._groupUnits(placements, true);
       const types = Object.keys(grouped);
       if (types.length === 0) continue;
+
+      // Use smaller maxPerRow for sea zones to prevent bleeding into land
+      // Sea zones use 3 across, land uses 5
+      const maxPerRow = t.isWater ? 3 : 5;
 
       // Calculate rows needed
       const numRows = Math.ceil(types.length / maxPerRow);
@@ -115,7 +118,7 @@ export class UnitRenderer {
   static SEA_ZONE_OFFSETS = {
     'West Mediteranean Sea Zone': { x: -60, y: 40 },  // Move away from Algeria
     'Central Mediteranean Sea Zone': { x: 0, y: 50 }, // Move south away from Italy
-    'East Mediteranean Sea Zone': { x: 40, y: 30 },   // Move away from Egypt
+    'East Mediteranean Sea Zone': { x: -40, y: 50 },  // Move left and down, away from Syria/Turkey
     'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
     'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
     'North Sea Zone': { x: -50, y: 50 },              // Bottom-left, away from UK islands
