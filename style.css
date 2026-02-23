@@ -7770,8 +7770,13 @@ html, body {
 .inline-dice-group {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 4px;
+  gap: 10px;
+  margin: 0 6px;
+}
+
+/* Defender side: reverse order so hits come before dice (reading left to right) */
+.combat-unit-side.defender .inline-dice-group {
+  flex-direction: row-reverse;
 }
 
 .inline-dice {
