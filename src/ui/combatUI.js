@@ -409,6 +409,15 @@ export class CombatUI {
       const nonSubAttackers = attackers.filter(u => u.type !== 'submarine' && !this.unitDefs[u.type]?.isAir);
       const selected = this._selectCheapestCasualties(nonSubAttackers, pendingSubFirstStrikeAttackerCasualties);
       for (const [type, count] of Object.entries(selected)) {
+        // Handle battleship damage specially
+        if (type === 'battleship_damage') {
+          const battleship = attackers.find(u => u.type === 'battleship');
+          if (battleship) {
+            battleship.damaged = true;
+            battleship.damagedCount = (battleship.damagedCount || 0) + count;
+          }
+          continue;
+        }
         const unit = attackers.find(u => u.type === type);
         if (unit) {
           unit.quantity -= count;
@@ -422,6 +431,15 @@ export class CombatUI {
       const nonSubDefenders = defenders.filter(u => u.type !== 'submarine' && !this.unitDefs[u.type]?.isAir);
       const selected = this._selectCheapestCasualties(nonSubDefenders, pendingSubFirstStrikeDefenderCasualties);
       for (const [type, count] of Object.entries(selected)) {
+        // Handle battleship damage specially
+        if (type === 'battleship_damage') {
+          const battleship = defenders.find(u => u.type === 'battleship');
+          if (battleship) {
+            battleship.damaged = true;
+            battleship.damagedCount = (battleship.damagedCount || 0) + count;
+          }
+          continue;
+        }
         const unit = defenders.find(u => u.type === type);
         if (unit) {
           unit.quantity -= count;
@@ -795,31 +813,14 @@ export class CombatUI {
           attackerUnit.quantity = Math.max(0, attackerUnit.quantity - quantity);
         }
 
-        // Add to destination territory
-        const destUnits = this.gameState.units[destination] || [];
-        const existing = destUnits.find(u => u.type === unitType && u.owner === player.id);
-        if (existing) {
-          existing.quantity += quantity;
-          existing.moved = true;
-        } else {
-          destUnits.push({
-            type: unitType,
-            quantity: quantity,
-            owner: player.id,
-            moved: true
-          });
-        }
-        this.gameState.units[destination] = destUnits;
-
-        // Check if landing on carrier
+        // Check if landing on carrier (sea zone destination)
         const destT = this.gameState.territoryByName[destination];
         if (destT?.isWater) {
-          // Land on carrier
+          // Land on carrier - add to carrier's aircraft array ONLY (not as standalone unit)
           const seaUnits = this.gameState.units[destination] || [];
           const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
           const carrierDef = this.unitDefs.carrier;
 
-          // Add to carrier's aircraft array
           let remainingToAdd = quantity;
           for (const carrier of carriers) {
             if (remainingToAdd <= 0) break;
@@ -831,6 +832,22 @@ export class CombatUI {
             }
             remainingToAdd -= toAdd;
           }
+        } else {
+          // Land on land territory - add as standalone unit
+          const destUnits = this.gameState.units[destination] || [];
+          const existing = destUnits.find(u => u.type === unitType && u.owner === player.id);
+          if (existing) {
+            existing.quantity += quantity;
+            existing.moved = true;
+          } else {
+            destUnits.push({
+              type: unitType,
+              quantity: quantity,
+              owner: player.id,
+              moved: true
+            });
+          }
+          this.gameState.units[destination] = destUnits;
         }
       }
     }
@@ -1038,6 +1055,14 @@ export class CombatUI {
       if (unit.quantity > 0) {
         units.push({ ...unit });
       }
+    }
+
+    // IMPORTANT: Preserve factories - they are NOT part of combat (excluded from defenders)
+    // They will be captured/transferred during _finalizeCombat()
+    const existingUnits = this.gameState.units[this.currentTerritory] || [];
+    const factory = existingUnits.find(u => u.type === 'factory');
+    if (factory) {
+      units.push({ ...factory });
     }
 
     // Update gameState and trigger re-render
@@ -1565,7 +1590,7 @@ export class CombatUI {
           <div class="retreat-header">Select Retreat Destination</div>
           <div class="retreat-options">
             ${retreatOptions.map(dest => `
-              <button class="retreat-dest-btn" data-action="confirm-retreat" data-destination="${dest}">
+              <button class="combat-btn retreat-dest-btn" data-action="confirm-retreat" data-destination="${dest}">
                 ${dest}
               </button>
             `).join('')}
@@ -1573,8 +1598,18 @@ export class CombatUI {
         </div>
       `;
     } else if (phase === 'selectCasualties') {
+      // Validate casualty selection is complete
+      const { attackers, defenders, pendingAttackerCasualties, pendingDefenderCasualties,
+              selectedAttackerCasualties, selectedDefenderCasualties } = this.combatState;
+      const attackerTotal = this._getTotalSelectedCasualties(selectedAttackerCasualties);
+      const defenderTotal = this._getTotalSelectedCasualties(selectedDefenderCasualties);
+      const attackerMax = this._getMaxAbsorbableCasualties(attackers);
+      const defenderMax = this._getMaxAbsorbableCasualties(defenders);
+      const effectiveAttacker = Math.min(pendingAttackerCasualties, attackerMax);
+      const effectiveDefender = Math.min(pendingDefenderCasualties, defenderMax);
+      const canConfirm = attackerTotal >= effectiveAttacker && defenderTotal >= effectiveDefender;
       html += `
-        <button class="combat-btn confirm" data-action="confirm-casualties">
+        <button class="combat-btn confirm" data-action="confirm-casualties" ${!canConfirm ? 'disabled' : ''}>
           Confirm Casualties
         </button>
       `;
@@ -1932,17 +1967,31 @@ export class CombatUI {
     const attackerTotal = this._getTotalSelectedCasualties(selectedAttackerCasualties);
     const defenderTotal = this._getTotalSelectedCasualties(selectedDefenderCasualties);
 
+    // Calculate max absorbable casualties (accounting for battleship 2-hit system)
+    const attackerMaxCasualties = this._getMaxAbsorbableCasualties(attackers);
+    const defenderMaxCasualties = this._getMaxAbsorbableCasualties(defenders);
+
+    // Effective casualties is min of pending and max absorbable
+    const effectiveAttackerCasualties = Math.min(pendingAttackerCasualties, attackerMaxCasualties);
+    const effectiveDefenderCasualties = Math.min(pendingDefenderCasualties, defenderMaxCasualties);
+
+    // Calculate wasted hits
+    const attackerWasted = Math.max(0, pendingDefenderCasualties - defenderMaxCasualties);
+    const defenderWasted = Math.max(0, pendingAttackerCasualties - attackerMaxCasualties);
+
     let html = `<div class="casualty-selection">`;
 
     // Attacker casualties (controlled by current player)
     if (pendingAttackerCasualties > 0) {
+      const isComplete = attackerTotal >= effectiveAttackerCasualties;
       html += `
         <div class="casualty-group attacker">
           <div class="casualty-header">
-            <span class="casualty-title">Select ${pendingAttackerCasualties} Attacker Casualties</span>
-            <span class="casualty-count ${attackerTotal === pendingAttackerCasualties ? 'complete' : 'incomplete'}">
-              ${attackerTotal}/${pendingAttackerCasualties}
+            <span class="casualty-title">Select ${effectiveAttackerCasualties} Attacker Casualties</span>
+            <span class="casualty-count ${isComplete ? 'complete' : 'incomplete'}">
+              ${attackerTotal}/${effectiveAttackerCasualties}
             </span>
+            ${defenderWasted > 0 ? `<span class="casualty-overflow">(${defenderWasted} wasted)</span>` : ''}
           </div>
           <div class="casualty-units">
             ${this._renderCasualtyUnits(attackers, selectedAttackerCasualties, 'attacker')}
@@ -1953,13 +2002,15 @@ export class CombatUI {
 
     // Defender casualties (now also selectable)
     if (pendingDefenderCasualties > 0) {
+      const isComplete = defenderTotal >= effectiveDefenderCasualties;
       html += `
         <div class="casualty-group defender">
           <div class="casualty-header">
-            <span class="casualty-title">Select ${pendingDefenderCasualties} Defender Casualties</span>
-            <span class="casualty-count ${defenderTotal === pendingDefenderCasualties ? 'complete' : 'incomplete'}">
-              ${defenderTotal}/${pendingDefenderCasualties}
+            <span class="casualty-title">Select ${effectiveDefenderCasualties} Defender Casualties</span>
+            <span class="casualty-count ${isComplete ? 'complete' : 'incomplete'}">
+              ${defenderTotal}/${effectiveDefenderCasualties}
             </span>
+            ${attackerWasted > 0 ? `<span class="casualty-overflow">(${attackerWasted} wasted)</span>` : ''}
           </div>
           <div class="casualty-units">
             ${this._renderCasualtyUnits(defenders, selectedDefenderCasualties, 'defender')}
@@ -1972,36 +2023,122 @@ export class CombatUI {
     return html;
   }
 
+  // Calculate max casualties a unit list can absorb (accounting for battleship 2-hit system)
+  _getMaxAbsorbableCasualties(units) {
+    let max = 0;
+    for (const unit of units) {
+      if (unit.quantity <= 0) continue;
+      // Skip transports and factories (can't be casualties)
+      if (unit.type === 'transport' || unit.type === 'factory') continue;
+
+      if (unit.type === 'battleship') {
+        // Battleships can take 2 hits each (1 damage + 1 destroy)
+        const undamaged = unit.quantity - (unit.damagedCount || 0);
+        const damaged = unit.damagedCount || 0;
+        // Undamaged can absorb 2 hits each, damaged can absorb 1 hit each
+        max += (undamaged * 2) + damaged;
+      } else {
+        // Other units absorb 1 hit each
+        max += unit.quantity;
+      }
+    }
+    return max;
+  }
+
   _renderCasualtyUnits(units, selected, side, readonly = false) {
     // A&A Anniversary: Transports are defenseless and cannot be selected as casualties
     // Factories are captured, not destroyed - exclude from casualties
-    return units.filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory').map(u => {
-      const def = this.unitDefs[u.type];
-      // Use faction-specific icon
-      const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
-      const selectedCount = selected[u.type] || 0;
+    let html = '';
 
-      return `
-        <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
-          <div class="casualty-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
-            <span class="casualty-name">${u.type}</span>
-            <span class="casualty-avail">(${u.quantity})</span>
+    for (const u of units.filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory')) {
+      const def = this.unitDefs[u.type];
+      const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
+
+      // Special handling for battleships (2-hit system)
+      if (u.type === 'battleship') {
+        const damagedCount = u.damagedCount || 0;
+        const undamagedCount = u.quantity - damagedCount;
+
+        // Show damage option for undamaged battleships
+        if (undamagedCount > 0) {
+          const damageSelected = selected['battleship_damage'] || 0;
+          html += `
+            <div class="casualty-unit ${damageSelected > 0 ? 'has-casualties' : ''}">
+              <div class="casualty-unit-info">
+                ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="battleship" title="Battleship (Damage): Absorb hit without destroying">` : ''}
+                <span class="casualty-name">Battleship</span>
+                <span class="casualty-avail damage">(${undamagedCount} undamaged)</span>
+              </div>
+              ${!readonly ? `
+                <div class="casualty-controls">
+                  <button class="casualty-btn minus" data-side="${side}" data-unit="battleship_damage" ${damageSelected <= 0 ? 'disabled' : ''}>−</button>
+                  <span class="casualty-selected">${damageSelected}</span>
+                  <button class="casualty-btn plus" data-side="${side}" data-unit="battleship_damage" ${damageSelected >= undamagedCount ? 'disabled' : ''}>+</button>
+                </div>
+              ` : `
+                <div class="casualty-controls readonly">
+                  <span class="casualty-selected">${damageSelected}</span>
+                </div>
+              `}
+            </div>
+          `;
+        }
+
+        // Show destroy option for damaged battleships (or all if no undamaged)
+        if (damagedCount > 0 || undamagedCount > 0) {
+          const destroySelected = selected['battleship'] || 0;
+          // Can destroy: damaged battleships + any undamaged that weren't selected for damage
+          const pendingDamage = selected['battleship_damage'] || 0;
+          const maxDestroyable = damagedCount + Math.max(0, undamagedCount - pendingDamage);
+          const statusText = damagedCount > 0 ? `(${damagedCount} damaged)` : '(destroy)';
+          html += `
+            <div class="casualty-unit ${destroySelected > 0 ? 'has-casualties' : ''}">
+              <div class="casualty-unit-info">
+                ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon damaged" alt="battleship" title="Battleship (Destroy): Remove from battle">` : ''}
+                <span class="casualty-name">Battleship</span>
+                <span class="casualty-avail destroy">${statusText}</span>
+              </div>
+              ${!readonly ? `
+                <div class="casualty-controls">
+                  <button class="casualty-btn minus" data-side="${side}" data-unit="battleship" ${destroySelected <= 0 ? 'disabled' : ''}>−</button>
+                  <span class="casualty-selected">${destroySelected}</span>
+                  <button class="casualty-btn plus" data-side="${side}" data-unit="battleship" ${destroySelected >= maxDestroyable ? 'disabled' : ''}>+</button>
+                </div>
+              ` : `
+                <div class="casualty-controls readonly">
+                  <span class="casualty-selected">${destroySelected}</span>
+                </div>
+              `}
+            </div>
+          `;
+        }
+      } else {
+        // Standard units
+        const selectedCount = selected[u.type] || 0;
+        html += `
+          <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
+            <div class="casualty-unit-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
+              <span class="casualty-name">${u.type}</span>
+              <span class="casualty-avail">(${u.quantity})</span>
+            </div>
+            ${!readonly ? `
+              <div class="casualty-controls">
+                <button class="casualty-btn minus" data-side="${side}" data-unit="${u.type}" ${selectedCount <= 0 ? 'disabled' : ''}>−</button>
+                <span class="casualty-selected">${selectedCount}</span>
+                <button class="casualty-btn plus" data-side="${side}" data-unit="${u.type}" ${selectedCount >= u.quantity ? 'disabled' : ''}>+</button>
+              </div>
+            ` : `
+              <div class="casualty-controls readonly">
+                <span class="casualty-selected">${selectedCount}</span>
+              </div>
+            `}
           </div>
-          ${!readonly ? `
-            <div class="casualty-controls">
-              <button class="casualty-btn minus" data-side="${side}" data-unit="${u.type}" ${selectedCount <= 0 ? 'disabled' : ''}>−</button>
-              <span class="casualty-selected">${selectedCount}</span>
-              <button class="casualty-btn plus" data-side="${side}" data-unit="${u.type}" ${selectedCount >= u.quantity ? 'disabled' : ''}>+</button>
-            </div>
-          ` : `
-            <div class="casualty-controls readonly">
-              <span class="casualty-selected">${selectedCount}</span>
-            </div>
-          `}
-        </div>
-      `;
-    }).join('');
+        `;
+      }
+    }
+
+    return html;
   }
 
   _renderAACasualtyUnits() {
@@ -2199,17 +2336,51 @@ export class CombatUI {
     const pendingCasualties = side === 'attacker' ? pendingAttackerCasualties : pendingDefenderCasualties;
     const selectedCasualties = side === 'attacker' ? selectedAttackerCasualties : selectedDefenderCasualties;
 
+    // Special handling for battleship_damage (refers to undamaged battleships taking damage)
+    if (unitType === 'battleship_damage') {
+      const battleship = units.find(u => u.type === 'battleship');
+      if (!battleship) return;
+
+      const undamagedCount = battleship.quantity - (battleship.damagedCount || 0);
+      const current = selectedCasualties['battleship_damage'] || 0;
+      const newValue = Math.max(0, Math.min(undamagedCount, current + delta));
+
+      // Check we don't exceed required casualties (using max absorbable)
+      const maxCasualties = this._getMaxAbsorbableCasualties(units);
+      const effectivePending = Math.min(pendingCasualties, maxCasualties);
+      const currentTotal = this._getTotalSelectedCasualties(selectedCasualties);
+      const newTotal = currentTotal - current + newValue;
+
+      if (newTotal <= effectivePending) {
+        selectedCasualties['battleship_damage'] = newValue;
+        this._render();
+      }
+      return;
+    }
+
     const unit = units.find(u => u.type === unitType);
     if (!unit) return;
 
-    const current = selectedCasualties[unitType] || 0;
-    const newValue = Math.max(0, Math.min(unit.quantity, current + delta));
+    // For battleship destruction, account for damage selections
+    let maxSelectable = unit.quantity;
+    if (unitType === 'battleship') {
+      const damagedCount = unit.damagedCount || 0;
+      const undamagedCount = unit.quantity - damagedCount;
+      const pendingDamage = selectedCasualties['battleship_damage'] || 0;
+      // Can destroy: damaged + (undamaged - pendingDamage)
+      maxSelectable = damagedCount + Math.max(0, undamagedCount - pendingDamage);
+    }
 
-    // Check we don't exceed required casualties
+    const current = selectedCasualties[unitType] || 0;
+    const newValue = Math.max(0, Math.min(maxSelectable, current + delta));
+
+    // Check we don't exceed required casualties (using max absorbable)
+    const maxCasualties = this._getMaxAbsorbableCasualties(units);
+    const effectivePending = Math.min(pendingCasualties, maxCasualties);
     const currentTotal = this._getTotalSelectedCasualties(selectedCasualties);
     const newTotal = currentTotal - current + newValue;
 
-    if (newTotal <= pendingCasualties) {
+    if (newTotal <= effectivePending) {
       selectedCasualties[unitType] = newValue;
       this._render();
     }

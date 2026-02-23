@@ -382,18 +382,31 @@ async function init() {
                 const transport = transports.find(t => t.id === cargoUnload.transportId);
                 if (transport && transport.cargo) {
                   // Find and unload the specific units from this transport
-                  const cargoIdx = transport.cargo.findIndex(c => c.type === cargoUnload.unitType);
-                  if (cargoIdx >= 0) {
+                  // IMPORTANT: Cargo items are stored individually (no quantity field)
+                  // So we need to remove multiple items if unloading multiple units
+                  let remaining = cargoUnload.quantity;
+                  let unloadedCount = 0;
+
+                  while (remaining > 0) {
+                    const cargoIdx = transport.cargo.findIndex(c => c.type === cargoUnload.unitType);
+                    if (cargoIdx < 0) break; // No more of this unit type
+
                     const cargoItem = transport.cargo[cargoIdx];
-                    const unloadQty = Math.min(cargoUnload.quantity, cargoItem.quantity || 1);
+                    const itemQty = cargoItem.quantity || 1;
+                    const toUnload = Math.min(remaining, itemQty);
 
                     // Remove from transport
-                    if (unloadQty >= (cargoItem.quantity || 1)) {
+                    if (toUnload >= itemQty) {
                       transport.cargo.splice(cargoIdx, 1);
                     } else {
-                      cargoItem.quantity -= unloadQty;
+                      cargoItem.quantity = itemQty - toUnload;
                     }
 
+                    remaining -= toUnload;
+                    unloadedCount += toUnload;
+                  }
+
+                  if (unloadedCount > 0) {
                     // Mark transport as moved (can't move again this turn)
                     transport.moved = true;
 
@@ -401,12 +414,12 @@ async function init() {
                     const destUnits = gameState.units[data.to] || [];
                     const existingUnit = destUnits.find(u => u.type === cargoUnload.unitType && u.owner === gameState.currentPlayer.id && u.moved);
                     if (existingUnit) {
-                      existingUnit.quantity = (existingUnit.quantity || 1) + unloadQty;
+                      existingUnit.quantity = (existingUnit.quantity || 1) + unloadedCount;
                     } else {
                       destUnits.push({
                         type: cargoUnload.unitType,
                         owner: gameState.currentPlayer.id,
-                        quantity: unloadQty,
+                        quantity: unloadedCount,
                         moved: true
                       });
                     }
@@ -423,12 +436,12 @@ async function init() {
                     gameState.moveHistory.push({
                       from: data.from,
                       to: data.to,
-                      units: [{ type: cargoUnload.unitType, quantity: unloadQty }],
+                      units: [{ type: cargoUnload.unitType, quantity: unloadedCount }],
                       transportId: cargoUnload.transportId,
                       isAmphibious: true
                     });
 
-                    unloadedUnits.push({ type: cargoUnload.unitType, quantity: unloadQty });
+                    unloadedUnits.push({ type: cargoUnload.unitType, quantity: unloadedCount });
                     anySuccess = true;
                   }
                 }

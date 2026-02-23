@@ -7393,6 +7393,25 @@ html, body {
   color: #ffb74d;
 }
 
+.casualty-overflow {
+  font-size: 10px;
+  color: #ff9800;
+  margin-left: 8px;
+  font-style: italic;
+}
+
+.casualty-avail.damage {
+  color: #4caf50;
+}
+
+.casualty-avail.destroy {
+  color: #f44336;
+}
+
+.casualty-icon.damaged {
+  filter: grayscale(50%) sepia(100%) hue-rotate(-30deg) saturate(200%);
+}
+
 .casualty-units {
   display: flex;
   flex-direction: column;

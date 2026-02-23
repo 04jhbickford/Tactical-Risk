@@ -1581,7 +1581,10 @@ export class PlayerPanel {
         if (!conn) continue;
         const owner = this.gameState.getOwner(terrName);
         const isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
-        destinations.set(terrName, { name: terrName, isEnemy, isWater: false, distance: info.distance });
+        // Only allow enemy territories during combat move
+        if (isCombatMove || !isEnemy) {
+          destinations.set(terrName, { name: terrName, isEnemy, isWater: false, distance: info.distance });
+        }
       }
 
       // Also add adjacent sea zones with friendly transports (for loading)
@@ -1646,7 +1649,8 @@ export class PlayerPanel {
           const owner = this.gameState.getOwner(terrName);
           isEnemy = owner && owner !== player.id && !this.gameState.areAllies(player.id, owner);
         }
-        if (!destinations.has(terrName)) {
+        // Only allow enemy territories during combat move
+        if (!destinations.has(terrName) && (isCombatMove || !isEnemy)) {
           destinations.set(terrName, { name: terrName, isEnemy, isWater: conn.isWater, distance: info.distance });
         }
       }
@@ -1665,7 +1669,8 @@ export class PlayerPanel {
         // Sea zones: check for enemy naval units (sea zones don't have ownership)
         const seaUnits = this.gameState.getUnitsAt(terrName) || [];
         const isEnemy = seaUnits.some(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner));
-        if (!destinations.has(terrName)) {
+        // Only allow enemy sea zones during combat move
+        if (!destinations.has(terrName) && (isCombatMove || !isEnemy)) {
           destinations.set(terrName, { name: terrName, isEnemy, isWater: true, distance: info.distance });
         }
       }

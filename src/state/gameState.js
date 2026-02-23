@@ -618,6 +618,27 @@ export class GameState {
       }
     }
 
+    // CRITICAL FIX: Also check the CURRENT territory (starting position) for carrier landing
+    // getReachableTerritoriesForAir excludes the starting territory, but air units CAN land
+    // on a carrier in the same sea zone they just attacked in
+    const currentT = this.territoryByName[territory];
+    if (currentT?.isWater) {
+      const seaUnits = this.units[territory] || [];
+      const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+      const carrierDef = unitDefs.carrier;
+
+      if (carrierDef && carriers.length > 0) {
+        let capacity = 0;
+        for (const carrier of carriers) {
+          const aircraft = carrier.aircraft || [];
+          capacity += Math.max(0, (carrierDef.aircraftCapacity || 2) - aircraft.length);
+        }
+        if (capacity > 0 && carrierDef.canCarry?.includes(unitType)) {
+          validLandings.push({ territory: territory, distance: 0, isCarrier: true });
+        }
+      }
+    }
+
     for (const [destName, info] of reachable) {
       // CRITICAL: Only allow landing in territories that were friendly at the START of the turn
       // Newly captured territories are NOT valid landing spots (unless using fallback)
