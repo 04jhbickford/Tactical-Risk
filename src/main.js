@@ -729,17 +729,23 @@ async function init() {
         camera.panTo(t.center[0], t.center[1]);
       }
     });
-    // Air landing now happens at end of all combats, not after each one
-    // Check for pending air landings when combat queue is empty
-    combatUI.setOnAllCombatsResolved(() => {
-      // Check if there are pending air landings
-      if (gameState.hasPendingAirLandings()) {
-        // Start the consolidated air landing UI
-        airLandingUI.startConsolidatedLanding();
-        // Highlight valid destinations on map
-        territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
-        camera.dirty = true;
-      }
+    // Air landing happens after each combat via player panel inline UI
+    combatUI.setOnAirLandingRequired((data) => {
+      // Use inline air landing UI in player panel
+      playerPanel.setAirLanding(
+        data.airUnitsToLand,
+        data.combatTerritory,
+        data.isRetreating,
+        (result) => {
+          // Air landing complete - pass result back to combat UI
+          combatUI.handleAirLandingComplete(result);
+          territoryRenderer.clearAirLandingDestinations();
+          camera.dirty = true;
+        }
+      );
+      // Highlight valid destinations on map
+      territoryRenderer.setAirLandingDestinations(playerPanel.getAirLandingDestinations());
+      camera.dirty = true;
     });
 
     // Tech UI

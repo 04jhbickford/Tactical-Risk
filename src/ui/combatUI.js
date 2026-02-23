@@ -1074,22 +1074,37 @@ export class CombatUI {
     }
 
     if (airUnitsToLand.length > 0) {
-      // Store air units in pending list - will be processed after ALL combats are done
-      this.gameState.addPendingAirLandings(this.currentTerritory, airUnitsToLand);
+      this.combatState.airUnitsToLand = airUnitsToLand;
+      this.combatState.selectedLandings = {};
+      this.combatState.phase = 'airLanding';
+
+      // If external air landing UI is connected, delegate to it and hide combat popup
+      if (this.onAirLandingRequired) {
+        // Hide combat popup - only show the air landing panel
+        this.el.classList.add('hidden');
+
+        this.onAirLandingRequired({
+          airUnitsToLand,
+          combatTerritory: this.currentTerritory,
+          isRetreating: this.combatState.isRetreating || false,
+        });
+      }
+    } else {
+      this.combatState.phase = 'resolved';
     }
-
-    // Always mark combat as resolved - air landing happens after all combats
-    this.combatState.phase = 'resolved';
   }
 
-  // Called from external AirLandingUI when landing selection is complete for a territory
+  // Called from external AirLandingUI when landing selection is complete
   handleAirLandingComplete(result) {
-    // Apply the landings for this batch
-    this._applyAirLandings(result.landings || {}, result.crashes || [], result.originTerritory);
+    if (!this.combatState) return;
+
+    // Apply landings from the external UI
+    this.combatState.selectedLandings = result.landings || {};
+    this._confirmAirLandings();
   }
 
-  // Apply air landings from the consolidated UI
-  _applyAirLandings(landings, crashes, originTerritory) {
+  _applyAirLandings_unused(landings, crashes, originTerritory) {
+    // This method is no longer used - keeping for reference
     const player = this.gameState.currentPlayer;
     const units = this.gameState.getUnitsAt(originTerritory) || [];
 
