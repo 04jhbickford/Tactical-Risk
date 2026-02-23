@@ -1882,55 +1882,46 @@ export class CombatUI {
 
   _renderDiceResults() {
     const { attackRolls, defenseRolls, attackHits, defenseHits } = this.lastRolls;
+    const player = this.gameState.currentPlayer;
+    const defenderOwner = this.combatState.defenders[0]?.owner;
+    const defenderPlayer = this.gameState.getPlayer(defenderOwner);
 
-    // Group rolls by unit type AND attack value for clearer display
-    // This separates supported infantry (attack 2) from unsupported (attack 1)
-    // isAttackRolls parameter: only attackers can have artillery support
-    const groupRolls = (rolls, valueKey, isAttackRolls = false) => {
+    // Group rolls by unit type
+    const groupRolls = (rolls) => {
       const groups = {};
       for (const r of rolls) {
-        const statValue = r[valueKey] || r.attackValue || r.defenseValue;
-        // Create unique key combining unit type and stat value
-        const key = `${r.unitType}_${statValue}`;
+        const key = r.unitType;
         if (!groups[key]) {
-          groups[key] = {
-            rolls: [],
-            needed: statValue,
-            unitType: r.unitType,
-            // Track if this is a supported infantry group - ONLY on attack (artillery support is attack only)
-            isSupported: isAttackRolls && r.unitType === 'infantry' && statValue === 2
-          };
+          groups[key] = { rolls: [], hits: 0, unitType: r.unitType };
         }
         groups[key].rolls.push(r);
+        if (r.hit) groups[key].hits++;
       }
       return groups;
     };
 
-    const attackGroups = groupRolls(attackRolls, 'attackValue', true);
-    const defenseGroups = groupRolls(defenseRolls, 'defenseValue', false);
+    const attackGroups = groupRolls(attackRolls);
+    const defenseGroups = groupRolls(defenseRolls);
 
-    const renderGroupedDice = (groups) => {
-      // Sort so supported infantry appears before regular infantry
-      const sortedEntries = Object.entries(groups).sort((a, b) => {
-        // Supported infantry first
-        if (a[1].isSupported && !b[1].isSupported) return -1;
-        if (!a[1].isSupported && b[1].isSupported) return 1;
-        return 0;
-      });
+    // Render dice for a side
+    const renderSideDice = (groups, playerId, totalHits, isAttacker) => {
+      const entries = Object.entries(groups);
+      if (entries.length === 0) return '<div class="dice-side-empty">No dice</div>';
 
-      return sortedEntries.map(([key, data]) => {
-        const hits = data.rolls.filter(r => r.hit).length;
-        // Label supported infantry clearly
-        const label = data.isSupported
-          ? `${data.unitType} (supported)`
-          : data.unitType;
+      return entries.map(([unitType, data]) => {
+        const imageSrc = playerId ? getUnitIconPath(unitType, playerId) : null;
         return `
-          <div class="dice-unit-group ${data.isSupported ? 'supported' : ''}">
-            <span class="dice-unit-label">${label} (≤${data.needed}):</span>
-            <span class="dice-unit-hits">${hits}/${data.rolls.length}</span>
-            <div class="dice-unit-rolls">
-              ${data.rolls.slice(0, 8).map(r => `<span class="die-small ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}
-              ${data.rolls.length > 8 ? `<span class="dice-more-small">+${data.rolls.length - 8}</span>` : ''}
+          <div class="dice-unit-row">
+            <div class="dice-unit-info">
+              ${imageSrc ? `<img src="${imageSrc}" class="dice-unit-icon" alt="${unitType}">` : ''}
+              <span class="dice-unit-name">${unitType}</span>
+            </div>
+            <div class="dice-unit-dice">
+              ${data.rolls.slice(0, 6).map(r => `<span class="die-inline ${r.hit ? 'hit' : 'miss'}">${r.roll}</span>`).join('')}
+              ${data.rolls.length > 6 ? `<span class="dice-more-inline">+${data.rolls.length - 6}</span>` : ''}
+            </div>
+            <div class="dice-unit-result ${data.hits > 0 ? 'has-hits' : ''}">
+              ${data.hits}/${data.rolls.length}
             </div>
           </div>
         `;
@@ -1938,20 +1929,24 @@ export class CombatUI {
     };
 
     return `
-      <div class="dice-results">
-        <div class="dice-result-section">
-          <div class="dice-result-header">
-            <span class="dice-result-label">⚔ Attack:</span>
-            <span class="dice-result-total">${attackHits} hits</span>
+      <div class="dice-results-split">
+        <div class="dice-side attacker">
+          <div class="dice-side-header" style="color: ${player.color}">
+            <span class="dice-side-label">⚔ ${player.name} (Attacker)</span>
+            <span class="dice-side-total">${attackHits} hits</span>
           </div>
-          ${renderGroupedDice(attackGroups)}
+          <div class="dice-side-content">
+            ${renderSideDice(attackGroups, player.id, attackHits, true)}
+          </div>
         </div>
-        <div class="dice-result-section">
-          <div class="dice-result-header">
-            <span class="dice-result-label">🛡 Defense:</span>
-            <span class="dice-result-total">${defenseHits} hits</span>
+        <div class="dice-side defender">
+          <div class="dice-side-header" style="color: ${defenderPlayer?.color || '#888'}">
+            <span class="dice-side-label">🛡 ${defenderPlayer?.name || 'Defender'}</span>
+            <span class="dice-side-total">${defenseHits} hits</span>
           </div>
-          ${renderGroupedDice(defenseGroups)}
+          <div class="dice-side-content">
+            ${renderSideDice(defenseGroups, defenderPlayer?.id, defenseHits, false)}
+          </div>
         </div>
       </div>
     `;
@@ -1963,6 +1958,10 @@ export class CombatUI {
       pendingAttackerCasualties, pendingDefenderCasualties,
       selectedAttackerCasualties, selectedDefenderCasualties
     } = this.combatState;
+
+    const player = this.gameState.currentPlayer;
+    const defenderOwner = defenders[0]?.owner;
+    const defenderPlayer = this.gameState.getPlayer(defenderOwner);
 
     const attackerTotal = this._getTotalSelectedCasualties(selectedAttackerCasualties);
     const defenderTotal = this._getTotalSelectedCasualties(selectedDefenderCasualties);
@@ -1979,45 +1978,64 @@ export class CombatUI {
     const attackerWasted = Math.max(0, pendingDefenderCasualties - defenderMaxCasualties);
     const defenderWasted = Math.max(0, pendingAttackerCasualties - attackerMaxCasualties);
 
-    let html = `<div class="casualty-selection">`;
+    const attackerComplete = attackerTotal >= effectiveAttackerCasualties;
+    const defenderComplete = defenderTotal >= effectiveDefenderCasualties;
 
-    // Attacker casualties (controlled by current player)
-    if (pendingAttackerCasualties > 0) {
-      const isComplete = attackerTotal >= effectiveAttackerCasualties;
-      html += `
-        <div class="casualty-group attacker">
-          <div class="casualty-header">
-            <span class="casualty-title">Select ${effectiveAttackerCasualties} Attacker Casualties</span>
-            <span class="casualty-count ${isComplete ? 'complete' : 'incomplete'}">
-              ${attackerTotal}/${effectiveAttackerCasualties}
-            </span>
-            ${defenderWasted > 0 ? `<span class="casualty-overflow">(${defenderWasted} wasted)</span>` : ''}
+    let html = `<div class="casualty-selection-split">`;
+
+    // Attacker side (left)
+    html += `
+      <div class="casualty-side attacker">
+        <div class="casualty-side-header" style="border-color: ${player.color}">
+          <span class="casualty-side-label" style="color: ${player.color}">⚔ ${player.name}</span>
+          <span class="casualty-side-role">(Attacker)</span>
+        </div>
+        ${pendingAttackerCasualties > 0 ? `
+          <div class="casualty-hit-counter ${attackerComplete ? 'complete' : 'incomplete'}">
+            <span class="hit-counter-label">Hits to assign:</span>
+            <span class="hit-counter-value">${attackerTotal}</span>
+            <span class="hit-counter-sep">of</span>
+            <span class="hit-counter-total">${effectiveAttackerCasualties}</span>
+            ${defenderWasted > 0 ? `<span class="hit-counter-wasted">(${defenderWasted} overkill)</span>` : ''}
           </div>
-          <div class="casualty-units">
+          <div class="casualty-units-compact">
             ${this._renderCasualtyUnits(attackers, selectedAttackerCasualties, 'attacker')}
           </div>
-        </div>
-      `;
-    }
-
-    // Defender casualties (now also selectable)
-    if (pendingDefenderCasualties > 0) {
-      const isComplete = defenderTotal >= effectiveDefenderCasualties;
-      html += `
-        <div class="casualty-group defender">
-          <div class="casualty-header">
-            <span class="casualty-title">Select ${effectiveDefenderCasualties} Defender Casualties</span>
-            <span class="casualty-count ${isComplete ? 'complete' : 'incomplete'}">
-              ${defenderTotal}/${effectiveDefenderCasualties}
-            </span>
-            ${attackerWasted > 0 ? `<span class="casualty-overflow">(${attackerWasted} wasted)</span>` : ''}
+        ` : `
+          <div class="casualty-none">
+            <span class="casualty-none-icon">✓</span>
+            <span class="casualty-none-text">No casualties</span>
           </div>
-          <div class="casualty-units">
+        `}
+      </div>
+    `;
+
+    // Defender side (right)
+    html += `
+      <div class="casualty-side defender">
+        <div class="casualty-side-header" style="border-color: ${defenderPlayer?.color || '#888'}">
+          <span class="casualty-side-label" style="color: ${defenderPlayer?.color || '#888'}">🛡 ${defenderPlayer?.name || 'Defender'}</span>
+          <span class="casualty-side-role">(Defender)</span>
+        </div>
+        ${pendingDefenderCasualties > 0 ? `
+          <div class="casualty-hit-counter ${defenderComplete ? 'complete' : 'incomplete'}">
+            <span class="hit-counter-label">Hits to assign:</span>
+            <span class="hit-counter-value">${defenderTotal}</span>
+            <span class="hit-counter-sep">of</span>
+            <span class="hit-counter-total">${effectiveDefenderCasualties}</span>
+            ${attackerWasted > 0 ? `<span class="hit-counter-wasted">(${attackerWasted} overkill)</span>` : ''}
+          </div>
+          <div class="casualty-units-compact">
             ${this._renderCasualtyUnits(defenders, selectedDefenderCasualties, 'defender')}
           </div>
-        </div>
-      `;
-    }
+        ` : `
+          <div class="casualty-none">
+            <span class="casualty-none-icon">✓</span>
+            <span class="casualty-none-text">No casualties</span>
+          </div>
+        `}
+      </div>
+    `;
 
     html += `</div>`;
     return html;

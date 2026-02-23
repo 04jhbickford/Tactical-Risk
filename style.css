@@ -7498,6 +7498,258 @@ html, body {
   text-align: center;
 }
 
+/* Split Dice Results Layout */
+.dice-results-split {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dice-side {
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.dice-side.attacker {
+  border-left: 3px solid var(--attacker-color, #ff6b6b);
+}
+
+.dice-side.defender {
+  border-right: 3px solid var(--defender-color, #4dabf7);
+}
+
+.dice-side-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.dice-side-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dice-side-total {
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.dice-side-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dice-side-empty {
+  color: #666;
+  font-size: 11px;
+  font-style: italic;
+  text-align: center;
+  padding: 8px;
+}
+
+.dice-unit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+}
+
+.dice-unit-info {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 60px;
+}
+
+.dice-unit-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.dice-unit-name {
+  font-size: 10px;
+  color: #aaa;
+  text-transform: capitalize;
+}
+
+.dice-unit-dice {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+}
+
+.die-inline {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.1);
+  color: #888;
+}
+
+.die-inline.hit {
+  background: rgba(76, 175, 80, 0.3);
+  color: #81c784;
+}
+
+.die-inline.miss {
+  background: rgba(244, 67, 54, 0.15);
+  color: #666;
+}
+
+.dice-more-inline {
+  font-size: 9px;
+  color: #666;
+  padding: 0 4px;
+}
+
+.dice-unit-result {
+  font-size: 11px;
+  font-weight: 600;
+  color: #666;
+  min-width: 30px;
+  text-align: right;
+}
+
+.dice-unit-result.has-hits {
+  color: #81c784;
+}
+
+/* Split Casualty Selection Layout */
+.casualty-selection-split {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.casualty-side {
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.casualty-side.attacker {
+  border-left: 3px solid var(--attacker-color, #ff6b6b);
+}
+
+.casualty-side.defender {
+  border-right: 3px solid var(--defender-color, #4dabf7);
+}
+
+.casualty-side-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid;
+}
+
+.casualty-side-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.casualty-side-role {
+  font-size: 10px;
+  color: #888;
+}
+
+.casualty-hit-counter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  background: rgba(255, 152, 0, 0.15);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.casualty-hit-counter.complete {
+  background: rgba(76, 175, 80, 0.15);
+  border-color: rgba(76, 175, 80, 0.3);
+}
+
+.hit-counter-label {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.hit-counter-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.hit-counter-sep {
+  font-size: 11px;
+  color: #666;
+}
+
+.hit-counter-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffb74d;
+}
+
+.casualty-hit-counter.complete .hit-counter-total {
+  color: #81c784;
+}
+
+.hit-counter-wasted {
+  font-size: 10px;
+  color: #ff9800;
+  margin-left: 4px;
+}
+
+.casualty-units-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.casualty-none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: #81c784;
+}
+
+.casualty-none-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.casualty-none-text {
+  font-size: 12px;
+  color: #666;
+}
+
 /* Combat Result */
 .combat-result {
   padding: 12px;
