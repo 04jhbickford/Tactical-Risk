@@ -2076,6 +2076,33 @@ export class GameState {
       this.units[toTerritory] = toUnits;
     }
 
+    // Optimize transport loading if loading land units onto transports
+    // Sort to load non-infantry first (tanks/artillery have limited slots)
+    if (loadingOntoTransport && toT?.isWater) {
+      // Build a map of units to load for optimization
+      const unitsToLoadMap = {};
+      for (const moveUnit of unitsToMove) {
+        const unitDef = unitDefs[moveUnit.type];
+        if (unitDef?.isLand) {
+          unitsToLoadMap[moveUnit.type] = (unitsToLoadMap[moveUnit.type] || 0) + moveUnit.quantity;
+        }
+      }
+
+      // Get all transports at destination
+      const destUnits = this.units[toTerritory] || [];
+      const transports = destUnits.filter(u => u.type === 'transport' && u.owner === player.id);
+
+      // Optimize cargo distribution
+      this._optimizeTransportCargo(transports, unitsToLoadMap, player.id);
+
+      // Sort unitsToMove so non-infantry loads first
+      unitsToMove.sort((a, b) => {
+        const aIsInf = a.type === 'infantry' ? 1 : 0;
+        const bIsInf = b.type === 'infantry' ? 1 : 0;
+        return aIsInf - bIsInf; // Non-infantry first
+      });
+    }
+
     for (const moveUnit of unitsToMove) {
       const unitDef = unitDefs[moveUnit.type];
       if (!unitDef) continue;
@@ -3894,6 +3921,94 @@ export class GameState {
       // Non-infantry can only be added if no other non-infantry present
       // And only 1 slot is available for non-infantry per transport
       return otherCount === 0 ? 1 : 0;
+    }
+  }
+
+  // Optimize transport cargo to maximize loading capacity
+  // Reorganizes existing cargo to make room for non-infantry units
+  _optimizeTransportCargo(transports, unitsToLoad, playerId) {
+    // unitsToLoad: { infantry: 10, armour: 2, artillery: 1, ... }
+    const nonInfantryTypes = Object.keys(unitsToLoad).filter(t => t !== 'infantry');
+    const nonInfantryCount = nonInfantryTypes.reduce((sum, t) => sum + unitsToLoad[t], 0);
+    const infantryCount = unitsToLoad.infantry || 0;
+
+    if (nonInfantryCount === 0) return; // No optimization needed
+
+    // Calculate current state
+    let transportsWithOnlyInfantry = [];
+    let transportsWithNonInfantry = [];
+    let emptyTransports = [];
+
+    for (const transport of transports) {
+      const cargo = transport.cargo || [];
+      const hasNonInfantry = cargo.some(c => c.type !== 'infantry');
+      const infantryOnBoard = cargo.filter(c => c.type === 'infantry').length;
+
+      if (cargo.length === 0) {
+        emptyTransports.push(transport);
+      } else if (hasNonInfantry) {
+        transportsWithNonInfantry.push(transport);
+      } else if (infantryOnBoard > 0) {
+        transportsWithOnlyInfantry.push(transport);
+      }
+    }
+
+    // Calculate how many transports we need for non-infantry
+    // Each transport can hold at most 1 non-infantry unit
+    const transportsNeededForNonInf = nonInfantryCount;
+
+    // Available slots for non-infantry = empty transports + transports with only 1 infantry
+    const availableForNonInf = emptyTransports.length +
+      transportsWithOnlyInfantry.filter(t => (t.cargo || []).length === 1).length;
+
+    // If we have enough slots, great. Otherwise, we need to rearrange.
+    if (availableForNonInf >= transportsNeededForNonInf) {
+      // Rearrange: move infantry from half-full transports to make room for non-infantry
+      // Priority: use empty transports first, then half-full (1 infantry) transports
+
+      // Sort half-full transports by having exactly 1 infantry
+      const halfFullTransports = transportsWithOnlyInfantry.filter(t => (t.cargo || []).length === 1);
+
+      // For each non-infantry to load, ensure we have a spot
+      let nonInfSlotsNeeded = nonInfantryCount;
+
+      // Empty transports can each take 1 non-infantry
+      nonInfSlotsNeeded -= emptyTransports.length;
+
+      // If we still need slots, we need to convert some half-full (1 inf) transports
+      // Those already have room for 1 non-infantry (1 inf + 1 tank is valid)
+      // No rearrangement needed for those
+
+      // But if we have transports with 2 infantry and need more non-inf slots,
+      // we need to move 1 infantry off to make room
+      if (nonInfSlotsNeeded > halfFullTransports.length) {
+        const fullInfantryTransports = transportsWithOnlyInfantry.filter(t => (t.cargo || []).length === 2);
+        const slotsToFree = nonInfSlotsNeeded - halfFullTransports.length;
+
+        // Try to move infantry from full-infantry transports to other transports
+        for (let i = 0; i < Math.min(slotsToFree, fullInfantryTransports.length); i++) {
+          const sourceTransport = fullInfantryTransports[i];
+          const cargo = sourceTransport.cargo || [];
+
+          // Find infantry to move
+          const infIndex = cargo.findIndex(c => c.type === 'infantry');
+          if (infIndex === -1) continue;
+
+          // Find a transport that can accept infantry
+          // Look for empty transports first, then half-full with 1 non-infantry
+          let targetTransport = emptyTransports.find(t => (t.cargo || []).length < 2);
+          if (!targetTransport) {
+            targetTransport = transportsWithNonInfantry.find(t => (t.cargo || []).length < 2);
+          }
+
+          if (targetTransport) {
+            // Move infantry
+            const inf = cargo.splice(infIndex, 1)[0];
+            targetTransport.cargo = targetTransport.cargo || [];
+            targetTransport.cargo.push(inf);
+          }
+        }
+      }
     }
   }
 
