@@ -1275,7 +1275,7 @@ export class PlayerPanel {
         </div>
         <div class="pp-placement-remaining">
           <span class="pp-remaining-label">Remaining to deploy:</span>
-          <span class="pp-remaining-value">${actualRemaining} units</span>
+          <span class="pp-remaining-value">${actualRemaining - totalQueued} units</span>
         </div>`;
 
     // Show selected territory (only if still placing)
@@ -1381,13 +1381,6 @@ export class PlayerPanel {
     }
     if (totalQueued > 0 && isValidPlacement) {
       html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
-    }
-    // "Done - Next Player" button is now in the fixed bottom actions bar
-    if (showDoneButton) {
-      html += `
-        <div class="pp-placement-complete">
-          <div class="pp-complete-message">✓ All ${limit} units deployed!</div>
-        </div>`;
     }
     html += `</div>`;
 
