@@ -836,7 +836,10 @@ async function init() {
     // Check if we should start a unit drag (during movement phases)
     if (gameState && e.button === 0) {
       const turnPhase = gameState.turnPhase;
-      const isMovementPhase = turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+      const isMovementPhase =
+        turnPhase === TURN_PHASES.COMBAT_MOVE ||
+        turnPhase === TURN_PHASES.NON_COMBAT_MOVE ||
+        turnPhase === TURN_PHASES.CONDUCT_COMBAT; // For retreat
 
       if (isMovementPhase && !gameState.currentPlayer?.isAI) {
         const world = camera.screenToWorld(e.clientX, e.clientY);

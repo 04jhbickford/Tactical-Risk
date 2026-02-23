@@ -1013,20 +1013,20 @@ export class TerritoryRenderer {
 
     ctx.save();
 
-    // Add glow effect
-    ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 20;
+    // Add strong glow effect for visibility
+    ctx.shadowColor = '#ffff00';
+    ctx.shadowBlur = 25;
 
-    // Fill with brighter highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    // Fill with visible yellow-tinted highlight
+    ctx.fillStyle = 'rgba(255, 255, 100, 0.4)';
     for (const poly of territory.polygons) {
       if (!poly || poly.length < 3) continue;
       this._fillPoly(ctx, poly);
     }
 
-    // Stroke outline with glow - use external edges only to hide internal borders
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.lineWidth = 3;
+    // Stroke outline with bright glow - use external edges only to hide internal borders
+    ctx.strokeStyle = 'rgba(255, 255, 150, 0.95)';
+    ctx.lineWidth = 4;
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
