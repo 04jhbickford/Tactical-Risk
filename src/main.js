@@ -41,6 +41,7 @@ import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
 import { BugTracker } from './ui/bugTracker.js';
 import { AirLandingUI } from './ui/airLandingUI.js';
+import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
 
 function wrapX(x) {
@@ -170,6 +171,10 @@ async function init() {
   const airLandingUI = new AirLandingUI();
   airLandingUI.setUnitDefs(unitDefs);
   airLandingUI.setTerritories(territories);
+
+  // Rocket Attack UI (for rockets technology)
+  const rocketUI = new RocketUI();
+  rocketUI.setUnitDefs(unitDefs);
 
   // Rules button is now in the HUD (top bar)
 
@@ -315,18 +320,14 @@ async function init() {
         break;
 
       case 'launch-rocket':
-        // Rocket attack using rockets technology
+        // Rocket attack using rockets technology - show modal
         if (data.from && data.target) {
-          const result = gameState.launchRocket(data.from, data.target);
-          if (result.success) {
-            actionLog.log(`🚀 ${result.message}`);
-            // Show a brief notification
-            showNotification(result.message);
-          } else {
-            console.warn('Rocket launch failed:', result.error);
-          }
-          camera.dirty = true;
+          rocketUI.launchRocket(data.from, data.target);
+        } else {
+          // Show selection modal
+          rocketUI.show();
         }
+        camera.dirty = true;
         break;
 
       case 'place-unit':
@@ -678,15 +679,32 @@ async function init() {
       }
     });
 
-    // Air Landing UI
+    // Air Landing UI - consolidated landing after ALL combats
     airLandingUI.setGameState(gameState);
-    airLandingUI.setOnComplete((result) => {
-      // Pass result back to combatUI
+    airLandingUI.setOnTerritoryComplete((result) => {
+      // Apply landings for this territory immediately
       combatUI.handleAirLandingComplete(result);
+      camera.dirty = true;
+    });
+    airLandingUI.setOnComplete((result) => {
+      // All territories done - clear destinations and proceed
+      territoryRenderer.clearAirLandingDestinations();
       camera.dirty = true;
     });
     airLandingUI.setOnHighlightTerritory((territory, highlight) => {
       territoryRenderer.setHoverHighlight(territory, highlight);
+      camera.dirty = true;
+    });
+    airLandingUI.setOnCenterCamera((territory) => {
+      // Center camera on the territory
+      if (territory && territory.center) {
+        camera.panTo(territory.center[0], territory.center[1]);
+      }
+    });
+
+    // Rocket Attack UI
+    rocketUI.setGameState(gameState);
+    rocketUI.setOnComplete(() => {
       camera.dirty = true;
     });
 
@@ -703,22 +721,17 @@ async function init() {
         camera.panTo(t.center[0], t.center[1]);
       }
     });
-    combatUI.setOnAirLandingRequired((data) => {
-      // Use inline air landing UI in player panel
-      playerPanel.setAirLanding(
-        data.airUnitsToLand,
-        data.combatTerritory,
-        data.isRetreating,
-        (result) => {
-          // Air landing complete - pass result back to combat UI
-          combatUI.handleAirLandingComplete(result);
-          territoryRenderer.clearAirLandingDestinations();
-          camera.dirty = true;
-        }
-      );
-      // Highlight valid destinations on map
-      territoryRenderer.setAirLandingDestinations(playerPanel.getAirLandingDestinations());
-      camera.dirty = true;
+    // Air landing now happens at end of all combats, not after each one
+    // Check for pending air landings when combat queue is empty
+    combatUI.setOnAllCombatsResolved(() => {
+      // Check if there are pending air landings
+      if (gameState.hasPendingAirLandings()) {
+        // Start the consolidated air landing UI
+        airLandingUI.startConsolidatedLanding();
+        // Highlight valid destinations on map
+        territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
+        camera.dirty = true;
+      }
     });
 
     // Tech UI
@@ -899,7 +912,18 @@ async function init() {
         }
       }
 
-      // Check if we're in air landing phase (inline UI in player panel)
+      // Check if consolidated air landing UI is active (after all combats)
+      if (hit && gameState && airLandingUI.isActive()) {
+        const handled = airLandingUI.handleTerritoryClick(hit);
+        if (handled) {
+          // Update map highlighting for valid destinations
+          territoryRenderer.setAirLandingDestinations(airLandingUI.getAllValidDestinations());
+          camera.dirty = true;
+          return;
+        }
+      }
+
+      // Check if we're in air landing phase (inline UI in player panel - legacy)
       if (hit && gameState && playerPanel.isAirLandingActive()) {
         const handled = playerPanel.handleAirLandingTerritoryClick(hit);
         if (handled) {

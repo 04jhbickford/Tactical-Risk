@@ -11255,6 +11255,42 @@ html, body {
   background: rgba(0, 0, 0, 0.15);
 }
 
+.alp-territory-progress {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #40c4ff;
+  background: rgba(64, 196, 255, 0.1);
+  border-bottom: 1px solid rgba(64, 196, 255, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alp-territory-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.alp-territory-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.alp-territory-dot.current {
+  background: #40c4ff;
+  border-color: #40c4ff;
+  box-shadow: 0 0 8px rgba(64, 196, 255, 0.5);
+}
+
+.alp-territory-dot.done {
+  background: #4caf50;
+  border-color: #4caf50;
+}
+
 .alp-unit {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   transition: all 0.15s ease;
@@ -12100,6 +12136,377 @@ html, body {
 .pp-rocket-btn:hover {
   background: linear-gradient(135deg, #e67e22, #e74c3c);
   transform: scale(1.02);
+}
+
+/* === Rocket Attack Modal === */
+.rocket-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid rgba(255, 140, 0, 0.4);
+  border-radius: 12px;
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 140, 0, 0.2);
+  z-index: 1100;
+  overflow: hidden;
+}
+
+.rocket-popup.hidden {
+  display: none;
+}
+
+.rocket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(255, 140, 0, 0.15), rgba(255, 69, 0, 0.1));
+  border-bottom: 1px solid rgba(255, 140, 0, 0.2);
+}
+
+.rocket-header.success {
+  background: linear-gradient(135deg, rgba(255, 140, 0, 0.25), rgba(255, 69, 0, 0.15));
+}
+
+.rocket-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff8c00;
+}
+
+.rocket-icon {
+  font-size: 22px;
+}
+
+.rocket-close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #aaa;
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rocket-close-btn:hover {
+  background: rgba(255, 100, 100, 0.3);
+  color: #fff;
+}
+
+.rocket-content {
+  padding: 20px;
+}
+
+.rocket-instructions {
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.5;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+.rocket-no-targets {
+  text-align: center;
+  padding: 30px;
+  color: #888;
+  font-style: italic;
+}
+
+.rocket-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rocket-source-card {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 140, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rocket-source-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255, 140, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 140, 0, 0.15);
+}
+
+.rocket-unit-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.rocket-unit-icon.small {
+  width: 20px;
+  height: 20px;
+}
+
+.rocket-source-name {
+  flex: 1;
+  font-weight: 600;
+  color: #fff;
+}
+
+.rocket-source-count {
+  font-size: 11px;
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.15);
+  padding: 3px 8px;
+  border-radius: 10px;
+}
+
+.rocket-targets {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rocket-target-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #d35400, #c0392b);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rocket-target-btn:hover {
+  background: linear-gradient(135deg, #e67e22, #e74c3c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(211, 84, 0, 0.3);
+}
+
+.rocket-target-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.rocket-target-name {
+  font-size: 13px;
+}
+
+.rocket-target-owner {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Battle display for rolling/result phases */
+.rocket-battle-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.rocket-attacker, .rocket-target {
+  text-align: center;
+  flex: 1;
+}
+
+.rocket-side-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.rocket-side-territory {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.rocket-battle-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.rocket-arrow {
+  padding: 0 20px;
+  font-size: 32px;
+}
+
+.rocket-projectile {
+  animation: rocketFly 0.5s ease-in-out infinite;
+}
+
+@keyframes rocketFly {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+
+.rocket-arrow.hit .rocket-explosion {
+  animation: explode 0.3s ease-out;
+}
+
+@keyframes explode {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0.8; }
+}
+
+/* Dice section */
+.rocket-dice-section {
+  text-align: center;
+  padding: 20px;
+}
+
+.rocket-dice-section.rolling .rocket-dice {
+  animation: diceShake 0.1s ease-in-out infinite;
+}
+
+@keyframes diceShake {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg); }
+}
+
+.rocket-dice-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #888;
+  margin-bottom: 12px;
+}
+
+.rocket-dice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #ff8c00, #ff6600);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+}
+
+.rocket-dice.result {
+  animation: none;
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.rocket-dice-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Result section */
+.rocket-result-section {
+  text-align: center;
+}
+
+.rocket-damage-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(231, 76, 60, 0.2), rgba(192, 57, 43, 0.15));
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 8px;
+}
+
+.rocket-damage-icon {
+  font-size: 28px;
+}
+
+.rocket-damage-text {
+  text-align: left;
+}
+
+.rocket-damage-amount {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #e74c3c;
+}
+
+.rocket-damage-target {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.rocket-damage-note {
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+.rocket-error {
+  text-align: center;
+  padding: 20px;
+  color: #e74c3c;
+  font-style: italic;
+}
+
+/* Actions */
+.rocket-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.rocket-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rocket-btn.primary {
+  background: linear-gradient(135deg, #ff8c00, #ff6600);
+  color: white;
+}
+
+.rocket-btn.primary:hover {
+  background: linear-gradient(135deg, #ffaa00, #ff8800);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 140, 0, 0.4);
+}
+
+.rocket-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #aaa;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.rocket-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
 }
 
 /* Game notification animation */

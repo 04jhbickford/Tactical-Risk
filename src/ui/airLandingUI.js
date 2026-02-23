@@ -1,4 +1,4 @@
-// Air Landing UI - Map-based view for selecting where air units land after combat
+// Air Landing UI - Map-based view for selecting where air units land after ALL combats
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 
@@ -7,13 +7,22 @@ export class AirLandingUI {
     this.gameState = null;
     this.unitDefs = null;
     this.territoryByName = null;
+
+    // All pending landings grouped by origin territory
+    this.pendingByTerritory = []; // [{ originTerritory, units: [...] }, ...]
+    this.currentTerritoryIndex = 0;
+
+    // Current territory's air units
     this.airUnitsToLand = [];
     this.selectedLandings = {};
     this.currentUnitIndex = 0;
     this.combatTerritory = null;
-    this.isRetreating = false;
+
     this.onComplete = null;
+    this.onTerritoryComplete = null; // Called when one territory's landings are done
     this.onHighlightTerritory = null;
+    this.onCenterCamera = null; // Callback to center camera on territory
+
     this._create();
   }
 
@@ -43,30 +52,71 @@ export class AirLandingUI {
     this.onComplete = callback;
   }
 
+  setOnTerritoryComplete(callback) {
+    this.onTerritoryComplete = callback;
+  }
+
   setOnHighlightTerritory(callback) {
     this.onHighlightTerritory = callback;
+  }
+
+  setOnCenterCamera(callback) {
+    this.onCenterCamera = callback;
   }
 
   isActive() {
     return !this.el.classList.contains('hidden') && this.airUnitsToLand.length > 0;
   }
 
-  // Initialize with air units needing landing after combat
-  setAirUnits(airUnitsToLand, combatTerritory, isRetreating = false) {
-    this.airUnitsToLand = airUnitsToLand;
-    this.combatTerritory = combatTerritory;
-    this.isRetreating = isRetreating;
-    this.selectedLandings = {};
-    this.currentUnitIndex = 0;
-    this._render();
+  // Initialize with all pending air landings from gameState
+  startConsolidatedLanding() {
+    const pending = this.gameState.getPendingAirLandings();
+    if (!pending || pending.length === 0) {
+      return false;
+    }
+
+    this.pendingByTerritory = pending.map(p => ({
+      originTerritory: p.originTerritory,
+      units: [...p.units],
+      landings: {},
+      crashes: []
+    }));
+    this.currentTerritoryIndex = 0;
+
+    // Start with first territory
+    this._loadCurrentTerritory();
     this.el.classList.remove('hidden');
+
+    return true;
+  }
+
+  _loadCurrentTerritory() {
+    const current = this.pendingByTerritory[this.currentTerritoryIndex];
+    if (!current) return;
+
+    this.combatTerritory = current.originTerritory;
+    this.airUnitsToLand = current.units;
+    this.selectedLandings = current.landings;
+    this.currentUnitIndex = 0;
+
+    // Center camera on this territory
+    if (this.onCenterCamera && this.territoryByName) {
+      const territory = this.territoryByName[this.combatTerritory];
+      if (territory) {
+        this.onCenterCamera(territory);
+      }
+    }
+
+    this._render();
   }
 
   hide() {
     this.el.classList.add('hidden');
+    this.pendingByTerritory = [];
     this.airUnitsToLand = [];
     this.selectedLandings = {};
     this.currentUnitIndex = 0;
+    this.currentTerritoryIndex = 0;
     // Clear any highlights
     if (this.onHighlightTerritory) {
       this.onHighlightTerritory(null, false);
@@ -83,9 +133,14 @@ export class AirLandingUI {
     // Check if this is a valid landing destination
     const validDest = currentUnit.landingOptions.find(opt => opt.territory === territory.name);
     if (validDest) {
-      // Use unit ID for individual tracking (allows same type to land at different locations)
       const unitKey = currentUnit.id || currentUnit.type;
       this.selectedLandings[unitKey] = territory.name;
+
+      // Save to current territory's data
+      const current = this.pendingByTerritory[this.currentTerritoryIndex];
+      if (current) {
+        current.landings[unitKey] = territory.name;
+      }
 
       // Move to next unit if available
       if (this.currentUnitIndex < this.airUnitsToLand.length - 1) {
@@ -93,10 +148,25 @@ export class AirLandingUI {
       }
 
       this._render();
+
+      // Check if all units for this territory are assigned
+      this._checkAutoAdvance();
+
       return true;
     }
 
     return false;
+  }
+
+  _checkAutoAdvance() {
+    // Check if all units have landing selections (or will crash)
+    const allSelected = this.airUnitsToLand.every(u => {
+      const unitKey = u.id || u.type;
+      return u.landingOptions.length === 0 || this.selectedLandings[unitKey];
+    });
+
+    // If all selected and there are more territories, show next button prominently
+    // Auto-advance is handled by confirm button
   }
 
   // Get valid destinations for current unit (for map highlighting)
@@ -128,28 +198,41 @@ export class AirLandingUI {
     const player = this.gameState.currentPlayer;
     if (!player) return;
 
+    const totalTerritories = this.pendingByTerritory.length;
     const totalUnits = this.airUnitsToLand.length;
     const currentUnit = this.airUnitsToLand[this.currentUnitIndex];
 
     // Check if all units have landing selections (or will crash)
-    // Use unit ID for individual tracking (allows same type to land at different locations)
     const allSelected = this.airUnitsToLand.every(u => {
       const unitKey = u.id || u.type;
       return u.landingOptions.length === 0 || this.selectedLandings[unitKey];
     });
 
+    const isLastTerritory = this.currentTerritoryIndex >= totalTerritories - 1;
+
     let html = `
       <div class="alp-header" style="border-left: 5px solid ${player.color}">
         <div class="alp-title">
           <span class="alp-icon">✈️</span>
-          ${this.isRetreating ? 'Retreat - ' : ''}Air Unit Landing
+          Air Unit Landing
         </div>
         <div class="alp-subtitle">From: ${this.combatTerritory}</div>
       </div>
 
+      ${totalTerritories > 1 ? `
+        <div class="alp-territory-progress">
+          Territory ${this.currentTerritoryIndex + 1} of ${totalTerritories}
+          <div class="alp-territory-dots">
+            ${this.pendingByTerritory.map((_, i) => `
+              <span class="alp-territory-dot ${i === this.currentTerritoryIndex ? 'current' : ''} ${i < this.currentTerritoryIndex ? 'done' : ''}"></span>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <div class="alp-instructions">
-        Select landing locations for your air units. They can only land in territories
-        that were <strong>friendly at the start of your turn</strong>.
+        Click the map or use dropdown to select landing locations.
+        Units can only land in territories <strong>friendly at turn start</strong>.
       </div>
 
       <div class="alp-progress">
@@ -162,7 +245,6 @@ export class AirLandingUI {
       const airUnit = this.airUnitsToLand[i];
       const def = this.unitDefs[airUnit.type];
       const imageSrc = getUnitIconPath(airUnit.type, player.id);
-      // Use unit ID for individual tracking (allows same type to land at different locations)
       const unitKey = airUnit.id || airUnit.type;
       const selectedDest = this.selectedLandings[unitKey];
       const hasOptions = airUnit.landingOptions.length > 0;
@@ -174,7 +256,7 @@ export class AirLandingUI {
       const distanceTraveled = originInfo?.distance || 0;
       const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
 
-      // Display unit number if there are multiple of same type (e.g., "Fighter #1", "Fighter #2")
+      // Display unit number if there are multiple of same type
       const sameTypeUnits = this.airUnitsToLand.filter(u => u.type === airUnit.type);
       const unitIndex = sameTypeUnits.indexOf(airUnit) + 1;
       const displayName = sameTypeUnits.length > 1
@@ -221,7 +303,7 @@ export class AirLandingUI {
     html += `
       <div class="alp-actions">
         <button class="alp-btn primary" data-action="confirm" ${!allSelected ? 'disabled' : ''}>
-          Confirm Landings
+          ${allSelected && !isLastTerritory ? 'Next Territory →' : 'Confirm Landings'}
         </button>
       </div>
     `;
@@ -244,7 +326,6 @@ export class AirLandingUI {
 
     // Destination dropdowns
     this.el.querySelectorAll('.alp-dest-select').forEach(select => {
-      // Hover events on options
       select.addEventListener('mouseover', (e) => {
         if (e.target.tagName === 'OPTION' && e.target.value) {
           if (this.onHighlightTerritory) {
@@ -259,59 +340,81 @@ export class AirLandingUI {
         }
       });
 
-      // Change event
       select.addEventListener('change', () => {
-        const unitKey = select.dataset.unit; // Now uses unit ID, not just type
+        const unitKey = select.dataset.unit;
         const destination = select.value;
+
         if (destination) {
           this.selectedLandings[unitKey] = destination;
+          // Save to current territory's data
+          const current = this.pendingByTerritory[this.currentTerritoryIndex];
+          if (current) {
+            current.landings[unitKey] = destination;
+          }
         } else {
           delete this.selectedLandings[unitKey];
+          const current = this.pendingByTerritory[this.currentTerritoryIndex];
+          if (current) {
+            delete current.landings[unitKey];
+          }
         }
         this._render();
-      });
-
-      // Focus/blur for dropdown highlighting
-      select.addEventListener('focus', () => {
-        // When dropdown opens, highlight all options
-        const unitKey = select.dataset.unit;
-        const unit = this.airUnitsToLand.find(u => (u.id || u.type) === unitKey);
-        if (unit && this.onHighlightTerritory) {
-          // Could highlight all options - for now just clear
-        }
       });
     });
 
     // Confirm button
     this.el.querySelector('[data-action="confirm"]')?.addEventListener('click', () => {
-      this._confirmLandings();
+      this._confirmCurrentTerritory();
     });
   }
 
-  _confirmLandings() {
-    if (!this.onComplete) return;
+  _confirmCurrentTerritory() {
+    const current = this.pendingByTerritory[this.currentTerritoryIndex];
+    if (!current) return;
 
-    // Build result with selected landings (keyed by unit ID for individual tracking)
-    const result = {
-      landings: { ...this.selectedLandings },
-      crashes: [],
-      isRetreating: this.isRetreating,
-      // Include original air units for ID-based processing
-      airUnitsToLand: this.airUnitsToLand,
-    };
-
-    // Track units that will crash
+    // Build crashes list for this territory
+    current.crashes = [];
     for (const unit of this.airUnitsToLand) {
+      const unitKey = unit.id || unit.type;
       if (unit.landingOptions.length === 0) {
-        result.crashes.push({
-          id: unit.id,
-          type: unit.type,
-          quantity: unit.quantity,
-        });
+        current.crashes.push(unitKey);
       }
     }
 
+    // Notify that this territory's landings are complete
+    if (this.onTerritoryComplete) {
+      this.onTerritoryComplete({
+        originTerritory: current.originTerritory,
+        landings: { ...current.landings },
+        crashes: [...current.crashes]
+      });
+    }
+
+    // Move to next territory or finish
+    if (this.currentTerritoryIndex < this.pendingByTerritory.length - 1) {
+      this.currentTerritoryIndex++;
+      this._loadCurrentTerritory();
+    } else {
+      // All territories done
+      this._finishAllLandings();
+    }
+  }
+
+  _finishAllLandings() {
+    // Clear pending air landings from gameState
+    this.gameState.clearPendingAirLandings();
+
+    // Notify completion
+    if (this.onComplete) {
+      this.onComplete({
+        territories: this.pendingByTerritory.map(t => ({
+          originTerritory: t.originTerritory,
+          landings: t.landings,
+          crashes: t.crashes
+        }))
+      });
+    }
+
     this.hide();
-    this.onComplete(result);
   }
 }

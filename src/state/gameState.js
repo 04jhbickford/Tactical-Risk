@@ -173,6 +173,10 @@ export class GameState {
     // Format: { 'territoryName': count } - how many AA guns at this territory have fired
     this.rocketsUsedThisTurn = {};
 
+    // Pending air landings accumulated from all combats (processed at end of combat phase)
+    // Format: [{ originTerritory, units: [{ id, type, quantity, landingOptions }] }]
+    this.pendingAirLandings = [];
+
     // Placement history for undo: [{ territory, unitType, owner }]
     this.placementHistory = [];
 
@@ -1697,6 +1701,7 @@ export class GameState {
     this.amphibiousTerritories = new Set();
     this.amphibiousAssaultDetails = {};
     this.rocketsUsedThisTurn = {};
+    this.pendingAirLandings = [];
 
     // Reset conquered flag for Risk card (one card per turn)
     const player = this.currentPlayer;
@@ -4318,6 +4323,40 @@ export class GameState {
     };
   }
 
+  // === PENDING AIR LANDINGS ===
+
+  // Add air units needing landing from a completed combat
+  addPendingAirLandings(originTerritory, airUnits) {
+    if (!airUnits || airUnits.length === 0) return;
+
+    // Check if we already have pending landings from this territory
+    const existing = this.pendingAirLandings.find(p => p.originTerritory === originTerritory);
+    if (existing) {
+      // Merge units
+      existing.units.push(...airUnits);
+    } else {
+      this.pendingAirLandings.push({
+        originTerritory,
+        units: [...airUnits]
+      });
+    }
+  }
+
+  // Check if there are pending air landings
+  hasPendingAirLandings() {
+    return this.pendingAirLandings.length > 0;
+  }
+
+  // Get all pending air landings
+  getPendingAirLandings() {
+    return this.pendingAirLandings;
+  }
+
+  // Clear pending air landings after they've been processed
+  clearPendingAirLandings() {
+    this.pendingAirLandings = [];
+  }
+
   subscribe(callback) {
     this._listeners.push(callback);
     return () => {
@@ -4408,6 +4447,7 @@ export class GameState {
 
     // Reset per-turn state on load (fresh state for the turn)
     this.rocketsUsedThisTurn = {};
+    this.pendingAirLandings = [];
     this.amphibiousTerritories = new Set();
     this.amphibiousAssaultDetails = {};
     this.moveHistory = [];
