@@ -1775,10 +1775,10 @@ export class PlayerPanel {
         </div>
 
         <div class="pp-move-category-tabs">
-          ${hasLand ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'land' ? 'active' : ''}" data-action="move-tab" data-tab="land">🏃 Land (${landUnits.length})</button>` : ''}
-          ${hasNaval ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'naval' ? 'active' : ''}" data-action="move-tab" data-tab="naval">⚓ Naval (${navalUnits.length})</button>` : ''}
-          ${hasAir ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'air' ? 'active' : ''}" data-action="move-tab" data-tab="air">✈ Air (${airUnits.length})</button>` : ''}
-          ${hasCargo ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'cargo' ? 'active' : ''}" data-action="move-tab" data-tab="cargo">🚶 Land (${cargoUnitsForAssault.length})</button>` : ''}
+          ${hasLand ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'land' ? 'active' : ''}" data-action="move-tab" data-tab="land">🏃 Land (${landUnits.reduce((s, u) => s + u.quantity, 0)})</button>` : ''}
+          ${hasNaval ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'naval' ? 'active' : ''}" data-action="move-tab" data-tab="naval">⚓ Naval (${navalUnits.reduce((s, u) => s + u.quantity, 0)})</button>` : ''}
+          ${hasAir ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'air' ? 'active' : ''}" data-action="move-tab" data-tab="air">✈ Air (${airUnits.reduce((s, u) => s + u.quantity, 0)})</button>` : ''}
+          ${hasCargo ? `<button class="pp-move-cat-tab ${this.moveUnitTab === 'cargo' ? 'active' : ''}" data-action="move-tab" data-tab="cargo">🚶 Land (${cargoUnitsForAssault.reduce((s, u) => s + u.quantity, 0)})</button>` : ''}
         </div>
 
         <div class="pp-move-units">`;
