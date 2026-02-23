@@ -145,10 +145,117 @@ export class UnitRenderer {
       };
     }
 
+    // Find the best position by sampling points within the sea zone
+    // and choosing the one furthest from any land
+    const bestPos = this._findBestSeaZonePosition(territory, cx, cy);
+    return bestPos || { x: cx, y: cy };
+  }
+
+  // Find the best position within a sea zone (furthest from land)
+  _findBestSeaZonePosition(seaZone, defaultX, defaultY) {
+    const polygons = seaZone.polygons;
+    if (!polygons || polygons.length === 0) return null;
+
+    // Get bounding box of the sea zone
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const poly of polygons) {
+      for (const [x, y] of poly) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+
+    // Collect all nearby land polygons (including islands within sea zone)
+    const landPolygons = [];
+    for (const [name, t] of Object.entries(this.territoryByName)) {
+      if (t.isWater) continue;
+      // Check if land territory is near this sea zone
+      const [landCx, landCy] = this._getTerritoryCenter(t);
+      if (landCx === null) continue;
+
+      // Include if within reasonable distance of sea zone bounds
+      const margin = 200;
+      if (landCx >= minX - margin && landCx <= maxX + margin &&
+          landCy >= minY - margin && landCy <= maxY + margin) {
+        for (const poly of t.polygons || []) {
+          landPolygons.push(poly);
+        }
+      }
+    }
+
+    // Also collect adjacent sea zone polygons to avoid bleeding over
+    const adjacentSeaPolygons = [];
+    for (const conn of seaZone.connections || []) {
+      const neighbor = this.territoryByName[conn];
+      if (neighbor && neighbor.isWater && neighbor.name !== seaZone.name) {
+        // We want to stay away from the boundary with other sea zones
+        for (const poly of neighbor.polygons || []) {
+          adjacentSeaPolygons.push(poly);
+        }
+      }
+    }
+
+    // Sample points within the sea zone and find the best one
+    const gridSize = 20; // Sample every 20 pixels
+    let bestPoint = { x: defaultX, y: defaultY };
+    let bestScore = -Infinity;
+
+    for (let x = minX + gridSize; x < maxX - gridSize; x += gridSize) {
+      for (let y = minY + gridSize; y < maxY - gridSize; y += gridSize) {
+        // Check if point is inside the sea zone
+        if (!this._pointInPolygons(x, y, polygons)) continue;
+
+        // Calculate minimum distance to any land polygon
+        let minLandDist = Infinity;
+        for (const poly of landPolygons) {
+          const dist = this._distanceToPolygon(x, y, poly);
+          minLandDist = Math.min(minLandDist, dist);
+        }
+
+        // Calculate minimum distance to sea zone boundary (stay inside)
+        let minBoundaryDist = Infinity;
+        for (const poly of polygons) {
+          const dist = this._distanceToPolygonEdge(x, y, poly);
+          minBoundaryDist = Math.min(minBoundaryDist, dist);
+        }
+
+        // Calculate minimum distance to adjacent sea zones (avoid bleeding)
+        let minAdjacentDist = Infinity;
+        for (const poly of adjacentSeaPolygons) {
+          const dist = this._distanceToPolygon(x, y, poly);
+          minAdjacentDist = Math.min(minAdjacentDist, dist);
+        }
+
+        // Score: prefer points far from land, but also reasonably centered
+        // Weight land distance heavily, boundary distance moderately
+        const distFromCenter = Math.sqrt((x - defaultX) ** 2 + (y - defaultY) ** 2);
+        const centerPenalty = distFromCenter * 0.3; // Slight preference for center
+
+        const score = Math.min(minLandDist, minBoundaryDist * 0.8, minAdjacentDist * 0.5) - centerPenalty;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestPoint = { x, y };
+        }
+      }
+    }
+
+    // Require minimum distance from land (40 pixels) to use the computed position
+    if (bestScore < 40) {
+      // Fall back to moving away from land centers
+      return this._fallbackSeaZonePosition(seaZone, defaultX, defaultY);
+    }
+
+    return bestPoint;
+  }
+
+  // Fallback method using the old approach
+  _fallbackSeaZonePosition(territory, cx, cy) {
     const connections = territory.connections || [];
     const landNeighbors = [];
 
-    // Find all adjacent land territories
     for (const conn of connections) {
       const neighbor = this.territoryByName[conn];
       if (neighbor && !neighbor.isWater) {
@@ -159,13 +266,9 @@ export class UnitRenderer {
       }
     }
 
-    if (landNeighbors.length === 0) {
-      return { x: cx, y: cy };
-    }
+    if (landNeighbors.length === 0) return { x: cx, y: cy };
 
-    // Calculate average direction towards land
-    let avgDx = 0;
-    let avgDy = 0;
+    let avgDx = 0, avgDy = 0;
     for (const land of landNeighbors) {
       avgDx += land.x - cx;
       avgDy += land.y - cy;
@@ -173,21 +276,78 @@ export class UnitRenderer {
     avgDx /= landNeighbors.length;
     avgDy /= landNeighbors.length;
 
-    // Normalize and move AWAY from land
     const dist = Math.sqrt(avgDx * avgDx + avgDy * avgDy);
-    if (dist < 1) {
-      return { x: cx, y: cy };
+    if (dist < 1) return { x: cx, y: cy };
+
+    const offsetDist = 80;
+    return {
+      x: cx - (avgDx / dist) * offsetDist,
+      y: cy - (avgDy / dist) * offsetDist
+    };
+  }
+
+  // Check if point is inside any of the polygons
+  _pointInPolygons(x, y, polygons) {
+    for (const poly of polygons) {
+      if (this._pointInPolygon(x, y, poly)) return true;
+    }
+    return false;
+  }
+
+  // Point-in-polygon test using ray casting
+  _pointInPolygon(x, y, polygon) {
+    if (!polygon || polygon.length < 3) return false;
+
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1];
+      const xj = polygon[j][0], yj = polygon[j][1];
+
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+
+  // Distance from point to nearest point on polygon
+  _distanceToPolygon(x, y, polygon) {
+    if (!polygon || polygon.length < 2) return Infinity;
+
+    let minDist = Infinity;
+    for (let i = 0; i < polygon.length; i++) {
+      const p1 = polygon[i];
+      const p2 = polygon[(i + 1) % polygon.length];
+      const dist = this._distanceToLineSegment(x, y, p1[0], p1[1], p2[0], p2[1]);
+      minDist = Math.min(minDist, dist);
+    }
+    return minDist;
+  }
+
+  // Distance from point to polygon edge (same as distanceToPolygon for boundary)
+  _distanceToPolygonEdge(x, y, polygon) {
+    return this._distanceToPolygon(x, y, polygon);
+  }
+
+  // Distance from point to line segment
+  _distanceToLineSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+
+    if (lenSq === 0) {
+      // Segment is a point
+      return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
     }
 
-    // Offset 60-80 pixels away from the average land direction (increased from 50)
-    const offsetDist = 70;
-    const offsetX = -(avgDx / dist) * offsetDist;
-    const offsetY = -(avgDy / dist) * offsetDist;
+    // Project point onto line, clamped to segment
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = Math.max(0, Math.min(1, t));
 
-    return {
-      x: cx + offsetX,
-      y: cy + offsetY
-    };
+    const nearestX = x1 + t * dx;
+    const nearestY = y1 + t * dy;
+
+    return Math.sqrt((px - nearestX) ** 2 + (py - nearestY) ** 2);
   }
 
   _groupUnits(placements, includeCargo = false) {
