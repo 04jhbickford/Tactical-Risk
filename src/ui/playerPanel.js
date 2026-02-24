@@ -1341,11 +1341,38 @@ export class PlayerPanel {
           html += `<div class="pp-placement-done-msg">No land/air units to place</div>`;
         }
       } else {
-        // Sea zone - show naval units
+        // Sea zone - show naval units and air units if carrier with space exists
+        let hasUnitsToShow = false;
+
         if (navalUnits.length > 0) {
           html += `<div class="pp-unit-category-label">Naval</div>`;
           html += navalUnits.map(renderPlacementRow).join('');
-        } else {
+          hasUnitsToShow = true;
+        }
+
+        // Check if there's a carrier with space for aircraft in this sea zone
+        const seaUnits = this.gameState.getUnitsAt?.(this.selectedTerritory.name) || [];
+        const playerCarriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
+        const hasCarrierWithSpace = playerCarriers.some(carrier => {
+          const aircraft = carrier.aircraft || [];
+          const carrierDef = this.unitDefs?.carrier;
+          const capacity = carrierDef?.aircraftCapacity || 2;
+          return aircraft.length < capacity;
+        });
+
+        // Show air units (fighters/tactical bombers) if carrier has space
+        if (hasCarrierWithSpace && airUnits.length > 0) {
+          // Filter to only show aircraft that carriers can carry
+          const carrierDef = this.unitDefs?.carrier;
+          const carriableAir = airUnits.filter(u => carrierDef?.canCarry?.includes(u.type));
+          if (carriableAir.length > 0) {
+            html += `<div class="pp-unit-category-label">Air (on Carrier)</div>`;
+            html += carriableAir.map(renderPlacementRow).join('');
+            hasUnitsToShow = true;
+          }
+        }
+
+        if (!hasUnitsToShow) {
           html += `<div class="pp-placement-done-msg">No naval units to place</div>`;
         }
       }

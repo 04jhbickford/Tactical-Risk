@@ -9,6 +9,7 @@ export class MovementUI {
     this.unitDefs = null;
     this.territoryByName = null;
     this.onMoveComplete = null;
+    this.onCancel = null; // Callback when cancel button is pressed
     this.onHighlightTerritory = null; // Callback for hover highlighting
 
     // Movement state
@@ -680,6 +681,10 @@ export class MovementUI {
     this.loadingTargetShipId = null;
     this.pendingDestination = null;
     this.el.classList.add('hidden');
+    // Notify main.js to deselect territory
+    if (this.onCancel) {
+      this.onCancel();
+    }
   }
 
   // Get ships that need individual selection (carriers/transports with cargo)
@@ -1272,13 +1277,14 @@ export class MovementUI {
     if (this.pendingDestination) {
       const destOwner = this.gameState.getOwner(this.pendingDestination);
       const isEnemyDest = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
+      const confirmBtnText = isEnemyDest ? 'Confirm Attack' : 'Confirm Move';
       confirmHtml = `
         <div class="mp-confirm-section sticky">
           <div class="mp-confirm-info">
             Moving to: <strong>${this.pendingDestination}</strong>
             ${isEnemyDest ? '<span class="mp-enemy-tag">ATTACK</span>' : ''}
           </div>
-          <button class="mp-confirm-btn primary" data-action="confirm-move">Confirm Move</button>
+          <button class="mp-confirm-btn primary ${isEnemyDest ? 'attack' : ''}" data-action="confirm-move">${confirmBtnText}</button>
         </div>
       `;
     }

@@ -686,6 +686,11 @@ async function init() {
         }
       }
     });
+    movementUI.onCancel = () => {
+      selectedTerritory = null;
+      playerPanel.setSelectedTerritory(null);
+      camera.dirty = true;
+    };
 
     // Air Landing UI - consolidated landing after ALL combats
     airLandingUI.setGameState(gameState);
