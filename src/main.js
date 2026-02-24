@@ -1124,14 +1124,35 @@ async function init() {
           .map(o => `    '${o.name}': { x: ${o.x}, y: ${o.y} },`)
           .join('\n');
 
-        console.clear();
-        console.log('=== COPY ALL OFFSETS BELOW ===\n');
-        console.log(allOffsets);
-        console.log('\n=== END OFFSETS ===');
-        console.log(`\nTotal zones: ${DEBUG_SEA_ZONE_OFFSETS.length}`);
+        // Create or update a copyable text box on screen
+        let debugBox = document.getElementById('debug-sea-zone-box');
+        if (!debugBox) {
+          debugBox = document.createElement('div');
+          debugBox.id = 'debug-sea-zone-box';
+          debugBox.style.cssText = 'position:fixed;top:10px;right:10px;width:400px;max-height:80vh;background:#222;border:2px solid #4CAF50;border-radius:8px;z-index:9999;font-family:monospace;font-size:12px;';
+          debugBox.innerHTML = `
+            <div style="background:#4CAF50;color:white;padding:8px;font-weight:bold;">
+              Sea Zone Offsets (click zones to add)
+              <button id="debug-copy-btn" style="float:right;background:#fff;color:#222;border:none;padding:4px 12px;cursor:pointer;border-radius:4px;">Copy All</button>
+            </div>
+            <textarea id="debug-offsets-text" style="width:100%;height:300px;background:#111;color:#0f0;border:none;padding:10px;box-sizing:border-box;resize:vertical;" readonly></textarea>
+            <div style="padding:8px;color:#aaa;">Total: <span id="debug-count">0</span> zones</div>
+          `;
+          document.body.appendChild(debugBox);
+
+          document.getElementById('debug-copy-btn').addEventListener('click', () => {
+            const textarea = document.getElementById('debug-offsets-text');
+            textarea.select();
+            document.execCommand('copy');
+            showNotification('Copied to clipboard!', 2000);
+          });
+        }
+
+        document.getElementById('debug-offsets-text').value = allOffsets;
+        document.getElementById('debug-count').textContent = DEBUG_SEA_ZONE_OFFSETS.length;
 
         // Show on screen
-        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} } (${DEBUG_SEA_ZONE_OFFSETS.length} total)`, 3000);
+        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} }`, 2000);
       }
 
       // Initial placement now uses inline UI in player panel - don't intercept clicks
