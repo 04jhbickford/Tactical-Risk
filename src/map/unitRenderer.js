@@ -122,7 +122,7 @@ export class UnitRenderer {
     'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
     'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
     'North Sea Zone': { x: -50, y: 50 },              // Bottom-left, away from UK islands
-    'Gulf of Mexico Sea Zone': { x: 100, y: 20 },      // Move far right into open Gulf water (center of sea zone polygon)
+    'Gulf of Mexico Sea Zone': { x: 60, y: -10 },      // Position just right of where West US/Mexico meet the Gulf
     'Carribean Sea Zone': { x: -30, y: 40 },          // Move down-left, into open water
     'Mexico Sea Zone': { x: -50, y: 0 },              // Move left, into Pacific
     'West Panama Sea Zone': { x: -40, y: 30 },        // Move down-left, away from Central America
