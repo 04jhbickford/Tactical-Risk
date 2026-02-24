@@ -115,66 +115,10 @@ export class UnitRenderer {
   }
 
   // Custom offsets for specific sea zones that need manual adjustment
-  // Sea zone offsets - use larger values for dramatic repositioning
+  // Sea zone offsets - only override where automatic positioning fails
+  // Most zones should use { x: 0, y: 0 } to let algorithm find best water position
   static SEA_ZONE_OFFSETS = {
-    // Mediterranean & European seas
-    'West Mediteranean Sea Zone': { x: -60, y: 70 },  // Far down-left, away from Spain/Algeria
-    'Central Mediteranean Sea Zone': { x: 0, y: 80 }, // Far south, away from Italy
-    'East Mediteranean Sea Zone': { x: -70, y: 50 },  // Far left and down, away from Egypt
-    'Black Sea Zone': { x: 0, y: 0 },                 // Center
-    'Baltic Sea Zone': { x: -70, y: 50 },             // Far left and down
-    'North Sea Zone': { x: -80, y: 70 },              // Far left and down, away from UK
-
-    // Arctic/Northern seas
-    'Barents Sea Zone': { x: 0, y: 50 },              // Down, away from coast
-    'Norwegian Sea Zone': { x: -60, y: 50 },          // Far left and down
-    'Arctic Sea Zone': { x: 0, y: 30 },               // Down
-
-    // Atlantic - Americas
-    'Gulf of Mexico Sea Zone': { x: -60, y: 20 },     // Far left into gulf
-    'Carribean Sea Zone': { x: -50, y: 40 },          // Far left and down
-    'Mexico Sea Zone': { x: -80, y: 30 },             // Far left and down
-    'West Panama Sea Zone': { x: -90, y: 40 },        // Far left and down
-    'East Panama Sea Zone': { x: -60, y: 40 },        // Far left
-    'Brazil Sea Zone': { x: -80, y: 0 },              // Far left, away from Brazil coast
-    'Argentina Sea Zone': { x: -70, y: 0 },           // Far left, away from coast
-    'East US Sea Zone': { x: 50, y: 20 },             // Right
-    'West US Sea Zone': { x: -70, y: 30 },            // Far left and down
-    'Alaska Sea Zone': { x: -80, y: 70 },             // Far left and down
-    'West Canada Sea Zone': { x: -80, y: 40 },        // Far left and down
-    'East Canada Sea Zone': { x: 50, y: 20 },         // Right
-
-    // Atlantic - Africa/Europe
-    'Congo Sea Zone': { x: -90, y: 20 },              // Far left, away from Africa
-    'West Africa Sea Zone': { x: -90, y: 30 },        // Far left and down
-    'South Africa Sea Zone': { x: -80, y: 50 },       // Far left and down
-
-    // Indian Ocean & Red Sea
-    'Red Sea Zone': { x: -50, y: -30 },               // Left and UP (north)
-    'Arabian Sea Zone': { x: -70, y: 60 },            // Far left and down
-    'Bay of Bengal Sea Zone': { x: 60, y: 50 },       // Far right and down
-    'Indian Ocean Sea Zone': { x: 0, y: 40 },         // Down
-    'West Australia Sea Zone': { x: -80, y: 20 },     // Far left, away from Australia
-    'East Indian Ocean Sea Zone': { x: -70, y: 20 },  // Far left
-
-    // Pacific - Asia
-    'Sea of Japan Zone': { x: 70, y: 40 },            // Far right and down, away from Japan
-    'Yellow Sea Zone': { x: 30, y: 50 },              // Right and down
-    'South China Sea Zone': { x: 30, y: 40 },         // Right and down
-    'Philippine Sea Zone': { x: 70, y: 30 },          // Far right
-    'East China Sea Zone': { x: 60, y: 40 },          // Far right and down
-    'Java Sea Zone': { x: 20, y: 40 },                // Right and down
-    'Celebes Sea Zone': { x: 40, y: 30 },             // Right and down
-    'Banda Sea Zone': { x: 40, y: 30 },               // Right and down
-
-    // Pacific - Islands & Australia
-    'Coral Sea Zone': { x: 70, y: 20 },               // Far right, away from Australia
-    'Tasman Sea Zone': { x: 70, y: 30 },              // Far right and down
-    'South Pacific Sea Zone': { x: -70, y: 20 },      // Far left
-    'Central Pacific Sea Zone': { x: 0, y: 30 },      // Down
-    'North Pacific Sea Zone': { x: 0, y: 30 },        // Down
-    'Hawaiian Sea Zone': { x: 0, y: 40 },             // Down
-    'Midway Sea Zone': { x: 0, y: 30 },               // Down
+    // Let automatic algorithm handle most zones - only add specific overrides as needed
   };
 
   // Custom offsets for land territories where units appear in wrong location
