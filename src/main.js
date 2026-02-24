@@ -46,6 +46,7 @@ import { UnitTooltip } from './ui/unitTooltip.js';
 
 // DEBUG: Set to true to log sea zone click coordinates for positioning
 const DEBUG_SEA_ZONE_CLICKS = true;
+const DEBUG_SEA_ZONE_OFFSETS = []; // Accumulates all clicked offsets
 
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
@@ -1110,16 +1111,27 @@ async function init() {
         const offsetX = Math.round(wrappedWorldX - cx);
         const offsetY = Math.round(world.y - cy);
 
-        const logMsg = `'${hit.name}': { x: ${offsetX}, y: ${offsetY} },`;
-        console.log('=== SEA ZONE CLICK ===');
-        console.log('Zone:', hit.name);
-        console.log('Center:', cx, cy);
-        console.log('Clicked:', Math.round(wrappedWorldX), Math.round(world.y));
-        console.log('OFFSET:', logMsg);
-        console.log('======================');
+        // Add to accumulated list (replace if same zone clicked again)
+        const existingIdx = DEBUG_SEA_ZONE_OFFSETS.findIndex(o => o.name === hit.name);
+        if (existingIdx >= 0) {
+          DEBUG_SEA_ZONE_OFFSETS[existingIdx] = { name: hit.name, x: offsetX, y: offsetY };
+        } else {
+          DEBUG_SEA_ZONE_OFFSETS.push({ name: hit.name, x: offsetX, y: offsetY });
+        }
 
-        // Also show on screen
-        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} }`, 5000);
+        // Build complete output string
+        const allOffsets = DEBUG_SEA_ZONE_OFFSETS
+          .map(o => `    '${o.name}': { x: ${o.x}, y: ${o.y} },`)
+          .join('\n');
+
+        console.clear();
+        console.log('=== COPY ALL OFFSETS BELOW ===\n');
+        console.log(allOffsets);
+        console.log('\n=== END OFFSETS ===');
+        console.log(`\nTotal zones: ${DEBUG_SEA_ZONE_OFFSETS.length}`);
+
+        // Show on screen
+        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} } (${DEBUG_SEA_ZONE_OFFSETS.length} total)`, 3000);
       }
 
       // Initial placement now uses inline UI in player panel - don't intercept clicks
