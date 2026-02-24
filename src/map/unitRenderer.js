@@ -116,9 +116,31 @@ export class UnitRenderer {
 
   // Custom offsets for specific sea zones that need manual adjustment
   // Sea zone offsets - only override where automatic positioning fails
-  // Most zones should use { x: 0, y: 0 } to let algorithm find best water position
   static SEA_ZONE_OFFSETS = {
-    // Let automatic algorithm handle most zones - only add specific overrides as needed
+    // Americas - Pacific coast
+    'Mexico Sea Zone': { x: -40, y: 0 },              // Left into Pacific
+    'West Panama Sea Zone': { x: -40, y: 0 },         // Left into Pacific
+
+    // Mediterranean
+    'West Mediteranean Sea Zone': { x: -30, y: 40 },  // Down-left, away from Spain
+    'Central Mediteranean Sea Zone': { x: 0, y: 50 }, // Down, away from Italy
+    'East Mediteranean Sea Zone': { x: -40, y: 30 },  // Left-down, away from Egypt
+
+    // Red Sea & Indian Ocean
+    'Red Sea Zone': { x: -20, y: -20 },               // Up-left into water
+    'Arabian Sea Zone': { x: -30, y: 30 },            // Down-left
+    'Bay of Bengal Sea Zone': { x: 30, y: 30 },       // Right-down
+
+    // Pacific - Asia
+    'Sea of Japan Zone': { x: 40, y: 0 },             // Right, away from Japan
+    'Philippine Sea Zone': { x: 40, y: 0 },           // Right
+    'Java Sea Zone': { x: 0, y: 30 },                 // Down into water
+    'Celebes Sea Zone': { x: 20, y: 20 },             // Right-down
+    'Banda Sea Zone': { x: 20, y: 20 },               // Right-down
+
+    // Pacific - Australia
+    'Coral Sea Zone': { x: 40, y: 0 },                // Right, away from Australia
+    'Tasman Sea Zone': { x: 40, y: 0 },               // Right, away from New Zealand
   };
 
   // Custom offsets for land territories where units appear in wrong location
