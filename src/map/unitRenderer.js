@@ -115,41 +115,10 @@ export class UnitRenderer {
   }
 
   // Custom offsets for specific sea zones that need manual adjustment
-  // Sea zone offsets - generated from debug click tool (zoom 0.5)
-  // Offset = where user clicked - territory center
-  // Units render at: center + offset = clicked position
-  static SEA_ZONE_OFFSETS = {
-    'North Sea Zone': { x: -273, y: -183 },
-    'Baltic Sea Zone': { x: 20, y: -81 },
-    'West Spain Sea Zone': { x: -2, y: -134 },
-    'West Mediteranean Sea Zone': { x: 17, y: -64 },
-    'Central Mediteranean Sea Zone': { x: 20, y: -13 },
-    'East Mediteranean Sea Zone': { x: 0, y: -22 },
-    'Black Sea Zone': { x: 4, y: -15 },
-    'Caspian Sea Zone': { x: -8, y: -25 },
-    'Red Sea Zone': { x: 140, y: 141 },
-    'Indian Ocean Sea Zone': { x: -178, y: -33 },
-    'Mozambique Sea Zone': { x: -6, y: -58 },
-    'West Africa Sea Zone': { x: 1, y: 186 },
-    'North Brazil Sea Zone': { x: -17, y: -8 },
-    'North Atlantic Sea Zone': { x: -24, y: -37 },
-    'Carribean Sea Zone': { x: -23, y: -27 },
-    'Gulf of Mexico Sea Zone': { x: -46, y: 936 },
-    'West Australia Sea Zone': { x: 3, y: -6 },
-    'East Indies Sea Zone': { x: -21, y: -5 },
-    'Borneo Sea Zone': { x: -70, y: 150 },
-    'South Australia Sea Zone': { x: 151, y: -33 },
-    'New Zealand Sea Zone': { x: -16, y: 32 },
-    'Solomon Islands Sea Zone': { x: -48, y: 82 },
-    'New Guinea Sea Zone': { x: -42, y: -9 },
-    'Caroline Islands Sea Zone': { x: -96, y: -6 },
-    'Kwangtung Sea Zone': { x: 30, y: -16 },
-    'Okinawa Sea Zone': { x: 32, y: -74 },
-    'Wake Island Sea Zone': { x: -22, y: 17 },
-    'Soviet Far East Sea Zone': { x: -138, y: -86 },
-    'West US Sea Zone': { x: -22, y: -39 },
-    'West Canada Sea Zone': { x: -16, y: -35 },
-    'Alaska Sea Zone': { x: -37, y: -8 },
+  // Sea zone absolute centers - click position becomes unit center
+  // Generated from debug click tool - stores exact world coordinates
+  static SEA_ZONE_CENTERS = {
+    // Paste absolute coordinates here from debug tool
   };
 
   // Custom offsets for land territories where units appear in wrong location
@@ -160,17 +129,16 @@ export class UnitRenderer {
 
   // Adjust sea zone center to avoid island/land overlap
   _adjustSeaZoneCenter(territory, cx, cy) {
-    // First check for manual overrides
-    const manualOffset = UnitRenderer.SEA_ZONE_OFFSETS[territory.name];
-    if (manualOffset) {
+    // First check for manual absolute coordinates
+    const manualCenter = UnitRenderer.SEA_ZONE_CENTERS[territory.name];
+    if (manualCenter) {
       return {
-        x: cx + manualOffset.x,
-        y: cy + manualOffset.y
+        x: manualCenter.x,
+        y: manualCenter.y
       };
     }
 
-    // Find the best position by sampling points within the sea zone
-    // and choosing the one furthest from any land
+    // Fall back to automatic positioning
     const bestPos = this._findBestSeaZonePosition(territory, cx, cy);
     return bestPos || { x: cx, y: cy };
   }
