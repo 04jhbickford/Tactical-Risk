@@ -292,9 +292,9 @@ export class TerritoryRenderer {
         cy += offset.y;
       }
 
-      // Position to upper-right of center
-      const x = cx + 15;
-      const y = cy - 20;
+      // Position centered above units (units are drawn at cy + 25)
+      const x = cx;
+      const y = cy - 5;
 
       this._drawOwnershipFlag(ctx, x, y, flagWidth, flagHeight, player.flag, player.color);
     }
