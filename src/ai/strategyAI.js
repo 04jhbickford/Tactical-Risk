@@ -650,6 +650,188 @@ export class BaseAI {
   }
 
   /**
+   * Calculate how many defense points are needed to adequately defend a territory
+   * Returns the minimum defensive strength required based on incoming threats
+   */
+  calculateDefenseRequirement(gameState, territoryId) {
+    const territory = this._getTerritory(gameState, territoryId);
+    if (!territory) return 0;
+
+    let requiredDefense = 0;
+
+    // Calculate threat from all hostile neighbors
+    const hostileNeighbors = this.getHostileNeighbors(gameState, territoryId);
+
+    for (const hostile of hostileNeighbors) {
+      const hostileId = this._getTerritoryId(hostile);
+      const hostileOwner = this._getOwnerId(hostile);
+      const hostileUnits = this.getPlayerUnitsAt(gameState, hostileId, hostileOwner);
+      const attackStrength = this.calculateCombatStrength(hostileUnits, true);
+
+      // Take the maximum single threat (enemy will likely attack with their strongest)
+      requiredDefense = Math.max(requiredDefense, attackStrength);
+    }
+
+    // Add buffer based on territory importance
+    let importanceMultiplier = 1.0;
+
+    // Capital requires extra defense
+    if (territory.isCapital) {
+      importanceMultiplier = 2.0;
+    }
+
+    // High IPC territories need more defense
+    const ipcValue = territory.ipcValue || territory.production || 0;
+    if (ipcValue >= 5) {
+      importanceMultiplier = Math.max(importanceMultiplier, 1.5);
+    }
+
+    return requiredDefense * importanceMultiplier;
+  }
+
+  /**
+   * Calculate penalty for leaving a territory vulnerable when attacking from it
+   * Returns a negative value to subtract from attack priority
+   */
+  calculateVulnerabilityPenalty(gameState, fromTerritoryId, unitsToMove) {
+    const territory = this._getTerritory(gameState, fromTerritoryId);
+    if (!territory) return 0;
+
+    // Get current units and calculate what remains after attack
+    const currentUnits = this.getPlayerUnitsAt(gameState, fromTerritoryId);
+    const remainingUnits = { ...currentUnits };
+
+    for (const [type, qty] of Object.entries(unitsToMove)) {
+      remainingUnits[type] = (remainingUnits[type] || 0) - qty;
+      if (remainingUnits[type] <= 0) delete remainingUnits[type];
+    }
+
+    const remainingStrength = this.calculateCombatStrength(remainingUnits, false);
+    const requiredDefense = this.calculateDefenseRequirement(gameState, fromTerritoryId);
+
+    // If we have enough defense remaining, no penalty
+    if (remainingStrength >= requiredDefense) {
+      return 0;
+    }
+
+    // Calculate how exposed we are
+    const defenseDeficit = requiredDefense - remainingStrength;
+    let penalty = defenseDeficit * 0.5; // Base penalty per point of deficit
+
+    // MASSIVE penalty for leaving capital undefended
+    if (territory.isCapital) {
+      if (remainingStrength < requiredDefense * 0.5) {
+        // Capital is severely exposed - this is almost always a bad move
+        penalty += 100 * this.weights.CAPITAL_DEFENSE_PRIORITY;
+      } else if (remainingStrength < requiredDefense) {
+        // Capital is somewhat exposed
+        penalty += 30 * this.weights.CAPITAL_DEFENSE_PRIORITY;
+      }
+    }
+
+    // Extra penalty for high-value territories
+    const ipcValue = territory.ipcValue || territory.production || 0;
+    penalty += defenseDeficit * (ipcValue / 5);
+
+    return penalty;
+  }
+
+  /**
+   * Calculate minimum units that MUST stay for defense
+   * Returns an object with unit counts that should not be moved
+   */
+  calculateMinimumDefenders(gameState, territoryId) {
+    const territory = this._getTerritory(gameState, territoryId);
+    if (!territory) return {};
+
+    const currentUnits = this.getPlayerUnitsAt(gameState, territoryId);
+    const requiredDefense = this.calculateDefenseRequirement(gameState, territoryId);
+
+    // If no threat, no minimum defenders needed
+    if (requiredDefense === 0) {
+      return {};
+    }
+
+    const minimumDefenders = {};
+    let defenseProvided = 0;
+
+    // Reserve infantry first (best defense per cost)
+    if (currentUnits.infantry && defenseProvided < requiredDefense) {
+      const infDefense = this.unitStats.infantry?.defense || 2;
+      const infNeeded = Math.ceil((requiredDefense - defenseProvided) / infDefense);
+      const infToKeep = Math.min(currentUnits.infantry, infNeeded);
+      if (infToKeep > 0) {
+        minimumDefenders.infantry = infToKeep;
+        defenseProvided += infToKeep * infDefense;
+      }
+    }
+
+    // Then reserve other defending units if still needed
+    if (defenseProvided < requiredDefense) {
+      for (const [type, qty] of Object.entries(currentUnits)) {
+        if (type === 'infantry' || type === 'factory' || type === 'aaGun') continue;
+
+        const stats = this.unitStats[type];
+        if (!stats || defenseProvided >= requiredDefense) continue;
+
+        const defense = stats.defense || 0;
+        if (defense > 0) {
+          const needed = Math.ceil((requiredDefense - defenseProvided) / defense);
+          const toKeep = Math.min(qty, needed);
+          if (toKeep > 0) {
+            minimumDefenders[type] = toKeep;
+            defenseProvided += toKeep * defense;
+          }
+        }
+      }
+    }
+
+    return minimumDefenders;
+  }
+
+  /**
+   * Get units available for attack (total minus minimum defenders)
+   */
+  getAvailableAttackForce(gameState, territoryId) {
+    const currentUnits = this.getPlayerUnitsAt(gameState, territoryId);
+    const minimumDefenders = this.calculateMinimumDefenders(gameState, territoryId);
+
+    const available = {};
+
+    for (const [type, qty] of Object.entries(currentUnits)) {
+      const reserved = minimumDefenders[type] || 0;
+      const canAttack = qty - reserved;
+      if (canAttack > 0) {
+        available[type] = canAttack;
+      }
+    }
+
+    return available;
+  }
+
+  /**
+   * Check if a territory is critically threatened (e.g., capital with enemy army adjacent)
+   */
+  isCriticallyThreatened(gameState, territoryId) {
+    const territory = this._getTerritory(gameState, territoryId);
+    if (!territory) return false;
+
+    const currentUnits = this.getPlayerUnitsAt(gameState, territoryId);
+    const myStrength = this.calculateCombatStrength(currentUnits, false);
+    const requiredDefense = this.calculateDefenseRequirement(gameState, territoryId);
+
+    // Critically threatened if we can't adequately defend
+    const isUnderstrength = myStrength < requiredDefense * 0.8;
+
+    // Capital is always critical if threatened
+    if (territory.isCapital && requiredDefense > 0) {
+      return isUnderstrength || myStrength < requiredDefense * 1.2;
+    }
+
+    return isUnderstrength && requiredDefense > 10;
+  }
+
+  /**
    * Called at end of turn to track patterns (optional)
    */
   onTurnEnd(gameState) {
@@ -998,8 +1180,14 @@ export class MediumAI extends BaseAI {
       for (const target of hostileNeighbors) {
         const targetId = this._getTerritoryId(target);
 
-        // Calculate optimal attacking force
-        const optimalForce = this.calculateOptimalAttackForce(gameState, myUnits, target);
+        // Get available units (respecting minimum defenders)
+        const availableForAttack = this.getAvailableAttackForce(gameState, territoryId);
+
+        // Skip if no units available for attack
+        if (this.countUnits(availableForAttack) === 0) continue;
+
+        // Calculate optimal attacking force from available units
+        const optimalForce = this.calculateOptimalAttackForce(gameState, availableForAttack, target, territoryId);
 
         if (optimalForce && this.countUnits(optimalForce) > 0) {
           // Calculate battle EV
@@ -1013,8 +1201,11 @@ export class MediumAI extends BaseAI {
             // Factor in opponent disruption
             const disruptionValue = this.calculateDisruptionValue(gameState, target);
 
-            // Total score
-            const totalScore = battleEV.ev + strategicValue + disruptionValue;
+            // Calculate vulnerability penalty for leaving source territory exposed
+            const vulnerabilityPenalty = this.calculateVulnerabilityPenalty(gameState, territoryId, optimalForce);
+
+            // Total score (subtract vulnerability penalty)
+            const totalScore = battleEV.ev + strategicValue + disruptionValue - vulnerabilityPenalty;
 
             possibleAttacks.push({
               from: territoryId,
@@ -1023,6 +1214,7 @@ export class MediumAI extends BaseAI {
               priority: totalScore,
               winProbability: battleEV.winProbability,
               ev: battleEV.ev,
+              vulnerabilityPenalty,
             });
           }
         }
@@ -1032,13 +1224,18 @@ export class MediumAI extends BaseAI {
     // Sort by priority (highest first)
     possibleAttacks.sort((a, b) => b.priority - a.priority);
 
-    // Select non-conflicting attacks
+    // Select non-conflicting attacks, but skip attacks from critically threatened territories
     const selectedAttacks = [];
     const usedTerritories = new Set();
 
     for (const attack of possibleAttacks) {
       // Don't use same units twice
       if (usedTerritories.has(attack.from)) continue;
+
+      // Skip attacks that have massive vulnerability penalties (likely leaving capital undefended)
+      if (attack.vulnerabilityPenalty > 50) {
+        continue;
+      }
 
       selectedAttacks.push(attack);
       usedTerritories.add(attack.from);
@@ -1052,25 +1249,41 @@ export class MediumAI extends BaseAI {
 
   /**
    * Calculate optimal attacking force for a target
+   * Now respects minimum defenders and source territory safety
    */
-  calculateOptimalAttackForce(gameState, availableUnits, target) {
+  calculateOptimalAttackForce(gameState, availableUnits, target, fromTerritoryId = null) {
     const targetId = this._getTerritoryId(target);
     const targetOwner = this._getOwnerId(target);
     const defenderUnits = this.getPlayerUnitsAt(gameState, targetId, targetOwner);
     const defenderStrength = this.calculateCombatStrength(defenderUnits, false);
 
-    // Start with all units
+    // Start with available units (already respects minimum defenders)
     const attackForce = { ...availableUnits };
 
     // Calculate battle outcome
     const result = this.calculateBattleOutcome(attackForce, defenderUnits);
     const winProb = result.winProbability || result.attackerWinChance || 0.5;
 
-    // If we have overwhelming force, hold some back
+    // If we have overwhelming force, hold some back for additional safety
     if (winProb > 0.85 && this.countUnits(attackForce) > 3) {
-      // Keep 1-2 infantry for defense
+      // Keep 1-2 infantry for extra defense
       if (attackForce.infantry && attackForce.infantry > 2) {
         attackForce.infantry = Math.max(1, attackForce.infantry - 2);
+      }
+    }
+
+    // Additional check: if source is capital, be more conservative
+    if (fromTerritoryId) {
+      const fromTerritory = this._getTerritory(gameState, fromTerritoryId);
+      if (fromTerritory?.isCapital) {
+        // On capital, always keep at least 2 infantry if possible
+        const currentUnits = this.getPlayerUnitsAt(gameState, fromTerritoryId);
+        if (currentUnits.infantry && currentUnits.infantry > 2) {
+          const reserveExtra = Math.min(2, attackForce.infantry || 0);
+          if (reserveExtra > 0 && attackForce.infantry) {
+            attackForce.infantry = Math.max(1, attackForce.infantry - reserveExtra);
+          }
+        }
       }
     }
 
@@ -1592,6 +1805,7 @@ export class HardAI extends MediumAI {
 
   /**
    * Combat Move Phase - Expectiminimax with Monte Carlo
+   * Now properly considers defense requirements before attacking
    */
   decideCombatMoves(gameState) {
     const analysis = this.analyzeStrategicSituation(gameState);
@@ -1603,13 +1817,27 @@ export class HardAI extends MediumAI {
         ? this.weights.CONSERVATISM_WHEN_AHEAD
         : 1.0;
 
-    // Generate all possible attack combinations
+    // CRITICAL: First identify territories that MUST be defended
+    const capitalId = this.findMyCapital(gameState);
+    const criticallyThreatenedTerritories = new Set();
+
+    // Check if capital is critically threatened
+    if (capitalId && this.isCriticallyThreatened(gameState, capitalId)) {
+      criticallyThreatenedTerritories.add(capitalId);
+    }
+
+    // Generate all possible attack combinations (now respects minimum defenders)
     const possibleAttacks = this.generateAllAttacks(gameState);
 
     // Evaluate each attack using expectiminimax
     const evaluatedAttacks = [];
 
     for (const attack of possibleAttacks) {
+      // CRITICAL: Skip attacks from critically threatened territories (like capital under attack)
+      if (criticallyThreatenedTerritories.has(attack.from)) {
+        continue;
+      }
+
       // For must-win territories, be more aggressive
       const isMustWin = analysis.mustWinTerritories.some(
         mw => this._getTerritoryId(mw.territory) === attack.to
@@ -1634,11 +1862,14 @@ export class HardAI extends MediumAI {
         this._getTerritory(gameState, attack.to)
       );
 
+      // CRITICAL: Calculate vulnerability penalty for leaving source exposed
+      const vulnerabilityPenalty = this.calculateVulnerabilityPenalty(gameState, attack.from, attack.units);
+
       // Apply must-win bonus
       const mustWinBonus = isMustWin ? 20 : 0;
 
-      // Apply aggression multiplier
-      let score = (battleEV.ev + strategicValue + mustWinBonus) * aggressionMultiplier;
+      // Apply aggression multiplier, subtract vulnerability penalty
+      let score = (battleEV.ev + strategicValue + mustWinBonus) * aggressionMultiplier - vulnerabilityPenalty;
 
       // Threshold check (lower for must-win)
       const threshold = isMustWin
@@ -1651,6 +1882,7 @@ export class HardAI extends MediumAI {
           priority: score,
           winProbability: adjustedWinProb,
           isMustWin,
+          vulnerabilityPenalty,
         });
       }
     }
@@ -1666,6 +1898,12 @@ export class HardAI extends MediumAI {
       if (usedTerritories.has(attack.from)) continue;
       if (targetedTerritories.has(attack.to)) continue;
 
+      // CRITICAL: Skip attacks with massive vulnerability penalties
+      // (e.g., leaving capital completely undefended)
+      if (attack.vulnerabilityPenalty > 100) {
+        continue;
+      }
+
       selectedAttacks.push(attack);
       usedTerritories.add(attack.from);
       targetedTerritories.add(attack.to);
@@ -1678,6 +1916,7 @@ export class HardAI extends MediumAI {
 
   /**
    * Generate all possible attacks
+   * Now respects minimum defenders - only uses available attack force
    */
   generateAllAttacks(gameState) {
     const attacks = [];
@@ -1685,17 +1924,19 @@ export class HardAI extends MediumAI {
 
     for (const territory of myTerritories) {
       const territoryId = this._getTerritoryId(territory);
-      const myUnits = this.getPlayerUnitsAt(gameState, territoryId);
 
-      if (this.countUnits(myUnits) === 0) continue;
+      // CRITICAL: Get available units for attack (respects minimum defenders)
+      const availableUnits = this.getAvailableAttackForce(gameState, territoryId);
+
+      if (this.countUnits(availableUnits) === 0) continue;
 
       const hostileNeighbors = this.getHostileNeighbors(gameState, territoryId);
 
       for (const hostile of hostileNeighbors) {
         const hostileId = this._getTerritoryId(hostile);
 
-        // Generate multiple attack options (all-in, partial, etc.)
-        const attackOptions = this.generateAttackOptions(myUnits);
+        // Generate multiple attack options from available units only
+        const attackOptions = this.generateAttackOptions(availableUnits);
 
         for (const units of attackOptions) {
           if (this.countUnits(units) > 0) {
