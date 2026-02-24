@@ -1385,7 +1385,17 @@ export class PlayerPanel {
         }
 
         if (!hasUnitsToShow) {
-          html += `<div class="pp-placement-done-msg">No naval units to place</div>`;
+          // Check if there are air units that could be placed IF there was a carrier
+          const hasAirUnits = airUnits.length > 0;
+          const carrierDef = this.unitDefs?.carrier;
+          const carriableAir = hasAirUnits ? airUnits.filter(u => carrierDef?.canCarry?.includes(u.type)) : [];
+
+          if (carriableAir.length > 0 && !hasCarrierWithSpace) {
+            html += `<div class="pp-placement-done-msg">No naval units to place</div>`;
+            html += `<div class="pp-placement-hint">💡 Place a carrier here first to deploy fighters</div>`;
+          } else {
+            html += `<div class="pp-placement-done-msg">No units to place here</div>`;
+          }
         }
       }
     } else {
@@ -2224,6 +2234,24 @@ export class PlayerPanel {
           <span class="pp-mob-sel-label">Deploying to:</span>
           <span class="pp-mob-sel-name">${this.selectedTerritory.name}</span>
         </div>`;
+
+      // Show factory production limit for factory territories
+      if (isFactoryTerritory) {
+        const capital = this.gameState.playerState?.[player.id]?.capitalTerritory;
+        const isCapitalFactory = this.selectedTerritory.name === capital;
+        const productionLimit = isCapitalFactory ? 20 : 5;
+        const mobilizationHistory = this.gameState.mobilizationHistory || [];
+        const unitsPlacedHere = mobilizationHistory
+          .filter(h => h.territory === this.selectedTerritory.name && h.owner === player.id)
+          .length;
+        const remaining = productionLimit - unitsPlacedHere;
+
+        html += `
+          <div class="pp-factory-limit">
+            <span class="pp-factory-type">${isCapitalFactory ? '★ Capital Factory' : 'Factory'}</span>
+            <span class="pp-factory-capacity ${remaining <= 0 ? 'full' : ''}">${unitsPlacedHere}/${productionLimit} units</span>
+          </div>`;
+      }
     } else {
       html += `<div class="pp-hint">Click a factory territory on the map to deploy units</div>`;
     }

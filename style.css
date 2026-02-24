@@ -3573,6 +3573,32 @@ html, body {
   color: #fff;
 }
 
+.pp-factory-limit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: rgba(255,193,7,0.1);
+  border: 1px solid rgba(255,193,7,0.3);
+  border-radius: 6px;
+  margin-top: 6px;
+}
+
+.pp-factory-type {
+  font-size: 11px;
+  color: #ffc107;
+}
+
+.pp-factory-capacity {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.pp-factory-capacity.full {
+  color: #f44336;
+}
+
 .pp-mobilize-units {
   display: flex;
   flex-wrap: wrap;

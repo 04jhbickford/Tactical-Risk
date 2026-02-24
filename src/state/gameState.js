@@ -1486,6 +1486,17 @@ export class GameState {
       if (!validFactories.has(territoryName)) {
         return { success: false, error: 'Units must be placed on territories with factories (factories built this turn cannot accept units)' };
       }
+
+      // Factory production limit check
+      // Capital factories can produce 20 units per turn, non-capital 5 units
+      const isCapitalFactory = territoryName === capital;
+      const productionLimit = isCapitalFactory ? 20 : 5;
+      const unitsPlacedHere = (this.mobilizationHistory || [])
+        .filter(h => h.territory === territoryName && h.owner === player.id)
+        .length;
+      if (unitsPlacedHere >= productionLimit) {
+        return { success: false, error: `Factory production limit reached (${productionLimit} units per turn for ${isCapitalFactory ? 'capital' : 'non-capital'} factories)` };
+      }
     }
 
     // Place the unit
