@@ -599,7 +599,7 @@ html, body {
   right: 0;
   bottom: 0;
   background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') left center / contain no-repeat;
-  background-color: #1a1a2e;
+  background-color: #12121f;
   z-index: 100;
   display: flex;
   align-items: stretch;
@@ -613,13 +613,13 @@ html, body {
 }
 
 .lobby-content {
-  background: rgba(15, 15, 30, 0.95);
+  background: linear-gradient(180deg, rgba(20, 20, 35, 0.98) 0%, rgba(15, 15, 28, 0.98) 100%);
   border-radius: 0;
-  padding: 25px 20px;
-  width: 320px;
-  min-width: 300px;
-  box-shadow: -5px 0 30px rgba(0,0,0,0.5);
-  border-left: 1px solid rgba(255,255,255,0.1);
+  padding: 0;
+  width: 340px;
+  min-width: 320px;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.6);
+  border-left: 1px solid rgba(100, 120, 180, 0.2);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -631,50 +631,61 @@ html, body {
   display: none;
 }
 
-.lobby-subtitle {
-  text-align: center;
-  color: #666;
-  font-size: 14px;
-  margin: 0 0 35px;
+.lobby-content.unified .lobby-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  margin: 0;
+}
+
+.lobby-content.unified .lobby-section .section-title {
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 2px;
-}
-
-.lobby-section {
-  margin-bottom: 28px;
-}
-
-.lobby-section h2 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #888;
-  margin: 0 0 8px;
+  color: #6a7a9a;
+  margin: 0 0 6px;
+  font-weight: 600;
 }
 
 .lobby-hint {
-  font-size: 12px;
-  color: #666;
-  margin: 0 0 14px;
+  font-size: 11px;
+  color: #556;
+  margin: 0 0 12px;
+}
+
+.lobby-content.unified .lobby-options {
+  padding: 15px 20px;
+  margin: 0;
+  background: rgba(0,0,0,0.2);
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.lobby-content.unified .lobby-footer {
+  padding: 15px 20px 20px;
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 /* --- Player Grid --- */
 .player-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   box-sizing: border-box;
+  flex: 1;
+  align-content: start;
 }
 
 .player-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 12px 8px;
-  background: rgba(255,255,255,0.03);
-  border: 2px solid rgba(255,255,255,0.08);
+  gap: 8px;
+  padding: 12px 10px;
+  background: rgba(40, 45, 70, 0.5);
+  border: 2px solid rgba(100, 120, 180, 0.15);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -685,13 +696,15 @@ html, body {
 }
 
 .player-card:hover {
-  background: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.15);
+  background: rgba(50, 60, 90, 0.6);
+  border-color: rgba(100, 140, 220, 0.3);
+  transform: translateY(-1px);
 }
 
 .player-card.selected {
-  background: rgba(255,255,255,0.08);
-  border-color: rgba(255,255,255,0.3);
+  background: rgba(60, 80, 120, 0.5);
+  border-color: rgba(100, 180, 255, 0.4);
+  box-shadow: 0 0 15px rgba(100, 150, 255, 0.15);
 }
 
 .player-card.selected .player-check {
@@ -759,16 +772,19 @@ html, body {
 /* --- Lobby Info --- */
 .lobby-info {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 15px;
-  margin-bottom: 15px;
-  font-size: 11px;
-  color: #888;
   justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 10px;
+  color: #667;
 }
 
-.info-item {
-  flex: 1;
+.lobby-info .info-item {
+  flex: none;
+}
+
+.lobby-info .info-divider {
+  color: #445;
 }
 
 .info-label {
@@ -824,32 +840,48 @@ html, body {
 /* --- Lobby Start Button --- */
 .lobby-start-btn {
   width: 100%;
-  padding: 16px;
-  font-size: 16px;
+  padding: 14px 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
-  background: linear-gradient(135deg, #4169e1, #3457b0);
+  background: linear-gradient(135deg, #4a7cff, #3860d0);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 .lobby-start-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5179f1, #4467c0);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(65, 105, 225, 0.3);
+  background: linear-gradient(135deg, #5a8cff, #4870e0);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(74, 124, 255, 0.35);
 }
 
 .lobby-start-btn:disabled {
-  background: #444;
-  color: #888;
+  background: rgba(60, 60, 80, 0.8);
+  color: #667;
   cursor: not-allowed;
 }
 
 /* --- Continue Game Button --- */
 .continue-section {
   margin-bottom: 24px;
+}
+
+.lobby-content.unified .continue-game-btn {
+  margin: 15px 20px;
+  width: calc(100% - 40px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #22a855, #1a8a45);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .continue-game-btn {
@@ -866,9 +898,9 @@ html, body {
 }
 
 .continue-game-btn:hover {
-  background: linear-gradient(135deg, #4ade80, #22c55e);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, #2ed066, #1fa050);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3);
 }
 
 .continue-icon {
@@ -11728,7 +11760,7 @@ html, body {
 .lobby-options {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   padding: 12px;
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
@@ -11743,8 +11775,26 @@ html, body {
 }
 
 .option-label {
-  font-size: 12px;
-  color: #888;
+  font-size: 11px;
+  color: #8899aa;
+}
+
+.option-hint {
+  font-size: 10px;
+  color: #556;
+}
+
+.option-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.option-checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4a7cff;
 }
 
 .option-info {
