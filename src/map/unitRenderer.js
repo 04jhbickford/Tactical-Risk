@@ -115,55 +115,56 @@ export class UnitRenderer {
   }
 
   // Custom offsets for specific sea zones that need manual adjustment
+  // Keep offsets SMALL (under 50) to stay within sea zone boundaries
   static SEA_ZONE_OFFSETS = {
     // Mediterranean & European seas
-    'West Mediteranean Sea Zone': { x: 0, y: 70 },    // Move far down into open water between Europe/Africa
-    'Central Mediteranean Sea Zone': { x: 0, y: 80 }, // Move far south away from Italy
-    'East Mediteranean Sea Zone': { x: -80, y: 60 },  // Move far left and down, away from Egypt/Turkey
-    'Black Sea Zone': { x: 0, y: 20 },                // Move slightly south
-    'Baltic Sea Zone': { x: -30, y: 20 },             // Move left and down into open water
-    'North Sea Zone': { x: -40, y: 30 },              // Move into open North Sea
+    'West Mediteranean Sea Zone': { x: 0, y: 30 },    // Nudge down
+    'Central Mediteranean Sea Zone': { x: 0, y: 40 }, // Nudge south
+    'East Mediteranean Sea Zone': { x: -30, y: 20 },  // Nudge left and down
+    'Black Sea Zone': { x: 0, y: 0 },                 // Center
+    'Baltic Sea Zone': { x: -20, y: 10 },             // Nudge left
+    'North Sea Zone': { x: -20, y: 20 },              // Nudge left and down
 
     // Atlantic - Americas
-    'Gulf of Mexico Sea Zone': { x: 80, y: 30 },      // Move far right into open Gulf
-    'Carribean Sea Zone': { x: 50, y: 60 },           // Move right and down into open Caribbean
-    'Mexico Sea Zone': { x: -100, y: 0 },             // Move far left, into Pacific
-    'West Panama Sea Zone': { x: -120, y: 50 },       // Move far left and down into Pacific
-    'East Panama Sea Zone': { x: 50, y: 50 },         // Move right and down into Caribbean
-    'East US Sea Zone': { x: 100, y: 30 },            // Move far right, away from US coast
-    'West US Sea Zone': { x: -80, y: 0 },             // Move further left, into Pacific
-    'Alaska Sea Zone': { x: -100, y: 80 },            // Move far left and down, away from Alaska
-    'West Canada Sea Zone': { x: -120, y: 0 },        // Move far left, away from Canada coastline
-    'East Canada Sea Zone': { x: 80, y: 30 },         // Move further right, into Atlantic
+    'Gulf of Mexico Sea Zone': { x: 30, y: 10 },      // Nudge right
+    'Carribean Sea Zone': { x: 10, y: 20 },           // Nudge right and down
+    'Mexico Sea Zone': { x: -30, y: 0 },              // Nudge left
+    'West Panama Sea Zone': { x: -40, y: 20 },        // Nudge left and down
+    'East Panama Sea Zone': { x: 20, y: 20 },         // Nudge right and down
+    'East US Sea Zone': { x: 30, y: 10 },             // Nudge right
+    'West US Sea Zone': { x: -30, y: 0 },             // Nudge left
+    'Alaska Sea Zone': { x: -30, y: 30 },             // Nudge left and down
+    'West Canada Sea Zone': { x: -40, y: 0 },         // Nudge left
+    'East Canada Sea Zone': { x: 30, y: 10 },         // Nudge right
 
     // Atlantic - Africa/Europe
-    'Congo Sea Zone': { x: -80, y: 0 },               // Move far left, away from African coast
-    'West Africa Sea Zone': { x: -80, y: 0 },         // Move far left, into Atlantic
-    'South Africa Sea Zone': { x: -60, y: 40 },       // Move left and down, into open ocean
+    'Congo Sea Zone': { x: -30, y: 0 },               // Nudge left
+    'West Africa Sea Zone': { x: -30, y: 0 },         // Nudge left
+    'South Africa Sea Zone': { x: -20, y: 20 },       // Nudge left and down
 
     // Indian Ocean & Red Sea
-    'Red Sea Zone': { x: -30, y: 0 },                 // Move left into center of Red Sea
-    'Arabian Sea Zone': { x: -40, y: 40 },            // Move left and down, into open water
-    'Bay of Bengal Sea Zone': { x: 0, y: 40 },        // Move down into open bay
+    'Red Sea Zone': { x: -10, y: 0 },                 // Nudge left
+    'Arabian Sea Zone': { x: -20, y: 20 },            // Nudge left and down
+    'Bay of Bengal Sea Zone': { x: 0, y: 20 },        // Nudge down
     'Indian Ocean Sea Zone': { x: 0, y: 0 },          // Center
-    'West Australia Sea Zone': { x: -60, y: 0 },      // Move left, away from Australia coast
-    'East Indian Ocean Sea Zone': { x: -40, y: 0 },   // Move left, away from Australia
+    'West Australia Sea Zone': { x: -30, y: 0 },      // Nudge left
+    'East Indian Ocean Sea Zone': { x: -20, y: 0 },   // Nudge left
 
     // Pacific - Asia
-    'Sea of Japan Zone': { x: 40, y: 0 },             // Move right, away from Japan/Korea
-    'Yellow Sea Zone': { x: 0, y: 40 },               // Move down into open water
-    'South China Sea Zone': { x: 0, y: 30 },          // Move down
-    'Philippine Sea Zone': { x: 40, y: 0 },           // Move right, into open Pacific
-    'East China Sea Zone': { x: 40, y: 30 },          // Move right and down
+    'Sea of Japan Zone': { x: 20, y: 0 },             // Nudge right
+    'Yellow Sea Zone': { x: 0, y: 20 },               // Nudge down
+    'South China Sea Zone': { x: 0, y: 10 },          // Nudge down
+    'Philippine Sea Zone': { x: 20, y: 0 },           // Nudge right
+    'East China Sea Zone': { x: 20, y: 10 },          // Nudge right and down
 
     // Pacific - Islands & Australia
-    'Coral Sea Zone': { x: 50, y: 0 },                // Move right, away from Australia
-    'Tasman Sea Zone': { x: 50, y: 0 },               // Move right
-    'South Pacific Sea Zone': { x: -80, y: -30 },     // Move left and up, away from South America
-    'Central Pacific Sea Zone': { x: 0, y: 30 },      // Move down slightly
-    'North Pacific Sea Zone': { x: 0, y: 30 },        // Move down
-    'Hawaiian Sea Zone': { x: 0, y: 40 },             // Move down, away from Midway
-    'Midway Sea Zone': { x: 0, y: -30 },              // Move up
+    'Coral Sea Zone': { x: 20, y: 0 },                // Nudge right
+    'Tasman Sea Zone': { x: 20, y: 0 },               // Nudge right
+    'South Pacific Sea Zone': { x: -30, y: 0 },       // Nudge left
+    'Central Pacific Sea Zone': { x: 0, y: 10 },      // Nudge down
+    'North Pacific Sea Zone': { x: 0, y: 10 },        // Nudge down
+    'Hawaiian Sea Zone': { x: 0, y: 20 },             // Nudge down
+    'Midway Sea Zone': { x: 0, y: -10 },              // Nudge up
   };
 
   // Custom offsets for land territories where units appear in wrong location
