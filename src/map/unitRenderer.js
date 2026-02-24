@@ -125,16 +125,16 @@ export class UnitRenderer {
     'North Sea Zone': { x: -40, y: 30 },              // Move into open North Sea
 
     // Atlantic - Americas
-    'Gulf of Mexico Sea Zone': { x: 80, y: 20 },      // Move far right into open Gulf
-    'Carribean Sea Zone': { x: 20, y: 40 },           // Move right and down into open Caribbean
-    'Mexico Sea Zone': { x: -80, y: 0 },              // Move far left, into Pacific
-    'West Panama Sea Zone': { x: -100, y: 0 },        // Move far left into Pacific, away from Central America
-    'East Panama Sea Zone': { x: 40, y: 40 },         // Move right and down into Caribbean
-    'East US Sea Zone': { x: 60, y: 30 },             // Move right and down, away from US coast
-    'West US Sea Zone': { x: -60, y: 0 },             // Move left, into Pacific
-    'Alaska Sea Zone': { x: -60, y: 60 },             // Move far left and down, away from Alaska
-    'West Canada Sea Zone': { x: -80, y: 0 },         // Move far left, away from Canada coastline
-    'East Canada Sea Zone': { x: 60, y: 30 },         // Move right and down, into Atlantic
+    'Gulf of Mexico Sea Zone': { x: 80, y: 30 },      // Move far right into open Gulf
+    'Carribean Sea Zone': { x: 50, y: 60 },           // Move right and down into open Caribbean
+    'Mexico Sea Zone': { x: -100, y: 0 },             // Move far left, into Pacific
+    'West Panama Sea Zone': { x: -120, y: 50 },       // Move far left and down into Pacific
+    'East Panama Sea Zone': { x: 50, y: 50 },         // Move right and down into Caribbean
+    'East US Sea Zone': { x: 100, y: 30 },            // Move far right, away from US coast
+    'West US Sea Zone': { x: -80, y: 0 },             // Move further left, into Pacific
+    'Alaska Sea Zone': { x: -100, y: 80 },            // Move far left and down, away from Alaska
+    'West Canada Sea Zone': { x: -120, y: 0 },        // Move far left, away from Canada coastline
+    'East Canada Sea Zone': { x: 80, y: 30 },         // Move further right, into Atlantic
 
     // Atlantic - Africa/Europe
     'Congo Sea Zone': { x: -80, y: 0 },               // Move far left, away from African coast
@@ -159,7 +159,7 @@ export class UnitRenderer {
     // Pacific - Islands & Australia
     'Coral Sea Zone': { x: 50, y: 0 },                // Move right, away from Australia
     'Tasman Sea Zone': { x: 50, y: 0 },               // Move right
-    'South Pacific Sea Zone': { x: 0, y: -50 },       // Move up, away from South America
+    'South Pacific Sea Zone': { x: -80, y: -30 },     // Move left and up, away from South America
     'Central Pacific Sea Zone': { x: 0, y: 30 },      // Move down slightly
     'North Pacific Sea Zone': { x: 0, y: 30 },        // Move down
     'Hawaiian Sea Zone': { x: 0, y: 40 },             // Move down, away from Midway
