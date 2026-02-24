@@ -922,78 +922,88 @@ async function init() {
       return;
     }
 
+    // Handle camera panning (only when mouse button is held down and dragging)
     const moved = camera.onMouseMove(e);
     if (moved) {
-      // Cancel any potential drag if camera is panning
+      // Camera is being panned - cancel drag and hide tooltips
       dragSourceTerritory = null;
       isDraggingUnits = false;
       canvas.classList.remove('dragging-units');
-
       canvas.classList.add('panning');
       canvas.classList.remove('hovering');
+      hoverTerritory = null;
       tooltip.hide();
       unitTooltip.hide();
+      if (hoverTooltipTimeout) {
+        clearTimeout(hoverTooltipTimeout);
+        hoverTooltipTimeout = null;
+      }
+      camera.dirty = true;
       return;
     }
 
-    // Hover detection - runs when not actively panning the camera
-    if (!camera.isDragging || !camera.hasDragged) {
-      const world = camera.screenToWorld(e.clientX, e.clientY);
-      const wrappedX = wrapX(world.x);
+    // HOVER DETECTION - Always runs when not panning
+    // This should work in ALL phases including initial deployment
+    const world = camera.screenToWorld(e.clientX, e.clientY);
+    const wrappedX = wrapX(world.x);
 
-      // First check for unit icon hover (higher priority)
-      let unitHit = null;
-      if (unitRenderer && gameState) {
-        unitHit = unitRenderer.hitTestUnit(wrappedX, world.y, camera.getZoom());
+    // First check for unit icon hover (higher priority than territory)
+    let unitHit = null;
+    if (unitRenderer && gameState) {
+      unitHit = unitRenderer.hitTestUnit(wrappedX, world.y, camera.getZoom());
+    }
+
+    if (unitHit) {
+      // Hovering over a unit icon - show unit tooltip
+      unitTooltip.show(unitHit, e.clientX, e.clientY);
+      tooltip.hide();
+      if (hoverTooltipTimeout) {
+        clearTimeout(hoverTooltipTimeout);
+        hoverTooltipTimeout = null;
       }
-
-      if (unitHit) {
-        // Show unit tooltip, hide territory tooltip
-        unitTooltip.show(unitHit, e.clientX, e.clientY);
-        tooltip.hide();
-        canvas.classList.add('hovering');
-        hoverTerritory = null; // Clear territory hover when over unit
+      canvas.classList.add('hovering');
+      if (hoverTerritory !== null) {
+        hoverTerritory = null;
         camera.dirty = true;
-      } else {
-        // Check for territory hover
-        unitTooltip.hide();
-        const hit = territoryMap.hitTest(wrappedX, world.y);
+      }
+    } else {
+      // Not over a unit - check for territory hover
+      unitTooltip.hide();
+      const hit = territoryMap.hitTest(wrappedX, world.y);
 
-        // Always update hover territory for highlight
-        if (hit !== hoverTerritory) {
-          hoverTerritory = hit;
-          camera.dirty = true;
+      // Update hover territory if changed
+      if (hit !== hoverTerritory) {
+        const previousTerritory = hoverTerritory;
+        hoverTerritory = hit;
+        camera.dirty = true;
+
+        // Territory changed - reset tooltip timer
+        if (hoverTooltipTimeout) {
+          clearTimeout(hoverTooltipTimeout);
+          hoverTooltipTimeout = null;
         }
+        tooltip.hide();
 
-        canvas.classList.toggle('hovering', !!hit);
-
-        // Handle tooltip timing
-        if (hit !== hoverTerritory || !hit) {
-          // Clear any pending tooltip show when territory changes
-          if (hoverTooltipTimeout) {
-            clearTimeout(hoverTooltipTimeout);
-            hoverTooltipTimeout = null;
-          }
-          tooltip.hide();
-        }
-
-        // Start delayed tooltip show for territory
-        if (hit && gameState && !hoverTooltipTimeout && !tooltip.isVisible) {
+        // Start new tooltip timer if hovering over a territory
+        if (hit && gameState) {
           lastHoverPos = { x: e.clientX, y: e.clientY };
           hoverTooltipTimeout = setTimeout(() => {
+            // Only show if still hovering over the same territory
             if (hoverTerritory === hit) {
               tooltip.show(hit, lastHoverPos.x, lastHoverPos.y);
             }
             hoverTooltipTimeout = null;
           }, TOOLTIP_DELAY);
-        } else if (hit && gameState) {
-          // Update position for pending/visible tooltip
-          lastHoverPos = { x: e.clientX, y: e.clientY };
-          if (tooltip.isVisible) {
-            tooltip.show(hit, e.clientX, e.clientY);
-          }
+        }
+      } else if (hit && gameState) {
+        // Same territory - update mouse position for tooltip
+        lastHoverPos = { x: e.clientX, y: e.clientY };
+        if (tooltip.isVisible) {
+          tooltip.show(hit, e.clientX, e.clientY);
         }
       }
+
+      canvas.classList.toggle('hovering', !!hit);
     }
   });
 
