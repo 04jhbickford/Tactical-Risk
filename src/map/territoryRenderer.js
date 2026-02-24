@@ -1013,25 +1013,39 @@ export class TerritoryRenderer {
 
     ctx.save();
 
-    // Add strong glow effect for visibility
-    ctx.shadowColor = '#ffff00';
-    ctx.shadowBlur = 25;
-
-    // Fill with visible yellow-tinted highlight
-    ctx.fillStyle = 'rgba(255, 255, 100, 0.4)';
-    for (const poly of territory.polygons) {
-      if (!poly || poly.length < 3) continue;
-      this._fillPoly(ctx, poly);
-    }
-
-    // Stroke outline with bright glow - use external edges only to hide internal borders
-    ctx.strokeStyle = 'rgba(255, 255, 150, 0.95)';
-    ctx.lineWidth = 4;
-    if (territory.polygons.length === 1) {
-      this._strokePoly(ctx, territory.polygons[0]);
+    if (territory.isWater) {
+      // Sea zones: subtle blue highlight, no fill to avoid covering islands
+      ctx.shadowColor = '#40c4ff';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = 'rgba(64, 196, 255, 0.7)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 4]);
+      for (const poly of territory.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._strokePoly(ctx, poly);
+      }
+      ctx.setLineDash([]);
     } else {
-      const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons, territory.name);
-      this._strokeEdges(ctx, externalEdges);
+      // Land territories: softer yellow highlight
+      ctx.shadowColor = '#ffcc00';
+      ctx.shadowBlur = 15;
+
+      // Fill with subtle highlight
+      ctx.fillStyle = 'rgba(255, 230, 100, 0.25)';
+      for (const poly of territory.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
+
+      // Stroke outline - use external edges only to hide internal borders
+      ctx.strokeStyle = 'rgba(255, 220, 100, 0.8)';
+      ctx.lineWidth = 3;
+      if (territory.polygons.length === 1) {
+        this._strokePoly(ctx, territory.polygons[0]);
+      } else {
+        const externalEdges = this._getExternalEdgesWithTolerance(territory.polygons, territory.name);
+        this._strokeEdges(ctx, externalEdges);
+      }
     }
 
     ctx.restore();
