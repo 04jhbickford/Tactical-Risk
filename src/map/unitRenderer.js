@@ -122,8 +122,13 @@ export class UnitRenderer {
     'Central Mediteranean Sea Zone': { x: 0, y: 40 }, // Nudge south
     'East Mediteranean Sea Zone': { x: -30, y: 20 },  // Nudge left and down
     'Black Sea Zone': { x: 0, y: 0 },                 // Center
-    'Baltic Sea Zone': { x: -20, y: 10 },             // Nudge left
-    'North Sea Zone': { x: -20, y: 20 },              // Nudge left and down
+    'Baltic Sea Zone': { x: -30, y: 20 },             // Nudge more left and down
+    'North Sea Zone': { x: -35, y: 30 },              // Nudge more left and down, away from UK
+
+    // Arctic/Northern seas
+    'Barents Sea Zone': { x: 0, y: 30 },              // Nudge down, away from coast
+    'Norwegian Sea Zone': { x: -20, y: 20 },          // Nudge left and down
+    'Arctic Sea Zone': { x: 0, y: 20 },               // Nudge down
 
     // Atlantic - Americas
     'Gulf of Mexico Sea Zone': { x: 30, y: 10 },      // Nudge right
@@ -133,22 +138,22 @@ export class UnitRenderer {
     'East Panama Sea Zone': { x: 20, y: 20 },         // Nudge right and down
     'East US Sea Zone': { x: 30, y: 10 },             // Nudge right
     'West US Sea Zone': { x: -30, y: 0 },             // Nudge left
-    'Alaska Sea Zone': { x: -30, y: 30 },             // Nudge left and down
-    'West Canada Sea Zone': { x: -40, y: 0 },         // Nudge left
+    'Alaska Sea Zone': { x: -40, y: 35 },             // Nudge more left and down
+    'West Canada Sea Zone': { x: -45, y: 10 },        // Nudge more left and down
     'East Canada Sea Zone': { x: 30, y: 10 },         // Nudge right
 
     // Atlantic - Africa/Europe
-    'Congo Sea Zone': { x: -45, y: 0 },               // Nudge more left, away from Africa
-    'West Africa Sea Zone': { x: -40, y: 0 },         // Nudge more left
-    'South Africa Sea Zone': { x: -30, y: 20 },       // Nudge left and down
+    'Congo Sea Zone': { x: -50, y: 0 },               // Nudge more left, away from Africa
+    'West Africa Sea Zone': { x: -50, y: 10 },        // Nudge more left and down
+    'South Africa Sea Zone': { x: -40, y: 25 },       // Nudge more left and down
 
     // Indian Ocean & Red Sea
-    'Red Sea Zone': { x: -15, y: 0 },                 // Nudge left
-    'Arabian Sea Zone': { x: -25, y: 25 },            // Nudge left and down
-    'Bay of Bengal Sea Zone': { x: 10, y: 25 },       // Nudge right and down
-    'Indian Ocean Sea Zone': { x: 0, y: 10 },         // Nudge down
-    'West Australia Sea Zone': { x: -40, y: 0 },      // Nudge more left, away from Australia
-    'East Indian Ocean Sea Zone': { x: -30, y: 0 },   // Nudge more left
+    'Red Sea Zone': { x: -25, y: 15 },                // Nudge more left and down into water
+    'Arabian Sea Zone': { x: -35, y: 30 },            // Nudge more left and down
+    'Bay of Bengal Sea Zone': { x: 15, y: 30 },       // Nudge more right and down
+    'Indian Ocean Sea Zone': { x: 0, y: 15 },         // Nudge down
+    'West Australia Sea Zone': { x: -45, y: 0 },      // Nudge more left, away from Australia
+    'East Indian Ocean Sea Zone': { x: -35, y: 0 },   // Nudge more left
 
     // Pacific - Asia
     'Sea of Japan Zone': { x: 30, y: 10 },            // Nudge right and down, away from Japan
