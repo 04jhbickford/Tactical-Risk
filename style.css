@@ -6238,6 +6238,15 @@ html, body {
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
+.mp-confirm-btn.attack {
+  background: linear-gradient(135deg, #e53935, #c62828);
+}
+
+.mp-confirm-btn.attack:hover {
+  background: linear-gradient(135deg, #ef5350, #d32f2f);
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
+}
+
 /* Select All Units section */
 .mp-select-all {
   display: flex;
