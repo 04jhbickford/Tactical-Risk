@@ -116,7 +116,7 @@ export class UnitRenderer {
 
   // Custom offsets for specific sea zones that need manual adjustment
   static SEA_ZONE_OFFSETS = {
-    'West Mediteranean Sea Zone': { x: -60, y: 40 },  // Move away from Algeria
+    'West Mediteranean Sea Zone': { x: -40, y: -30 }, // Center between W Europe and Algeria
     'Central Mediteranean Sea Zone': { x: 0, y: 50 }, // Move south away from Italy
     'East Mediteranean Sea Zone': { x: -40, y: 50 },  // Move left and down, away from Syria/Turkey
     'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
