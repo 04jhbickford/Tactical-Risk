@@ -609,7 +609,7 @@ html, body {
   content: '';
   flex: 1;
   min-width: 50%;
-  background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center center / cover no-repeat;
+  background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center top / cover no-repeat;
 }
 
 .lobby-overlay.hidden {

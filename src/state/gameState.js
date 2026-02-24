@@ -825,13 +825,15 @@ export class GameState {
   // Land units can only move through friendly/allied land territories (blitzing)
   // In combat move, can pass through friendly to reach enemy
   // In non-combat move, can only enter friendly/allied
+  // BLITZ RULE: Units with movement > 1 can pass through UNDEFENDED enemy territories
+  // (capturing them as they pass), allowing them to continue and attack
   getReachableTerritoriesForLand(fromTerritory, movementRange, playerId, isCombatMove = false) {
-    const reachable = new Map(); // territory -> { distance, path }
+    const reachable = new Map(); // territory -> { distance, path, blitzedTerritories }
     const visited = new Set();
-    const queue = [{ territory: fromTerritory, distance: 0, path: [fromTerritory] }];
+    const queue = [{ territory: fromTerritory, distance: 0, path: [fromTerritory], blitzed: [] }];
 
     while (queue.length > 0) {
-      const { territory, distance, path } = queue.shift();
+      const { territory, distance, path, blitzed } = queue.shift();
 
       if (visited.has(territory)) continue;
       visited.add(territory);
@@ -848,20 +850,37 @@ export class GameState {
       const isAllied = owner && this.areAllies(playerId, owner);
       const isEnemy = owner && owner !== playerId && !isAllied;
 
+      // Check if enemy territory is undefended (can be blitzed)
+      let isUndefended = false;
+      if (isEnemy) {
+        const units = this.units[territory] || [];
+        const enemyUnits = units.filter(u => u.owner !== playerId && !this.areAllies(playerId, u.owner));
+        isUndefended = enemyUnits.length === 0;
+      }
+
       // Don't add starting territory to results
       if (territory !== fromTerritory) {
         // In combat move: can reach enemy territories as final destination
         // In non-combat move: can only reach friendly/allied
         if (isCombatMove || isFriendly || isAllied || !owner) {
-          reachable.set(territory, { distance, path });
+          reachable.set(territory, { distance, path, blitzedTerritories: blitzed });
         }
       }
 
       // Stop if we've reached max movement
       if (distance >= movementRange) continue;
 
-      // Can only continue through friendly/allied territories (not enemy)
-      if (territory !== fromTerritory && isEnemy) continue;
+      // Can continue through friendly/allied territories
+      // BLITZ: Also can continue through UNDEFENDED enemy territories (capturing them)
+      // (movement must be > 1 for blitz, which is already implied by distance < movementRange)
+      let canContinue = isFriendly || isAllied || !owner;
+      let newBlitzed = [...blitzed];
+      if (!canContinue && isEnemy && isUndefended && isCombatMove && territory !== fromTerritory) {
+        // Blitz through this undefended enemy territory
+        canContinue = true;
+        newBlitzed.push(territory);
+      }
+      if (territory !== fromTerritory && !canContinue) continue;
 
       // Get all connections (including land bridges)
       const connections = this.getConnections(territory);
@@ -876,7 +895,8 @@ export class GameState {
         queue.push({
           territory: conn,
           distance: distance + 1,
-          path: [...path, conn]
+          path: [...path, conn],
+          blitzed: newBlitzed
         });
       }
     }
@@ -890,11 +910,18 @@ export class GameState {
     return reachable.has(toTerritory);
   }
 
-  // Get land unit path for validation and display
+  // Get land unit path for validation and display (includes blitzed territories)
   getLandUnitPath(fromTerritory, toTerritory, movementRange, playerId, isCombatMove) {
     const reachable = this.getReachableTerritoriesForLand(fromTerritory, movementRange, playerId, isCombatMove);
     const info = reachable.get(toTerritory);
-    return info ? info.path : null;
+    return info ? { path: info.path, blitzedTerritories: info.blitzedTerritories || [] } : null;
+  }
+
+  // Get blitzed territories for a path
+  getBlitzedTerritories(fromTerritory, toTerritory, movementRange, playerId) {
+    const reachable = this.getReachableTerritoriesForLand(fromTerritory, movementRange, playerId, true);
+    const info = reachable.get(toTerritory);
+    return info?.blitzedTerritories || [];
   }
 
   // Check if two territories are connected by land bridge
@@ -2324,6 +2351,43 @@ export class GameState {
       return def && def.isLand;
     });
 
+    // TANK BLITZ: Capture undefended enemy territories along the path
+    // Only during combat move, only for land units with movement > 1
+    let blitzedCaptures = []; // Array of { territory, previousOwner }
+    if (isCombatMove && movedLandUnits) {
+      // Find max movement range of land units being moved
+      let maxLandMovement = 0;
+      for (const moveUnit of unitsToMove) {
+        const def = unitDefs[moveUnit.type];
+        if (def?.isLand && (def.movement || 1) > maxLandMovement) {
+          maxLandMovement = def.movement || 1;
+        }
+      }
+
+      // If we have tanks (movement > 1), check for blitzed territories
+      if (maxLandMovement > 1) {
+        const blitzedTerritories = this.getBlitzedTerritories(fromTerritory, toTerritory, maxLandMovement, player.id);
+
+        // Capture each blitzed territory
+        for (const blitzedTerrName of blitzedTerritories) {
+          const blitzedOwner = this.getOwner(blitzedTerrName);
+          if (blitzedOwner && blitzedOwner !== player.id) {
+            // Track for undo
+            blitzedCaptures.push({ territory: blitzedTerrName, previousOwner: blitzedOwner });
+
+            // Capture the territory
+            this.territoryState[blitzedTerrName].owner = player.id;
+
+            // Award Risk card for conquering (one per turn per Risk rules)
+            if (!this.conqueredThisTurn[player.id]) {
+              this.conqueredThisTurn[player.id] = true;
+              cardAwarded = this.awardRiskCard(player.id);
+            }
+          }
+        }
+      }
+    }
+
     if (!toT?.isWater && isEnemy && movedLandUnits) {
       // Check if there are any enemy units remaining
       const enemyUnits = this.units[toTerritory]?.filter(u =>
@@ -2353,6 +2417,7 @@ export class GameState {
       previousOwner: isEnemy ? toOwner : null,
       loadedOntoTransport: loadingOntoTransport, // Track for undo - remove from cargo
       loadedOntoCarrier: landingOnCarrier, // Track for undo - remove from aircraft
+      blitzedCaptures: blitzedCaptures.length > 0 ? blitzedCaptures : undefined, // Track blitzed territories for undo
     });
 
     // Track air unit origins for post-combat landing (combat move only)
@@ -2401,6 +2466,7 @@ export class GameState {
       captured,
       cardAwarded,
       isAttack: isCombatMove && isEnemy && !captured,
+      blitzedCaptures: blitzedCaptures.length > 0 ? blitzedCaptures : undefined,
     };
   }
 
@@ -2579,6 +2645,13 @@ export class GameState {
     // If territory was captured by this move, restore previous owner
     if (lastMove.captured && lastMove.previousOwner) {
       this.territoryState[lastMove.to].owner = lastMove.previousOwner;
+    }
+
+    // Restore blitzed territories to their previous owners
+    if (lastMove.blitzedCaptures && lastMove.blitzedCaptures.length > 0) {
+      for (const blitzed of lastMove.blitzedCaptures) {
+        this.territoryState[blitzed.territory].owner = blitzed.previousOwner;
+      }
     }
 
     // Restore air unit origins - remove tracking for destination, could restore to source
