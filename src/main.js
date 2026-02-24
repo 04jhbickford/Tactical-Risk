@@ -45,7 +45,7 @@ import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
 
 // DEBUG: Set to true to log sea zone click coordinates for positioning
-const DEBUG_SEA_ZONE_CLICKS = true;
+const DEBUG_SEA_ZONE_CLICKS = false;
 const DEBUG_SEA_ZONE_OFFSETS = []; // Accumulates all clicked offsets
 
 function wrapX(x) {
@@ -598,21 +598,6 @@ async function init() {
     } else {
       gameState.initGame(gameMode, selectedPlayers, options);
     }
-
-    // DEBUG: Add test naval units to ALL sea zones for coordinate testing (V1.91 ONLY - REMOVE AFTER)
-    const testPlayerId = selectedPlayers?.[0]?.id || 'Americans';
-    for (const t of territories) {
-      if (t.isWater) {
-        gameState.units[t.name] = gameState.units[t.name] || [];
-        gameState.units[t.name].push(
-          { type: 'battleship', quantity: 1, owner: testPlayerId },
-          { type: 'carrier', quantity: 1, owner: testPlayerId },
-          { type: 'destroyer', quantity: 1, owner: testPlayerId },
-          { type: 'submarine', quantity: 1, owner: testPlayerId }
-        );
-      }
-    }
-    console.log('DEBUG: Added test naval units to all sea zones');
 
     // Initialize AI controller
     aiController = new AIController();
