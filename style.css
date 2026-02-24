@@ -598,13 +598,12 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center top / cover no-repeat;
+  background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') left center / contain no-repeat;
   background-color: #1a1a2e;
   z-index: 100;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 20px;
+  align-items: stretch;
+  justify-content: flex-end;
   transition: opacity 0.3s ease;
 }
 
@@ -614,14 +613,16 @@ html, body {
 }
 
 .lobby-content {
-  background: rgba(15, 15, 30, 0.92);
-  border-radius: 16px;
-  padding: 25px 30px 30px;
-  max-width: 800px;
-  width: 95%;
-  box-shadow: 0 25px 80px rgba(0,0,0,0.5);
-  border: 1px solid rgba(255,255,255,0.15);
-  backdrop-filter: blur(10px);
+  background: rgba(15, 15, 30, 0.95);
+  border-radius: 0;
+  padding: 25px 20px;
+  width: 320px;
+  min-width: 300px;
+  box-shadow: -5px 0 30px rgba(0,0,0,0.5);
+  border-left: 1px solid rgba(255,255,255,0.1);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .lobby-title,
@@ -660,8 +661,8 @@ html, body {
 /* --- Player Grid --- */
 .player-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -758,11 +759,12 @@ html, body {
 /* --- Lobby Info --- */
 .lobby-info {
   display: flex;
-  gap: 20px;
-  margin-bottom: 24px;
-  padding: 14px;
-  background: rgba(255,255,255,0.03);
-  border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 8px 15px;
+  margin-bottom: 15px;
+  font-size: 11px;
+  color: #888;
+  justify-content: center;
 }
 
 .info-item {
@@ -11725,17 +11727,18 @@ html, body {
 
 .lobby-options {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 14px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .option-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
