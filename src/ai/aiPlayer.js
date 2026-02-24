@@ -147,10 +147,18 @@ export class AIPlayer {
       analysis.weakestOpponent = analysis.opponents[analysis.opponents.length - 1];
     }
 
-    // Check capital safety
+    // Check capital safety - both ownership AND threat level
     if (analysis.myCapital) {
       const capitalOwner = this.gameState.getOwner(analysis.myCapital);
-      analysis.capitalSafe = capitalOwner === this.playerId;
+      analysis.capitalOwned = capitalOwner === this.playerId;
+
+      // Calculate threat to capital
+      analysis.capitalThreat = this._calculateThreatLevel(analysis.myCapital);
+      analysis.capitalThreatPower = this._getMaxEnemyThreatPower(analysis.myCapital);
+      analysis.capitalDefensePower = this._getOwnDefensePower(analysis.myCapital);
+
+      // Capital is only truly "safe" if owned AND not significantly threatened
+      analysis.capitalSafe = analysis.capitalOwned && analysis.capitalThreat < 0.5;
     }
 
     // Analyze continent progress
@@ -794,19 +802,51 @@ export class AIPlayer {
 
     // Easy AI requires higher odds
     const minWinProb = 1 - this.config.minAttackRatio * 0.35;
-    const viable = winProbability >= minWinProb;
+    let viable = winProbability >= minWinProb;
 
-    // Don't attack if it would leave territory defenseless (except hard AI)
-    if (this.difficulty !== 'hard') {
-      const remainingDefense = this._calculateDefenseAfterAttack(fromTerritory, available);
-      if (remainingDefense < defensePower * 0.5) {
-        return { viable: false };
+    // CRITICAL: Check if this attack would expose the capital - applies to ALL difficulties
+    const attackUnits = available.map(u => ({ type: u.type, quantity: u.quantity }));
+    if (this._wouldExposeCapital(fromTerritory, attackUnits)) {
+      // Capital protection takes priority over ALL attacks
+      return { viable: false, reason: 'would expose capital' };
+    }
+
+    // Check if source territory is our capital - be extra cautious
+    const myCapital = this.gameState.getCapital(this.playerId);
+    if (fromTerritory === myCapital) {
+      const capitalThreat = this._getMaxEnemyThreatPower(myCapital);
+      if (capitalThreat > 0) {
+        // Capital is threatened - don't attack from it unless we have overwhelming defense
+        const currentDefense = this._getOwnDefensePower(myCapital);
+        const defenseAfter = this._calculateDefenseAfterAttack(myCapital, available);
+        if (defenseAfter < capitalThreat * 1.5) {
+          return { viable: false, reason: 'capital threatened' };
+        }
+      }
+    }
+
+    // Don't attack if it would leave territory defenseless - applies to all difficulties now
+    const remainingDefense = this._calculateDefenseAfterAttack(fromTerritory, available);
+    const localThreat = this._getMaxEnemyThreatPower(fromTerritory);
+    if (localThreat > 0 && remainingDefense < localThreat * 0.5) {
+      // Territory would be very vulnerable after attack
+      if (fromTerritory === myCapital) {
+        // Never leave capital vulnerable
+        return { viable: false, reason: 'capital would be vulnerable' };
+      }
+      // For non-capital, hard AI can still take the risk if the attack is valuable enough
+      if (this.difficulty !== 'hard') {
+        return { viable: false, reason: 'territory would be vulnerable' };
+      }
+      // Hard AI: only proceed if target is very high value
+      if (score < 20) {
+        return { viable: false, reason: 'not worth the risk' };
       }
     }
 
     return {
       viable,
-      attackers: available.map(u => ({ type: u.type, quantity: u.quantity })),
+      attackers: attackUnits,
       score,
       winProbability,
     };
@@ -815,6 +855,7 @@ export class AIPlayer {
   _gatherAttackForce(target, committedUnits, allIn = false) {
     const forces = [];
     const connections = this.gameState.getConnections(target);
+    const myCapital = this.gameState.getCapital(this.playerId);
 
     for (const territory of connections) {
       if (this.gameState.getOwner(territory) !== this.playerId) continue;
@@ -828,18 +869,75 @@ export class AIPlayer {
 
       if (available.length === 0) continue;
 
+      // Check if this is the capital - need to be extra careful
+      const isCapital = territory === myCapital;
+      const capitalThreat = isCapital ? this._getMaxEnemyThreatPower(territory) : 0;
+
       // Decide how many to send
       let attackers;
-      if (allIn) {
-        // Send everything for capital retake
+      if (allIn && !isCapital) {
+        // Send everything for capital retake (but never strip our own capital)
         attackers = available.map(u => ({ type: u.type, quantity: u.quantity }));
+      } else if (isCapital && capitalThreat > 0) {
+        // CRITICAL: Capital is threatened - calculate how many we MUST keep
+        const currentDefense = this._getOwnDefensePower(territory);
+        const requiredDefense = capitalThreat * 1.5; // Need 50% more defense than threat
+
+        if (currentDefense <= requiredDefense) {
+          // Cannot spare any units - capital needs all defenders
+          continue;
+        }
+
+        // Calculate how much defense we can spare
+        const sparableDefense = currentDefense - requiredDefense;
+        attackers = [];
+
+        // Sort units by defense value (send lowest defense first)
+        const sortedUnits = [...available].sort((a, b) => {
+          const defA = this.gameState.unitDefs?.[a.type]?.defense || 0;
+          const defB = this.gameState.unitDefs?.[b.type]?.defense || 0;
+          return defA - defB;
+        });
+
+        let defenseUsed = 0;
+        for (const u of sortedUnits) {
+          const def = this.gameState.unitDefs?.[u.type];
+          const unitDefense = (def?.defense || 0) * u.quantity;
+
+          if (defenseUsed + unitDefense <= sparableDefense) {
+            attackers.push({ type: u.type, quantity: u.quantity });
+            defenseUsed += unitDefense;
+          } else {
+            // Can only send some of this unit type
+            const canSend = Math.floor((sparableDefense - defenseUsed) / (def?.defense || 1));
+            if (canSend > 0) {
+              attackers.push({ type: u.type, quantity: Math.min(canSend, u.quantity) });
+            }
+            break;
+          }
+        }
       } else {
-        // Keep some for defense based on difficulty
+        // Normal attack - keep some for defense based on difficulty
         const keepRatio = this.config.reserveDefense;
         attackers = available.map(u => ({
           type: u.type,
           quantity: Math.max(1, Math.floor(u.quantity * (1 - keepRatio))),
         })).filter(u => u.quantity > 0);
+
+        // Double-check this won't expose capital
+        if (this._wouldExposeCapital(territory, attackers)) {
+          // Reduce attack force to protect capital
+          const reducedAttackers = attackers.map(u => ({
+            type: u.type,
+            quantity: Math.max(1, Math.floor(u.quantity * 0.5)),
+          })).filter(u => u.quantity > 0);
+
+          if (!this._wouldExposeCapital(territory, reducedAttackers)) {
+            attackers = reducedAttackers;
+          } else {
+            continue; // Skip this territory entirely
+          }
+        }
       }
 
       if (attackers.length > 0) {
@@ -1086,6 +1184,76 @@ export class AIPlayer {
       }
     }
     return power;
+  }
+
+  // Get max enemy attack power from adjacent territories
+  _getMaxEnemyThreatPower(territory) {
+    let maxPower = 0;
+    for (const conn of this.gameState.getConnections(territory)) {
+      const owner = this.gameState.getOwner(conn);
+      if (owner && owner !== this.playerId) {
+        const enemyUnits = this.gameState.getUnits(conn, owner) || [];
+        const power = this._calculateAttackPower(enemyUnits);
+        maxPower = Math.max(maxPower, power);
+      }
+    }
+    return maxPower;
+  }
+
+  // Get own defense power at a territory
+  _getOwnDefensePower(territory) {
+    const units = this.gameState.getUnits(territory, this.playerId) || [];
+    let power = 0;
+    for (const unit of units) {
+      const def = this.gameState.unitDefs?.[unit.type];
+      if (def) {
+        power += (def.defense || 0) * (unit.quantity || 1);
+      }
+    }
+    return power;
+  }
+
+  // Check if moving units would leave capital dangerously exposed
+  _wouldExposeCapital(fromTerritory, unitsToMove) {
+    const myCapital = this.gameState.getCapital(this.playerId);
+    if (!myCapital) return false;
+
+    // Check if source territory is the capital
+    const isCapital = fromTerritory === myCapital;
+
+    // Check if source territory is adjacent to capital (removing units could allow enemy path)
+    const capitalConnections = this.gameState.getConnections(myCapital);
+    const isAdjacentToCapital = capitalConnections.includes(fromTerritory);
+
+    if (!isCapital && !isAdjacentToCapital) {
+      return false; // Not near capital, OK to move
+    }
+
+    // Calculate current capital threat
+    const capitalThreat = this._getMaxEnemyThreatPower(myCapital);
+    if (capitalThreat === 0) {
+      return false; // No threat to capital
+    }
+
+    // Calculate defense after moving units
+    let capitalDefense = this._getOwnDefensePower(myCapital);
+
+    if (isCapital) {
+      // Directly reducing capital defense
+      for (const u of unitsToMove) {
+        const def = this.gameState.unitDefs?.[u.type];
+        if (def) {
+          capitalDefense -= (def.defense || 0) * (u.quantity || 1);
+        }
+      }
+    }
+
+    // Capital should maintain at least enough defense to deter attack
+    // We want defense power >= threat power for capital to be safe
+    const safetyMargin = 1.2; // Require 20% more defense than threat
+    const requiredDefense = capitalThreat * safetyMargin;
+
+    return capitalDefense < requiredDefense;
   }
 
   _calculateDefenseAfterAttack(territory, attackers) {
