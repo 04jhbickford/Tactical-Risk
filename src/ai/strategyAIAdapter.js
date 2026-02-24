@@ -261,17 +261,64 @@ export class StrategyAIPlayer {
       return { done: true };
     }
 
-    // Get all existing capitals from other players
+    // Get all existing capitals from multiple sources for robustness
     const existingCapitals = new Set();
+
+    // Method 1: Check playerState.capitalTerritory
     for (const player of (this.gameState.players || [])) {
       if (player.id !== this.playerId) {
-        const playerCapital = this.gameState.playerState?.[player.id]?.capitalTerritory ||
-                              this.gameState.getCapital?.(player.id);
+        const playerCapital = this.gameState.playerState?.[player.id]?.capitalTerritory;
         if (playerCapital) {
           existingCapitals.add(playerCapital);
         }
       }
     }
+
+    // Method 2: Check territoryState.isCapital flag
+    for (const [terrName, terrState] of Object.entries(this.gameState.territoryState || {})) {
+      if (terrState.isCapital && terrState.owner !== this.playerId) {
+        existingCapitals.add(terrName);
+      }
+    }
+
+    // Method 3: Use getCapital helper if available
+    for (const player of (this.gameState.players || [])) {
+      if (player.id !== this.playerId) {
+        const cap = this.gameState.getCapital?.(player.id);
+        if (cap) {
+          existingCapitals.add(cap);
+        }
+      }
+    }
+
+    // Helper function to check if a territory is too close to existing capitals
+    const isTooCloseToCapital = (terrName) => {
+      // Distance 0: Is a capital
+      if (existingCapitals.has(terrName)) {
+        return true;
+      }
+
+      const connections = this.gameState.territoryByName?.[terrName]?.connections || [];
+
+      // Distance 1: Adjacent to a capital
+      for (const conn of connections) {
+        if (existingCapitals.has(conn)) {
+          return true;
+        }
+      }
+
+      // Distance 2: Neighbor of neighbor is a capital
+      for (const conn of connections) {
+        const conn2 = this.gameState.territoryByName?.[conn]?.connections || [];
+        for (const neighbor2 of conn2) {
+          if (existingCapitals.has(neighbor2)) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
 
     // Score each territory for capital placement
     let bestTerritory = null;
@@ -281,31 +328,13 @@ export class StrategyAIPlayer {
       const territory = this.gameState.territoryByName[terrName];
       if (!territory) continue;
 
+      // CRITICAL: Skip territories within 2 spaces of existing capitals
+      if (isTooCloseToCapital(terrName)) {
+        continue; // Don't even consider this territory
+      }
+
       let score = 0;
       const connections = territory.connections || [];
-
-      // CRITICAL: Enforce minimum 2-territory separation between capitals
-      // Check if this IS another capital (shouldn't happen)
-      if (existingCapitals.has(terrName)) {
-        score -= 1000;
-      }
-
-      // Check distance 1 (direct neighbors) - massive penalty
-      for (const conn of connections) {
-        if (existingCapitals.has(conn)) {
-          score -= 500;
-        }
-      }
-
-      // Check distance 2 (neighbors of neighbors) - large penalty
-      for (const conn of connections) {
-        const conn2 = this.gameState.territoryByName?.[conn]?.connections || [];
-        for (const neighbor2 of conn2) {
-          if (existingCapitals.has(neighbor2)) {
-            score -= 300;
-          }
-        }
-      }
 
       // Higher production is better
       score += (territory.production || 0) * 3;
@@ -331,6 +360,22 @@ export class StrategyAIPlayer {
         bestScore = score;
         bestTerritory = terrName;
       }
+    }
+
+    // Fallback: if no valid territory found (all too close), pick the best we can
+    if (!bestTerritory && landTerritories.length > 0) {
+      // Just pick the highest production territory as fallback
+      let fallbackBest = null;
+      let fallbackScore = -Infinity;
+      for (const terrName of landTerritories) {
+        const t = this.gameState.territoryByName[terrName];
+        const prod = t?.production || 0;
+        if (prod > fallbackScore) {
+          fallbackScore = prod;
+          fallbackBest = terrName;
+        }
+      }
+      bestTerritory = fallbackBest;
     }
 
     if (bestTerritory) {

@@ -293,8 +293,10 @@ export class AIPlayer {
     let score = 0;
     const connections = this.gameState.getConnections(territory);
 
-    // Get all existing capitals
+    // Get all existing capitals from multiple sources for robustness
     const existingCapitals = new Set();
+
+    // Method 1: Check playerState.capitalTerritory
     for (const player of this.gameState.players) {
       if (player.id !== this.playerId) {
         const playerCapital = this.gameState.playerState[player.id]?.capitalTerritory;
@@ -304,29 +306,44 @@ export class AIPlayer {
       }
     }
 
-    // CRITICAL: Enforce minimum 2-territory separation between any two capitals
-    // Check distance 1 (direct neighbors)
-    for (const conn of connections) {
-      if (existingCapitals.has(conn)) {
-        // Adjacent to another capital (distance 1) - massive penalty, effectively disqualifies
-        score -= 500;
+    // Method 2: Check territoryState.isCapital flag
+    for (const [terrName, terrState] of Object.entries(this.gameState.territoryState || {})) {
+      if (terrState.isCapital && terrState.owner !== this.playerId) {
+        existingCapitals.add(terrName);
       }
     }
 
-    // Check distance 2 (neighbors of neighbors)
-    for (const conn of connections) {
-      const conn2 = this.gameState.getConnections(conn);
-      for (const neighbor2 of conn2) {
-        if (existingCapitals.has(neighbor2)) {
-          // Within 2 territories of another capital - large penalty, effectively disqualifies
-          score -= 300;
+    // Method 3: Use getCapital helper if available
+    for (const player of this.gameState.players) {
+      if (player.id !== this.playerId) {
+        const cap = this.gameState.getCapital?.(player.id);
+        if (cap) {
+          existingCapitals.add(cap);
         }
       }
     }
 
-    // Also check if this territory IS another player's capital (shouldn't happen but safety check)
+    // CRITICAL: Enforce minimum 2-territory separation between any two capitals
+    // This territory itself is a capital - impossible
     if (existingCapitals.has(territory)) {
-      score -= 1000;
+      return -10000; // Return immediately, don't even consider
+    }
+
+    // Check distance 1 (direct neighbors) - effectively disqualifies
+    for (const conn of connections) {
+      if (existingCapitals.has(conn)) {
+        return -5000; // Return immediately, this is too close
+      }
+    }
+
+    // Check distance 2 (neighbors of neighbors) - effectively disqualifies
+    for (const conn of connections) {
+      const conn2 = this.gameState.getConnections(conn);
+      for (const neighbor2 of conn2) {
+        if (existingCapitals.has(neighbor2)) {
+          return -3000; // Return immediately, this is too close
+        }
+      }
     }
 
     // Prefer territories with more friendly neighbors (defensible)
