@@ -942,15 +942,21 @@ async function init() {
       return;
     }
 
+    // Remove panning class when not panning
+    canvas.classList.remove('panning');
+
     // HOVER DETECTION - Always runs when not panning
     // This should work in ALL phases including initial deployment
     const world = camera.screenToWorld(e.clientX, e.clientY);
     const wrappedX = wrapX(world.x);
 
+    // Debug: log to console to verify hover detection is running
+    // console.log('Hover check at:', wrappedX, world.y);
+
     // First check for unit icon hover (higher priority than territory)
     let unitHit = null;
     if (unitRenderer && gameState) {
-      unitHit = unitRenderer.hitTestUnit(wrappedX, world.y, camera.getZoom());
+      unitHit = unitRenderer.hitTestUnit(wrappedX, world.y, camera.zoom);
     }
 
     if (unitHit) {
