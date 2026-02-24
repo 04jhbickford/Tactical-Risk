@@ -595,6 +595,21 @@ async function init() {
       gameState.initGame(gameMode, selectedPlayers, options);
     }
 
+    // DEBUG: Add test naval units to ALL sea zones for coordinate testing (V1.91 ONLY - REMOVE AFTER)
+    const testPlayerId = selectedPlayers?.[0]?.id || 'Americans';
+    for (const t of territories) {
+      if (t.isWater) {
+        gameState.units[t.name] = gameState.units[t.name] || [];
+        gameState.units[t.name].push(
+          { type: 'battleship', quantity: 1, owner: testPlayerId },
+          { type: 'carrier', quantity: 1, owner: testPlayerId },
+          { type: 'destroyer', quantity: 1, owner: testPlayerId },
+          { type: 'submarine', quantity: 1, owner: testPlayerId }
+        );
+      }
+    }
+    console.log('DEBUG: Added test naval units to all sea zones');
+
     // Initialize AI controller
     aiController = new AIController();
     aiController.setUnitDefs(unitDefs);
