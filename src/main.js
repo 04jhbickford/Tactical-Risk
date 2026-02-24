@@ -44,6 +44,9 @@ import { AirLandingUI } from './ui/airLandingUI.js';
 import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
 
+// DEBUG: Set to true to log sea zone click coordinates for positioning
+const DEBUG_SEA_ZONE_CLICKS = true;
+
 function wrapX(x) {
   return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
 }
@@ -1092,8 +1095,32 @@ async function init() {
 
     if (!wasDrag) {
       const world = camera.screenToWorld(e.clientX, e.clientY);
-      const hit = territoryMap.hitTest(wrapX(world.x), world.y);
+      const wrappedWorldX = wrapX(world.x);
+      const hit = territoryMap.hitTest(wrappedWorldX, world.y);
       console.log('[MouseUp] Hit test result:', hit?.name || 'null');
+
+      // DEBUG: Log sea zone click coordinates for positioning naval units
+      if (DEBUG_SEA_ZONE_CLICKS && hit && hit.isWater) {
+        // Calculate the territory's current center
+        const center = hit.center || [0, 0];
+        const cx = center[0];
+        const cy = center[1];
+
+        // Calculate offset from center to clicked position
+        const offsetX = Math.round(wrappedWorldX - cx);
+        const offsetY = Math.round(world.y - cy);
+
+        const logMsg = `'${hit.name}': { x: ${offsetX}, y: ${offsetY} },`;
+        console.log('=== SEA ZONE CLICK ===');
+        console.log('Zone:', hit.name);
+        console.log('Center:', cx, cy);
+        console.log('Clicked:', Math.round(wrappedWorldX), Math.round(world.y));
+        console.log('OFFSET:', logMsg);
+        console.log('======================');
+
+        // Also show on screen
+        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} }`, 5000);
+      }
 
       // Initial placement now uses inline UI in player panel - don't intercept clicks
       // Just let the territory selection flow through to setSelectedTerritory

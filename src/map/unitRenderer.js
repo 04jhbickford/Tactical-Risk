@@ -115,35 +115,10 @@ export class UnitRenderer {
   }
 
   // Custom offsets for specific sea zones that need manual adjustment
-  // Sea zone offsets - only override where automatic positioning fails
+  // Sea zone offsets - click on map with DEBUG_SEA_ZONE_CLICKS enabled to get values
+  // Copy the offset values from browser console and paste here
   static SEA_ZONE_OFFSETS = {
-    // Americas - Pacific coast
-    'Alaska Sea Zone': { x: -50, y: 40 },             // Left-down into Pacific
-    'West Canada Sea Zone': { x: -50, y: 20 },        // Left into Pacific
-    'Mexico Sea Zone': { x: -60, y: 0 },              // More left into Pacific
-    'West Panama Sea Zone': { x: -60, y: 0 },         // More left into Pacific
-    'Gulf of Mexico Sea Zone': { x: -30, y: 20 },     // Left-down into gulf
-
-    // Mediterranean - need bigger offsets
-    'West Mediteranean Sea Zone': { x: -50, y: 60 },  // More down-left, away from Spain
-    'Central Mediteranean Sea Zone': { x: 0, y: 70 }, // More down, away from Italy
-    'East Mediteranean Sea Zone': { x: -60, y: 50 },  // More left-down, away from Egypt
-
-    // Red Sea & Indian Ocean - bigger offsets
-    'Red Sea Zone': { x: -30, y: -30 },               // More up-left into water
-    'Arabian Sea Zone': { x: -50, y: 50 },            // More down-left
-    'Bay of Bengal Sea Zone': { x: 50, y: 40 },       // More right-down
-
-    // Pacific - Asia - bigger offsets
-    'Sea of Japan Zone': { x: 60, y: 20 },            // More right, away from Japan
-    'Philippine Sea Zone': { x: 60, y: 20 },          // More right
-    'Java Sea Zone': { x: 0, y: 50 },                 // More down into water
-    'Celebes Sea Zone': { x: 40, y: 30 },             // More right-down
-    'Banda Sea Zone': { x: 40, y: 30 },               // More right-down
-
-    // Pacific - Australia - bigger offsets
-    'Coral Sea Zone': { x: 60, y: 0 },                // More right, away from Australia
-    'Tasman Sea Zone': { x: 60, y: 0 },               // More right, away from New Zealand
+    // Paste offsets here after clicking on map where you want units centered
   };
 
   // Custom offsets for land territories where units appear in wrong location
