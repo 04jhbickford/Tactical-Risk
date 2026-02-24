@@ -1108,8 +1108,12 @@ async function init() {
         const cy = center[1];
 
         // Calculate offset from center to clicked position
-        const offsetX = Math.round(wrappedWorldX - cx);
+        let offsetX = Math.round(wrappedWorldX - cx);
         const offsetY = Math.round(world.y - cy);
+
+        // Fix wrap issue: if offset is > half map width, wrap it
+        if (offsetX > MAP_WIDTH / 2) offsetX -= MAP_WIDTH;
+        if (offsetX < -MAP_WIDTH / 2) offsetX += MAP_WIDTH;
 
         // Add to accumulated list (replace if same zone clicked again)
         const existingIdx = DEBUG_SEA_ZONE_OFFSETS.findIndex(o => o.name === hit.name);
@@ -1132,7 +1136,7 @@ async function init() {
           debugBox.style.cssText = 'position:fixed;top:10px;right:10px;width:400px;max-height:80vh;background:#222;border:2px solid #4CAF50;border-radius:8px;z-index:9999;font-family:monospace;font-size:12px;';
           debugBox.innerHTML = `
             <div style="background:#4CAF50;color:white;padding:8px;font-weight:bold;">
-              Sea Zone Offsets (click zones to add)
+              Sea Zone Offsets - Zoom: <span id="debug-zoom">1.0</span>
               <button id="debug-copy-btn" style="float:right;background:#fff;color:#222;border:none;padding:4px 12px;cursor:pointer;border-radius:4px;">Copy All</button>
             </div>
             <textarea id="debug-offsets-text" style="width:100%;height:300px;background:#111;color:#0f0;border:none;padding:10px;box-sizing:border-box;resize:vertical;" readonly></textarea>
@@ -1150,9 +1154,10 @@ async function init() {
 
         document.getElementById('debug-offsets-text').value = allOffsets;
         document.getElementById('debug-count').textContent = DEBUG_SEA_ZONE_OFFSETS.length;
+        document.getElementById('debug-zoom').textContent = camera.zoom.toFixed(2);
 
         // Show on screen
-        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} }`, 2000);
+        showNotification(`${hit.name}: { x: ${offsetX}, y: ${offsetY} } (zoom: ${camera.zoom.toFixed(2)})`, 2000);
       }
 
       // Initial placement now uses inline UI in player panel - don't intercept clicks
