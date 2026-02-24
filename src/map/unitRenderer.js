@@ -116,24 +116,50 @@ export class UnitRenderer {
 
   // Custom offsets for specific sea zones that need manual adjustment
   static SEA_ZONE_OFFSETS = {
-    'West Mediteranean Sea Zone': { x: -40, y: -30 }, // Center between W Europe and Algeria
-    'Central Mediteranean Sea Zone': { x: 0, y: 50 }, // Move south away from Italy
-    'East Mediteranean Sea Zone': { x: -40, y: 50 },  // Move left and down, away from Syria/Turkey
-    'Black Sea Zone': { x: 0, y: -40 },               // Move north into water
-    'Baltic Sea Zone': { x: 0, y: 30 },               // Move south into water
-    'North Sea Zone': { x: -50, y: 50 },              // Bottom-left, away from UK islands
-    'Gulf of Mexico Sea Zone': { x: 60, y: -10 },      // Position just right of where West US/Mexico meet the Gulf
-    'Carribean Sea Zone': { x: -30, y: 40 },          // Move down-left, into open water
-    'Mexico Sea Zone': { x: -50, y: 0 },              // Move left, into Pacific
-    'West Panama Sea Zone': { x: -40, y: 30 },        // Move down-left, away from Central America
-    'East US Sea Zone': { x: 50, y: 0 },              // Move right, away from US coast
-    'West US Sea Zone': { x: -40, y: 0 },             // Move left, into Pacific
-    'Alaska Sea Zone': { x: 0, y: 50 },               // Move south, away from Alaska
-    'West Canada Sea Zone': { x: -60, y: 0 },         // Move left, away from Canada coastline
-    'South Pacific Sea Zone': { x: 0, y: -50 },       // Move up, away from South America
-    'East Canada Sea Zone': { x: 60, y: 0 },          // Move right, away from Canada coastline
-    'Congo Sea Zone': { x: -40, y: 0 },               // Move left, away from African coast
-    'West Africa Sea Zone': { x: -50, y: 0 },         // Move left, into Atlantic
+    // Mediterranean & European seas
+    'West Mediteranean Sea Zone': { x: -20, y: 40 },  // Move down into open water between Europe/Africa
+    'Central Mediteranean Sea Zone': { x: 0, y: 60 }, // Move further south away from Italy
+    'East Mediteranean Sea Zone': { x: -60, y: 40 },  // Move left and down, away from Syria/Turkey
+    'Black Sea Zone': { x: 0, y: 0 },                 // Center of Black Sea
+    'Baltic Sea Zone': { x: -30, y: 20 },             // Move left and down into open water
+    'North Sea Zone': { x: -40, y: 30 },              // Move into open North Sea
+
+    // Atlantic - Americas
+    'Gulf of Mexico Sea Zone': { x: 60, y: -10 },     // Position in open Gulf water
+    'Carribean Sea Zone': { x: 0, y: 30 },            // Move down into open Caribbean
+    'Mexico Sea Zone': { x: -60, y: 0 },              // Move left, into Pacific
+    'West Panama Sea Zone': { x: -50, y: 20 },        // Move left and down, away from Central America
+    'East US Sea Zone': { x: 40, y: 30 },             // Move right and down, away from US coast
+    'West US Sea Zone': { x: -50, y: 0 },             // Move left, into Pacific
+    'Alaska Sea Zone': { x: -30, y: 40 },             // Move left and down, away from Alaska
+    'West Canada Sea Zone': { x: -70, y: 0 },         // Move further left, away from Canada coastline
+    'East Canada Sea Zone': { x: 50, y: 30 },         // Move right and down, into Atlantic
+
+    // Atlantic - Africa/Europe
+    'Congo Sea Zone': { x: -60, y: 0 },               // Move further left, away from African coast
+    'West Africa Sea Zone': { x: -60, y: 0 },         // Move left, into Atlantic
+    'South Africa Sea Zone': { x: -40, y: 40 },       // Move left and down, into open ocean
+
+    // Indian Ocean & Red Sea
+    'Red Sea Zone': { x: 0, y: 30 },                  // Move down into open Red Sea
+    'Arabian Sea Zone': { x: -30, y: 30 },            // Move left and down, into open water
+    'Bay of Bengal Sea Zone': { x: 0, y: 30 },        // Move down into open bay
+    'Indian Ocean Sea Zone': { x: 0, y: 0 },          // Center
+
+    // Pacific - Asia
+    'Sea of Japan Zone': { x: 30, y: 0 },             // Move right, away from Japan/Korea
+    'Yellow Sea Zone': { x: 0, y: 30 },               // Move down into open water
+    'South China Sea Zone': { x: 0, y: 0 },           // Center
+    'Philippine Sea Zone': { x: 30, y: 0 },           // Move right, into open Pacific
+    'East China Sea Zone': { x: 30, y: 30 },          // Move right and down
+
+    // Pacific - Islands & Australia
+    'Coral Sea Zone': { x: 30, y: 0 },                // Move right, away from Australia
+    'Tasman Sea Zone': { x: 30, y: 0 },               // Move right
+    'South Pacific Sea Zone': { x: 0, y: -40 },       // Move up, away from South America
+    'Central Pacific Sea Zone': { x: 0, y: 0 },       // Center
+    'North Pacific Sea Zone': { x: 0, y: 0 },         // Center
+    'Hawaiian Sea Zone': { x: 0, y: 0 },              // Center
   };
 
   // Custom offsets for land territories where units appear in wrong location
