@@ -293,28 +293,40 @@ export class AIPlayer {
     let score = 0;
     const connections = this.gameState.getConnections(territory);
 
-    // CRITICAL: Heavily penalize territories adjacent to existing capitals
-    // Enforce minimum 1-territory separation between any two capitals
+    // Get all existing capitals
+    const existingCapitals = new Set();
+    for (const player of this.gameState.players) {
+      if (player.id !== this.playerId) {
+        const playerCapital = this.gameState.playerState[player.id]?.capitalTerritory;
+        if (playerCapital) {
+          existingCapitals.add(playerCapital);
+        }
+      }
+    }
+
+    // CRITICAL: Enforce minimum 2-territory separation between any two capitals
+    // Check distance 1 (direct neighbors)
     for (const conn of connections) {
-      for (const player of this.gameState.players) {
-        if (player.id !== this.playerId) {
-          const playerCapital = this.gameState.playerState[player.id]?.capitalTerritory;
-          if (playerCapital === conn) {
-            // Adjacent to another capital - massive penalty
-            score -= 100;
-          }
+      if (existingCapitals.has(conn)) {
+        // Adjacent to another capital (distance 1) - massive penalty, effectively disqualifies
+        score -= 500;
+      }
+    }
+
+    // Check distance 2 (neighbors of neighbors)
+    for (const conn of connections) {
+      const conn2 = this.gameState.getConnections(conn);
+      for (const neighbor2 of conn2) {
+        if (existingCapitals.has(neighbor2)) {
+          // Within 2 territories of another capital - large penalty, effectively disqualifies
+          score -= 300;
         }
       }
     }
 
     // Also check if this territory IS another player's capital (shouldn't happen but safety check)
-    for (const player of this.gameState.players) {
-      if (player.id !== this.playerId) {
-        const playerCapital = this.gameState.playerState[player.id]?.capitalTerritory;
-        if (playerCapital === territory) {
-          score -= 200;
-        }
-      }
+    if (existingCapitals.has(territory)) {
+      score -= 1000;
     }
 
     // Prefer territories with more friendly neighbors (defensible)

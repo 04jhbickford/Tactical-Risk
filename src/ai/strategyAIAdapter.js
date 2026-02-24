@@ -248,6 +248,7 @@ export class StrategyAIPlayer {
 
   /**
    * Capital Placement - Find best strategic capital location
+   * Enforces minimum 2-territory separation from other capitals
    */
   async _placeCapital(callbacks) {
     const ownedTerritories = this.gameState.getPlayerTerritories?.(this.playerId) || [];
@@ -260,6 +261,18 @@ export class StrategyAIPlayer {
       return { done: true };
     }
 
+    // Get all existing capitals from other players
+    const existingCapitals = new Set();
+    for (const player of (this.gameState.players || [])) {
+      if (player.id !== this.playerId) {
+        const playerCapital = this.gameState.playerState?.[player.id]?.capitalTerritory ||
+                              this.gameState.getCapital?.(player.id);
+        if (playerCapital) {
+          existingCapitals.add(playerCapital);
+        }
+      }
+    }
+
     // Score each territory for capital placement
     let bestTerritory = null;
     let bestScore = -Infinity;
@@ -269,12 +282,35 @@ export class StrategyAIPlayer {
       if (!territory) continue;
 
       let score = 0;
+      const connections = territory.connections || [];
+
+      // CRITICAL: Enforce minimum 2-territory separation between capitals
+      // Check if this IS another capital (shouldn't happen)
+      if (existingCapitals.has(terrName)) {
+        score -= 1000;
+      }
+
+      // Check distance 1 (direct neighbors) - massive penalty
+      for (const conn of connections) {
+        if (existingCapitals.has(conn)) {
+          score -= 500;
+        }
+      }
+
+      // Check distance 2 (neighbors of neighbors) - large penalty
+      for (const conn of connections) {
+        const conn2 = this.gameState.territoryByName?.[conn]?.connections || [];
+        for (const neighbor2 of conn2) {
+          if (existingCapitals.has(neighbor2)) {
+            score -= 300;
+          }
+        }
+      }
 
       // Higher production is better
       score += (territory.production || 0) * 3;
 
-      // More connections (defensibility) is better
-      const connections = territory.connections || [];
+      // More friendly connections (defensibility) is better
       const friendlyConnections = connections.filter(c => {
         const owner = this.gameState.getOwner?.(c);
         return owner === this.playerId;
