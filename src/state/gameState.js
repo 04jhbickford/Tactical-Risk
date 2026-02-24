@@ -1379,6 +1379,13 @@ export class GameState {
     const unitDef = unitDefs[unitType];
     if (!unitDef) return { success: false, error: 'Unknown unit type' };
 
+    // Check mobilization capacity - cannot buy more units than we can place
+    const capacity = this.getMobilizationCapacity(player.id);
+    const currentPurchases = this.getPendingPurchaseCount(player.id);
+    if (currentPurchases >= capacity) {
+      return { success: false, error: `Mobilization capacity reached (${capacity} units max - capital: 20, factories: 5 each)` };
+    }
+
     // Apply industrial tech discount (-1 IPC, min 1)
     let cost = unitDef.cost;
     if (this.hasTech(player.id, 'industrialTech')) {
@@ -1621,6 +1628,42 @@ export class GameState {
     }
 
     return territories;
+  }
+
+  // Calculate total mobilization capacity for a player
+  // Capital = 20 units, each additional factory = 5 units
+  getMobilizationCapacity(playerId) {
+    const capital = this.playerState[playerId]?.capitalTerritory;
+    let totalCapacity = 0;
+
+    // Capital provides 20 capacity if player still owns it
+    if (capital && this.getOwner(capital) === playerId) {
+      totalCapacity += 20;
+    }
+
+    // Each additional factory provides 5 capacity
+    for (const [terrName, units] of Object.entries(this.units)) {
+      // Skip capital (already counted)
+      if (terrName === capital) continue;
+
+      // Check if territory is owned by player
+      if (this.getOwner(terrName) !== playerId) continue;
+
+      // Check for factory
+      const hasFactory = units.some(u => u.type === 'factory' && u.owner === playerId);
+      if (hasFactory) {
+        totalCapacity += 5;
+      }
+    }
+
+    return totalCapacity;
+  }
+
+  // Get current pending purchase count for a player
+  getPendingPurchaseCount(playerId) {
+    return this.pendingPurchases
+      .filter(p => p.owner === playerId)
+      .reduce((sum, p) => sum + (p.quantity || 1), 0);
   }
 
   // Get valid sea zones for naval unit placement

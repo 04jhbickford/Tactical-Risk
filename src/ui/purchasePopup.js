@@ -262,6 +262,11 @@ export class PurchasePopup {
     const ownedTerritories = this._getOwnedTerritories(player.id);
     const canBuildFactory = ownedTerritories.some(name => !factoryTerritories.includes(name));
 
+    // Get mobilization capacity
+    const mobilizationCapacity = this.gameState.getMobilizationCapacity?.(player.id) || 20;
+    const currentPurchases = this.gameState.getPendingPurchaseCount?.(player.id) || 0;
+    const remainingCapacity = mobilizationCapacity - currentPurchases;
+
     // Show all units that can be placed somewhere
     const units = Object.entries(this.unitDefs)
       .filter(([type, u]) => {
@@ -286,9 +291,15 @@ export class PurchasePopup {
       </div>
 
       <div class="pp-budget">
-        <span class="pp-budget-label">Remaining:</span>
+        <span class="pp-budget-label">IPCs:</span>
         <span class="pp-budget-value ${remaining < 5 ? 'low' : ''}">$${remaining}</span>
         <span class="pp-budget-total">/ $${ipcs}</span>
+      </div>
+
+      <div class="pp-capacity ${remainingCapacity <= 0 ? 'at-limit' : ''}">
+        <span class="pp-capacity-label">Capacity:</span>
+        <span class="pp-capacity-value">${currentPurchases}/${mobilizationCapacity}</span>
+        <span class="pp-capacity-hint">(Capital: 20, Factory: 5)</span>
       </div>
 
       <div class="pp-instructions-small">
@@ -300,7 +311,7 @@ export class PurchasePopup {
 
     for (const [unitType, def] of units) {
       const qty = this.purchaseCart[unitType] || 0;
-      const canAdd = remaining >= def.cost;
+      const canAdd = remaining >= def.cost && remainingCapacity > 0;
       const imageSrc = getUnitIconPath(unitType, player.id);
 
       html += `

@@ -2359,6 +2359,44 @@ html, body {
   color: #888;
 }
 
+/* Mobilization Capacity display */
+.pp-capacity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  background: rgba(76,175,80,0.1);
+  border: 1px solid rgba(76,175,80,0.3);
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.pp-capacity.at-limit {
+  background: rgba(244,67,54,0.15);
+  border-color: rgba(244,67,54,0.4);
+}
+
+.pp-capacity-label {
+  font-size: 10px;
+  color: #888;
+}
+
+.pp-capacity-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4caf50;
+}
+
+.pp-capacity.at-limit .pp-capacity-value {
+  color: #f44336;
+}
+
+.pp-capacity-hint {
+  font-size: 9px;
+  color: #666;
+  margin-left: auto;
+}
+
 /* Risk Cards section in purchase phase */
 .pp-risk-cards-section {
   background: rgba(128,0,255,0.1);
