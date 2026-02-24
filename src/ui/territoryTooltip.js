@@ -141,12 +141,16 @@ export class TerritoryTooltip {
               if (def.cost) unitTooltip += `\nCost: ${def.cost} IPCs`;
             }
 
+            // Capitalize unit type name
+            const unitTypeName = u.type.charAt(0).toUpperCase() + u.type.slice(1);
+
             html += `<div class="tt-unit-icon-row" title="${unitTooltip}">`;
             if (iconPath) {
               html += `<img src="${iconPath}" class="tt-unit-icon" style="border-color:${color}" alt="${u.type}">`;
             } else {
               html += `<span class="tt-unit-badge" style="background:${color}"></span>`;
             }
+            html += `<span class="tt-unit-name">${unitTypeName}</span>`;
             html += `<span class="tt-unit-qty">×${u.quantity}</span>`;
             html += `</div>`;
           }
