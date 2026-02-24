@@ -95,11 +95,34 @@ export class TerritoryTooltip {
     if (this.gameState) {
       const units = this.gameState.getUnitsAt(t.name);
       if (units && units.length > 0) {
-        // Group units by owner
+        // Group units by owner, and collect cargo/aircraft for sea zones
         const unitsByOwner = {};
+        const cargoByOwner = {};     // cargo on transports
+        const aircraftByOwner = {};  // aircraft on carriers
+
         for (const u of units) {
           if (!unitsByOwner[u.owner]) unitsByOwner[u.owner] = [];
           unitsByOwner[u.owner].push(u);
+
+          // For sea zones, collect cargo from transports
+          if (t.isWater && u.cargo && u.cargo.length > 0) {
+            if (!cargoByOwner[u.owner]) cargoByOwner[u.owner] = {};
+            for (const c of u.cargo) {
+              const cargoOwner = c.owner || u.owner;
+              if (!cargoByOwner[cargoOwner]) cargoByOwner[cargoOwner] = {};
+              cargoByOwner[cargoOwner][c.type] = (cargoByOwner[cargoOwner][c.type] || 0) + (c.quantity || 1);
+            }
+          }
+
+          // For sea zones, collect aircraft from carriers
+          if (t.isWater && u.aircraft && u.aircraft.length > 0) {
+            if (!aircraftByOwner[u.owner]) aircraftByOwner[u.owner] = {};
+            for (const a of u.aircraft) {
+              const airOwner = a.owner || u.owner;
+              if (!aircraftByOwner[airOwner]) aircraftByOwner[airOwner] = {};
+              aircraftByOwner[airOwner][a.type] = (aircraftByOwner[airOwner][a.type] || 0) + (a.quantity || 1);
+            }
+          }
         }
 
         html += `<div class="tt-units-section">`;
@@ -155,6 +178,44 @@ export class TerritoryTooltip {
             html += `</div>`;
           }
           html += `</div>`;
+
+          // Show cargo on transports for this player (sea zones only)
+          if (t.isWater && cargoByOwner[ownerId] && Object.keys(cargoByOwner[ownerId]).length > 0) {
+            html += `<div class="tt-cargo-section">`;
+            html += `<div class="tt-cargo-label">📦 On Transports:</div>`;
+            html += `<div class="tt-cargo-grid">`;
+            for (const [cargoType, qty] of Object.entries(cargoByOwner[ownerId])) {
+              const cargoIcon = getUnitIconPath(cargoType, ownerId);
+              const cargoName = cargoType.charAt(0).toUpperCase() + cargoType.slice(1);
+              html += `<div class="tt-unit-icon-row">`;
+              if (cargoIcon) {
+                html += `<img src="${cargoIcon}" class="tt-unit-icon" style="border-color:${color}" alt="${cargoType}">`;
+              }
+              html += `<span class="tt-unit-name">${cargoName}</span>`;
+              html += `<span class="tt-unit-qty">×${qty}</span>`;
+              html += `</div>`;
+            }
+            html += `</div></div>`;
+          }
+
+          // Show aircraft on carriers for this player (sea zones only)
+          if (t.isWater && aircraftByOwner[ownerId] && Object.keys(aircraftByOwner[ownerId]).length > 0) {
+            html += `<div class="tt-aircraft-section">`;
+            html += `<div class="tt-aircraft-label">✈️ On Carriers:</div>`;
+            html += `<div class="tt-aircraft-grid">`;
+            for (const [airType, qty] of Object.entries(aircraftByOwner[ownerId])) {
+              const airIcon = getUnitIconPath(airType, ownerId);
+              const airName = airType.charAt(0).toUpperCase() + airType.slice(1);
+              html += `<div class="tt-unit-icon-row">`;
+              if (airIcon) {
+                html += `<img src="${airIcon}" class="tt-unit-icon" style="border-color:${color}" alt="${airType}">`;
+              }
+              html += `<span class="tt-unit-name">${airName}</span>`;
+              html += `<span class="tt-unit-qty">×${qty}</span>`;
+              html += `</div>`;
+            }
+            html += `</div></div>`;
+          }
 
           // Power totals row for this player
           if (totalAttack > 0 || totalDefense > 0) {

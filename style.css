@@ -2020,6 +2020,32 @@ html, body {
   font-size: 9px;
 }
 
+/* Cargo and Aircraft on ships */
+.tt-cargo-section,
+.tt-aircraft-section {
+  margin-top: 6px;
+  padding: 4px 6px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+  border-left: 2px solid rgba(255,255,255,0.2);
+}
+
+.tt-cargo-label,
+.tt-aircraft-label {
+  font-size: 9px;
+  color: #aaa;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tt-cargo-grid,
+.tt-aircraft-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 /* Adjacent territories info */
 .tt-adjacent {
   display: flex;

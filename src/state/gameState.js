@@ -1176,6 +1176,11 @@ export class GameState {
             const currentAircraft = carrier.aircraft || [];
             if (carrierDef && currentAircraft.length < (carrierDef.aircraftCapacity || 2)) {
               if (carrierDef.canCarry?.includes(unitType)) {
+                // Individualize carrier if not already (so aircraft stay with it when moved)
+                if (!carrier.id) {
+                  carrier.id = `carrier_${++this._shipIdCounter}`;
+                  carrier.quantity = 1;
+                }
                 // Place on carrier
                 unitEntry.quantity--;
                 carrier.aircraft = carrier.aircraft || [];
