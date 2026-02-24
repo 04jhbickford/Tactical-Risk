@@ -116,9 +116,36 @@ export class UnitRenderer {
 
   // Custom offsets for specific sea zones that need manual adjustment
   // Sea zone absolute centers - click position becomes unit center
-  // Generated from debug click tool - stores exact world coordinates
+  // Generated from debug click tool at zoom 0.5 - exact world coordinates
   static SEA_ZONE_CENTERS = {
-    // Paste absolute coordinates here from debug tool
+    'West US Sea Zone': { x: 3078, y: 800 },
+    'Alaska Sea Zone': { x: 2840, y: 470 },
+    'Soviet Far East Sea Zone': { x: 2558, y: 408 },
+    'Midway Sea Zone': { x: 2918, y: 630 },
+    'Wake Island Sea Zone': { x: 2766, y: 990 },
+    'New Zealand Sea Zone': { x: 2964, y: 1658 },
+    'Solomon Islands Sea Zone': { x: 2778, y: 1288 },
+    'Caroline Islands Sea Zone': { x: 2500, y: 1084 },
+    'Kwangtung Sea Zone': { x: 2342, y: 862 },
+    'Borneo Sea Zone': { x: 2318, y: 1364 },
+    'East Indies Sea Zone': { x: 1998, y: 1432 },
+    'West Australia Sea Zone': { x: 2094, y: 1520 },
+    'Indian Ocean Sea Zone': { x: 1688, y: 1186 },
+    'Red Sea Zone': { x: 1568, y: 1292 },
+    'Mozambique Sea Zone': { x: 1440, y: 1464 },
+    'Black Sea Zone': { x: 1348, y: 648 },
+    'Caspian Sea Zone': { x: 1512, y: 632 },
+    'East Mediteranean Sea Zone': { x: 1264, y: 842 },
+    'Central Mediteranean Sea Zone': { x: 1116, y: 842 },
+    'West Mediteranean Sea Zone': { x: 912, y: 760 },
+    'North Sea Zone': { x: 684, y: 236 },
+    'Baltic Sea Zone': { x: 1106, y: 342 },
+    'West Spain Sea Zone': { x: 638, y: 614 },
+    'North Atlantic Sea Zone': { x: 472, y: 890 },
+    'West Africa Sea Zone': { x: 622, y: 1238 },
+    'North Brazil Sea Zone': { x: 464, y: 1148 },
+    'Gulf of Mexico Sea Zone': { x: 3450, y: 922 },
+    'Carribean Sea Zone': { x: 290, y: 1102 },
   };
 
   // Custom offsets for land territories where units appear in wrong location
