@@ -598,11 +598,13 @@ html, body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center top / cover no-repeat;
+  background-color: #1a1a2e;
   z-index: 100;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 20px;
   transition: opacity 0.3s ease;
 }
 
@@ -612,25 +614,20 @@ html, body {
 }
 
 .lobby-content {
-  background: rgba(20, 20, 40, 0.95);
+  background: rgba(15, 15, 30, 0.92);
   border-radius: 16px;
-  padding: 40px 30px;
+  padding: 25px 30px 30px;
   max-width: 800px;
   width: 95%;
   box-shadow: 0 25px 80px rgba(0,0,0,0.5);
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
 }
 
-.lobby-title {
-  font-size: 42px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0 0 8px;
-  letter-spacing: 3px;
-  background: linear-gradient(135deg, #f0f0f0, #888);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+.lobby-title,
+.lobby-subtitle,
+.lobby-header-main {
+  display: none;
 }
 
 .lobby-subtitle {
