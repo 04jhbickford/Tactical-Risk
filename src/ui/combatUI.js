@@ -2096,12 +2096,14 @@ export class CombatUI {
     });
 
     for (const unitType of sortedTypes) {
-      // Skip infantry and artillery if they're fully paired
-      if (unitType === 'infantry' && extraInfantry <= 0 && pairedCount > 0) continue;
-      if (unitType === 'artillery' && extraArtillery <= 0 && pairedCount > 0) continue;
-
       const attackerUnit = attackers.find(u => u.type === unitType);
       const defenderUnit = defenders.find(u => u.type === unitType);
+      const defendQtyCheck = defenderUnit?.quantity || 0;
+
+      // Skip infantry and artillery if they're fully paired AND defender doesn't have any
+      // Don't skip if defender has these units - they need to be shown
+      if (unitType === 'infantry' && extraInfantry <= 0 && pairedCount > 0 && defendQtyCheck === 0) continue;
+      if (unitType === 'artillery' && extraArtillery <= 0 && pairedCount > 0 && defendQtyCheck === 0) continue;
       const def = this.unitDefs[unitType];
 
       // Get faction-specific icons

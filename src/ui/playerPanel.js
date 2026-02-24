@@ -1234,9 +1234,6 @@ export class PlayerPanel {
     const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
     const slotsRemaining = limit - placedThisRound;
 
-    // Calculate actual total remaining from unit quantities
-    const actualRemaining = unitsToPlace.reduce((sum, u) => sum + u.quantity, 0);
-
     // Separate units by category
     const landUnits = unitsToPlace.filter(u => {
       const def = this.unitDefs?.[u.type];
@@ -1250,6 +1247,21 @@ export class PlayerPanel {
       const def = this.unitDefs?.[u.type];
       return def?.isSea && u.quantity > 0;
     });
+
+    // Calculate actual remaining - only count units that can actually be placed
+    // Land/Air units can always be placed on owned territories
+    const landAirRemaining = [...landUnits, ...airUnits].reduce((sum, u) => sum + u.quantity, 0);
+    // Naval units need valid sea zones - check if player has any
+    const hasValidSeaZones = this.gameState.getPlayerTerritories?.(player.id)?.some(tName => {
+      const t = this.gameState.territoryByName?.[tName];
+      if (!t || t.isWater) return false;
+      return t.connections?.some(conn => {
+        const ct = this.gameState.territoryByName?.[conn];
+        return ct?.isWater;
+      });
+    }) || false;
+    const navalRemaining = hasValidSeaZones ? navalUnits.reduce((sum, u) => sum + u.quantity, 0) : 0;
+    const actualRemaining = landAirRemaining + navalRemaining;
 
     // Initialize placement queue if not exists
     if (!this.placementQueue) this.placementQueue = {};

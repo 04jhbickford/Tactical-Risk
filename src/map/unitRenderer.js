@@ -129,6 +129,11 @@ export class UnitRenderer {
     'East US Sea Zone': { x: 50, y: 0 },              // Move right, away from US coast
     'West US Sea Zone': { x: -40, y: 0 },             // Move left, into Pacific
     'Alaska Sea Zone': { x: 0, y: 50 },               // Move south, away from Alaska
+    'West Canada Sea Zone': { x: -60, y: 0 },         // Move left, away from Canada coastline
+    'South Pacific Sea Zone': { x: 0, y: -50 },       // Move up, away from South America
+    'East Canada Sea Zone': { x: 60, y: 0 },          // Move right, away from Canada coastline
+    'Congo Sea Zone': { x: -40, y: 0 },               // Move left, away from African coast
+    'West Africa Sea Zone': { x: -50, y: 0 },         // Move left, into Atlantic
   };
 
   // Custom offsets for land territories where units appear in wrong location
