@@ -87,29 +87,126 @@ export class UnitRenderer {
       // Sea zones use 3 across, land uses 5
       const maxPerRow = t.isWater ? 3 : 5;
 
-      // Calculate rows needed
-      const numRows = Math.ceil(types.length / maxPerRow);
-      const baseY = cy + 25;
+      // For sea zones, separate into three categories
+      if (t.isWater) {
+        this._renderSeaZoneUnits(ctx, cx, cy, grouped, iconSize, spacingX, spacingY, zoom);
+      } else {
+        // Land territory: render all units in flat grid
+        this._renderUnitGrid(ctx, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, zoom);
+      }
+    }
+  }
 
-      let typeIndex = 0;
-      for (let row = 0; row < numRows; row++) {
-        const typesInRow = Math.min(maxPerRow, types.length - row * maxPerRow);
-        const rowY = baseY + row * spacingY;
-        const startX = cx - ((typesInRow - 1) * spacingX) / 2;
+  // Render units in a sea zone with three visual sections:
+  // 1. Naval units (ships)
+  // 2. Cargo units (on transports/carriers)
+  // 3. Air units (not landed)
+  _renderSeaZoneUnits(ctx, cx, cy, grouped, iconSize, spacingX, spacingY, zoom) {
+    const maxPerRow = 3;
+    const sectionGap = 6; // Extra gap between sections
 
-        for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
-          const key = types[typeIndex];
-          const { total, owner, type: unitType, isOnCarrier, isOnTransport, damaged } = grouped[key];
-          const x = startX + col * spacingX;
-          const color = this.gameState.getPlayerColor(owner);
+    // Categorize units into three groups
+    const navalTypes = ['transport', 'submarine', 'destroyer', 'cruiser', 'battleship', 'carrier'];
 
-          this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport, damaged);
+    const navalUnits = [];
+    const cargoUnits = [];
+    const airUnits = [];
 
-          if (total > 1) {
-            this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, total, zoom);
-          }
-          typeIndex++;
+    for (const [key, unitInfo] of Object.entries(grouped)) {
+      if (unitInfo.isOnCarrier || unitInfo.isOnTransport) {
+        cargoUnits.push({ key, ...unitInfo });
+      } else if (navalTypes.includes(unitInfo.type)) {
+        navalUnits.push({ key, ...unitInfo });
+      } else if (unitInfo.type === 'fighter' || unitInfo.type === 'bomber') {
+        // Air unit NOT on a carrier (flying over sea zone)
+        airUnits.push({ key, ...unitInfo });
+      } else {
+        // Other units (shouldn't normally be in sea zone, but handle gracefully)
+        navalUnits.push({ key, ...unitInfo });
+      }
+    }
+
+    let currentY = cy + 25;
+
+    // Draw naval units (ships) - Section 1
+    if (navalUnits.length > 0) {
+      currentY = this._renderUnitSection(ctx, cx, currentY, navalUnits, maxPerRow, iconSize, spacingX, spacingY, zoom, 'naval');
+      if (cargoUnits.length > 0 || airUnits.length > 0) {
+        currentY += sectionGap;
+      }
+    }
+
+    // Draw cargo units (on boats) - Section 2
+    if (cargoUnits.length > 0) {
+      currentY = this._renderUnitSection(ctx, cx, currentY, cargoUnits, maxPerRow, iconSize, spacingX, spacingY, zoom, 'cargo');
+      if (airUnits.length > 0) {
+        currentY += sectionGap;
+      }
+    }
+
+    // Draw air units (not landed) - Section 3
+    if (airUnits.length > 0) {
+      this._renderUnitSection(ctx, cx, currentY, airUnits, maxPerRow, iconSize, spacingX, spacingY, zoom, 'air');
+    }
+  }
+
+  // Render a section of units and return the Y position for the next section
+  _renderUnitSection(ctx, cx, startY, units, maxPerRow, iconSize, spacingX, spacingY, zoom, sectionType) {
+    const numRows = Math.ceil(units.length / maxPerRow);
+    let unitIndex = 0;
+
+    for (let row = 0; row < numRows; row++) {
+      const unitsInRow = Math.min(maxPerRow, units.length - row * maxPerRow);
+      const rowY = startY + row * spacingY;
+      const startX = cx - ((unitsInRow - 1) * spacingX) / 2;
+
+      for (let col = 0; col < unitsInRow && unitIndex < units.length; col++) {
+        const unitInfo = units[unitIndex];
+        const x = startX + col * spacingX;
+        const color = this.gameState.getPlayerColor(unitInfo.owner);
+
+        // Determine visual flags based on section type
+        const isOnCarrier = unitInfo.isOnCarrier || false;
+        const isOnTransport = unitInfo.isOnTransport || false;
+        const isFlying = sectionType === 'air';
+
+        this._drawUnitIcon(ctx, x, rowY, iconSize, unitInfo.type, color, unitInfo.owner,
+                          isOnCarrier, isOnTransport, unitInfo.damaged || 0, isFlying);
+
+        if (unitInfo.total > 1) {
+          this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, unitInfo.total, zoom);
         }
+        unitIndex++;
+      }
+    }
+
+    // Return the Y position after this section
+    return startY + numRows * spacingY;
+  }
+
+  // Render units in a flat grid (for land territories)
+  _renderUnitGrid(ctx, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, zoom) {
+    const numRows = Math.ceil(types.length / maxPerRow);
+    const baseY = cy + 25;
+
+    let typeIndex = 0;
+    for (let row = 0; row < numRows; row++) {
+      const typesInRow = Math.min(maxPerRow, types.length - row * maxPerRow);
+      const rowY = baseY + row * spacingY;
+      const startX = cx - ((typesInRow - 1) * spacingX) / 2;
+
+      for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
+        const key = types[typeIndex];
+        const { total, owner, type: unitType, isOnCarrier, isOnTransport, damaged } = grouped[key];
+        const x = startX + col * spacingX;
+        const color = this.gameState.getPlayerColor(owner);
+
+        this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport, damaged);
+
+        if (total > 1) {
+          this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, total, zoom);
+        }
+        typeIndex++;
       }
     }
   }
@@ -421,7 +518,7 @@ export class UnitRenderer {
     return grouped;
   }
 
-  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false, damaged = 0) {
+  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false, damaged = 0, isFlying = false) {
     const img = this._getUnitImage(unitType, factionId);
 
     ctx.save();
@@ -443,6 +540,20 @@ export class UnitRenderer {
 
       // Slightly different border color for cargo units
       ctx.strokeStyle = isOnCarrier ? 'rgba(100,150,255,0.8)' : 'rgba(150,100,50,0.8)';
+    } else if (isFlying) {
+      // Flying air unit indicator - draw small wing marks above
+      ctx.strokeStyle = 'rgba(135,206,250,0.9)'; // Light sky blue
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      // Draw small chevron/wing marks above the icon
+      const wingY = y - bgSize / 2 - 4;
+      ctx.moveTo(x - bgSize / 3, wingY + 2);
+      ctx.lineTo(x, wingY - 2);
+      ctx.lineTo(x + bgSize / 3, wingY + 2);
+      ctx.stroke();
+
+      // Sky blue border to indicate airborne
+      ctx.strokeStyle = 'rgba(135,206,250,0.8)';
     } else if (damaged > 0) {
       // Damaged battleship indicator - orange/red border and cross
       ctx.strokeStyle = 'rgba(255,100,0,0.9)';
@@ -628,7 +739,6 @@ export class UnitRenderer {
     const iconSize = Math.max(14, Math.min(24, 20 * zoom));
     const spacingX = iconSize + 4;
     const spacingY = iconSize + 8;
-    const maxPerRow = 5;
     const hitRadius = (iconSize + 4) / 2;
 
     for (const [territory, placements] of Object.entries(this.gameState.units)) {
@@ -655,40 +765,140 @@ export class UnitRenderer {
       const types = Object.keys(grouped);
       if (types.length === 0) continue;
 
-      const numRows = Math.ceil(types.length / maxPerRow);
-      const baseY = cy + 25;
-
-      let typeIndex = 0;
-      for (let row = 0; row < numRows; row++) {
-        const typesInRow = Math.min(maxPerRow, types.length - row * maxPerRow);
-        const rowY = baseY + row * spacingY;
-        const startX = cx - ((typesInRow - 1) * spacingX) / 2;
-
-        for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
-          const key = types[typeIndex];
-          const unitInfo = grouped[key];
-          const x = startX + col * spacingX;
-
-          // Check if point is within this icon's bounds
-          const dx = worldX - x;
-          const dy = worldY - rowY;
-          if (Math.abs(dx) <= hitRadius && Math.abs(dy) <= hitRadius) {
-            return {
-              territory: territory,
-              unitType: unitInfo.type,
-              owner: unitInfo.owner,
-              quantity: unitInfo.total,
-              isOnCarrier: unitInfo.isOnCarrier || false,
-              isOnTransport: unitInfo.isOnTransport || false,
-              damaged: unitInfo.damaged || 0,
-              unitDef: this.unitDefs[unitInfo.type]
-            };
-          }
-          typeIndex++;
-        }
+      // For sea zones, use three-section hit testing
+      if (t.isWater) {
+        const result = this._hitTestSeaZoneUnits(worldX, worldY, territory, cx, cy, grouped, iconSize, spacingX, spacingY, hitRadius);
+        if (result) return result;
+      } else {
+        // Land territory: flat grid hit testing
+        const maxPerRow = 5;
+        const result = this._hitTestUnitGrid(worldX, worldY, territory, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, hitRadius);
+        if (result) return result;
       }
     }
 
+    return null;
+  }
+
+  // Hit test for sea zone units with three-section layout
+  _hitTestSeaZoneUnits(worldX, worldY, territory, cx, cy, grouped, iconSize, spacingX, spacingY, hitRadius) {
+    const maxPerRow = 3;
+    const sectionGap = 6;
+    const navalTypes = ['transport', 'submarine', 'destroyer', 'cruiser', 'battleship', 'carrier'];
+
+    const navalUnits = [];
+    const cargoUnits = [];
+    const airUnits = [];
+
+    for (const [key, unitInfo] of Object.entries(grouped)) {
+      if (unitInfo.isOnCarrier || unitInfo.isOnTransport) {
+        cargoUnits.push({ key, ...unitInfo });
+      } else if (navalTypes.includes(unitInfo.type)) {
+        navalUnits.push({ key, ...unitInfo });
+      } else if (unitInfo.type === 'fighter' || unitInfo.type === 'bomber') {
+        airUnits.push({ key, ...unitInfo });
+      } else {
+        navalUnits.push({ key, ...unitInfo });
+      }
+    }
+
+    let currentY = cy + 25;
+
+    // Test naval units section
+    if (navalUnits.length > 0) {
+      const result = this._hitTestSection(worldX, worldY, territory, cx, currentY, navalUnits, maxPerRow, iconSize, spacingX, spacingY, hitRadius, 'naval');
+      if (result) return result;
+      const numRows = Math.ceil(navalUnits.length / maxPerRow);
+      currentY += numRows * spacingY;
+      if (cargoUnits.length > 0 || airUnits.length > 0) currentY += sectionGap;
+    }
+
+    // Test cargo units section
+    if (cargoUnits.length > 0) {
+      const result = this._hitTestSection(worldX, worldY, territory, cx, currentY, cargoUnits, maxPerRow, iconSize, spacingX, spacingY, hitRadius, 'cargo');
+      if (result) return result;
+      const numRows = Math.ceil(cargoUnits.length / maxPerRow);
+      currentY += numRows * spacingY;
+      if (airUnits.length > 0) currentY += sectionGap;
+    }
+
+    // Test air units section
+    if (airUnits.length > 0) {
+      const result = this._hitTestSection(worldX, worldY, territory, cx, currentY, airUnits, maxPerRow, iconSize, spacingX, spacingY, hitRadius, 'air');
+      if (result) return result;
+    }
+
+    return null;
+  }
+
+  // Hit test a section of units
+  _hitTestSection(worldX, worldY, territory, cx, startY, units, maxPerRow, iconSize, spacingX, spacingY, hitRadius, sectionType) {
+    const numRows = Math.ceil(units.length / maxPerRow);
+    let unitIndex = 0;
+
+    for (let row = 0; row < numRows; row++) {
+      const unitsInRow = Math.min(maxPerRow, units.length - row * maxPerRow);
+      const rowY = startY + row * spacingY;
+      const startX = cx - ((unitsInRow - 1) * spacingX) / 2;
+
+      for (let col = 0; col < unitsInRow && unitIndex < units.length; col++) {
+        const unitInfo = units[unitIndex];
+        const x = startX + col * spacingX;
+
+        const dx = worldX - x;
+        const dy = worldY - rowY;
+        if (Math.abs(dx) <= hitRadius && Math.abs(dy) <= hitRadius) {
+          return {
+            territory: territory,
+            unitType: unitInfo.type,
+            owner: unitInfo.owner,
+            quantity: unitInfo.total,
+            isOnCarrier: unitInfo.isOnCarrier || false,
+            isOnTransport: unitInfo.isOnTransport || false,
+            isFlying: sectionType === 'air',
+            damaged: unitInfo.damaged || 0,
+            unitDef: this.unitDefs[unitInfo.type]
+          };
+        }
+        unitIndex++;
+      }
+    }
+    return null;
+  }
+
+  // Hit test for flat grid layout (land territories)
+  _hitTestUnitGrid(worldX, worldY, territory, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, hitRadius) {
+    const numRows = Math.ceil(types.length / maxPerRow);
+    const baseY = cy + 25;
+
+    let typeIndex = 0;
+    for (let row = 0; row < numRows; row++) {
+      const typesInRow = Math.min(maxPerRow, types.length - row * maxPerRow);
+      const rowY = baseY + row * spacingY;
+      const startX = cx - ((typesInRow - 1) * spacingX) / 2;
+
+      for (let col = 0; col < typesInRow && typeIndex < types.length; col++) {
+        const key = types[typeIndex];
+        const unitInfo = grouped[key];
+        const x = startX + col * spacingX;
+
+        const dx = worldX - x;
+        const dy = worldY - rowY;
+        if (Math.abs(dx) <= hitRadius && Math.abs(dy) <= hitRadius) {
+          return {
+            territory: territory,
+            unitType: unitInfo.type,
+            owner: unitInfo.owner,
+            quantity: unitInfo.total,
+            isOnCarrier: unitInfo.isOnCarrier || false,
+            isOnTransport: unitInfo.isOnTransport || false,
+            damaged: unitInfo.damaged || 0,
+            unitDef: this.unitDefs[unitInfo.type]
+          };
+        }
+        typeIndex++;
+      }
+    }
     return null;
   }
 }

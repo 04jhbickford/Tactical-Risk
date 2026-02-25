@@ -132,6 +132,7 @@ export class UnitTooltip {
     if (def.aircraftCapacity) specials.push(`Aircraft: ${def.aircraftCapacity}`);
     if (unitInfo.isOnCarrier) specials.push('On Carrier');
     if (unitInfo.isOnTransport) specials.push('On Transport');
+    if (unitInfo.isFlying) specials.push('✈ In Flight');
     if (unitInfo.damaged > 0) specials.push('⚠ Damaged');
     // Heavy bombers tech indicator
     if (this.gameState && unitInfo.owner && unitType === 'bomber' && this.gameState.hasTech(unitInfo.owner, 'heavyBombers')) {
