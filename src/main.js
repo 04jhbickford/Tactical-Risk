@@ -623,21 +623,39 @@ async function init() {
     // Create sync manager
     syncManager = createSyncManager(gameId, gameState);
 
-    // Check if we need to initialize the game (host) or wait for state (client)
     const user = authManager.getUser();
-    const isHost = lobbyData?.hostId === user?.id;
 
     // Get players and settings - handle both lobby document and game document structures
-    // Lobby document: { players: [...], settings: {...} }
-    // Game document: { lobbyData: { players: [...], settings: {...} } }
+    // Lobby document: { hostId, players: [...], settings: {...} }
+    // Game document: { lobbyData: { players: [...], settings: {...} }, stateVersion, state }
     const playersData = lobbyData?.lobbyData?.players || lobbyData?.players;
     const settingsData = lobbyData?.lobbyData?.settings || lobbyData?.settings;
+
+    // Determine if we're the host:
+    // - For lobby: check lobbyData.hostId
+    // - For game: check if any player has isHost: true and matches our userId
+    let isHost = lobbyData?.hostId === user?.id;
+    if (!isHost && playersData) {
+      const hostPlayer = playersData.find(p => p.isHost);
+      isHost = hostPlayer?.oderId === user?.id;
+    }
+
+    // Check if game already has state (rejoining an active game)
+    const hasExistingState = lobbyData?.stateVersion > 0 && lobbyData?.state;
 
     // Set host flag on syncManager
     syncManager.setIsHost(isHost);
 
-    if (isHost && playersData) {
-      // Host initializes the game
+    if (hasExistingState) {
+      // Rejoining a game that already has state - just load it
+      const stateLoaded = await syncManager.startSync();
+      if (!stateLoaded) {
+        console.error('Failed to load game state');
+        alert('Failed to rejoin game. Please try again.');
+        return;
+      }
+    } else if (isHost && playersData) {
+      // Host initializes the game (first time)
       const players = playersData.map(p => {
         const factionDef = setup.risk.factions.find(f => f.id === p.factionId);
         return {
@@ -667,7 +685,7 @@ async function init() {
       // Start listening for updates
       await syncManager.startSync();
     } else {
-      // Non-host client: wait for state to be available
+      // Non-host client: wait for state to be available (host hasn't initialized yet)
       const stateLoaded = await syncManager.startSyncAndWaitForState();
       if (!stateLoaded) {
         console.error('Failed to load game state');

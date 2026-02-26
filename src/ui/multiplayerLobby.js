@@ -478,33 +478,50 @@ export class MultiplayerLobby {
         </div>
 
         <div class="mp-lobby-actions">
-          ${isHost && lobby.isPublished
+          ${lobby.isPublished
             ? `<button class="mp-action-btn secondary" data-action="back-to-browse">← Back</button>`
             : ''
           }
           <button class="mp-action-btn ${isHost && lobby.isPublished ? 'danger-outline' : 'secondary'}" data-action="leave">
             ${isHost && lobby.isPublished ? 'Delete Lobby' : 'Leave Lobby'}
           </button>
-          ${isHost ? (
-            lobby.isPublished
-              ? `<button class="mp-action-btn start" data-action="start"
-                        ${!currentPlayer?.factionId || !currentPlayer?.color || lobby.players.length < 2 ? 'disabled' : ''}>
-                  Start Game
-                </button>`
-              : `<button class="mp-action-btn primary" data-action="publish"
+          ${(() => {
+            const isFull = lobby.players.length >= lobby.settings.maxPlayers;
+            const allHaveFactions = lobby.players.every(p => p.factionId);
+            const canStart = lobby.players.length >= 2 && allHaveFactions && (isHost || isFull);
+
+            if (isHost && !lobby.isPublished) {
+              // Host hasn't published yet - show Create Game
+              return `<button class="mp-action-btn primary" data-action="publish"
                         ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
                   Create Game
-                </button>`
-          ) : `
-            <button class="mp-action-btn ${currentPlayer?.isReady ? 'ready' : 'primary'}" data-action="ready"
-                    ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
-              ${currentPlayer?.isReady ? 'Cancel Ready' : 'Ready Up'}
-            </button>
-            <div class="mp-waiting-indicator">
-              <div class="waiting-dot"></div>
-              <span>Waiting for host to start...</span>
-            </div>
-          `}
+                </button>`;
+            } else if (canStart) {
+              // Can start (host always, or anyone when full)
+              return `<button class="mp-action-btn start" data-action="start"
+                        ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
+                  Start Game
+                </button>`;
+            } else if (!isHost) {
+              // Non-host waiting for more players
+              return `
+                <button class="mp-action-btn ${currentPlayer?.isReady ? 'ready' : 'primary'}" data-action="ready"
+                        ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
+                  ${currentPlayer?.isReady ? 'Cancel Ready' : 'Ready Up'}
+                </button>
+                <div class="mp-waiting-indicator">
+                  <div class="waiting-dot"></div>
+                  <span>Waiting for more players...</span>
+                </div>
+              `;
+            } else {
+              // Host with published lobby, not full
+              return `<button class="mp-action-btn start" data-action="start"
+                        ${!currentPlayer?.factionId || !currentPlayer?.color || lobby.players.length < 2 ? 'disabled' : ''}>
+                  Start Game
+                </button>`;
+            }
+          })()}
         </div>
       </div>
     `;

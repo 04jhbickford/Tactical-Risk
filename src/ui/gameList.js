@@ -65,11 +65,12 @@ export class GameList {
     }
 
     try {
-      // Query games where user is a player and game is active
+      // Query games where user is a player
+      // Include both 'active' and 'starting' (in case host hasn't initialized yet)
       const q = query(
         collection(this.db, 'games'),
         where('playerUserIds', 'array-contains', userId),
-        where('status', '==', 'active')
+        where('status', 'in', ['active', 'starting'])
       );
 
       const snapshot = await getDocs(q);
@@ -155,8 +156,11 @@ export class GameList {
       lastUpdated = this._formatTimeAgo(date);
     }
 
-    // Check if it's user's turn
-    const isMyTurn = game.currentPlayerId === user?.id;
+    // Check game status
+    const isStarting = game.status === 'starting';
+
+    // Check if it's user's turn (only relevant for active games)
+    const isMyTurn = !isStarting && game.currentPlayerId === user?.id;
 
     // Get current player name
     const currentPlayer = players.find(p => p.oderId === game.currentPlayerId);
@@ -168,20 +172,27 @@ export class GameList {
     // Player names list
     const playerNames = players.map(p => p.displayName).join(', ');
 
+    // Status display
+    let statusHtml;
+    if (isStarting) {
+      statusHtml = '<span class="mp-waiting">Starting...</span>';
+    } else if (isMyTurn) {
+      statusHtml = '<span class="mp-your-turn">Your Turn!</span>';
+    } else {
+      statusHtml = `<span class="mp-waiting">Waiting: ${currentPlayerName}</span>`;
+    }
+
     return `
       <div class="mp-game-row">
         <button class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
           <div class="mp-game-info">
             <span class="mp-game-name">${playerNames}</span>
             <span class="mp-game-details">
-              Round ${round} · ${players.length} players · ${lastUpdated}
+              ${isStarting ? 'Starting' : `Round ${round}`} · ${players.length} players · ${lastUpdated}
             </span>
           </div>
           <div class="mp-game-status">
-            ${isMyTurn
-              ? '<span class="mp-your-turn">Your Turn!</span>'
-              : `<span class="mp-waiting">Waiting: ${currentPlayerName}</span>`
-            }
+            ${statusHtml}
           </div>
         </button>
         ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}

@@ -126,6 +126,9 @@ export class LobbyManager {
   async getOpenLobbies() {
     if (!this.db) return [];
 
+    const user = this.authManager.getUser();
+    const userId = user?.id;
+
     try {
       const q = query(
         collection(this.db, 'lobbies'),
@@ -134,10 +137,15 @@ export class LobbyManager {
       const snapshot = await getDocs(q);
 
       // Filter to only public lobbies (no password), published, and not full
+      // EXCEPT: always show user's own lobbies (even if full)
       const lobbies = [];
       snapshot.forEach(doc => {
         const data = doc.data();
-        if (!data.password && data.isPublished && data.players.length < data.settings.maxPlayers) {
+        const isOwnLobby = data.players?.some(p => p.oderId === userId);
+        const isPublicAndNotFull = !data.password && data.isPublished && data.players.length < data.settings.maxPlayers;
+
+        // Show if: (public, published, not full) OR (user's own lobby that is published)
+        if (isPublicAndNotFull || (isOwnLobby && data.isPublished)) {
           lobbies.push({ id: doc.id, ...data });
         }
       });
@@ -409,14 +417,31 @@ export class LobbyManager {
     }
   }
 
-  // Check if game can be started (host can start anytime with 2+ players who have factions)
+  // Check if game can be started
+  // Host can start anytime with 2+ players who have factions
+  // Any player can start when lobby is full and all have factions
   canStart() {
     if (!this.currentLobby) return false;
     if (this.currentLobby.players.length < 2) return false;
 
-    // All players must have selected a faction (color is optional, will get default)
-    // Host doesn't need to "ready up" - they just click Start Game
-    return this.currentLobby.players.every(p => p.factionId);
+    // All players must have selected a faction
+    const allHaveFactions = this.currentLobby.players.every(p => p.factionId);
+    if (!allHaveFactions) return false;
+
+    return true;
+  }
+
+  // Check if current user can initiate start (host always, others only when full)
+  canInitiateStart() {
+    if (!this.canStart()) return false;
+
+    const user = this.authManager.getUser();
+    const isHost = this.currentLobby.hostId === user?.id;
+    const isFull = this.currentLobby.players.length >= this.currentLobby.settings.maxPlayers;
+
+    // Host can always start if canStart() is true
+    // Others can start only when lobby is full
+    return isHost || isFull;
   }
 
   // Check if lobby can be published (host has selected faction)
@@ -453,13 +478,17 @@ export class LobbyManager {
     }
   }
 
-  // Start the game (host only)
+  // Start the game (host can always start, others can start when lobby is full)
   async startGame() {
     if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
 
     const user = this.authManager.getUser();
-    if (this.currentLobby.hostId !== user.id) {
-      return { success: false, error: 'Only host can start' };
+    const isHost = this.currentLobby.hostId === user.id;
+    const isFull = this.currentLobby.players.length >= this.currentLobby.settings.maxPlayers;
+
+    // Host can always start, others only when full
+    if (!isHost && !isFull) {
+      return { success: false, error: 'Only host can start before lobby is full' };
     }
 
     // Check minimum requirements
