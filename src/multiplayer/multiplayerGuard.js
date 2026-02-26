@@ -11,32 +11,55 @@ export class MultiplayerGuard {
   wrapGameState(gameState) {
     // Methods that modify game state and should be blocked for non-active players
     const methodsToWrap = [
-      'moveUnits',
+      // Turn and phase management
       'nextPhase',
       'nextTurn',
-      'mobilizeUnit',
-      'mobilizeUnits',
+      // Capital placement (initial game setup)
+      'placeCapital',
+      'setCapital',
+      // Initial unit placement (Risk-style setup)
+      'placeInitialUnit',
+      'placeInitialUnits',
+      'finishPlacementRound',
+      'undoPlacement',
+      // Movement
+      'moveUnits',
+      // Purchases
       'purchaseUnit',
       'cancelPurchase',
       'confirmPurchases',
-      'setTerritoryOwner',
-      'addUnit',
-      'removeUnit',
-      'addIPCs',
-      'removeIPCs',
-      'setCapital',
-      'developTech',
+      'addToPendingPurchases',
+      'removeFromPendingPurchases',
+      'clearPendingPurchases',
+      // Mobilization
+      'mobilizeUnit',
+      'mobilizeUnits',
+      'undoMobilization',
+      // Combat
       'resolveCombat',
       'retreatUnits',
       'finishCombat',
       'finishAllCombats',
-      'tradeRiskCards',
+      // Territory and units
+      'setTerritoryOwner',
+      'addUnit',
+      'removeUnit',
       'placeUnit',
-      'placeInitialUnits',
+      // IPCs
+      'addIPCs',
+      'removeIPCs',
+      // Tech
+      'developTech',
+      // Risk cards
+      'tradeRiskCards',
+      'tradeSpecificCards',
+      // Rocket attacks
       'fireRocket',
+      // Placement UI methods
       'selectUnitToPlace',
       'confirmPlacement',
       'cancelPlacement',
+      // Air landings
       'applyAirLandings'
     ];
 
