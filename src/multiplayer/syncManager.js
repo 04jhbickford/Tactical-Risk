@@ -115,6 +115,83 @@ export class SyncManager {
     return true;
   }
 
+  // Start sync and wait for state to be available (for non-host clients)
+  async startSyncAndWaitForState(maxWaitMs = 10000) {
+    if (!this.db || !this.gameId) {
+      console.error('SyncManager: Missing db or gameId');
+      return false;
+    }
+
+    const gameRef = doc(this.db, 'games', this.gameId);
+    const startTime = Date.now();
+
+    // Poll for state to be available
+    while (Date.now() - startTime < maxWaitMs) {
+      const snapshot = await getDoc(gameRef);
+      if (!snapshot.exists()) {
+        console.error('SyncManager: Game not found');
+        return false;
+      }
+
+      const data = snapshot.data();
+      if (data.state && data.stateVersion > 0) {
+        // State is available, load it
+        this.localVersion = data.stateVersion;
+        this.gameState.loadFromJSON(data.state);
+        this._updateActivePlayer(data.currentPlayerId);
+
+        // Now subscribe to real-time updates
+        this.unsubscribe = onSnapshot(gameRef, (snapshot) => {
+          if (!snapshot.exists()) {
+            this._notifyListeners('game_deleted', null);
+            return;
+          }
+
+          const newData = snapshot.data();
+
+          // Skip if this is our own update
+          if (this.isPushing) return;
+
+          // Only update if version is newer
+          if (newData.stateVersion > this.localVersion) {
+            this.localVersion = newData.stateVersion;
+
+            // Load new state
+            if (newData.state) {
+              this.gameState.loadFromJSON(newData.state);
+            }
+
+            // Update active player status
+            this._updateActivePlayer(newData.currentPlayerId);
+
+            this._notifyListeners('state_updated', {
+              version: this.localVersion,
+              currentPlayerId: newData.currentPlayerId
+            });
+          } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
+            // Turn changed
+            this._updateActivePlayer(newData.currentPlayerId);
+            this._notifyListeners('turn_changed', {
+              currentPlayerId: newData.currentPlayerId,
+              isActivePlayer: this.isActivePlayer
+            });
+          }
+        }, (error) => {
+          console.error('SyncManager: Subscription error', error);
+          this._notifyListeners('error', error);
+        });
+
+        return true;
+      }
+
+      // Wait a bit before polling again
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    console.error('SyncManager: Timeout waiting for game state');
+    return false;
+  }
+
   // Stop listening
   stopSync() {
     if (this.unsubscribe) {

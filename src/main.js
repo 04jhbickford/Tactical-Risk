@@ -623,10 +623,6 @@ async function init() {
     // Create sync manager
     syncManager = createSyncManager(gameId, gameState);
 
-    // Create multiplayer guard
-    multiplayerGuard = createMultiplayerGuard(syncManager);
-    multiplayerGuard.wrapGameState(gameState);
-
     // Check if we need to initialize the game (host) or wait for state (client)
     const user = authManager.getUser();
     const isHost = lobbyData?.hostId === user?.id;
@@ -641,7 +637,8 @@ async function init() {
           name: p.displayName,
           color: p.color || factionDef?.color,
           lightColor: p.color || factionDef?.lightColor,
-          isAI: false,
+          isAI: p.isAI || false,
+          aiDifficulty: p.aiDifficulty || null,
           oderId: p.oderId // Link to Firebase user ID
         };
       });
@@ -657,10 +654,22 @@ async function init() {
 
       // Push initial state to Firestore
       await syncManager.forcePush(true);
+
+      // Start listening for updates
+      await syncManager.startSync();
+    } else {
+      // Non-host client: wait for state to be available
+      const stateLoaded = await syncManager.startSyncAndWaitForState();
+      if (!stateLoaded) {
+        console.error('Failed to load game state');
+        alert('Failed to join game. Please try again.');
+        return;
+      }
     }
 
-    // Start listening for updates
-    await syncManager.startSync();
+    // Create multiplayer guard after state is ready
+    multiplayerGuard = createMultiplayerGuard(syncManager);
+    multiplayerGuard.wrapGameState(gameState);
 
     // Set up sync manager reference in gameState
     gameState.syncManager = syncManager;
@@ -694,8 +703,14 @@ async function init() {
 
   // Function to wire up all game components (shared between local and multiplayer)
   const wireUpGameComponents = () => {
-    // Initialize AI controller (only for local games)
-    if (!gameState.isMultiplayer) {
+    // Check if there are AI players
+    const hasAIPlayers = gameState.players?.some(p => p.isAI);
+
+    // Initialize AI controller for local games OR multiplayer games with AI (host only runs AI)
+    // In multiplayer, only the host should run AI actions to avoid conflicts
+    const shouldInitAI = !gameState.isMultiplayer || (hasAIPlayers && syncManager?.checkIsActivePlayer());
+
+    if (shouldInitAI || hasAIPlayers) {
       aiController = new AIController();
       aiController.setUnitDefs(unitDefs);
       aiController.setActionLog(actionLog);
