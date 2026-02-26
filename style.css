@@ -1379,30 +1379,17 @@ html, body {
   background: linear-gradient(135deg, #0a0f1a 0%, #0d1526 50%, #0a1020 100%);
 }
 
-/* Hero image on the left */
+/* Hero image on the left - clean display without overlay */
 .lobby-overlay.modern::before {
   content: '';
   flex: 1;
   min-width: 50%;
   background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center top / cover no-repeat;
-  position: relative;
 }
 
-/* Gradient fade from hero to content - smooth transition */
+/* No gradient overlay - clean image */
 .lobby-overlay.modern::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 52%;
-  height: 100%;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    transparent 50%,
-    rgba(10, 15, 26, 0.3) 70%,
-    rgba(10, 15, 26, 0.6) 85%,
-    rgba(10, 15, 26, 0.95) 100%);
-  pointer-events: none;
+  display: none;
 }
 
 .lobby-container.modern {

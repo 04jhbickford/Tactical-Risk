@@ -193,7 +193,13 @@ export class PlayerPanel {
 
     // Check if it's the local player's turn in multiplayer
     const isMultiplayer = this.gameState.isMultiplayer;
-    const isLocalPlayerTurn = !isMultiplayer || (this.syncManager?.checkIsActivePlayer());
+    const localUserId = this.syncManager?.userId;
+    const currentPlayerOderId = player?.oderId;
+
+    // It's our turn if: not multiplayer, OR syncManager says so, OR current player is us
+    const isLocalPlayerTurn = !isMultiplayer ||
+      this.syncManager?.checkIsActivePlayer() ||
+      (localUserId && currentPlayerOderId === localUserId);
 
     let html = '';
 
@@ -203,8 +209,11 @@ export class PlayerPanel {
     // Phase indicator
     html += this._renderPhaseIndicator(phase, turnPhase);
 
-    // Multiplayer waiting indicator
-    if (isMultiplayer && !isLocalPlayerTurn) {
+    // Multiplayer waiting indicator - only show when waiting for ANOTHER player
+    // Never show "Waiting for X" when X is the local player
+    const isWaitingForOther = isMultiplayer && !isLocalPlayerTurn &&
+      (!localUserId || currentPlayerOderId !== localUserId);
+    if (isWaitingForOther) {
       html += this._renderWaitingIndicator(player);
     }
 
