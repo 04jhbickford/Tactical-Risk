@@ -696,6 +696,14 @@ async function init() {
 
       gameState.initGame('risk', players, options);
 
+      // Log player mapping for debugging
+      console.log('[MP] Player mapping:');
+      players.forEach((p, i) => {
+        console.log(`  [${i}] ${p.name} (oderId: ${p.oderId}, isAI: ${p.isAI})`);
+      });
+      console.log(`[MP] First player (index 0): ${gameState.currentPlayer?.name} (oderId: ${gameState.currentPlayer?.oderId})`);
+      console.log(`[MP] My userId: ${user?.id}`);
+
       // Push initial state to Firestore
       console.log('[MP] Initializing game and pushing state...');
       const pushSuccess = await syncManager.forcePush(true);
@@ -707,7 +715,7 @@ async function init() {
 
       // Start listening for updates
       await syncManager.startSync();
-      console.log('[MP] Game initialized successfully');
+      console.log('[MP] Game initialized successfully. isActivePlayer:', syncManager.checkIsActivePlayer());
     } else if (!playersData) {
       // No player data available
       console.error('[MP] No player data available');
@@ -716,6 +724,7 @@ async function init() {
     } else {
       // Waiting for another client to initialize
       console.log('[MP] Waiting for game state from initializer...');
+      console.log(`[MP] My userId: ${user?.id}`);
       const stateLoaded = await syncManager.startSyncAndWaitForState();
       if (!stateLoaded) {
         console.error('[MP] Timeout waiting for game state');

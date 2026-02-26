@@ -86,11 +86,20 @@ export class SyncManager {
 
       const newData = snapshot.data();
 
-      // Skip if this is our own update
-      if (this.isPushing) return;
+      console.log(`[Sync] onSnapshot (init): version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
+
+      // Skip if this is our own update (but still check turn changes)
+      if (this.isPushing) {
+        // Even when pushing, update active player if it changed
+        if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
+          this._updateActivePlayer(newData.currentPlayerId);
+        }
+        return;
+      }
 
       // Only update if version is newer
       if (newData.stateVersion > this.localVersion) {
+        console.log(`[Sync] Loading newer state (init): ${this.localVersion} -> ${newData.stateVersion}`);
         this.localVersion = newData.stateVersion;
 
         // Load new state
@@ -106,7 +115,8 @@ export class SyncManager {
           currentPlayerId: newData.currentPlayerId
         });
       } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-        // Turn changed
+        // Turn changed without version bump (shouldn't happen, but handle it)
+        console.log(`[Sync] Turn changed without version bump (init): ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
         this._updateActivePlayer(newData.currentPlayerId);
         this._notifyListeners('turn_changed', {
           currentPlayerId: newData.currentPlayerId,
@@ -142,9 +152,17 @@ export class SyncManager {
       const data = snapshot.data();
       if (data.state && data.stateVersion > 0) {
         // State is available, load it
+        console.log('[Sync] State received from Firebase:');
+        console.log(`  stateVersion: ${data.stateVersion}`);
+        console.log(`  currentPlayerId: ${data.currentPlayerId}`);
+        console.log(`  currentPlayerIndex in state: ${data.state.currentPlayerIndex}`);
+        console.log(`  players in state:`, data.state.players?.map((p, i) => `[${i}] ${p.name} (oderId: ${p.oderId})`));
+
         this.localVersion = data.stateVersion;
         this.gameState.loadFromJSON(data.state);
         this._updateActivePlayer(data.currentPlayerId);
+
+        console.log(`[Sync] After load - currentPlayer: ${this.gameState.currentPlayer?.name} (oderId: ${this.gameState.currentPlayer?.oderId})`);
 
         // Now subscribe to real-time updates
         this.unsubscribe = onSnapshot(gameRef, (snapshot) => {
@@ -155,11 +173,20 @@ export class SyncManager {
 
           const newData = snapshot.data();
 
-          // Skip if this is our own update
-          if (this.isPushing) return;
+          console.log(`[Sync] onSnapshot: version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
+
+          // Skip if this is our own update (but still check turn changes)
+          if (this.isPushing) {
+            // Even when pushing, update active player if it changed
+            if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
+              this._updateActivePlayer(newData.currentPlayerId);
+            }
+            return;
+          }
 
           // Only update if version is newer
           if (newData.stateVersion > this.localVersion) {
+            console.log(`[Sync] Loading newer state: ${this.localVersion} -> ${newData.stateVersion}`);
             this.localVersion = newData.stateVersion;
 
             // Load new state
@@ -175,7 +202,8 @@ export class SyncManager {
               currentPlayerId: newData.currentPlayerId
             });
           } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-            // Turn changed
+            // Turn changed without version bump (shouldn't happen, but handle it)
+            console.log(`[Sync] Turn changed without version bump: ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
             this._updateActivePlayer(newData.currentPlayerId);
             this._notifyListeners('turn_changed', {
               currentPlayerId: newData.currentPlayerId,
