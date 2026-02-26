@@ -1379,18 +1379,38 @@ html, body {
   background: linear-gradient(135deg, #0a0f1a 0%, #0d1526 50%, #0a1020 100%);
 }
 
+/* Hero image on the left */
 .lobby-overlay.modern::before {
-  display: none;
+  content: '';
+  flex: 1;
+  min-width: 50%;
+  background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center top / cover no-repeat;
+  position: relative;
+}
+
+/* Gradient fade from hero to content */
+.lobby-overlay.modern::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 60%, rgba(10, 15, 26, 0.7) 85%, #0a0f1a 100%);
+  pointer-events: none;
 }
 
 .lobby-container.modern {
-  width: 100%;
+  width: 50%;
+  min-width: 420px;
+  max-width: 600px;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
+  background: linear-gradient(135deg, rgba(10, 15, 26, 0.95) 0%, rgba(13, 21, 38, 0.98) 100%);
 }
 
 .lobby-bg-pattern {
@@ -1407,8 +1427,10 @@ html, body {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 800px;
-  padding: 40px;
+  max-width: 580px;
+  padding: 40px 30px;
+  overflow-y: auto;
+  max-height: 100vh;
 }
 
 /* Main Menu */
@@ -1425,7 +1447,7 @@ html, body {
 }
 
 .lobby-logo {
-  font-size: 56px;
+  font-size: 42px;
   font-weight: 800;
   letter-spacing: -1px;
   margin: 0;
@@ -1437,43 +1459,42 @@ html, body {
 }
 
 .lobby-tagline {
-  font-size: 16px;
+  font-size: 13px;
   color: #64748b;
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   letter-spacing: 2px;
   text-transform: uppercase;
 }
 
 .lobby-version-badge {
   display: inline-block;
-  margin-top: 12px;
-  padding: 4px 12px;
+  margin-top: 10px;
+  padding: 3px 10px;
   background: rgba(59, 130, 246, 0.15);
   border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 10px;
   color: #60a5fa;
   letter-spacing: 1px;
 }
 
 /* Menu Grid */
 .lobby-menu-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   width: 100%;
-  max-width: 600px;
 }
 
 .lobby-menu-card {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  align-items: center;
   gap: 16px;
-  padding: 28px;
+  padding: 20px 24px;
   background: linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
   border: 1px solid rgba(148, 163, 184, 0.1);
-  border-radius: 16px;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -1491,9 +1512,9 @@ html, body {
 }
 
 .lobby-menu-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
   border-color: rgba(59, 130, 246, 0.3);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3), 0 0 60px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25), 0 0 30px rgba(59, 130, 246, 0.1);
 }
 
 .lobby-menu-card:hover::before {
@@ -1514,16 +1535,17 @@ html, body {
 }
 
 .menu-card-icon {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(59, 130, 246, 0.15);
-  border-radius: 12px;
+  border-radius: 10px;
   color: #60a5fa;
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
 }
 
 .lobby-menu-card.online .menu-card-icon {
@@ -1532,27 +1554,28 @@ html, body {
 }
 
 .menu-card-icon svg {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .menu-card-content {
   position: relative;
   z-index: 1;
+  flex: 1;
 }
 
 .menu-card-content h3 {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
   color: #f1f5f9;
-  margin: 0 0 6px;
+  margin: 0 0 3px;
 }
 
 .menu-card-content p {
-  font-size: 14px;
+  font-size: 13px;
   color: #94a3b8;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .menu-card-badge {
@@ -1677,17 +1700,17 @@ html, body {
 /* Modern Player Grid */
 .player-grid.modern {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
 }
 
 .player-card.modern {
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 12px 10px;
   background: linear-gradient(145deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.7) 100%);
   border: 2px solid rgba(148, 163, 184, 0.08);
-  border-radius: 14px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.25s ease;
   position: relative;
@@ -1709,14 +1732,14 @@ html, body {
   display: flex;
   justify-content: center;
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .player-avatar {
-  width: 52px;
-  height: 52px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  border: 3px solid;
+  border: 2px solid;
   overflow: hidden;
   display: flex;
   align-items: center;

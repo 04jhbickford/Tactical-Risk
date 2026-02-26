@@ -627,9 +627,15 @@ async function init() {
     const user = authManager.getUser();
     const isHost = lobbyData?.hostId === user?.id;
 
-    if (isHost && lobbyData?.lobbyData) {
+    // Get players and settings - handle both lobby document and game document structures
+    // Lobby document: { players: [...], settings: {...} }
+    // Game document: { lobbyData: { players: [...], settings: {...} } }
+    const playersData = lobbyData?.lobbyData?.players || lobbyData?.players;
+    const settingsData = lobbyData?.lobbyData?.settings || lobbyData?.settings;
+
+    if (isHost && playersData) {
       // Host initializes the game
-      const players = lobbyData.lobbyData.players.map(p => {
+      const players = playersData.map(p => {
         const factionDef = setup.risk.factions.find(f => f.id === p.factionId);
         return {
           ...factionDef,
@@ -645,8 +651,8 @@ async function init() {
 
       const options = {
         alliancesEnabled: false,
-        teamsEnabled: lobbyData.lobbyData.settings?.teamsEnabled || false,
-        startingIPCs: lobbyData.lobbyData.settings?.startingIPCs || 80,
+        teamsEnabled: settingsData?.teamsEnabled || false,
+        startingIPCs: settingsData?.startingIPCs || 80,
         isMultiplayer: true
       };
 
