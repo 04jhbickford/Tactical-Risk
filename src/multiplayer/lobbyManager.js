@@ -122,6 +122,18 @@ export class LobbyManager {
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
   }
 
+  // Find game by lobby code (for rejoining started games)
+  async findGameByCode(code) {
+    const q = query(
+      collection(this.db, 'games'),
+      where('lobbyCode', '==', code.toUpperCase()),
+      where('status', 'in', ['starting', 'active'])
+    );
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return null;
+    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+  }
+
   // Get all open public lobbies (no password, waiting status)
   async getOpenLobbies() {
     if (!this.db) return [];
@@ -157,15 +169,30 @@ export class LobbyManager {
     }
   }
 
-  // Join a lobby by code
+  // Join a lobby by code (or rejoin a started game by code)
   async joinLobby(code, password = null) {
     if (!this.db) return { success: false, error: 'Not connected' };
 
     const user = this.authManager.getUser();
     if (!user) return { success: false, error: 'Not logged in' };
 
-    const lobby = await this._findLobbyByCode(code);
-    if (!lobby) return { success: false, error: 'Lobby not found' };
+    // First try to find a waiting lobby
+    let lobby = await this._findLobbyByCode(code);
+
+    // If no lobby found, check if there's a started game with this code
+    if (!lobby) {
+      const game = await this.findGameByCode(code);
+      if (game) {
+        // Check if user is a player in this game
+        if (game.playerUserIds?.includes(user.id)) {
+          // Return game info for rejoining
+          return { success: true, isGame: true, gameId: game.id, game };
+        } else {
+          return { success: false, error: 'Game already started' };
+        }
+      }
+      return { success: false, error: 'Lobby not found' };
+    }
 
     // Check password
     if (lobby.password && lobby.password !== password) {
@@ -506,16 +533,19 @@ export class LobbyManager {
     const playerUserIds = this.currentLobby.players.map(p => p.oderId);
 
     try {
-      // Create game document (initial state will be set by the first client)
+      // Create game document
+      // The person who clicks Start becomes the initializer (startedBy)
       await setDoc(doc(this.db, 'games', gameId), {
         lobbyId: this.currentLobby.id,
+        lobbyCode: this.currentLobby.code, // Store code for rejoining
         status: 'starting',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         currentPlayerId: null, // Will be set when game initializes
         stateVersion: 0,
         playerUserIds,
-        state: null, // Will be populated by host
+        startedBy: user.id, // Track who started the game (they will initialize)
+        state: null, // Will be populated by starter
         lobbyData: {
           players: this.currentLobby.players,
           settings: this.currentLobby.settings

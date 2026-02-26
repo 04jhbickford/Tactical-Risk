@@ -331,6 +331,12 @@ export class MultiplayerLobby {
             const result = await this.lobbyManager.joinLobby(code, null);
             if (!result.success) {
               alert(result.error);
+            } else if (result.isGame) {
+              // Code matched a started game - rejoin it directly
+              this.hide();
+              if (this.onStart) {
+                this.onStart(result.gameId, result.game);
+              }
             }
           });
         });
@@ -800,8 +806,14 @@ export class MultiplayerLobby {
         errorEl.textContent = result.error;
         errorEl.classList.remove('hidden');
       }
+    } else if (result.isGame) {
+      // Code matched a started game - rejoin it directly
+      this.hide();
+      if (this.onStart) {
+        this.onStart(result.gameId, result.game);
+      }
     }
-    // Lobby subscription will update mode to 'lobby'
+    // For lobbies, subscription will update mode to 'lobby'
   }
 
   async _loadAvailableGames() {
@@ -844,6 +856,12 @@ export class MultiplayerLobby {
             const result = await this.lobbyManager.joinLobby(code, null);
             if (!result.success) {
               alert(result.error);
+            } else if (result.isGame) {
+              // Code matched a started game - rejoin it directly
+              this.hide();
+              if (this.onStart) {
+                this.onStart(result.gameId, result.game);
+              }
             }
           });
         });

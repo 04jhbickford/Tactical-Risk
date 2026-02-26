@@ -627,11 +627,11 @@ async function init() {
 
     // Get players and settings - handle both lobby document and game document structures
     // Lobby document: { hostId, players: [...], settings: {...} }
-    // Game document: { lobbyData: { players: [...], settings: {...} }, stateVersion, state }
+    // Game document: { lobbyData: { players: [...], settings: {...} }, stateVersion, state, startedBy }
     const playersData = lobbyData?.lobbyData?.players || lobbyData?.players;
     const settingsData = lobbyData?.lobbyData?.settings || lobbyData?.settings;
 
-    // Determine if we're the host:
+    // Determine if we're the host (for AI control purposes):
     // - For lobby: check lobbyData.hostId
     // - For game: check if any player has isHost: true and matches our userId
     let isHost = lobbyData?.hostId === user?.id;
@@ -640,10 +640,17 @@ async function init() {
       isHost = hostPlayer?.oderId === user?.id;
     }
 
+    // Determine if we should initialize the game:
+    // - If startedBy exists (game doc), check if we're the starter
+    // - Otherwise fall back to isHost check (lobby doc)
+    const shouldInitialize = lobbyData?.startedBy
+      ? lobbyData.startedBy === user?.id
+      : isHost;
+
     // Check if game already has state (rejoining an active game)
     const hasExistingState = lobbyData?.stateVersion > 0 && lobbyData?.state;
 
-    // Set host flag on syncManager
+    // Set host flag on syncManager (for AI control - original host controls AI)
     syncManager.setIsHost(isHost);
 
     if (hasExistingState) {
@@ -654,8 +661,8 @@ async function init() {
         alert('Failed to rejoin game. Please try again.');
         return;
       }
-    } else if (isHost && playersData) {
-      // Host initializes the game (first time)
+    } else if (shouldInitialize && playersData) {
+      // Initialize the game (person who clicked Start)
       const players = playersData.map(p => {
         const factionDef = setup.risk.factions.find(f => f.id === p.factionId);
         return {
