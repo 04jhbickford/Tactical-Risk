@@ -622,12 +622,25 @@ export class PlayerPanel {
 
     html += `</div>`;
 
-    // Current player detailed breakdown
-    const currentStats = playerStats.find(s => s.player.id === currentPlayer.id);
-    if (currentStats) {
+    // In multiplayer, find the LOCAL player's stats (not the current turn player)
+    // In single player, show current turn player's stats
+    const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
+    let localPlayerStats = null;
+
+    if (isMultiplayer) {
+      // Find player whose oderId matches the local user
+      localPlayerStats = playerStats.find(s => s.player.oderId === this.localUserId);
+    } else {
+      // Single player mode - show current turn player
+      localPlayerStats = playerStats.find(s => s.player.id === currentPlayer.id);
+    }
+
+    if (localPlayerStats) {
+      const localPlayer = localPlayerStats.player;
+
       html += `
         <div class="pp-stat-section pp-current-detail">
-          <div class="pp-stat-header">Your Forces</div>
+          <div class="pp-stat-header">Your Forces${isMultiplayer ? ` (${localPlayer.name})` : ''}</div>
           <div class="pp-unit-breakdown">`;
 
       const unitCategories = {
@@ -637,27 +650,27 @@ export class PlayerPanel {
       };
 
       for (const [category, types] of Object.entries(unitCategories)) {
-        const categoryUnits = types.filter(t => currentStats.units[t] > 0);
+        const categoryUnits = types.filter(t => localPlayerStats.units[t] > 0);
         if (categoryUnits.length > 0) {
           html += `<div class="pp-unit-category">
             <span class="pp-unit-cat-label">${category}:</span>
-            ${categoryUnits.map(t => `<span class="pp-unit-count">${currentStats.units[t]} ${t}</span>`).join(', ')}
+            ${categoryUnits.map(t => `<span class="pp-unit-count">${localPlayerStats.units[t]} ${t}</span>`).join(', ')}
           </div>`;
         }
       }
 
       html += `</div></div>`;
 
-      // Risk Cards for current player
-      if (currentStats.cards.length > 0) {
+      // Risk Cards for LOCAL player only
+      if (localPlayerStats.cards.length > 0) {
         const cardCounts = { infantry: 0, cavalry: 0, artillery: 0, wild: 0 };
-        for (const card of currentStats.cards) {
+        for (const card of localPlayerStats.cards) {
           cardCounts[card] = (cardCounts[card] || 0) + 1;
         }
 
         html += `
           <div class="pp-stat-section">
-            <div class="pp-stat-header">🃏 Your Risk Cards (${currentStats.cards.length})</div>
+            <div class="pp-stat-header">🃏 Your Risk Cards (${localPlayerStats.cards.length})</div>
             <div class="pp-card-list">`;
 
         const cardTypes = ['infantry', 'cavalry', 'artillery', 'wild'];
@@ -670,8 +683,8 @@ export class PlayerPanel {
         html += `</div></div>`;
       }
 
-      // Technologies for current player
-      const techs = this.gameState.playerTechs?.[currentPlayer.id]?.unlockedTechs || [];
+      // Technologies for LOCAL player only
+      const techs = this.gameState.playerTechs?.[localPlayer.id]?.unlockedTechs || [];
       if (techs.length > 0) {
         html += `
           <div class="pp-stat-section">

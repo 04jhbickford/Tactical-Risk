@@ -2440,6 +2440,32 @@ html, body {
   letter-spacing: 0.5px;
 }
 
+.mp-game-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mp-game-row .mp-game-item {
+  flex: 1;
+}
+
+.mp-admin-delete {
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mp-admin-delete:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 .mp-rejoin-btn {
   display: flex;
   align-items: center;
@@ -3404,6 +3430,84 @@ html, body {
   background: linear-gradient(135deg, #66bb6a, #43a047);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+/* --- HUD Hamburger Menu --- */
+.hud-menu-container {
+  position: relative;
+}
+
+.hud-menu-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hud-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.hud-menu-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.hud-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: rgba(30, 30, 50, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+  z-index: 100;
+}
+
+.hud-menu-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.hud-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #e0e0e0;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.hud-menu-item:first-child {
+  border-radius: 7px 7px 0 0;
+}
+
+.hud-menu-item:last-child {
+  border-radius: 0 0 7px 7px;
+}
+
+.hud-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.hud-menu-item-icon {
+  font-size: 16px;
 }
 
 /* --- Combat Indicator --- */
@@ -15378,6 +15482,82 @@ html, body {
   text-align: center;
   color: #888;
   font-style: italic;
+}
+
+/* MP Game Options (Team Mode toggle in lobby) */
+.mp-game-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.mp-toggle-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.mp-toggle-inline input {
+  display: none;
+}
+
+.mp-toggle-inline .toggle-slider {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 11px;
+  transition: background 0.2s;
+}
+
+.mp-toggle-inline .toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.mp-toggle-inline input:checked + .toggle-slider {
+  background: #4CAF50;
+}
+
+.mp-toggle-inline input:checked + .toggle-slider::after {
+  transform: translateX(18px);
+}
+
+.mp-toggle-inline .toggle-label-text {
+  color: #ccc;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Team mode badge for non-hosts */
+.mp-team-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  border-radius: 6px;
+  color: #4CAF50;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.mp-team-mode-badge::before {
+  content: '\u2714';
 }
 
 /* Game List Styles */

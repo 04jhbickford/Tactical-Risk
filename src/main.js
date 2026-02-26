@@ -763,6 +763,18 @@ async function init() {
       rulesPanel.toggle();
     });
 
+    hud.setOnExitToLobby(() => {
+      // Stop sync manager if multiplayer
+      if (syncManager) {
+        syncManager.stopSync();
+        syncManager = null;
+      }
+      // Reset game state
+      gameState = null;
+      // Show lobby
+      lobby.show();
+    });
+
     // Bug tracker
     bugTracker.setGameState(gameState);
     bugTracker.setActionLog(actionLog);

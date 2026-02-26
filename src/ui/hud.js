@@ -7,12 +7,26 @@ export class HUD {
     this.gameState = null;
     this.onNextPhase = null;
     this.onRulesToggle = null;
+    this.onExitToLobby = null;
+    this.menuOpen = false;
     this.el = document.getElementById('hud');
     this._render();
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+      if (this.menuOpen && !e.target.closest('.hud-menu-container')) {
+        this.menuOpen = false;
+        this._updateMenuState();
+      }
+    });
   }
 
   setOnRulesToggle(callback) {
     this.onRulesToggle = callback;
+  }
+
+  setOnExitToLobby(callback) {
+    this.onExitToLobby = callback;
   }
 
   setGameState(gameState) {
@@ -26,7 +40,26 @@ export class HUD {
   }
 
   _render() {
-    let html = `<span class="hud-title">Tactical Risk</span>`;
+    // Hamburger menu button
+    let html = `
+      <div class="hud-menu-container">
+        <button class="hud-menu-btn" data-action="toggle-menu" title="Menu">
+          <span class="hud-menu-icon">☰</span>
+        </button>
+        <div class="hud-menu-dropdown ${this.menuOpen ? 'open' : ''}">
+          <button class="hud-menu-item" data-action="rules">
+            <span class="hud-menu-item-icon">📖</span>
+            <span>Game Rules</span>
+          </button>
+          <button class="hud-menu-item" data-action="exit-lobby">
+            <span class="hud-menu-item-icon">🚪</span>
+            <span>Exit to Lobby</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    html += `<span class="hud-title">Tactical Risk</span>`;
 
     if (this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY) {
       const phase = this.gameState.phase;
@@ -102,23 +135,48 @@ export class HUD {
     }
     html += `</div>`;
 
-    // Rules button (top right)
-    // Note: End Phase button moved to player panel Actions tab
-    html += `<button class="hud-btn rules-btn" data-action="rules" title="Game Rules">📖 Rules</button>`;
-
     this.el.innerHTML = html;
     this._bindEvents();
   }
 
+  _updateMenuState() {
+    const dropdown = this.el.querySelector('.hud-menu-dropdown');
+    if (dropdown) {
+      dropdown.classList.toggle('open', this.menuOpen);
+    }
+  }
+
   _bindEvents() {
-    const rulesBtn = this.el.querySelector('[data-action="rules"]');
-    rulesBtn?.addEventListener('click', () => {
+    // Menu toggle button
+    const menuBtn = this.el.querySelector('[data-action="toggle-menu"]');
+    menuBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.menuOpen = !this.menuOpen;
+      this._updateMenuState();
+    });
+
+    // Rules menu item
+    const rulesItem = this.el.querySelector('.hud-menu-item[data-action="rules"]');
+    rulesItem?.addEventListener('click', () => {
+      this.menuOpen = false;
+      this._updateMenuState();
       if (this.onRulesToggle) {
         this.onRulesToggle();
       }
     });
 
-    }
+    // Exit to lobby menu item
+    const exitItem = this.el.querySelector('.hud-menu-item[data-action="exit-lobby"]');
+    exitItem?.addEventListener('click', () => {
+      this.menuOpen = false;
+      this._updateMenuState();
+      if (this.onExitToLobby) {
+        if (confirm('Exit to lobby? Your game progress will be lost.')) {
+          this.onExitToLobby();
+        }
+      }
+    });
+  }
 
   _getPhaseName(phase) {
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Place Capital';

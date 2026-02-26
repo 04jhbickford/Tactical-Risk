@@ -217,20 +217,27 @@ export class LobbyManager {
 
     // If host, delete lobby or transfer host
     if (lobby.hostId === user.id) {
-      if (lobby.players.length <= 1) {
-        // Delete empty lobby
+      // Filter out leaving player and find next human player for host
+      const remainingPlayers = lobby.players.filter(p => p.oderId !== user.id);
+      const nextHumanPlayer = remainingPlayers.find(p => !p.isAI);
+
+      if (remainingPlayers.length === 0 || !nextHumanPlayer) {
+        // No players left or only AI players remain - delete lobby
+        // AI should never be host
         try {
           await deleteDoc(doc(this.db, 'lobbies', lobbyId));
         } catch (error) {
           console.error('Error deleting lobby:', error);
         }
       } else {
-        // Transfer host to next player
-        const newPlayers = lobby.players.filter(p => p.oderId !== user.id);
-        newPlayers[0].isHost = true;
+        // Transfer host to next human player
+        const newPlayers = remainingPlayers.map(p => ({
+          ...p,
+          isHost: p.oderId === nextHumanPlayer.oderId
+        }));
         try {
           await updateDoc(doc(this.db, 'lobbies', lobbyId), {
-            hostId: newPlayers[0].oderId,
+            hostId: nextHumanPlayer.oderId,
             players: newPlayers,
             updatedAt: serverTimestamp()
           });
@@ -300,6 +307,35 @@ export class LobbyManager {
   // Select faction
   async selectFaction(factionId, color) {
     return this.updatePlayer({ factionId, color });
+  }
+
+  // Update lobby settings (host only)
+  async updateSettings(updates) {
+    if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
+
+    const user = this.authManager.getUser();
+    if (!user) return { success: false, error: 'Not logged in' };
+
+    // Only host can update settings
+    if (this.currentLobby.hostId !== user.id) {
+      return { success: false, error: 'Only host can update settings' };
+    }
+
+    const newSettings = {
+      ...this.currentLobby.settings,
+      ...updates
+    };
+
+    try {
+      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+        settings: newSettings,
+        updatedAt: serverTimestamp()
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating settings:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Add AI player (host only)
@@ -471,6 +507,45 @@ export class LobbyManager {
     if (!this.currentLobby) return null;
     const user = this.authManager.getUser();
     return this.currentLobby.players.find(p => p.oderId === user?.id);
+  }
+
+  // Admin emails that can delete any game
+  static ADMIN_EMAILS = ['bickford.james@gmail.com'];
+
+  // Check if current user is admin
+  isAdmin() {
+    const user = this.authManager.getUser();
+    return user && LobbyManager.ADMIN_EMAILS.includes(user.email);
+  }
+
+  // Admin: Delete any lobby by ID
+  async adminDeleteLobby(lobbyId) {
+    if (!this.isAdmin()) {
+      return { success: false, error: 'Not authorized' };
+    }
+
+    try {
+      await deleteDoc(doc(this.db, 'lobbies', lobbyId));
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting lobby:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Admin: Delete any game by ID
+  async adminDeleteGame(gameId) {
+    if (!this.isAdmin()) {
+      return { success: false, error: 'Not authorized' };
+    }
+
+    try {
+      await deleteDoc(doc(this.db, 'games', gameId));
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting game:', error);
+      return { success: false, error: error.message };
+    }
   }
 }
 

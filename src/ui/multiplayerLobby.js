@@ -202,18 +202,11 @@ export class MultiplayerLobby {
             </select>
           </div>
         </div>
-        <div class="mp-options-row">
-          <label class="mp-checkbox-option">
-            <input type="checkbox" id="create-private">
-            <span class="checkbox-box"></span>
-            <span>Private Game</span>
-          </label>
-          <label class="mp-checkbox-option">
-            <input type="checkbox" id="create-teams">
-            <span class="checkbox-box"></span>
-            <span>Team Mode</span>
-          </label>
-        </div>
+        <label class="mp-checkbox-option standalone">
+          <input type="checkbox" id="create-private">
+          <span class="checkbox-box"></span>
+          <span>Private Game</span>
+        </label>
         <div class="mp-password-field hidden" id="password-field">
           <label>Password</label>
           <input type="password" id="create-password" class="modern-input" placeholder="">
@@ -354,6 +347,18 @@ export class MultiplayerLobby {
               }).join('')}
             </div>
           </div>
+
+          ${isHost ? `
+            <div class="mp-game-options">
+              <label class="mp-toggle-inline">
+                <input type="checkbox" id="lobby-teams" ${lobby.settings?.teamsEnabled ? 'checked' : ''}>
+                <span class="toggle-slider small"></span>
+                <span class="toggle-label-text">Team Mode</span>
+              </label>
+            </div>
+          ` : (lobby.settings?.teamsEnabled ? `
+            <div class="mp-team-mode-badge">Team Mode Enabled</div>
+          ` : '')}
         </div>
 
         <div class="mp-lobby-actions">
@@ -501,6 +506,11 @@ export class MultiplayerLobby {
         await this.lobbyManager.removeAIPlayer(index);
       });
     });
+
+    // Team mode toggle (host only)
+    this.el.querySelector('#lobby-teams')?.addEventListener('change', async (e) => {
+      await this.lobbyManager.updateSettings({ teamsEnabled: e.target.checked });
+    });
   }
 
   _showAddAIDialog() {
@@ -582,13 +592,12 @@ export class MultiplayerLobby {
     const startingIPCs = parseInt(form.querySelector('#create-ipcs').value);
     const isPrivate = form.querySelector('#create-private').checked;
     const password = isPrivate ? form.querySelector('#create-password').value : null;
-    const teamsEnabled = form.querySelector('#create-teams').checked;
 
     const result = await this.lobbyManager.createLobby(name, {
       maxPlayers,
       startingIPCs,
       password: password || null,
-      teamsEnabled
+      teamsEnabled: false // Team mode can be enabled in the lobby
     });
 
     if (!result.success) {
@@ -621,6 +630,8 @@ export class MultiplayerLobby {
     const container = this.el.querySelector('#available-games');
     if (!container) return;
 
+    const isAdmin = this.lobbyManager.isAdmin();
+
     try {
       const lobbies = await this.lobbyManager.getOpenLobbies();
 
@@ -634,13 +645,16 @@ export class MultiplayerLobby {
           <h3 class="mp-section-title">Open Games</h3>
           <div class="mp-games-list">
             ${lobbies.map(lobby => `
-              <button class="mp-game-item" data-lobby-id="${lobby.id}" data-code="${lobby.code}">
-                <div class="mp-game-info">
-                  <span class="mp-game-name">${lobby.name}</span>
-                  <span class="mp-game-players">${lobby.players.length}/${lobby.settings.maxPlayers} players</span>
-                </div>
-                <span class="mp-game-join">Join</span>
-              </button>
+              <div class="mp-game-row">
+                <button class="mp-game-item" data-lobby-id="${lobby.id}" data-code="${lobby.code}">
+                  <div class="mp-game-info">
+                    <span class="mp-game-name">${lobby.name}</span>
+                    <span class="mp-game-players">${lobby.players.length}/${lobby.settings.maxPlayers} players</span>
+                  </div>
+                  <span class="mp-game-join">Join</span>
+                </button>
+                ${isAdmin ? `<button class="mp-admin-delete" data-delete-lobby="${lobby.id}" title="Delete (Admin)">🗑</button>` : ''}
+              </div>
             `).join('')}
           </div>
         `;
@@ -655,6 +669,24 @@ export class MultiplayerLobby {
             }
           });
         });
+
+        // Bind admin delete buttons
+        if (isAdmin) {
+          container.querySelectorAll('.mp-admin-delete').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const lobbyId = btn.dataset.deleteLobby;
+              if (confirm('Delete this lobby? This cannot be undone.')) {
+                const result = await this.lobbyManager.adminDeleteLobby(lobbyId);
+                if (result.success) {
+                  this._loadAvailableGames(); // Refresh list
+                } else {
+                  alert('Failed to delete: ' + result.error);
+                }
+              }
+            });
+          });
+        }
       }
     } catch (error) {
       console.error('Error loading available games:', error);
