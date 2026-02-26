@@ -208,8 +208,15 @@ export class SyncManager {
 
   // Update active player status
   _updateActivePlayer(currentPlayerId) {
+    const wasActive = this.isActivePlayer;
     this._lastCurrentPlayerId = currentPlayerId;
     this.isActivePlayer = currentPlayerId === this.userId;
+
+    console.log(`[Sync] Active player update: currentPlayerId=${currentPlayerId}, myUserId=${this.userId}, isActive=${this.isActivePlayer}`);
+
+    if (wasActive !== this.isActivePlayer) {
+      console.log(`[Sync] Turn changed: ${wasActive ? 'was my turn' : 'was waiting'} -> ${this.isActivePlayer ? 'now my turn' : 'now waiting'}`);
+    }
   }
 
   // Push state to Firestore (called after local state changes)

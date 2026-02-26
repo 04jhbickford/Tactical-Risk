@@ -745,13 +745,25 @@ export class PlayerPanel {
   }
 
   _renderTerritoryTab(player) {
-    const territories = this.gameState.getPlayerTerritories(player.id);
+    // In multiplayer, show LOCAL player's territories (not current turn player)
+    const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
+    let displayPlayer = player;
+
+    if (isMultiplayer) {
+      // Find local player by oderId
+      const localPlayer = this.gameState.players?.find(p => p.oderId === this.localUserId);
+      if (localPlayer) {
+        displayPlayer = localPlayer;
+      }
+    }
+
+    const territories = this.gameState.getPlayerTerritories(displayPlayer.id);
     let html = '<div class="pp-territory-tab">';
 
     // Territory count
     html += `
       <div class="pp-stat-section">
-        <div class="pp-stat-header">🏴 Territories</div>
+        <div class="pp-stat-header">🏴 ${isMultiplayer ? 'Your ' : ''}Territories</div>
         <div class="pp-territory-count">${territories.length} territories controlled</div>
       </div>`;
 

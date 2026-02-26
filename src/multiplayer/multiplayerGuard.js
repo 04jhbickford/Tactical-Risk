@@ -46,9 +46,23 @@ export class MultiplayerGuard {
 
         gameState[methodName] = (...args) => {
           // Check if multiplayer and not active player
-          if (gameState.isMultiplayer && this.syncManager && !this.syncManager.checkIsActivePlayer()) {
-            console.warn(`MultiplayerGuard: Blocked ${methodName} - not your turn`);
-            return { success: false, error: 'Not your turn' };
+          if (gameState.isMultiplayer && this.syncManager) {
+            const isActive = this.syncManager.checkIsActivePlayer();
+            const isHost = this.syncManager.isHost;
+            const currentPlayer = gameState.currentPlayer;
+            const userId = this.syncManager.userId;
+
+            console.log(`[Guard] ${methodName}: isActive=${isActive}, isHost=${isHost}, currentPlayer=${currentPlayer?.name} (oderId=${currentPlayer?.oderId}), myUserId=${userId}`);
+
+            if (!isActive && !isHost) {
+              console.warn(`[Guard] BLOCKED ${methodName} - not your turn`);
+              return { success: false, error: 'Not your turn' };
+            }
+            // Host can act for AI players
+            if (!isActive && isHost && !currentPlayer?.isAI) {
+              console.warn(`[Guard] BLOCKED ${methodName} - host but current player is not AI`);
+              return { success: false, error: 'Not your turn' };
+            }
           }
           return original(...args);
         };
