@@ -58,7 +58,10 @@ export class GameList {
     this._render();
 
     const userId = this.authManager.getUserId();
+    console.log('[GameList] Loading games for userId:', userId);
+
     if (!userId || !this.db) {
+      console.warn('[GameList] No userId or db - cannot load games');
       this.games = [];
       this.isLoading = false;
       return;
@@ -74,10 +77,16 @@ export class GameList {
       );
 
       const snapshot = await getDocs(q);
-      this.games = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      console.log(`[GameList] Found ${snapshot.docs.length} games`);
+
+      this.games = snapshot.docs.map(doc => {
+        const data = doc.data();
+        console.log(`[GameList] Game ${doc.id}: status=${data.status}, playerUserIds=`, data.playerUserIds);
+        return {
+          id: doc.id,
+          ...data
+        };
+      });
 
       // Sort by last updated
       this.games.sort((a, b) => {
@@ -86,7 +95,7 @@ export class GameList {
         return bTime - aTime;
       });
     } catch (error) {
-      console.error('Error loading games:', error);
+      console.error('[GameList] Error loading games:', error);
       this.games = [];
     }
 
@@ -104,9 +113,11 @@ export class GameList {
         <div class="mp-games-loading">Loading your games...</div>
       `;
     } else if (this.games.length === 0) {
+      const userId = this.authManager.getUserId();
       content = `
         <p class="mp-no-games">No active games found.</p>
         <p class="mp-no-games-hint">Games you create or join will appear here.</p>
+        <p class="mp-no-games-hint" style="font-size: 0.75em; color: #666;">Your ID: ${userId ? userId.slice(-8) : 'not logged in'}</p>
       `;
     } else {
       content = `
