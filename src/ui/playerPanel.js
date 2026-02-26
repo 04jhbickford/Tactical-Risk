@@ -362,20 +362,39 @@ export class PlayerPanel {
     const aiLabel = player.isAI ? `<span class="pp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : '';
     const textColor = this._getContrastColor(player.color);
 
+    // In multiplayer, show separate identity bar when it's not your turn
+    let identityBar = '';
+    if (isMultiplayer && !isLocalPlayerTurn && this.localUserId) {
+      // Find local player info
+      const localPlayer = this.gameState.players?.find(p => p.oderId === this.localUserId);
+      if (localPlayer) {
+        const localTextColor = this._getContrastColor(localPlayer.color);
+        identityBar = `
+          <div class="pp-identity-bar" style="background: ${localPlayer.color};">
+            ${localPlayer.flag ? `<img src="assets/flags/${localPlayer.flag}" class="pp-flag-small" alt="${localPlayer.name}">` : ''}
+            <span style="color: ${localTextColor};">You: <strong>${localPlayer.name}</strong></span>
+          </div>`;
+      }
+    }
+
     // Multiplayer turn indicator
     let turnIndicator = '';
+    let headerLabel = player.name;
     if (isMultiplayer) {
       if (isLocalPlayerTurn) {
         turnIndicator = `<span class="pp-turn-badge your-turn" style="color: ${textColor};">YOUR TURN</span>`;
       } else {
+        // Show "Current Turn:" label to make it clear this isn't the local player
+        headerLabel = `${player.name}'s Turn`;
         turnIndicator = `<span class="pp-turn-badge waiting">WAITING</span>`;
       }
     }
 
     return `
+      ${identityBar}
       <div class="pp-header compact ${!isLocalPlayerTurn ? 'not-your-turn' : ''}" style="background: ${player.color};">
         ${player.flag ? `<img src="assets/flags/${player.flag}" class="pp-flag" alt="${player.name}">` : ''}
-        <span class="pp-player-name" style="color: ${textColor};">${player.name}</span>
+        <span class="pp-player-name" style="color: ${textColor};">${headerLabel}</span>
         ${aiLabel}
         ${turnIndicator}
         <span class="pp-resources-inline" style="color: ${textColor};">${ipcs}$ · ${territories}T</span>
@@ -383,12 +402,16 @@ export class PlayerPanel {
   }
 
   _renderWaitingIndicator(player) {
+    // Get local player name for clarity
+    const localPlayer = this.gameState.players?.find(p => p.oderId === this.localUserId);
+    const localName = localPlayer?.name || 'your';
+
     return `
       <div class="pp-waiting-overlay">
         <div class="pp-waiting-content">
           <div class="pp-waiting-spinner"></div>
-          <p>Waiting for ${player.name}...</p>
-          <p class="pp-waiting-hint">You can view the map while waiting.</p>
+          <p>Waiting for <strong>${player.name}</strong> to finish their turn...</p>
+          <p class="pp-waiting-hint">You are playing as <strong>${localName}</strong>. You can view the map while waiting.</p>
         </div>
       </div>`;
   }

@@ -872,7 +872,26 @@ async function init() {
 
     // Set multiplayer state for player panel
     if (gameState.isMultiplayer) {
-      playerPanel.setMultiplayerState(syncManager, authManager.getUserId());
+      const localUserId = authManager.getUserId();
+      const localPlayer = gameState.players?.find(p => p.oderId === localUserId);
+      const firstPlayer = gameState.players?.[0];
+
+      console.log('[MP] Identity check:');
+      console.log(`  Local user ID: ${localUserId}`);
+      console.log(`  Local player: ${localPlayer?.name || 'NOT FOUND'} (oderId: ${localPlayer?.oderId})`);
+      console.log(`  First turn player: ${firstPlayer?.name} (oderId: ${firstPlayer?.oderId})`);
+      console.log(`  Current player: ${gameState.currentPlayer?.name} (oderId: ${gameState.currentPlayer?.oderId})`);
+      console.log(`  Is active player: ${syncManager.checkIsActivePlayer()}`);
+
+      // Log a sync event for debugging
+      playerPanel.logSyncEvent('identity_check', {
+        localUserId: localUserId?.slice(-6) || 'none',
+        localPlayer: localPlayer?.name || 'NOT_FOUND',
+        currentPlayer: gameState.currentPlayer?.name,
+        isActive: syncManager.checkIsActivePlayer()
+      });
+
+      playerPanel.setMultiplayerState(syncManager, localUserId);
     }
 
     tooltip.setGameState(gameState);
