@@ -688,7 +688,7 @@ async function init() {
       if (event === 'state_updated' || event === 'turn_changed') {
         camera.dirty = true;
         // Update player panel to reflect turn change
-        playerPanel.render();
+        playerPanel._render();
 
         if (event === 'turn_changed' && data.isActivePlayer) {
           showNotification("It's your turn!");

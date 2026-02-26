@@ -430,6 +430,28 @@ export class PlayerPanel {
   _renderActionsTab(phase, turnPhase, player) {
     let html = '<div class="pp-actions-tab">';
 
+    // In multiplayer, check if it's the local player's turn
+    const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
+    const isLocalPlayerTurn = !isMultiplayer ||
+      this.syncManager?.checkIsActivePlayer() ||
+      (player?.oderId === this.localUserId);
+
+    // If multiplayer and not our turn, show waiting message
+    if (isMultiplayer && !isLocalPlayerTurn) {
+      const flagSrc = player?.flag ? `assets/flags/${player.flag}` : null;
+      html += `
+        <div class="pp-waiting-turn">
+          <div class="pp-waiting-header">
+            ${flagSrc ? `<img src="${flagSrc}" class="pp-waiting-flag" alt="${player.name}">` : ''}
+            <span style="color: ${player.color}">${player.name}</span> is playing
+          </div>
+          <div class="pp-waiting-phase">${this._getPhaseDisplayName(phase, turnPhase)}</div>
+          <div class="pp-waiting-hint">You'll be notified when it's your turn</div>
+        </div>`;
+      html += '</div>';
+      return html;
+    }
+
     // AI status
     if (player.isAI) {
       html += `<div class="pp-ai-thinking"><span class="pp-ai-spinner"></span> AI is thinking...</div>`;
@@ -451,6 +473,24 @@ export class PlayerPanel {
 
     html += '</div>';
     return html;
+  }
+
+  _getPhaseDisplayName(phase, turnPhase) {
+    if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Placing Capital';
+    if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Initial Deployment';
+    if (phase === GAME_PHASES.PLAYING) {
+      const phaseNames = {
+        [TURN_PHASES.DEVELOP_TECH]: 'Researching Technology',
+        [TURN_PHASES.PURCHASE]: 'Purchasing Units',
+        [TURN_PHASES.COMBAT_MOVE]: 'Combat Movement',
+        [TURN_PHASES.COMBAT]: 'Resolving Combat',
+        [TURN_PHASES.NON_COMBAT_MOVE]: 'Non-Combat Movement',
+        [TURN_PHASES.MOBILIZE]: 'Mobilizing Units',
+        [TURN_PHASES.COLLECT_INCOME]: 'Collecting Income'
+      };
+      return phaseNames[turnPhase] || 'Playing';
+    }
+    return 'Playing';
   }
 
   _renderPhaseActions(phase, turnPhase, player) {

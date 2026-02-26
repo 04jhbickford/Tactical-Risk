@@ -6104,6 +6104,47 @@ html, body {
   to { transform: rotate(360deg); }
 }
 
+/* Multiplayer waiting for opponent */
+.pp-waiting-turn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  text-align: center;
+  gap: 12px;
+}
+
+.pp-waiting-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pp-waiting-flag {
+  width: 28px;
+  height: 21px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,255,255,0.2);
+  object-fit: cover;
+}
+
+.pp-waiting-phase {
+  font-size: 14px;
+  color: #888;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
+}
+
+.pp-waiting-hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 8px;
+}
+
 .pp-purchase-header {
   font-size: 12px;
   text-transform: uppercase;
