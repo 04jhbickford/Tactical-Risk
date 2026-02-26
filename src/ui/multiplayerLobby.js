@@ -282,11 +282,21 @@ export class MultiplayerLobby {
     if (!container) return;
 
     const isAdmin = this.lobbyManager.isAdmin();
+    const user = this.authManager.getUser();
 
     try {
       const lobbies = await this.lobbyManager.getOpenLobbies();
 
-      if (lobbies.length === 0) {
+      // Sort: user's own lobbies first, then by creation time
+      const sortedLobbies = [...lobbies].sort((a, b) => {
+        const aIsOwn = a.hostId === user?.id;
+        const bIsOwn = b.hostId === user?.id;
+        if (aIsOwn && !bIsOwn) return -1;
+        if (!aIsOwn && bIsOwn) return 1;
+        return 0; // Keep original order otherwise
+      });
+
+      if (sortedLobbies.length === 0) {
         container.innerHTML = `
           <p class="mp-no-games">No open games available.</p>
           <p class="mp-no-games-hint">Create a game or check back later.</p>
@@ -294,18 +304,23 @@ export class MultiplayerLobby {
       } else {
         container.innerHTML = `
           <div class="mp-games-list">
-            ${lobbies.map(lobby => `
-              <div class="mp-game-row">
-                <button class="mp-game-item" data-lobby-id="${lobby.id}" data-code="${lobby.code}">
-                  <div class="mp-game-info">
-                    <span class="mp-game-name">${lobby.name}</span>
-                    <span class="mp-game-details">${lobby.players.length}/${lobby.settings.maxPlayers} players</span>
-                  </div>
-                  <span class="mp-game-join">Join</span>
-                </button>
-                ${isAdmin ? `<button class="mp-admin-delete" data-delete-lobby="${lobby.id}" title="Delete (Admin)">🗑</button>` : ''}
-              </div>
-            `).join('')}
+            ${sortedLobbies.map(lobby => {
+              const isOwnLobby = lobby.hostId === user?.id;
+              const playersNeeded = lobby.settings.maxPlayers - lobby.players.length;
+              const waitingText = playersNeeded === 1 ? 'Waiting for 1 player' : `Waiting for ${playersNeeded} players`;
+              return `
+                <div class="mp-game-row ${isOwnLobby ? 'own-lobby' : ''}">
+                  <button class="mp-game-item" data-lobby-id="${lobby.id}" data-code="${lobby.code}">
+                    <div class="mp-game-info">
+                      <span class="mp-game-name">${lobby.name}</span>
+                      <span class="mp-game-details">${lobby.players.length}/${lobby.settings.maxPlayers} players${isOwnLobby ? ' · ' + waitingText : ''}</span>
+                    </div>
+                    <span class="mp-game-join">${isOwnLobby ? 'Enter' : 'Join'}</span>
+                  </button>
+                  ${isAdmin ? `<button class="mp-admin-delete" data-delete-lobby="${lobby.id}" title="Delete (Admin)">🗑</button>` : ''}
+                </div>
+              `;
+            }).join('')}
           </div>
         `;
 
@@ -464,12 +479,17 @@ export class MultiplayerLobby {
 
         <div class="mp-lobby-actions">
           <button class="mp-action-btn secondary" data-action="leave">Leave Lobby</button>
-          ${isHost ? `
-            <button class="mp-action-btn start" data-action="start"
-                    ${!currentPlayer?.factionId || !currentPlayer?.color || lobby.players.length < 2 ? 'disabled' : ''}>
-              Start Game
-            </button>
-          ` : `
+          ${isHost ? (
+            lobby.isPublished
+              ? `<button class="mp-action-btn start" data-action="start"
+                        ${!currentPlayer?.factionId || !currentPlayer?.color || lobby.players.length < 2 ? 'disabled' : ''}>
+                  Start Game
+                </button>`
+              : `<button class="mp-action-btn primary" data-action="publish"
+                        ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
+                  Create Game
+                </button>`
+          ) : `
             <button class="mp-action-btn ${currentPlayer?.isReady ? 'ready' : 'primary'}" data-action="ready"
                     ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
               ${currentPlayer?.isReady ? 'Cancel Ready' : 'Ready Up'}
@@ -583,6 +603,21 @@ export class MultiplayerLobby {
     this.el.querySelector('[data-action="start"]')?.addEventListener('click', async () => {
       const result = await this.lobbyManager.startGame();
       if (!result.success) {
+        alert(result.error);
+      }
+    });
+
+    // Publish lobby (make visible in Open Games, then go to browse)
+    this.el.querySelector('[data-action="publish"]')?.addEventListener('click', async () => {
+      const result = await this.lobbyManager.publishLobby();
+      if (result.success) {
+        // Disconnect from lobby updates (but stay in the lobby)
+        this.lobbyManager.disconnectFromLobby();
+        // Go to browse view to see the game in the list
+        this.mode = 'browse';
+        this._render();
+        this._loadBrowseGames();
+      } else {
         alert(result.error);
       }
     });

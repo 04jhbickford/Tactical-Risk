@@ -81,6 +81,7 @@ export class LobbyManager {
       name: name || `${user.displayName}'s Game`,
       password: settings.password || null,
       status: 'waiting', // 'waiting', 'starting', 'in_progress', 'finished'
+      isPublished: false, // Lobby not visible in Open Games until host clicks "Create Game"
       settings: {
         maxPlayers: settings.maxPlayers || 5,
         startingIPCs: settings.startingIPCs || 80,
@@ -132,11 +133,11 @@ export class LobbyManager {
       );
       const snapshot = await getDocs(q);
 
-      // Filter to only public lobbies (no password) and not full
+      // Filter to only public lobbies (no password), published, and not full
       const lobbies = [];
       snapshot.forEach(doc => {
         const data = doc.data();
-        if (!data.password && data.players.length < data.settings.maxPlayers) {
+        if (!data.password && data.isPublished && data.players.length < data.settings.maxPlayers) {
           lobbies.push({ id: doc.id, ...data });
         }
       });
@@ -418,6 +419,40 @@ export class LobbyManager {
     return this.currentLobby.players.every(p => p.factionId);
   }
 
+  // Check if lobby can be published (host has selected faction)
+  canPublish() {
+    if (!this.currentLobby) return false;
+    const hostPlayer = this.currentLobby.players.find(p => p.isHost);
+    return hostPlayer?.factionId && hostPlayer?.color;
+  }
+
+  // Publish lobby to make it visible in Open Games (host only)
+  async publishLobby() {
+    if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
+
+    const user = this.authManager.getUser();
+    if (this.currentLobby.hostId !== user.id) {
+      return { success: false, error: 'Only host can publish' };
+    }
+
+    // Check host has selected faction
+    const hostPlayer = this.currentLobby.players.find(p => p.isHost);
+    if (!hostPlayer?.factionId) {
+      return { success: false, error: 'Please select a faction first' };
+    }
+
+    try {
+      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+        isPublished: true,
+        updatedAt: serverTimestamp()
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error publishing lobby:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Start the game (host only)
   async startGame() {
     if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
@@ -499,6 +534,16 @@ export class LobbyManager {
   // Get current lobby
   getLobby() {
     return this.currentLobby;
+  }
+
+  // Disconnect from lobby updates without leaving (used when going to browse view)
+  disconnectFromLobby() {
+    if (this.lobbyUnsubscribe) {
+      this.lobbyUnsubscribe();
+      this.lobbyUnsubscribe = null;
+    }
+    this.currentLobby = null;
+    this._notifyListeners();
   }
 
   // Check if current user is host

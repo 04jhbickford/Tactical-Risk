@@ -2484,6 +2484,25 @@ html, body {
   gap: 8px;
 }
 
+.mp-game-row.own-lobby {
+  position: relative;
+}
+
+.mp-game-row.own-lobby .mp-game-item {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.mp-game-row.own-lobby .mp-game-item:hover {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+
+.mp-game-row.own-lobby .mp-game-join {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
 .mp-game-row .mp-game-item {
   flex: 1;
 }
