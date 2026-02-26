@@ -52,8 +52,8 @@ export class HUD {
             <span>Game Rules</span>
           </button>
           <button class="hud-menu-item" data-action="exit-lobby">
-            <span class="hud-menu-item-icon">🚪</span>
-            <span>Exit to Lobby</span>
+            <span class="hud-menu-item-icon">💾</span>
+            <span>Save & Exit</span>
           </button>
         </div>
       </div>
@@ -171,7 +171,12 @@ export class HUD {
       this.menuOpen = false;
       this._updateMenuState();
       if (this.onExitToLobby) {
-        if (confirm('Exit to lobby? Your game progress will be lost.')) {
+        // In multiplayer, game is auto-saved; in single player, progress is lost
+        const isMultiplayer = this.gameState?.isMultiplayer;
+        const message = isMultiplayer
+          ? 'Exit to lobby? Your game is saved and you can resume later.'
+          : 'Exit to lobby? Your game progress will be lost.';
+        if (confirm(message)) {
           this.onExitToLobby();
         }
       }

@@ -764,6 +764,9 @@ async function init() {
     });
 
     hud.setOnExitToLobby(() => {
+      // Check if this was a multiplayer game before resetting
+      const wasMultiplayer = gameState?.isMultiplayer;
+
       // Stop sync manager if multiplayer
       if (syncManager) {
         syncManager.stopSync();
@@ -771,8 +774,13 @@ async function init() {
       }
       // Reset game state
       gameState = null;
-      // Show lobby
-      lobby.show();
+
+      // Show appropriate lobby
+      if (wasMultiplayer && multiplayerLobby) {
+        multiplayerLobby.show();
+      } else {
+        lobby.show();
+      }
     });
 
     // Bug tracker
