@@ -104,6 +104,8 @@ export class MultiplayerLobby {
       content = this._renderCreate(user);
     } else if (this.mode === 'join') {
       content = this._renderJoin(user);
+    } else if (this.mode === 'browse') {
+      content = this._renderBrowse(user);
     } else if (this.mode === 'lobby') {
       content = this._renderLobby(user);
     }
@@ -131,36 +133,44 @@ export class MultiplayerLobby {
     return `
       <p class="mp-welcome">Welcome, <strong>${user?.displayName || 'Player'}</strong></p>
 
-      <div class="mp-menu-grid">
+      <div class="mp-menu-grid four-col">
         <button class="mp-menu-card" data-action="create">
           <div class="mp-card-icon">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           </div>
           <div class="mp-card-content">
             <h3>Create Game</h3>
-            <p>Host a new multiplayer game</p>
+            <p>Host a new game</p>
           </div>
         </button>
         <button class="mp-menu-card" data-action="join">
           <div class="mp-card-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
           </div>
           <div class="mp-card-content">
             <h3>Join by Code</h3>
-            <p>Enter a game code</p>
+            <p>Enter game code</p>
+          </div>
+        </button>
+        <button class="mp-menu-card" data-action="browse">
+          <div class="mp-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          </div>
+          <div class="mp-card-content">
+            <h3>Open Games</h3>
+            <p>Browse lobbies</p>
+          </div>
+        </button>
+        <button class="mp-menu-card" data-action="rejoin">
+          <div class="mp-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+          </div>
+          <div class="mp-card-content">
+            <h3>My Games</h3>
+            <p>Resume playing</p>
           </div>
         </button>
       </div>
-
-      <div class="mp-available-games" id="available-games">
-        <h3 class="mp-section-title">Open Games</h3>
-        <div class="mp-games-loading">Loading...</div>
-      </div>
-
-      <button class="mp-rejoin-btn" data-action="rejoin">
-        <span class="mp-rejoin-icon">↻</span>
-        <span>My Active Games</span>
-      </button>
 
       <div class="mp-footer-actions">
         <button class="mp-secondary-btn" data-action="back">← Back</button>
@@ -245,6 +255,92 @@ export class MultiplayerLobby {
         <button type="submit" class="mp-primary-btn">Join Game</button>
       </form>
     `;
+  }
+
+  _renderBrowse(user) {
+    const isAdmin = this.lobbyManager.isAdmin();
+    return `
+      <div class="mp-form-header">
+        <button class="back-btn" data-action="cancel">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h2>Open Games</h2>
+        <button class="mp-refresh-btn" data-action="refresh-browse" title="Refresh">↻</button>
+      </div>
+
+      <div class="mp-browse-games" id="browse-games">
+        <div class="mp-games-loading">Loading open games...</div>
+      </div>
+    `;
+  }
+
+  async _loadBrowseGames() {
+    const container = this.el.querySelector('#browse-games');
+    if (!container) return;
+
+    const isAdmin = this.lobbyManager.isAdmin();
+
+    try {
+      const lobbies = await this.lobbyManager.getOpenLobbies();
+
+      if (lobbies.length === 0) {
+        container.innerHTML = `
+          <p class="mp-no-games">No open games available.</p>
+          <p class="mp-no-games-hint">Create a game or check back later.</p>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="mp-games-list">
+            ${lobbies.map(lobby => `
+              <div class="mp-game-row">
+                <button class="mp-game-item" data-lobby-id="${lobby.id}" data-code="${lobby.code}">
+                  <div class="mp-game-info">
+                    <span class="mp-game-name">${lobby.name}</span>
+                    <span class="mp-game-details">${lobby.players.length}/${lobby.settings.maxPlayers} players</span>
+                  </div>
+                  <span class="mp-game-join">Join</span>
+                </button>
+                ${isAdmin ? `<button class="mp-admin-delete" data-delete-lobby="${lobby.id}" title="Delete (Admin)">🗑</button>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+
+        // Bind click events for game items
+        container.querySelectorAll('.mp-game-item').forEach(item => {
+          item.addEventListener('click', async () => {
+            const code = item.dataset.code;
+            const result = await this.lobbyManager.joinLobby(code, null);
+            if (!result.success) {
+              alert(result.error);
+            }
+          });
+        });
+
+        // Bind admin delete buttons
+        if (isAdmin) {
+          container.querySelectorAll('.mp-admin-delete').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const lobbyId = btn.dataset.deleteLobby;
+              if (confirm('Delete this lobby? This cannot be undone.')) {
+                const result = await this.lobbyManager.adminDeleteLobby(lobbyId);
+                if (result.success) {
+                  this._loadBrowseGames();
+                } else {
+                  alert('Failed to delete: ' + result.error);
+                }
+              }
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading open games:', error);
+      container.innerHTML = `
+        <p class="mp-no-games">Failed to load games.</p>
+      `;
+    }
   }
 
   _renderLobby(user) {
@@ -396,11 +492,21 @@ export class MultiplayerLobby {
       this._render();
     });
 
+    this.el.querySelector('[data-action="browse"]')?.addEventListener('click', () => {
+      this.mode = 'browse';
+      this._render();
+      this._loadBrowseGames();
+    });
+
     this.el.querySelector('[data-action="rejoin"]')?.addEventListener('click', () => {
       // Show game list for rejoining
       if (this.onBack) {
         this.onBack('rejoin');
       }
+    });
+
+    this.el.querySelector('[data-action="refresh-browse"]')?.addEventListener('click', () => {
+      this._loadBrowseGames();
     });
 
     this.el.querySelector('[data-action="back"]')?.addEventListener('click', () => {
@@ -435,9 +541,9 @@ export class MultiplayerLobby {
       }
     });
 
-    // Load available games when in menu mode
-    if (this.mode === 'menu') {
-      this._loadAvailableGames();
+    // Load browse games when in browse mode
+    if (this.mode === 'browse') {
+      this._loadBrowseGames();
     }
 
     // Create form
