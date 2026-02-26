@@ -552,10 +552,11 @@ export class LobbyManager {
         }
       });
 
-      // Update lobby status
+      // Update lobby status (include startedBy so clients know who initializes)
       await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
         status: 'starting',
         gameId,
+        startedBy: user.id,
         updatedAt: serverTimestamp()
       });
 

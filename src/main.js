@@ -653,12 +653,22 @@ async function init() {
     // Set host flag on syncManager (for AI control - original host controls AI)
     syncManager.setIsHost(isHost);
 
+    console.log('[MP] Starting game:', {
+      gameId,
+      hasExistingState,
+      shouldInitialize,
+      isHost,
+      startedBy: lobbyData?.startedBy,
+      userId: user?.id
+    });
+
     if (hasExistingState) {
       // Rejoining a game that already has state - just load it
+      console.log('[MP] Rejoining existing game...');
       const stateLoaded = await syncManager.startSync();
       if (!stateLoaded) {
-        console.error('Failed to load game state');
-        alert('Failed to rejoin game. Please try again.');
+        console.error('[MP] Failed to load existing game state');
+        alert('Error 1: Failed to rejoin game. Could not load game state.');
         return;
       }
     } else if (shouldInitialize && playersData) {
@@ -687,18 +697,32 @@ async function init() {
       gameState.initGame('risk', players, options);
 
       // Push initial state to Firestore
-      await syncManager.forcePush(true);
+      console.log('[MP] Initializing game and pushing state...');
+      const pushSuccess = await syncManager.forcePush(true);
+      if (!pushSuccess) {
+        console.error('[MP] Failed to push initial game state');
+        alert('Error 2: Failed to initialize game. Could not save game state.');
+        return;
+      }
 
       // Start listening for updates
       await syncManager.startSync();
+      console.log('[MP] Game initialized successfully');
+    } else if (!playersData) {
+      // No player data available
+      console.error('[MP] No player data available');
+      alert('Error 3: Failed to start game. No player data found.');
+      return;
     } else {
-      // Non-host client: wait for state to be available (host hasn't initialized yet)
+      // Waiting for another client to initialize
+      console.log('[MP] Waiting for game state from initializer...');
       const stateLoaded = await syncManager.startSyncAndWaitForState();
       if (!stateLoaded) {
-        console.error('Failed to load game state');
-        alert('Failed to join game. Please try again.');
+        console.error('[MP] Timeout waiting for game state');
+        alert('Error 4: Failed to join game. Timed out waiting for game to initialize. The host may have disconnected.');
         return;
       }
+      console.log('[MP] Game state received');
     }
 
     // Create multiplayer guard after state is ready
