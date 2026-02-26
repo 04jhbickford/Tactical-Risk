@@ -44,6 +44,16 @@ import { AirLandingUI } from './ui/airLandingUI.js';
 import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
 
+// Multiplayer imports
+import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
+import { getAuthManager } from './multiplayer/auth.js';
+import { getLobbyManager } from './multiplayer/lobbyManager.js';
+import { createSyncManager } from './multiplayer/syncManager.js';
+import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
+import { AuthScreen } from './ui/authScreen.js';
+import { MultiplayerLobby } from './ui/multiplayerLobby.js';
+import { GameList } from './ui/gameList.js';
+
 // DEBUG: Set to true to log sea zone click coordinates for positioning
 const DEBUG_SEA_ZONE_CLICKS = false;
 const DEBUG_SEA_ZONE_OFFSETS = []; // Accumulates all clicked offsets
@@ -587,29 +597,116 @@ async function init() {
     }
   };
 
-  // Lobby
-  const lobby = new Lobby(setup, (gameMode, selectedPlayers, options = {}) => {
+  // Multiplayer state
+  let syncManager = null;
+  let multiplayerGuard = null;
+  let authScreen = null;
+  let multiplayerLobby = null;
+  let gameListUI = null;
+
+  // Initialize Firebase (if configured)
+  initializeFirebase();
+  const authManager = getAuthManager();
+  const lobbyManager = getLobbyManager();
+
+  if (isFirebaseConfigured()) {
+    authManager.initialize();
+    lobbyManager.initialize();
+  }
+
+  // Function to start a multiplayer game
+  const startMultiplayerGame = async (gameId, lobbyData) => {
     // Initialize game state
     gameState = new GameState(setup, territories, continents);
+    gameState.isMultiplayer = true;
 
-    // Check if loading from save
-    if (options.loadFromSave) {
-      gameState.loadFromJSON(options.loadFromSave);
-    } else {
-      gameState.initGame(gameMode, selectedPlayers, options);
+    // Create sync manager
+    syncManager = createSyncManager(gameId, gameState);
+
+    // Create multiplayer guard
+    multiplayerGuard = createMultiplayerGuard(syncManager);
+    multiplayerGuard.wrapGameState(gameState);
+
+    // Check if we need to initialize the game (host) or wait for state (client)
+    const user = authManager.getUser();
+    const isHost = lobbyData?.hostId === user?.id;
+
+    if (isHost && lobbyData?.lobbyData) {
+      // Host initializes the game
+      const players = lobbyData.lobbyData.players.map(p => {
+        const factionDef = setup.risk.factions.find(f => f.id === p.factionId);
+        return {
+          ...factionDef,
+          id: p.factionId,
+          name: p.displayName,
+          color: p.color || factionDef?.color,
+          lightColor: p.color || factionDef?.lightColor,
+          isAI: false,
+          oderId: p.oderId // Link to Firebase user ID
+        };
+      });
+
+      const options = {
+        alliancesEnabled: false,
+        teamsEnabled: lobbyData.lobbyData.settings?.teamsEnabled || false,
+        startingIPCs: lobbyData.lobbyData.settings?.startingIPCs || 80,
+        isMultiplayer: true
+      };
+
+      gameState.initGame('risk', players, options);
+
+      // Push initial state to Firestore
+      await syncManager.forcePush(true);
     }
 
-    // Initialize AI controller
-    aiController = new AIController();
-    aiController.setUnitDefs(unitDefs);
-    aiController.setActionLog(actionLog);
-    aiController.setGameState(gameState); // Must be after setUnitDefs
-    aiController.setOnAction((action, data) => {
-      camera.dirty = true;
+    // Start listening for updates
+    await syncManager.startSync();
+
+    // Set up sync manager reference in gameState
+    gameState.syncManager = syncManager;
+
+    // Subscribe to sync events
+    syncManager.subscribe((event, data) => {
+      if (event === 'state_updated' || event === 'turn_changed') {
+        camera.dirty = true;
+        // Update player panel to reflect turn change
+        playerPanel.render();
+
+        if (event === 'turn_changed' && data.isActivePlayer) {
+          showNotification("It's your turn!");
+        }
+      }
     });
-    aiController.setOnStatusUpdate((message) => {
-      console.log('[AI Status]', message);
+
+    // Set up gameState observer to push changes
+    gameState.subscribe(() => {
+      if (syncManager && syncManager.checkIsActivePlayer()) {
+        syncManager.pushState();
+      }
     });
+
+    // Wire up all the UI components (same as local game)
+    wireUpGameComponents();
+
+    // Start with map overview
+    camera.dirty = true;
+  };
+
+  // Function to wire up all game components (shared between local and multiplayer)
+  const wireUpGameComponents = () => {
+    // Initialize AI controller (only for local games)
+    if (!gameState.isMultiplayer) {
+      aiController = new AIController();
+      aiController.setUnitDefs(unitDefs);
+      aiController.setActionLog(actionLog);
+      aiController.setGameState(gameState);
+      aiController.setOnAction((action, data) => {
+        camera.dirty = true;
+      });
+      aiController.setOnStatusUpdate((message) => {
+        console.log('[AI Status]', message);
+      });
+    }
 
     // Wire up components
     hud.setGameState(gameState);
@@ -648,6 +745,12 @@ async function init() {
     playerPanel.setContinents(continents);
     playerPanel.setTerritories(territories);
     playerPanel.setActionLog(actionLog);
+
+    // Set multiplayer state for player panel
+    if (gameState.isMultiplayer) {
+      playerPanel.setMultiplayerState(syncManager, authManager.getUserId());
+    }
+
     tooltip.setGameState(gameState);
     unitTooltip.setGameState(gameState);
     territoryRenderer.setGameState(gameState);
@@ -824,10 +927,87 @@ async function init() {
     // Show panels (continentPanel hidden - info now in Players/Territory tabs)
     continentPanel.hide();
     playerPanel.show();
+  };
+
+  // Handle Play Online button click
+  const handlePlayOnline = () => {
+    if (!isFirebaseConfigured()) {
+      alert('Multiplayer is not configured. Please set up Firebase in src/multiplayer/firebase.js');
+      lobby.show();
+      return;
+    }
+
+    // Check if user is logged in
+    if (authManager.isLoggedIn()) {
+      // Show multiplayer lobby
+      if (!multiplayerLobby) {
+        multiplayerLobby = new MultiplayerLobby(
+          setup,
+          // onStart - when game starts
+          (gameId, lobbyData) => {
+            startMultiplayerGame(gameId, lobbyData);
+          },
+          // onBack
+          (action) => {
+            if (action === 'rejoin') {
+              // Show game list
+              if (!gameListUI) {
+                gameListUI = new GameList(
+                  // onSelectGame
+                  (gameId, game) => {
+                    startMultiplayerGame(gameId, game);
+                  },
+                  // onBack
+                  () => {
+                    multiplayerLobby.show();
+                  }
+                );
+              }
+              gameListUI.show();
+            } else {
+              // Back to main lobby
+              lobby.show();
+            }
+          }
+        );
+      }
+      multiplayerLobby.show();
+    } else {
+      // Show auth screen
+      if (!authScreen) {
+        authScreen = new AuthScreen((user) => {
+          if (user) {
+            // User logged in, show multiplayer lobby
+            handlePlayOnline();
+          } else {
+            // User cancelled, back to main lobby
+            lobby.show();
+          }
+        });
+      }
+      authScreen.show();
+    }
+  };
+
+  // Lobby (local games)
+  const lobby = new Lobby(setup, (gameMode, selectedPlayers, options = {}) => {
+    // Initialize game state for local game
+    gameState = new GameState(setup, territories, continents);
+    gameState.isMultiplayer = false;
+
+    // Check if loading from save
+    if (options.loadFromSave) {
+      gameState.loadFromJSON(options.loadFromSave);
+    } else {
+      gameState.initGame(gameMode, selectedPlayers, options);
+    }
+
+    // Wire up all game components
+    wireUpGameComponents();
 
     // Start with map overview - no auto-pan
     camera.dirty = true;
-  });
+  }, handlePlayOnline);
 
   // Load map tiles
   await mapRenderer.load();

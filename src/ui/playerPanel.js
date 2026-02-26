@@ -90,6 +90,12 @@ export class PlayerPanel {
     this.actionLog = actionLog;
   }
 
+  // Multiplayer state
+  setMultiplayerState(syncManager, localUserId) {
+    this.syncManager = syncManager;
+    this.localUserId = localUserId;
+  }
+
   setActionCallback(callback) {
     this.onAction = callback;
   }
@@ -185,13 +191,22 @@ export class PlayerPanel {
     const phase = this.gameState.phase;
     const turnPhase = this.gameState.turnPhase;
 
+    // Check if it's the local player's turn in multiplayer
+    const isMultiplayer = this.gameState.isMultiplayer;
+    const isLocalPlayerTurn = !isMultiplayer || (this.syncManager?.checkIsActivePlayer());
+
     let html = '';
 
     // Player header (compact, always visible)
-    html += this._renderHeader(player);
+    html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
 
     // Phase indicator
     html += this._renderPhaseIndicator(phase, turnPhase);
+
+    // Multiplayer waiting indicator
+    if (isMultiplayer && !isLocalPlayerTurn) {
+      html += this._renderWaitingIndicator(player);
+    }
 
     // Tab navigation
     html += this._renderTabs();
@@ -327,18 +342,40 @@ export class PlayerPanel {
     return html;
   }
 
-  _renderHeader(player) {
+  _renderHeader(player, isMultiplayer = false, isLocalPlayerTurn = true) {
     const ipcs = this.gameState.getIPCs(player.id);
     const territories = this.gameState.getPlayerTerritories(player.id).length;
     const aiLabel = player.isAI ? `<span class="pp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : '';
     const textColor = this._getContrastColor(player.color);
 
+    // Multiplayer turn indicator
+    let turnIndicator = '';
+    if (isMultiplayer) {
+      if (isLocalPlayerTurn) {
+        turnIndicator = `<span class="pp-turn-badge your-turn" style="color: ${textColor};">YOUR TURN</span>`;
+      } else {
+        turnIndicator = `<span class="pp-turn-badge waiting">WAITING</span>`;
+      }
+    }
+
     return `
-      <div class="pp-header compact" style="background: ${player.color};">
+      <div class="pp-header compact ${!isLocalPlayerTurn ? 'not-your-turn' : ''}" style="background: ${player.color};">
         ${player.flag ? `<img src="assets/flags/${player.flag}" class="pp-flag" alt="${player.name}">` : ''}
         <span class="pp-player-name" style="color: ${textColor};">${player.name}</span>
         ${aiLabel}
+        ${turnIndicator}
         <span class="pp-resources-inline" style="color: ${textColor};">${ipcs}$ · ${territories}T</span>
+      </div>`;
+  }
+
+  _renderWaitingIndicator(player) {
+    return `
+      <div class="pp-waiting-overlay">
+        <div class="pp-waiting-content">
+          <div class="pp-waiting-spinner"></div>
+          <p>Waiting for ${player.name}...</p>
+          <p class="pp-waiting-hint">You can view the map while waiting.</p>
+        </div>
       </div>`;
   }
 

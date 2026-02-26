@@ -188,6 +188,10 @@ export class GameState {
     this.unitsPlacedThisRound = 0;
     this.placementRound = 0;
 
+    // Multiplayer state
+    this.isMultiplayer = false;
+    this.syncManager = null; // Reference to SyncManager for pushing state changes
+
     // Build lookups
     this.territoryByName = {};
     this.landTerritories = [];
@@ -4615,15 +4619,21 @@ export class GameState {
     for (const cb of this._listeners) {
       cb(this);
     }
+
+    // Push state to server if multiplayer
+    if (this.isMultiplayer && this.syncManager) {
+      this.syncManager.pushState();
+    }
   }
 
   toJSON() {
     return {
-      version: 9,
+      version: 10, // v10: Added multiplayer support
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
       teamsEnabled: this.teamsEnabled,
-      players: this.players,
+      isMultiplayer: this.isMultiplayer,
+      players: this.players, // Players now include oderId for multiplayer
       currentPlayerIndex: this.currentPlayerIndex,
       round: this.round,
       phase: this.phase,
@@ -4654,6 +4664,10 @@ export class GameState {
     this.gameMode = data.gameMode;
     this.alliancesEnabled = data.alliancesEnabled ?? (data.gameMode === 'classic');
     this.teamsEnabled = data.teamsEnabled ?? false;
+    // v10: Multiplayer flag (don't overwrite if already set - syncManager sets it before load)
+    if (data.isMultiplayer !== undefined && !this.isMultiplayer) {
+      this.isMultiplayer = data.isMultiplayer;
+    }
     this.players = data.players;
     this.currentPlayerIndex = data.currentPlayerIndex;
     this.round = data.round;

@@ -31,9 +31,10 @@ const TEAM_COLORS = {
 };
 
 export class Lobby {
-  constructor(setup, onStart) {
+  constructor(setup, onStart, onPlayOnline) {
     this.setup = setup;
     this.onStart = onStart;
+    this.onPlayOnline = onPlayOnline; // Callback for Play Online button
     this.selectedPlayers = [];
     this.playerNames = {};
     this.playerColors = {};
@@ -81,15 +82,21 @@ export class Lobby {
         </div>
         <p class="lobby-subtitle">World War II Strategy Game</p>
 
-        ${hasAutoSave ? `
-          <button class="continue-game-btn" data-action="continue">
-            <span class="continue-icon">&#9654;</span>
-            <span class="continue-text">
-              <span class="continue-title">Continue Game</span>
-              <span class="continue-time">${autoSaveDisplay}</span>
-            </span>
+        <div class="lobby-main-buttons">
+          ${hasAutoSave ? `
+            <button class="continue-game-btn" data-action="continue">
+              <span class="continue-icon">&#9654;</span>
+              <span class="continue-text">
+                <span class="continue-title">Continue Game</span>
+                <span class="continue-time">${autoSaveDisplay}</span>
+              </span>
+            </button>
+          ` : ''}
+          <button class="play-online-btn" data-action="play-online">
+            <span class="online-icon">&#127760;</span>
+            <span class="online-text">Play Online</span>
           </button>
-        ` : ''}
+        </div>
 
         <div class="lobby-section">
           <h2 class="section-title">Select Players</h2>
@@ -269,6 +276,14 @@ export class Lobby {
     // Continue game button
     this.el.querySelector('.continue-game-btn')?.addEventListener('click', () => {
       this._continueGame();
+    });
+
+    // Play Online button
+    this.el.querySelector('.play-online-btn')?.addEventListener('click', () => {
+      if (this.onPlayOnline) {
+        this.hide();
+        this.onPlayOnline();
+      }
     });
 
     // Start button

@@ -1,0 +1,245 @@
+// Sync Manager for Tactical Risk multiplayer
+// Handles real-time game state synchronization via Firestore
+
+import {
+  doc,
+  getDoc,
+  updateDoc,
+  onSnapshot,
+  serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { getFirebaseDb } from './firebase.js';
+import { getAuthManager } from './auth.js';
+
+export class SyncManager {
+  constructor(gameId, gameState) {
+    this.db = getFirebaseDb();
+    this.authManager = getAuthManager();
+    this.gameId = gameId;
+    this.gameState = gameState;
+    this.localVersion = 0;
+    this.isActivePlayer = false;
+    this.isPushing = false;
+    this.unsubscribe = null;
+    this._listeners = [];
+    this._pendingPush = null;
+  }
+
+  // Get current user ID
+  get userId() {
+    return this.authManager.getUserId();
+  }
+
+  // Subscribe to state changes
+  subscribe(callback) {
+    this._listeners.push(callback);
+    return () => {
+      this._listeners = this._listeners.filter(cb => cb !== callback);
+    };
+  }
+
+  _notifyListeners(event, data) {
+    for (const cb of this._listeners) {
+      cb(event, data);
+    }
+  }
+
+  // Start listening to game updates
+  async startSync() {
+    if (!this.db || !this.gameId) {
+      console.error('SyncManager: Missing db or gameId');
+      return false;
+    }
+
+    const gameRef = doc(this.db, 'games', this.gameId);
+
+    // Get initial state
+    const snapshot = await getDoc(gameRef);
+    if (!snapshot.exists()) {
+      console.error('SyncManager: Game not found');
+      return false;
+    }
+
+    const data = snapshot.data();
+    this.localVersion = data.stateVersion || 0;
+
+    // If state exists, load it
+    if (data.state) {
+      this.gameState.loadFromJSON(data.state);
+    }
+
+    // Determine if we're the active player
+    this._updateActivePlayer(data.currentPlayerId);
+
+    // Subscribe to real-time updates
+    this.unsubscribe = onSnapshot(gameRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        this._notifyListeners('game_deleted', null);
+        return;
+      }
+
+      const newData = snapshot.data();
+
+      // Skip if this is our own update
+      if (this.isPushing) return;
+
+      // Only update if version is newer
+      if (newData.stateVersion > this.localVersion) {
+        this.localVersion = newData.stateVersion;
+
+        // Load new state
+        if (newData.state) {
+          this.gameState.loadFromJSON(newData.state);
+        }
+
+        // Update active player status
+        this._updateActivePlayer(newData.currentPlayerId);
+
+        this._notifyListeners('state_updated', {
+          version: this.localVersion,
+          currentPlayerId: newData.currentPlayerId
+        });
+      } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
+        // Turn changed
+        this._updateActivePlayer(newData.currentPlayerId);
+        this._notifyListeners('turn_changed', {
+          currentPlayerId: newData.currentPlayerId,
+          isActivePlayer: this.isActivePlayer
+        });
+      }
+    }, (error) => {
+      console.error('SyncManager: Subscription error', error);
+      this._notifyListeners('error', error);
+    });
+
+    return true;
+  }
+
+  // Stop listening
+  stopSync() {
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+  }
+
+  // Update active player status
+  _updateActivePlayer(currentPlayerId) {
+    this._lastCurrentPlayerId = currentPlayerId;
+    this.isActivePlayer = currentPlayerId === this.userId;
+  }
+
+  // Push state to Firestore (called after local state changes)
+  async pushState() {
+    // Only active player can push state
+    if (!this.isActivePlayer) {
+      console.warn('SyncManager: Non-active player attempted to push state');
+      return false;
+    }
+
+    // Debounce rapid updates
+    if (this._pendingPush) {
+      clearTimeout(this._pendingPush);
+    }
+
+    return new Promise((resolve) => {
+      this._pendingPush = setTimeout(async () => {
+        this._pendingPush = null;
+        const result = await this._doPush();
+        resolve(result);
+      }, 100); // 100ms debounce
+    });
+  }
+
+  async _doPush() {
+    if (!this.db || !this.gameId) return false;
+
+    this.isPushing = true;
+
+    try {
+      const gameRef = doc(this.db, 'games', this.gameId);
+      const state = this.gameState.toJSON();
+
+      // Get current player's userId for turn tracking
+      const currentPlayer = this.gameState.currentPlayer;
+      const currentPlayerId = currentPlayer?.oderId || null;
+
+      await updateDoc(gameRef, {
+        state,
+        stateVersion: this.localVersion + 1,
+        currentPlayerId,
+        updatedAt: serverTimestamp()
+      });
+
+      this.localVersion++;
+
+      // Update active player if turn changed
+      if (currentPlayerId !== this._lastCurrentPlayerId) {
+        this._updateActivePlayer(currentPlayerId);
+      }
+
+      return true;
+    } catch (error) {
+      console.error('SyncManager: Push failed', error);
+      this._notifyListeners('push_failed', error);
+      return false;
+    } finally {
+      this.isPushing = false;
+    }
+  }
+
+  // Force push (for game initialization by host)
+  async forcePush(isHost = false) {
+    if (!this.db || !this.gameId) return false;
+
+    this.isPushing = true;
+
+    try {
+      const gameRef = doc(this.db, 'games', this.gameId);
+      const state = this.gameState.toJSON();
+
+      // Get current player's userId for turn tracking
+      const currentPlayer = this.gameState.currentPlayer;
+      const currentPlayerId = currentPlayer?.oderId || null;
+
+      await updateDoc(gameRef, {
+        state,
+        stateVersion: 1,
+        currentPlayerId,
+        status: 'active',
+        updatedAt: serverTimestamp()
+      });
+
+      this.localVersion = 1;
+      this._updateActivePlayer(currentPlayerId);
+
+      return true;
+    } catch (error) {
+      console.error('SyncManager: Force push failed', error);
+      return false;
+    } finally {
+      this.isPushing = false;
+    }
+  }
+
+  // Check if we're the active player
+  checkIsActivePlayer() {
+    return this.isActivePlayer;
+  }
+
+  // Get the current player ID from Firestore
+  async getCurrentPlayerId() {
+    if (!this.db || !this.gameId) return null;
+
+    const gameRef = doc(this.db, 'games', this.gameId);
+    const snapshot = await getDoc(gameRef);
+    if (!snapshot.exists()) return null;
+
+    return snapshot.data().currentPlayerId;
+  }
+}
+
+// Factory function
+export function createSyncManager(gameId, gameState) {
+  return new SyncManager(gameId, gameState);
+}
