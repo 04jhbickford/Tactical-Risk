@@ -478,7 +478,13 @@ export class MultiplayerLobby {
         </div>
 
         <div class="mp-lobby-actions">
-          <button class="mp-action-btn secondary" data-action="leave">Leave Lobby</button>
+          ${isHost && lobby.isPublished
+            ? `<button class="mp-action-btn secondary" data-action="back-to-browse">← Back</button>`
+            : ''
+          }
+          <button class="mp-action-btn ${isHost && lobby.isPublished ? 'danger-outline' : 'secondary'}" data-action="leave">
+            ${isHost && lobby.isPublished ? 'Delete Lobby' : 'Leave Lobby'}
+          </button>
           ${isHost ? (
             lobby.isPublished
               ? `<button class="mp-action-btn start" data-action="start"
@@ -594,6 +600,14 @@ export class MultiplayerLobby {
       await this.lobbyManager.leaveLobby();
       this.mode = 'menu';
       this._render();
+    });
+
+    // Back to browse (for host returning to Open Games without leaving)
+    this.el.querySelector('[data-action="back-to-browse"]')?.addEventListener('click', () => {
+      this.lobbyManager.disconnectFromLobby();
+      this.mode = 'browse';
+      this._render();
+      this._loadBrowseGames();
     });
 
     this.el.querySelector('[data-action="ready"]')?.addEventListener('click', async () => {

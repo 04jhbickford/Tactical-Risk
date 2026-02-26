@@ -3164,6 +3164,17 @@ html, body {
   cursor: not-allowed;
 }
 
+.mp-action-btn.danger-outline {
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+}
+
+.mp-action-btn.danger-outline:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
 .mp-waiting-indicator {
   display: flex;
   align-items: center;
