@@ -1388,15 +1388,20 @@ html, body {
   position: relative;
 }
 
-/* Gradient fade from hero to content */
+/* Gradient fade from hero to content - smooth transition */
 .lobby-overlay.modern::after {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
-  width: 55%;
+  width: 52%;
   height: 100%;
-  background: linear-gradient(90deg, transparent 60%, rgba(10, 15, 26, 0.7) 85%, #0a0f1a 100%);
+  background: linear-gradient(90deg,
+    transparent 0%,
+    transparent 50%,
+    rgba(10, 15, 26, 0.3) 70%,
+    rgba(10, 15, 26, 0.6) 85%,
+    rgba(10, 15, 26, 0.95) 100%);
   pointer-events: none;
 }
 
@@ -1694,7 +1699,89 @@ html, body {
   text-transform: uppercase;
   letter-spacing: 2px;
   color: #64748b;
-  margin: 0 0 16px;
+  margin: 0;
+}
+
+/* Players header with teams toggle */
+.players-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.teams-toggle-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.teams-toggle-compact input[type="checkbox"] {
+  display: none;
+}
+
+.teams-toggle-compact .toggle-slider.small {
+  width: 36px;
+  height: 20px;
+  background: rgba(71, 85, 105, 0.6);
+  border-radius: 10px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.teams-toggle-compact .toggle-slider.small::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #94a3b8;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.teams-toggle-compact input:checked + .toggle-slider.small {
+  background: #3b82f6;
+}
+
+.teams-toggle-compact input:checked + .toggle-slider.small::after {
+  transform: translateX(16px);
+  background: white;
+}
+
+.teams-toggle-compact .toggle-text {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+/* Options row (compact) */
+.options-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(30, 41, 59, 0.3);
+  border-radius: 10px;
+}
+
+.select-option.inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.select-option.inline .select-label {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.modern-select.compact {
+  padding: 8px 12px;
+  min-width: 80px;
 }
 
 /* Modern Player Grid */
@@ -2287,6 +2374,85 @@ html, body {
   margin: 4px 0 0;
 }
 
+/* Available Games Section */
+.mp-available-games {
+  margin-top: 16px;
+  padding: 16px;
+  background: rgba(30, 41, 59, 0.3);
+  border-radius: 12px;
+}
+
+.mp-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #64748b;
+  margin: 0 0 12px;
+}
+
+.mp-no-games {
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+  padding: 12px;
+}
+
+.mp-games-loading {
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+  padding: 12px;
+}
+
+.mp-games-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-game-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mp-game-item:hover {
+  background: rgba(15, 23, 42, 0.7);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.mp-game-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mp-game-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #e2e8f0;
+}
+
+.mp-game-players {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.mp-game-join {
+  font-size: 12px;
+  font-weight: 600;
+  color: #60a5fa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .mp-rejoin-btn {
   display: flex;
   align-items: center;
@@ -2309,6 +2475,57 @@ html, body {
 
 .mp-rejoin-icon {
   font-size: 18px;
+}
+
+/* Checkbox options row */
+.mp-options-row {
+  display: flex;
+  gap: 20px;
+  padding: 12px 0;
+}
+
+.mp-checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.mp-checkbox-option input[type="checkbox"] {
+  display: none;
+}
+
+.mp-checkbox-option .checkbox-box {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(148, 163, 184, 0.3);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.mp-checkbox-option input:checked + .checkbox-box {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.mp-checkbox-option input:checked + .checkbox-box::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.mp-password-field {
+  margin-top: 8px;
+}
+
+.mp-password-field.hidden {
+  display: none;
 }
 
 .mp-footer-actions {

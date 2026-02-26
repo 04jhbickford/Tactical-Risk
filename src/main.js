@@ -633,6 +633,9 @@ async function init() {
     const playersData = lobbyData?.lobbyData?.players || lobbyData?.players;
     const settingsData = lobbyData?.lobbyData?.settings || lobbyData?.settings;
 
+    // Set host flag on syncManager
+    syncManager.setIsHost(isHost);
+
     if (isHost && playersData) {
       // Host initializes the game
       const players = playersData.map(p => {
@@ -694,8 +697,9 @@ async function init() {
     });
 
     // Set up gameState observer to push changes
+    // Host pushes all state changes (including AI turns), others only push their own turns
     gameState.subscribe(() => {
-      if (syncManager && syncManager.checkIsActivePlayer()) {
+      if (syncManager && (syncManager.checkIsActivePlayer() || syncManager.isHost)) {
         syncManager.pushState();
       }
     });
@@ -714,7 +718,7 @@ async function init() {
 
     // Initialize AI controller for local games OR multiplayer games with AI (host only runs AI)
     // In multiplayer, only the host should run AI actions to avoid conflicts
-    const shouldInitAI = !gameState.isMultiplayer || (hasAIPlayers && syncManager?.checkIsActivePlayer());
+    const shouldInitAI = !gameState.isMultiplayer || (hasAIPlayers && syncManager?.isHost);
 
     if (shouldInitAI || hasAIPlayers) {
       aiController = new AIController();

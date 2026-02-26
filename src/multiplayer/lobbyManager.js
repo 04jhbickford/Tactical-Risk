@@ -121,6 +121,33 @@ export class LobbyManager {
     return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
   }
 
+  // Get all open public lobbies (no password, waiting status)
+  async getOpenLobbies() {
+    if (!this.db) return [];
+
+    try {
+      const q = query(
+        collection(this.db, 'lobbies'),
+        where('status', '==', 'waiting')
+      );
+      const snapshot = await getDocs(q);
+
+      // Filter to only public lobbies (no password) and not full
+      const lobbies = [];
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (!data.password && data.players.length < data.settings.maxPlayers) {
+          lobbies.push({ id: doc.id, ...data });
+        }
+      });
+
+      return lobbies;
+    } catch (error) {
+      console.error('Error getting open lobbies:', error);
+      return [];
+    }
+  }
+
   // Join a lobby by code
   async joinLobby(code, password = null) {
     if (!this.db) return { success: false, error: 'Not connected' };

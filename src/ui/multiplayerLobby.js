@@ -144,15 +144,20 @@ export class MultiplayerLobby {
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
           </div>
           <div class="mp-card-content">
-            <h3>Join Game</h3>
-            <p>Enter a game code to join</p>
+            <h3>Join by Code</h3>
+            <p>Enter a game code</p>
           </div>
         </button>
       </div>
 
+      <div class="mp-available-games" id="available-games">
+        <h3 class="mp-section-title">Open Games</h3>
+        <div class="mp-games-loading">Loading...</div>
+      </div>
+
       <button class="mp-rejoin-btn" data-action="rejoin">
         <span class="mp-rejoin-icon">↻</span>
-        <span>Rejoin Active Games</span>
+        <span>My Active Games</span>
       </button>
 
       <div class="mp-footer-actions">
@@ -189,26 +194,30 @@ export class MultiplayerLobby {
           <div class="mp-field">
             <label>Starting IPCs</label>
             <select id="create-ipcs" class="modern-select">
-              <option value="40">40 IPCs</option>
-              <option value="60">60 IPCs</option>
-              <option value="80" selected>80 IPCs</option>
-              <option value="100">100 IPCs</option>
-              <option value="120">120 IPCs</option>
+              <option value="40">40</option>
+              <option value="60">60</option>
+              <option value="80" selected>80</option>
+              <option value="100">100</option>
+              <option value="120">120</option>
             </select>
           </div>
         </div>
-        <div class="mp-field">
-          <label>Password (optional)</label>
-          <input type="password" id="create-password" placeholder="Leave empty for public game" class="modern-input">
+        <div class="mp-options-row">
+          <label class="mp-checkbox-option">
+            <input type="checkbox" id="create-private">
+            <span class="checkbox-box"></span>
+            <span>Private Game</span>
+          </label>
+          <label class="mp-checkbox-option">
+            <input type="checkbox" id="create-teams">
+            <span class="checkbox-box"></span>
+            <span>Team Mode</span>
+          </label>
         </div>
-        <label class="mp-toggle-option">
-          <input type="checkbox" id="create-teams">
-          <span class="toggle-slider"></span>
-          <div class="toggle-label">
-            <span class="toggle-title">Team Mode</span>
-            <span class="toggle-desc">Players on same team share victory</span>
-          </div>
-        </label>
+        <div class="mp-password-field hidden" id="password-field">
+          <label>Password</label>
+          <input type="password" id="create-password" class="modern-input" placeholder="">
+        </div>
 
         <div class="mp-error hidden" id="create-error"></div>
 
@@ -407,6 +416,23 @@ export class MultiplayerLobby {
       this._render();
     });
 
+    // Private checkbox - show/hide password field
+    this.el.querySelector('#create-private')?.addEventListener('change', (e) => {
+      const passwordField = this.el.querySelector('#password-field');
+      if (passwordField) {
+        passwordField.classList.toggle('hidden', !e.target.checked);
+        if (!e.target.checked) {
+          const passwordInput = this.el.querySelector('#create-password');
+          if (passwordInput) passwordInput.value = '';
+        }
+      }
+    });
+
+    // Load available games when in menu mode
+    if (this.mode === 'menu') {
+      this._loadAvailableGames();
+    }
+
     // Create form
     this.el.querySelector('[data-form="create"]')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -554,7 +580,8 @@ export class MultiplayerLobby {
     const name = form.querySelector('#create-name').value;
     const maxPlayers = parseInt(form.querySelector('#create-max-players').value);
     const startingIPCs = parseInt(form.querySelector('#create-ipcs').value);
-    const password = form.querySelector('#create-password').value;
+    const isPrivate = form.querySelector('#create-private').checked;
+    const password = isPrivate ? form.querySelector('#create-password').value : null;
     const teamsEnabled = form.querySelector('#create-teams').checked;
 
     const result = await this.lobbyManager.createLobby(name, {
@@ -588,5 +615,53 @@ export class MultiplayerLobby {
       }
     }
     // Lobby subscription will update mode to 'lobby'
+  }
+
+  async _loadAvailableGames() {
+    const container = this.el.querySelector('#available-games');
+    if (!container) return;
+
+    try {
+      const lobbies = await this.lobbyManager.getOpenLobbies();
+
+      if (lobbies.length === 0) {
+        container.innerHTML = `
+          <h3 class="mp-section-title">Open Games</h3>
+          <p class="mp-no-games">No open games available. Create one or join by code.</p>
+        `;
+      } else {
+        container.innerHTML = `
+          <h3 class="mp-section-title">Open Games</h3>
+          <div class="mp-games-list">
+            ${lobbies.map(lobby => `
+              <button class="mp-game-item" data-lobby-id="${lobby.id}" data-code="${lobby.code}">
+                <div class="mp-game-info">
+                  <span class="mp-game-name">${lobby.name}</span>
+                  <span class="mp-game-players">${lobby.players.length}/${lobby.settings.maxPlayers} players</span>
+                </div>
+                <span class="mp-game-join">Join</span>
+              </button>
+            `).join('')}
+          </div>
+        `;
+
+        // Bind click events for game items
+        container.querySelectorAll('.mp-game-item').forEach(item => {
+          item.addEventListener('click', async () => {
+            const code = item.dataset.code;
+            const result = await this.lobbyManager.joinLobby(code, null);
+            if (!result.success) {
+              alert(result.error);
+            }
+          });
+        });
+      }
+    } catch (error) {
+      console.error('Error loading available games:', error);
+      container.innerHTML = `
+        <h3 class="mp-section-title">Open Games</h3>
+        <p class="mp-no-games">Failed to load games.</p>
+      `;
+    }
   }
 }

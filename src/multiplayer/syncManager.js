@@ -19,10 +19,16 @@ export class SyncManager {
     this.gameState = gameState;
     this.localVersion = 0;
     this.isActivePlayer = false;
+    this.isHost = false; // Whether this client is the game host
     this.isPushing = false;
     this.unsubscribe = null;
     this._listeners = [];
     this._pendingPush = null;
+  }
+
+  // Set whether this client is the host (controls AI players)
+  setIsHost(isHost) {
+    this.isHost = isHost;
   }
 
   // Get current user ID
@@ -208,9 +214,10 @@ export class SyncManager {
 
   // Push state to Firestore (called after local state changes)
   async pushState() {
-    // Only active player can push state
-    if (!this.isActivePlayer) {
-      console.warn('SyncManager: Non-active player attempted to push state');
+    // Allow push if: 1) We're the active player, OR 2) We're the host (for AI turns)
+    const canPush = this.isActivePlayer || this.isHost;
+    if (!canPush) {
+      console.warn('SyncManager: Non-active non-host player attempted to push state');
       return false;
     }
 

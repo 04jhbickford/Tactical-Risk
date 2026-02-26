@@ -1,7 +1,7 @@
 // Modern Lobby UI for Tactical Risk
 // Clean two-stage flow: Play Mode Selection → Game Setup
 
-export const GAME_VERSION = 'V2.20';
+export const GAME_VERSION = 'V2.21';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
@@ -160,39 +160,31 @@ export class Lobby {
 
         <div class="setup-body">
           <div class="players-section">
-            <h3 class="section-label">Players</h3>
+            <div class="players-header">
+              <h3 class="section-label">Players</h3>
+              <label class="teams-toggle-compact">
+                <input type="checkbox" id="teams-enabled" ${this.teamsEnabled ? 'checked' : ''}>
+                <span class="toggle-slider small"></span>
+                <span class="toggle-text">Teams</span>
+              </label>
+            </div>
             <div class="player-grid modern">
               ${factions.map((p, i) => this._renderPlayerCard(p, i)).join('')}
             </div>
           </div>
 
-          <div class="options-section">
-            <h3 class="section-label">Game Options</h3>
-            <div class="options-grid">
-              <div class="option-card">
-                <label class="toggle-option">
-                  <input type="checkbox" id="teams-enabled" ${this.teamsEnabled ? 'checked' : ''}>
-                  <span class="toggle-slider"></span>
-                  <div class="toggle-label">
-                    <span class="toggle-title">Team Mode</span>
-                    <span class="toggle-desc">Allied players share victory</span>
-                  </div>
-                </label>
-              </div>
-              <div class="option-card">
-                <label class="select-option">
-                  <span class="select-label">Starting IPCs</span>
-                  <select id="starting-ipcs" class="modern-select">
-                    <option value="40" ${this.startingIPCs === 40 ? 'selected' : ''}>40 IPCs</option>
-                    <option value="60" ${this.startingIPCs === 60 ? 'selected' : ''}>60 IPCs</option>
-                    <option value="80" ${this.startingIPCs === 80 ? 'selected' : ''}>80 IPCs (Default)</option>
-                    <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100 IPCs</option>
-                    <option value="120" ${this.startingIPCs === 120 ? 'selected' : ''}>120 IPCs</option>
-                    <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150 IPCs</option>
-                  </select>
-                </label>
-              </div>
-            </div>
+          <div class="options-row">
+            <label class="select-option inline">
+              <span class="select-label">Starting IPCs</span>
+              <select id="starting-ipcs" class="modern-select compact">
+                <option value="40" ${this.startingIPCs === 40 ? 'selected' : ''}>40</option>
+                <option value="60" ${this.startingIPCs === 60 ? 'selected' : ''}>60</option>
+                <option value="80" ${this.startingIPCs === 80 ? 'selected' : ''}>80</option>
+                <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100</option>
+                <option value="120" ${this.startingIPCs === 120 ? 'selected' : ''}>120</option>
+                <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150</option>
+              </select>
+            </label>
           </div>
         </div>
 
