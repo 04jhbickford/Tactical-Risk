@@ -275,14 +275,84 @@ export class LobbyManager {
     return this.updatePlayer({ factionId, color });
   }
 
+  // Add AI player (host only)
+  async addAIPlayer(difficulty, factionId, color) {
+    if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
+
+    const user = this.authManager.getUser();
+    if (this.currentLobby.hostId !== user.id) {
+      return { success: false, error: 'Only host can add AI' };
+    }
+
+    if (this.currentLobby.players.length >= this.currentLobby.settings.maxPlayers) {
+      return { success: false, error: 'Lobby is full' };
+    }
+
+    const aiId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const difficultyNames = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+
+    const aiPlayer = {
+      oderId: aiId,
+      displayName: `${difficultyNames[difficulty] || 'AI'} Bot`,
+      factionId,
+      color,
+      isReady: true, // AI is always ready
+      isHost: false,
+      isAI: true,
+      aiDifficulty: difficulty,
+      joinedAt: Date.now()
+    };
+
+    const players = [...this.currentLobby.players, aiPlayer];
+
+    try {
+      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+        players,
+        updatedAt: serverTimestamp()
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error adding AI player:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Remove AI player (host only)
+  async removeAIPlayer(index) {
+    if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
+
+    const user = this.authManager.getUser();
+    if (this.currentLobby.hostId !== user.id) {
+      return { success: false, error: 'Only host can remove AI' };
+    }
+
+    const player = this.currentLobby.players[index];
+    if (!player || !player.isAI) {
+      return { success: false, error: 'Not an AI player' };
+    }
+
+    const players = this.currentLobby.players.filter((_, i) => i !== index);
+
+    try {
+      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+        players,
+        updatedAt: serverTimestamp()
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Error removing AI player:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Check if all players are ready
   canStart() {
     if (!this.currentLobby) return false;
     if (this.currentLobby.players.length < 2) return false;
 
-    // All players must have selected a faction and be ready
+    // All players must have selected a faction and be ready (AI players are always ready)
     return this.currentLobby.players.every(p =>
-      p.factionId && p.isReady
+      p.factionId && (p.isReady || p.isAI)
     );
   }
 

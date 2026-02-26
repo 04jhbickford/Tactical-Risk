@@ -25,6 +25,12 @@ const FACTION_COLORS = [
   { id: 'teal', color: '#008B8B', name: 'Teal' },
 ];
 
+const AI_DIFFICULTIES = [
+  { id: 'easy', name: 'Easy AI' },
+  { id: 'medium', name: 'Medium AI' },
+  { id: 'hard', name: 'Hard AI' },
+];
+
 export class MultiplayerLobby {
   constructor(setup, onStart, onBack) {
     this.setup = setup;
@@ -240,21 +246,32 @@ export class MultiplayerLobby {
       </div>
 
       <div class="mp-players-section">
-        <h3>Players (${lobby.players.length}/${lobby.settings.maxPlayers})</h3>
+        <div class="mp-players-header">
+          <h3>Players (${lobby.players.length}/${lobby.settings.maxPlayers})</h3>
+          ${isHost && lobby.players.length < lobby.settings.maxPlayers ? `
+            <button class="mp-add-ai-btn" data-action="add-ai">+ Add AI</button>
+          ` : ''}
+        </div>
         <div class="mp-players-list">
-          ${lobby.players.map(player => {
+          ${lobby.players.map((player, index) => {
             const isMe = player.oderId === user?.id;
+            const isAI = player.isAI;
             const faction = factions.find(f => f.id === player.factionId);
             return `
-              <div class="mp-player-card ${isMe ? 'is-me' : ''} ${player.isReady ? 'ready' : ''}">
+              <div class="mp-player-card ${isMe ? 'is-me' : ''} ${player.isReady ? 'ready' : ''} ${isAI ? 'is-ai' : ''}">
                 <div class="mp-player-info">
                   ${faction ? `<img src="assets/flags/${faction.flag}" class="mp-player-flag">` : '<div class="mp-player-flag-placeholder">?</div>'}
                   <span class="mp-player-name">${player.displayName}</span>
                   ${player.isHost ? '<span class="mp-host-badge">HOST</span>' : ''}
+                  ${isAI ? `<span class="mp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : ''}
                 </div>
                 <div class="mp-player-status">
                   ${player.color ? `<div class="mp-player-color" style="background: ${player.color}"></div>` : ''}
-                  <span class="mp-ready-status ${player.isReady ? 'ready' : ''}">${player.isReady ? 'Ready' : 'Not Ready'}</span>
+                  ${isAI ? `
+                    ${isHost ? `<button class="mp-remove-ai-btn" data-action="remove-ai" data-index="${index}" title="Remove AI">✕</button>` : ''}
+                  ` : `
+                    <span class="mp-ready-status ${player.isReady ? 'ready' : ''}">${player.isReady ? 'Ready' : 'Not Ready'}</span>
+                  `}
                 </div>
               </div>
             `;
@@ -404,6 +421,93 @@ export class MultiplayerLobby {
         const currentPlayer = this.lobbyManager.getCurrentPlayer();
         await this.lobbyManager.selectFaction(currentPlayer?.factionId, color);
       });
+    });
+
+    // Add AI button
+    this.el.querySelector('[data-action="add-ai"]')?.addEventListener('click', () => {
+      this._showAddAIDialog();
+    });
+
+    // Remove AI buttons
+    this.el.querySelectorAll('[data-action="remove-ai"]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const index = parseInt(btn.dataset.index);
+        await this.lobbyManager.removeAIPlayer(index);
+      });
+    });
+  }
+
+  _showAddAIDialog() {
+    const factions = this.setup?.risk?.factions || FACTIONS;
+    const lobby = this.lobbyManager.getLobby();
+    const takenFactions = new Set(lobby.players.map(p => p.factionId).filter(Boolean));
+    const takenColors = new Set(lobby.players.map(p => p.color).filter(Boolean));
+
+    // Find available faction and color
+    const availableFaction = factions.find(f => !takenFactions.has(f.id));
+    const availableColor = FACTION_COLORS.find(c => !takenColors.has(c.color));
+
+    // Create dialog
+    const dialog = document.createElement('div');
+    dialog.className = 'mp-ai-dialog-overlay';
+    dialog.innerHTML = `
+      <div class="mp-ai-dialog">
+        <h3>Add AI Player</h3>
+        <div class="mp-field">
+          <label>Difficulty</label>
+          <select id="ai-difficulty">
+            ${AI_DIFFICULTIES.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mp-field">
+          <label>Faction</label>
+          <select id="ai-faction">
+            ${factions.map(f => `
+              <option value="${f.id}" ${takenFactions.has(f.id) ? 'disabled' : ''} ${f.id === availableFaction?.id ? 'selected' : ''}>
+                ${f.name} ${takenFactions.has(f.id) ? '(Taken)' : ''}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+        <div class="mp-field">
+          <label>Color</label>
+          <select id="ai-color">
+            ${FACTION_COLORS.map(c => `
+              <option value="${c.color}" ${takenColors.has(c.color) ? 'disabled' : ''} ${c.color === availableColor?.color ? 'selected' : ''}>
+                ${c.name} ${takenColors.has(c.color) ? '(Taken)' : ''}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+        <div class="mp-form-buttons">
+          <button type="button" class="mp-cancel-btn" data-action="cancel-ai">Cancel</button>
+          <button type="button" class="mp-submit-btn" data-action="confirm-ai">Add AI</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Bind dialog events
+    dialog.querySelector('[data-action="cancel-ai"]').addEventListener('click', () => {
+      dialog.remove();
+    });
+
+    dialog.querySelector('[data-action="confirm-ai"]').addEventListener('click', async () => {
+      const difficulty = dialog.querySelector('#ai-difficulty').value;
+      const factionId = dialog.querySelector('#ai-faction').value;
+      const color = dialog.querySelector('#ai-color').value;
+
+      await this.lobbyManager.addAIPlayer(difficulty, factionId, color);
+      dialog.remove();
+    });
+
+    // Close on overlay click
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        dialog.remove();
+      }
     });
   }
 

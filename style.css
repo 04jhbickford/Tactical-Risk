@@ -13063,16 +13063,23 @@ html, body {
 
 .mp-field input, .mp-field select {
   padding: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  background: #1a1a2e;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 6px;
   color: #fff;
   font-size: 1em;
 }
 
+.mp-field select option {
+  background: #1a1a2e;
+  color: #fff;
+  padding: 8px;
+}
+
 .mp-field input:focus, .mp-field select:focus {
   outline: none;
   border-color: #4CAF50;
+  background: #252540;
 }
 
 .mp-checkbox-field {
@@ -13725,4 +13732,118 @@ html, body {
 .pp-waiting-hint {
   font-size: 0.85em;
   color: #888;
+}
+
+/* AI Player Styles */
+.mp-players-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.mp-players-header h3 {
+  color: #aaa;
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.mp-add-ai-btn {
+  padding: 6px 12px;
+  background: rgba(255, 152, 0, 0.2);
+  border: 1px solid rgba(255, 152, 0, 0.5);
+  border-radius: 4px;
+  color: #FF9800;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mp-add-ai-btn:hover {
+  background: rgba(255, 152, 0, 0.3);
+  color: #FFB74D;
+}
+
+.mp-player-card.is-ai {
+  border-color: rgba(255, 152, 0, 0.5);
+  background: rgba(255, 152, 0, 0.1);
+}
+
+.mp-ai-badge {
+  padding: 2px 6px;
+  background: rgba(255, 152, 0, 0.3);
+  border-radius: 4px;
+  font-size: 0.7em;
+  color: #FF9800;
+  margin-left: 4px;
+}
+
+.mp-remove-ai-btn {
+  padding: 4px 8px;
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid rgba(244, 67, 54, 0.5);
+  border-radius: 4px;
+  color: #ff6b6b;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mp-remove-ai-btn:hover {
+  background: rgba(244, 67, 54, 0.3);
+}
+
+/* AI Dialog */
+.mp-ai-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.mp-ai-dialog {
+  background: linear-gradient(145deg, #1a1a2e, #16213e);
+  border-radius: 12px;
+  padding: 24px;
+  width: 320px;
+  max-width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.mp-ai-dialog h3 {
+  color: #fff;
+  margin: 0 0 20px 0;
+  text-align: center;
+}
+
+.mp-ai-dialog .mp-field {
+  margin-bottom: 16px;
+}
+
+.mp-ai-dialog .mp-field select {
+  width: 100%;
+  padding: 10px;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+}
+
+.mp-ai-dialog .mp-field select option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.mp-ai-dialog .mp-field select option:disabled {
+  color: #666;
+}
+
+.mp-ai-dialog .mp-form-buttons {
+  margin-top: 20px;
 }
