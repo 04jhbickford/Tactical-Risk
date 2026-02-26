@@ -408,15 +408,14 @@ export class LobbyManager {
     }
   }
 
-  // Check if all players are ready
+  // Check if game can be started (host can start anytime with 2+ players who have factions)
   canStart() {
     if (!this.currentLobby) return false;
     if (this.currentLobby.players.length < 2) return false;
 
-    // All players must have selected a faction and be ready (AI players are always ready)
-    return this.currentLobby.players.every(p =>
-      p.factionId && (p.isReady || p.isAI)
-    );
+    // All players must have selected a faction (color is optional, will get default)
+    // Host doesn't need to "ready up" - they just click Start Game
+    return this.currentLobby.players.every(p => p.factionId);
   }
 
   // Start the game (host only)
@@ -428,8 +427,15 @@ export class LobbyManager {
       return { success: false, error: 'Only host can start' };
     }
 
-    if (!this.canStart()) {
-      return { success: false, error: 'Not all players ready' };
+    // Check minimum requirements
+    if (this.currentLobby.players.length < 2) {
+      return { success: false, error: 'Need at least 2 players' };
+    }
+
+    // Check all players have selected factions
+    const playersWithoutFaction = this.currentLobby.players.filter(p => !p.factionId);
+    if (playersWithoutFaction.length > 0) {
+      return { success: false, error: 'All players must select a faction' };
     }
 
     const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

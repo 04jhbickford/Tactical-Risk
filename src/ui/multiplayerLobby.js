@@ -110,6 +110,9 @@ export class MultiplayerLobby {
       content = this._renderLobby(user);
     }
 
+    // Contextual tagline based on mode
+    const tagline = this.mode === 'lobby' ? 'Game Lobby' : 'Online Multiplayer';
+
     this.el.innerHTML = `
       <div class="lobby-container modern">
         <div class="lobby-bg-pattern"></div>
@@ -117,7 +120,7 @@ export class MultiplayerLobby {
           <div class="mp-lobby-container">
             <div class="lobby-brand mp-brand">
               <h1 class="lobby-logo">Tactical Risk</h1>
-              <p class="lobby-tagline">Online Multiplayer</p>
+              <p class="lobby-tagline">${tagline}</p>
               <span class="lobby-version-badge">${GAME_VERSION}</span>
             </div>
             ${content}
@@ -158,7 +161,7 @@ export class MultiplayerLobby {
           </div>
           <div class="mp-card-content">
             <h3>Open Games</h3>
-            <p>Browse lobbies</p>
+            <p>Join a lobby</p>
           </div>
         </button>
         <button class="mp-menu-card" data-action="rejoin">
@@ -390,7 +393,7 @@ export class MultiplayerLobby {
               const isAI = player.isAI;
               const faction = factions.find(f => f.id === player.factionId);
               return `
-                <div class="mp-player-item ${isMe ? 'is-me' : ''} ${player.isReady || isAI ? 'ready' : ''}">
+                <div class="mp-player-item ${isMe ? 'is-me' : ''} ${faction ? 'ready' : ''}">
                   <div class="mp-player-avatar" style="border-color: ${player.color || '#64748b'}">
                     ${faction ? `<img src="assets/flags/${faction.flag}" alt="${faction.name}">` : '<span class="no-faction">?</span>'}
                   </div>
@@ -399,7 +402,7 @@ export class MultiplayerLobby {
                     <div class="mp-player-badges">
                       ${player.isHost ? '<span class="badge host">HOST</span>' : ''}
                       ${isAI ? `<span class="badge ai">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : ''}
-                      ${!isAI ? `<span class="badge ${player.isReady ? 'ready' : 'waiting'}">${player.isReady ? 'READY' : 'WAITING'}</span>` : ''}
+                      ${!isAI && !player.isHost ? `<span class="badge ${player.isReady ? 'ready' : 'waiting'}">${player.isReady ? 'READY' : 'SELECTING'}</span>` : ''}
                     </div>
                   </div>
                   ${isAI && isHost ? `
@@ -460,19 +463,20 @@ export class MultiplayerLobby {
         </div>
 
         <div class="mp-lobby-actions">
-          <button class="mp-action-btn secondary" data-action="leave">Leave</button>
-          <button class="mp-action-btn ${currentPlayer?.isReady ? 'ready' : 'primary'}" data-action="ready"
-                  ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
-            ${currentPlayer?.isReady ? 'Cancel Ready' : 'Ready Up'}
-          </button>
+          <button class="mp-action-btn secondary" data-action="leave">Leave Lobby</button>
           ${isHost ? `
-            <button class="mp-action-btn start" data-action="start" ${!canStart ? 'disabled' : ''}>
+            <button class="mp-action-btn start" data-action="start"
+                    ${!currentPlayer?.factionId || !currentPlayer?.color || lobby.players.length < 2 ? 'disabled' : ''}>
               Start Game
             </button>
           ` : `
+            <button class="mp-action-btn ${currentPlayer?.isReady ? 'ready' : 'primary'}" data-action="ready"
+                    ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
+              ${currentPlayer?.isReady ? 'Cancel Ready' : 'Ready Up'}
+            </button>
             <div class="mp-waiting-indicator">
               <div class="waiting-dot"></div>
-              <span>Waiting for host...</span>
+              <span>Waiting for host to start...</span>
             </div>
           `}
         </div>
