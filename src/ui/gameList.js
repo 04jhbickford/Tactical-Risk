@@ -6,10 +6,12 @@ import {
   query,
   where,
   getDocs,
-  orderBy
+  deleteDoc,
+  doc
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getFirebaseDb } from '../multiplayer/firebase.js';
 import { getAuthManager } from '../multiplayer/auth.js';
+import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 
 export class GameList {
   constructor(onSelectGame, onBack) {
@@ -17,6 +19,7 @@ export class GameList {
     this.onBack = onBack;
     this.db = getFirebaseDb();
     this.authManager = getAuthManager();
+    this.lobbyManager = getLobbyManager();
     this.el = null;
     this.games = [];
     this.isLoading = false;
@@ -46,7 +49,7 @@ export class GameList {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'game-list';
-    this.el.className = 'game-list-overlay';
+    this.el.className = 'lobby-overlay modern';
     document.body.appendChild(this.el);
   }
 
@@ -91,42 +94,49 @@ export class GameList {
 
   _render() {
     const user = this.authManager.getUser();
+    const isAdmin = this.lobbyManager.isAdmin();
 
     let content = '';
 
     if (this.isLoading) {
       content = `
-        <div class="game-list-loading">
-          <div class="loading-spinner"></div>
-          <p>Loading your games...</p>
-        </div>
+        <div class="mp-games-loading">Loading your games...</div>
       `;
     } else if (this.games.length === 0) {
       content = `
-        <div class="game-list-empty">
-          <p>No active games found.</p>
-          <p class="game-list-hint">Games you join or create will appear here.</p>
-        </div>
+        <p class="mp-no-games">No active games found.</p>
+        <p class="mp-no-games-hint">Games you create or join will appear here.</p>
       `;
     } else {
       content = `
-        <div class="game-list-items">
-          ${this.games.map(game => this._renderGameItem(game, user)).join('')}
+        <div class="mp-games-list">
+          ${this.games.map(game => this._renderGameItem(game, user, isAdmin)).join('')}
         </div>
       `;
     }
 
     this.el.innerHTML = `
-      <div class="game-list-content">
-        <div class="game-list-header">
-          <h2>Your Active Games</h2>
-          <button class="game-list-refresh-btn" data-action="refresh" title="Refresh">&#8635;</button>
-        </div>
+      <div class="lobby-container modern">
+        <div class="lobby-bg-pattern"></div>
+        <div class="lobby-content-wrapper">
+          <div class="mp-lobby-container">
+            <div class="lobby-brand mp-brand">
+              <h1 class="lobby-logo">Tactical Risk</h1>
+              <p class="lobby-tagline">My Active Games</p>
+            </div>
 
-        ${content}
+            <div class="mp-active-games-section">
+              <div class="mp-section-header">
+                <h3 class="mp-section-title">Your Games</h3>
+                <button class="mp-refresh-btn" data-action="refresh" title="Refresh">↻</button>
+              </div>
+              ${content}
+            </div>
 
-        <div class="game-list-footer">
-          <button class="game-list-back-btn" data-action="back">Back</button>
+            <div class="mp-footer-actions">
+              <button class="mp-secondary-btn" data-action="back">← Back</button>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -134,10 +144,9 @@ export class GameList {
     this._bindEvents();
   }
 
-  _renderGameItem(game, user) {
+  _renderGameItem(game, user, isAdmin) {
     const lobbyData = game.lobbyData || {};
     const players = lobbyData.players || [];
-    const settings = lobbyData.settings || {};
 
     // Format last updated time
     let lastUpdated = 'Unknown';
@@ -156,32 +165,26 @@ export class GameList {
     // Get round info from state
     const round = game.state?.round || 1;
 
+    // Player names list
+    const playerNames = players.map(p => p.displayName).join(', ');
+
     return `
-      <div class="game-list-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
-        <div class="game-item-main">
-          <div class="game-item-info">
-            <span class="game-item-players">${players.length} players</span>
-            <span class="game-item-round">Round ${round}</span>
-            <span class="game-item-time">${lastUpdated}</span>
+      <div class="mp-game-row">
+        <button class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
+          <div class="mp-game-info">
+            <span class="mp-game-name">${playerNames}</span>
+            <span class="mp-game-details">
+              Round ${round} · ${players.length} players · ${lastUpdated}
+            </span>
           </div>
-          <div class="game-item-turn">
+          <div class="mp-game-status">
             ${isMyTurn
-              ? '<span class="your-turn-badge">Your Turn!</span>'
-              : `<span class="waiting-for">Waiting for ${currentPlayerName}</span>`
+              ? '<span class="mp-your-turn">Your Turn!</span>'
+              : `<span class="mp-waiting">Waiting: ${currentPlayerName}</span>`
             }
           </div>
-        </div>
-        <div class="game-item-players-list">
-          ${players.map(p => `
-            <span class="game-player-tag" style="border-color: ${p.color || '#666'}">
-              ${p.displayName}
-              ${p.oderId === game.currentPlayerId ? ' (active)' : ''}
-            </span>
-          `).join('')}
-        </div>
-        <button class="game-item-join-btn" data-game-id="${game.id}">
-          ${isMyTurn ? 'Play Now' : 'View Game'}
         </button>
+        ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}
       </div>
     `;
   }
@@ -215,14 +218,31 @@ export class GameList {
       this._render();
     });
 
-    // Game items
-    this.el.querySelectorAll('.game-item-join-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const gameId = btn.dataset.gameId;
+    // Game items - click to join
+    this.el.querySelectorAll('.mp-game-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
         if (game && this.onSelectGame) {
           this.hide();
           this.onSelectGame(gameId, game);
+        }
+      });
+    });
+
+    // Admin delete buttons
+    this.el.querySelectorAll('.mp-admin-delete').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const gameId = btn.dataset.deleteGame;
+        if (confirm('Delete this game? This cannot be undone.')) {
+          const result = await this.lobbyManager.adminDeleteGame(gameId);
+          if (result.success) {
+            await this._loadGames();
+            this._render();
+          } else {
+            alert('Failed to delete: ' + result.error);
+          }
         }
       });
     });
