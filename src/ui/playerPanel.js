@@ -22,6 +22,7 @@ const TABS = [
   { id: 'stats', label: 'Players', icon: '📊' },
   { id: 'territory', label: 'Territory', icon: '🗺' },
   { id: 'log', label: 'Log', icon: '📜' },
+  { id: 'debug', label: 'Debug', icon: '🔧', multiplayerOnly: true },
 ];
 
 export class PlayerPanel {
@@ -47,6 +48,10 @@ export class PlayerPanel {
     // Inline movement state
     this.moveSelectedUnits = {};  // { unitType: quantity }
     this.movePendingDest = null;
+
+    // Multiplayer debug log
+    this.syncLog = [];
+    this.maxSyncLogEntries = 20;
 
     // Inline air landing state
     this.airLandingData = null;  // { airUnitsToLand, combatTerritory, isRetreating }
@@ -400,9 +405,12 @@ export class PlayerPanel {
   }
 
   _renderTabs() {
+    const isMultiplayer = this.gameState?.isMultiplayer;
+    const visibleTabs = TABS.filter(tab => !tab.multiplayerOnly || isMultiplayer);
+
     return `
       <div class="pp-tabs">
-        ${TABS.map(tab => `
+        ${visibleTabs.map(tab => `
           <button class="pp-tab ${this.activeTab === tab.id ? 'active' : ''}"
                   data-tab="${tab.id}" title="${tab.label}">
             <span class="pp-tab-icon">${tab.icon}</span>
@@ -422,6 +430,8 @@ export class PlayerPanel {
         return this._renderTerritoryTab(player);
       case 'log':
         return this._renderLogTab();
+      case 'debug':
+        return this._renderDebugTab();
       default:
         return '';
     }
@@ -2562,6 +2572,20 @@ export class PlayerPanel {
           return;
         }
 
+        if (action === 'copy-debug') {
+          const debugInfo = this.getDebugInfo();
+          navigator.clipboard.writeText(debugInfo).then(() => {
+            btn.textContent = '✓ Copied!';
+            setTimeout(() => {
+              btn.textContent = '📋 Copy Debug Info';
+            }, 2000);
+          }).catch(err => {
+            console.error('Failed to copy:', err);
+            btn.textContent = '❌ Failed';
+          });
+          return;
+        }
+
         if (action === 'trade-set' && setIndex !== undefined) {
           const cardSet = this.validCardSets[parseInt(setIndex)];
           if (this.onAction && cardSet) {
@@ -3046,5 +3070,176 @@ export class PlayerPanel {
     }
 
     return false;
+  }
+
+  // Add a sync event to the debug log
+  logSyncEvent(event, details = {}) {
+    const entry = {
+      time: new Date().toLocaleTimeString('en-US', { hour12: false }),
+      event,
+      ...details
+    };
+    this.syncLog.push(entry);
+    if (this.syncLog.length > this.maxSyncLogEntries) {
+      this.syncLog.shift();
+    }
+  }
+
+  // Get debug info as copyable text
+  getDebugInfo() {
+    const gs = this.gameState;
+    const sm = this.syncManager;
+
+    if (!gs) return 'No game state';
+
+    const lines = [];
+    lines.push('=== TACTICAL RISK DEBUG INFO ===');
+    lines.push(`Time: ${new Date().toISOString()}`);
+    lines.push('');
+
+    // Connection info
+    lines.push('--- CONNECTION ---');
+    lines.push(`My User ID: ${this.localUserId || 'not set'}`);
+    lines.push(`Is Multiplayer: ${gs.isMultiplayer}`);
+    if (sm) {
+      lines.push(`Is Active Player: ${sm.checkIsActivePlayer()}`);
+      lines.push(`Is Host: ${sm.isHost}`);
+      lines.push(`Local Version: ${sm.localVersion}`);
+      lines.push(`Last Current Player ID: ${sm._lastCurrentPlayerId || 'none'}`);
+    }
+    lines.push('');
+
+    // Game state
+    lines.push('--- GAME STATE ---');
+    lines.push(`Phase: ${gs.phase}`);
+    lines.push(`Turn Phase: ${gs.turnPhase}`);
+    lines.push(`Round: ${gs.round}`);
+    lines.push(`Current Player Index: ${gs.currentPlayerIndex}`);
+    const cp = gs.currentPlayer;
+    if (cp) {
+      lines.push(`Current Player: ${cp.name} (oderId: ${cp.oderId}, isAI: ${cp.isAI})`);
+    }
+    lines.push('');
+
+    // Player mapping
+    lines.push('--- PLAYERS ---');
+    if (gs.players) {
+      gs.players.forEach((p, i) => {
+        const isMe = p.oderId === this.localUserId ? ' <-- ME' : '';
+        const isCurrent = i === gs.currentPlayerIndex ? ' <-- CURRENT' : '';
+        lines.push(`[${i}] ${p.name} (oderId: ${p.oderId}, isAI: ${p.isAI})${isMe}${isCurrent}`);
+      });
+    }
+    lines.push('');
+
+    // Recent sync events
+    lines.push('--- SYNC LOG (newest first) ---');
+    if (this.syncLog.length === 0) {
+      lines.push('No sync events yet');
+    } else {
+      [...this.syncLog].reverse().forEach(entry => {
+        const details = Object.entries(entry)
+          .filter(([k]) => k !== 'time' && k !== 'event')
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ');
+        lines.push(`${entry.time} | ${entry.event}${details ? ': ' + details : ''}`);
+      });
+    }
+
+    lines.push('');
+    lines.push('=== END DEBUG INFO ===');
+
+    return lines.join('\n');
+  }
+
+  _renderDebugTab() {
+    const gs = this.gameState;
+    const sm = this.syncManager;
+
+    let html = '<div class="pp-debug-tab">';
+
+    // Copy button at top
+    html += `
+      <div class="pp-debug-actions">
+        <button class="pp-debug-copy-btn" data-action="copy-debug">
+          📋 Copy Debug Info
+        </button>
+      </div>
+    `;
+
+    // Connection status
+    html += '<div class="pp-debug-section">';
+    html += '<div class="pp-debug-header">Connection</div>';
+    html += '<div class="pp-debug-grid">';
+    html += `<div class="pp-debug-label">My User ID:</div><div class="pp-debug-value">${this.localUserId || 'not set'}</div>`;
+    if (sm) {
+      html += `<div class="pp-debug-label">Active Player:</div><div class="pp-debug-value ${sm.checkIsActivePlayer() ? 'pp-debug-yes' : 'pp-debug-no'}">${sm.checkIsActivePlayer() ? 'YES (my turn)' : 'NO (waiting)'}</div>`;
+      html += `<div class="pp-debug-label">Is Host:</div><div class="pp-debug-value">${sm.isHost ? 'YES' : 'NO'}</div>`;
+      html += `<div class="pp-debug-label">State Version:</div><div class="pp-debug-value">${sm.localVersion}</div>`;
+    }
+    html += '</div></div>';
+
+    // Current turn
+    html += '<div class="pp-debug-section">';
+    html += '<div class="pp-debug-header">Current Turn</div>';
+    html += '<div class="pp-debug-grid">';
+    const cp = gs?.currentPlayer;
+    if (cp) {
+      const isMe = cp.oderId === this.localUserId;
+      html += `<div class="pp-debug-label">Player:</div><div class="pp-debug-value" style="color: ${cp.color}">${cp.name}${isMe ? ' (ME)' : ''}</div>`;
+      html += `<div class="pp-debug-label">Player oderId:</div><div class="pp-debug-value">${cp.oderId}</div>`;
+      html += `<div class="pp-debug-label">Player Index:</div><div class="pp-debug-value">${gs.currentPlayerIndex}</div>`;
+    }
+    html += `<div class="pp-debug-label">Phase:</div><div class="pp-debug-value">${gs?.phase || 'N/A'}</div>`;
+    html += `<div class="pp-debug-label">Turn Phase:</div><div class="pp-debug-value">${gs?.turnPhase || 'N/A'}</div>`;
+    html += `<div class="pp-debug-label">Round:</div><div class="pp-debug-value">${gs?.round || 'N/A'}</div>`;
+    html += '</div></div>';
+
+    // Player list
+    html += '<div class="pp-debug-section">';
+    html += '<div class="pp-debug-header">Players</div>';
+    html += '<div class="pp-debug-players">';
+    if (gs?.players) {
+      gs.players.forEach((p, i) => {
+        const isMe = p.oderId === this.localUserId;
+        const isCurrent = i === gs.currentPlayerIndex;
+        html += `
+          <div class="pp-debug-player ${isMe ? 'pp-debug-me' : ''} ${isCurrent ? 'pp-debug-current' : ''}">
+            <span class="pp-debug-player-idx">[${i}]</span>
+            <span class="pp-debug-player-name" style="color: ${p.color}">${p.name}</span>
+            <span class="pp-debug-player-info">${p.isAI ? 'AI' : 'Human'}</span>
+            ${isMe ? '<span class="pp-debug-badge">ME</span>' : ''}
+            ${isCurrent ? '<span class="pp-debug-badge current">TURN</span>' : ''}
+          </div>
+        `;
+      });
+    }
+    html += '</div></div>';
+
+    // Sync log
+    html += '<div class="pp-debug-section">';
+    html += '<div class="pp-debug-header">Sync Log</div>';
+    html += '<div class="pp-debug-log">';
+    if (this.syncLog.length === 0) {
+      html += '<div class="pp-debug-log-empty">No sync events yet</div>';
+    } else {
+      [...this.syncLog].reverse().forEach(entry => {
+        const details = Object.entries(entry)
+          .filter(([k]) => k !== 'time' && k !== 'event')
+          .map(([k, v]) => `${k}=${v}`)
+          .join(', ');
+        html += `
+          <div class="pp-debug-log-entry">
+            <span class="pp-debug-log-time">${entry.time}</span>
+            <span class="pp-debug-log-event">${entry.event}</span>
+            ${details ? `<span class="pp-debug-log-details">${details}</span>` : ''}
+          </div>
+        `;
+      });
+    }
+    html += '</div></div>';
+
+    html += '</div>';
+    return html;
   }
 }

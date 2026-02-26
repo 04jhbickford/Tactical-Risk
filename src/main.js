@@ -662,6 +662,13 @@ async function init() {
       userId: user?.id
     });
 
+    // Log initial game start to debug panel
+    playerPanel.logSyncEvent('game_start', {
+      gameId: gameId.slice(-6),
+      isHost,
+      shouldInitialize
+    });
+
     if (hasExistingState) {
       // Rejoining a game that already has state - just load it
       console.log('[MP] Rejoining existing game...');
@@ -743,6 +750,13 @@ async function init() {
 
     // Subscribe to sync events
     syncManager.subscribe((event, data) => {
+      // Log all sync events to debug tab
+      playerPanel.logSyncEvent(event, {
+        version: data?.version,
+        currentPlayerId: data?.currentPlayerId,
+        isActivePlayer: data?.isActivePlayer
+      });
+
       if (event === 'state_updated' || event === 'turn_changed') {
         camera.dirty = true;
         // Update player panel to reflect turn change
@@ -758,6 +772,11 @@ async function init() {
     // Host pushes all state changes (including AI turns), others only push their own turns
     gameState.subscribe(() => {
       if (syncManager && (syncManager.checkIsActivePlayer() || syncManager.isHost)) {
+        playerPanel.logSyncEvent('state_push', {
+          version: syncManager.localVersion + 1,
+          currentPlayer: gameState.currentPlayer?.name,
+          phase: gameState.turnPhase
+        });
         syncManager.pushState();
       }
     });
