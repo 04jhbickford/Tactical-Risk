@@ -35,30 +35,36 @@ export class AuthScreen {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'auth-screen';
-    this.el.className = 'auth-overlay';
+    this.el.className = 'lobby-overlay modern';
     document.body.appendChild(this.el);
   }
 
   _render() {
     const html = `
-      <div class="auth-content">
-        <div class="auth-header">
-          <h1 class="auth-title">Tactical Risk Online</h1>
-          <p class="auth-subtitle">Sign in to play multiplayer</p>
-        </div>
+      <div class="lobby-container modern">
+        <div class="lobby-bg-pattern"></div>
+        <div class="lobby-content-wrapper">
+          <div class="auth-container">
+            <div class="lobby-brand">
+              <h1 class="lobby-logo">Tactical Risk</h1>
+              <p class="lobby-tagline">Sign in to play online</p>
+            </div>
 
-        <div class="auth-tabs">
-          <button class="auth-tab ${this.mode === 'login' ? 'active' : ''}" data-mode="login">Sign In</button>
-          <button class="auth-tab ${this.mode === 'signup' ? 'active' : ''}" data-mode="signup">Sign Up</button>
-          <button class="auth-tab ${this.mode === 'phone' || this.mode === 'verify' ? 'active' : ''}" data-mode="phone">Phone</button>
-        </div>
+            <div class="auth-tabs modern">
+              <button class="auth-tab ${this.mode === 'login' ? 'active' : ''}" data-mode="login">Sign In</button>
+              <button class="auth-tab ${this.mode === 'signup' ? 'active' : ''}" data-mode="signup">Sign Up</button>
+              <button class="auth-tab ${this.mode === 'phone' || this.mode === 'verify' ? 'active' : ''}" data-mode="phone">Phone</button>
+            </div>
 
-        <div class="auth-form-container">
-          ${this._renderForm()}
-        </div>
+            <div class="auth-form-container">
+              ${this._renderForm()}
+            </div>
 
-        <div class="auth-footer">
-          <button class="auth-back-btn" data-action="back">Back to Lobby</button>
+            <button class="auth-back-btn modern" data-action="back">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+              Back to Menu
+            </button>
+          </div>
         </div>
       </div>
     `;
@@ -70,17 +76,17 @@ export class AuthScreen {
   _renderForm() {
     if (this.mode === 'login') {
       return `
-        <form class="auth-form" data-form="login">
-          <div class="auth-field">
+        <form class="auth-form modern" data-form="login">
+          <div class="mp-field">
             <label for="login-email">Email</label>
-            <input type="email" id="login-email" placeholder="your@email.com" required>
+            <input type="email" id="login-email" placeholder="your@email.com" required class="modern-input">
           </div>
-          <div class="auth-field">
+          <div class="mp-field">
             <label for="login-password">Password</label>
-            <input type="password" id="login-password" placeholder="Password" required>
+            <input type="password" id="login-password" placeholder="Password" required class="modern-input">
           </div>
-          <div class="auth-error hidden" id="login-error"></div>
-          <button type="submit" class="auth-submit-btn" ${this.isLoading ? 'disabled' : ''}>
+          <div class="mp-error hidden" id="login-error"></div>
+          <button type="submit" class="mp-primary-btn" ${this.isLoading ? 'disabled' : ''}>
             ${this.isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
@@ -89,21 +95,21 @@ export class AuthScreen {
 
     if (this.mode === 'signup') {
       return `
-        <form class="auth-form" data-form="signup">
-          <div class="auth-field">
+        <form class="auth-form modern" data-form="signup">
+          <div class="mp-field">
             <label for="signup-name">Display Name</label>
-            <input type="text" id="signup-name" placeholder="Your name" maxlength="20" required>
+            <input type="text" id="signup-name" placeholder="Your name" maxlength="20" required class="modern-input">
           </div>
-          <div class="auth-field">
+          <div class="mp-field">
             <label for="signup-email">Email</label>
-            <input type="email" id="signup-email" placeholder="your@email.com" required>
+            <input type="email" id="signup-email" placeholder="your@email.com" required class="modern-input">
           </div>
-          <div class="auth-field">
+          <div class="mp-field">
             <label for="signup-password">Password</label>
-            <input type="password" id="signup-password" placeholder="Min 6 characters" minlength="6" required>
+            <input type="password" id="signup-password" placeholder="Min 6 characters" minlength="6" required class="modern-input">
           </div>
-          <div class="auth-error hidden" id="signup-error"></div>
-          <button type="submit" class="auth-submit-btn" ${this.isLoading ? 'disabled' : ''}>
+          <div class="mp-error hidden" id="signup-error"></div>
+          <button type="submit" class="mp-primary-btn" ${this.isLoading ? 'disabled' : ''}>
             ${this.isLoading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
@@ -112,14 +118,14 @@ export class AuthScreen {
 
     if (this.mode === 'phone') {
       return `
-        <form class="auth-form" data-form="phone">
-          <div class="auth-field">
+        <form class="auth-form modern" data-form="phone">
+          <div class="mp-field">
             <label for="phone-number">Phone Number</label>
-            <input type="tel" id="phone-number" placeholder="+1234567890" required>
+            <input type="tel" id="phone-number" placeholder="+1234567890" required class="modern-input">
             <span class="auth-hint">Include country code (e.g., +1 for US)</span>
           </div>
-          <div class="auth-error hidden" id="phone-error"></div>
-          <button type="submit" id="phone-submit-btn" class="auth-submit-btn" ${this.isLoading ? 'disabled' : ''}>
+          <div class="mp-error hidden" id="phone-error"></div>
+          <button type="submit" id="phone-submit-btn" class="mp-primary-btn" ${this.isLoading ? 'disabled' : ''}>
             ${this.isLoading ? 'Sending code...' : 'Send Verification Code'}
           </button>
         </form>
@@ -128,17 +134,17 @@ export class AuthScreen {
 
     if (this.mode === 'verify') {
       return `
-        <form class="auth-form" data-form="verify">
-          <p class="auth-verify-info">Enter the code sent to ${this.phoneNumber}</p>
-          <div class="auth-field">
+        <form class="auth-form modern" data-form="verify">
+          <p class="auth-verify-info">Enter the code sent to <strong>${this.phoneNumber}</strong></p>
+          <div class="mp-field">
             <label for="verify-code">Verification Code</label>
-            <input type="text" id="verify-code" placeholder="123456" maxlength="6" required>
+            <input type="text" id="verify-code" placeholder="123456" maxlength="6" required class="modern-input code-input">
           </div>
-          <div class="auth-error hidden" id="verify-error"></div>
-          <button type="submit" class="auth-submit-btn" ${this.isLoading ? 'disabled' : ''}>
+          <div class="mp-error hidden" id="verify-error"></div>
+          <button type="submit" class="mp-primary-btn" ${this.isLoading ? 'disabled' : ''}>
             ${this.isLoading ? 'Verifying...' : 'Verify Code'}
           </button>
-          <button type="button" class="auth-resend-btn" data-action="resend">
+          <button type="button" class="auth-resend-btn modern" data-action="resend">
             Didn't receive code? Resend
           </button>
         </form>
