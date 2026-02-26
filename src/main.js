@@ -764,23 +764,25 @@ async function init() {
     });
 
     hud.setOnExitToLobby(() => {
-      // Check if this was a multiplayer game before resetting
-      const wasMultiplayer = gameState?.isMultiplayer;
-
       // Stop sync manager if multiplayer
       if (syncManager) {
         syncManager.stopSync();
         syncManager = null;
       }
+
+      // Hide any open multiplayer UI
+      if (multiplayerLobby) {
+        multiplayerLobby.hide();
+      }
+      if (gameListUI) {
+        gameListUI.hide();
+      }
+
       // Reset game state
       gameState = null;
 
-      // Show appropriate lobby
-      if (wasMultiplayer && multiplayerLobby) {
-        multiplayerLobby.show();
-      } else {
-        lobby.show();
-      }
+      // Always go back to main home screen
+      lobby.show();
     });
 
     // Bug tracker

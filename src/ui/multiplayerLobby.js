@@ -63,6 +63,8 @@ export class MultiplayerLobby {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+    // Reset mode to menu for next time
+    this.mode = 'menu';
   }
 
   destroy() {
