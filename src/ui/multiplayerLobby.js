@@ -53,6 +53,7 @@ export class MultiplayerLobby {
 
   show() {
     console.log('[MultiplayerLobby] show() called, mode:', this.mode);
+    console.trace('[MultiplayerLobby] show() stack trace');
     this.el.classList.remove('hidden');
     this.el.style.display = 'flex'; // Ensure visible
     this._subscribeToLobby();

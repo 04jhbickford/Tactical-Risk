@@ -1,7 +1,7 @@
 // Modern Lobby UI for Tactical Risk
 // Clean two-stage flow: Play Mode Selection → Game Setup
 
-export const GAME_VERSION = 'V2.44';
+export const GAME_VERSION = 'V2.45';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
