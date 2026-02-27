@@ -221,12 +221,19 @@ export class LobbyManager {
       joinedAt: Date.now()
     };
 
+    console.log('[LobbyManager] Player joining lobby:', {
+      oderId: user.id,
+      displayName: user.displayName,
+      lobbyId: lobby.id
+    });
+
     try {
       await updateDoc(doc(this.db, 'lobbies', lobby.id), {
         players: arrayUnion(newPlayer),
         updatedAt: serverTimestamp()
       });
       this._subscribeToLobby(lobby.id);
+      console.log('[LobbyManager] Player successfully joined lobby');
       return { success: true, lobbyId: lobby.id };
     } catch (error) {
       console.error('Error joining lobby:', error);
@@ -531,6 +538,13 @@ export class LobbyManager {
 
     const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const playerUserIds = this.currentLobby.players.map(p => p.oderId);
+
+    // Log players and their oderIds for debugging
+    console.log('[LobbyManager] Starting game with players:');
+    this.currentLobby.players.forEach((p, i) => {
+      console.log(`  [${i}] ${p.displayName}: oderId=${p.oderId}, isAI=${p.isAI || false}`);
+    });
+    console.log('[LobbyManager] playerUserIds array:', playerUserIds);
 
     try {
       // Create game document

@@ -26,17 +26,22 @@ export class GameList {
   }
 
   async show() {
+    console.log('[GameList] show() called');
+    console.trace('[GameList] show() stack trace');
     if (!this.el) {
       this._create();
     }
     this.el.classList.remove('hidden');
+    this.el.style.display = 'flex'; // Ensure it's visible
     await this._loadGames();
     this._render();
   }
 
   hide() {
+    console.log('[GameList] hide() called');
     if (this.el) {
       this.el.classList.add('hidden');
+      this.el.style.display = 'none'; // Force hide with display none
     }
   }
 
@@ -70,6 +75,11 @@ export class GameList {
     try {
       // Query games where user is a player
       // Include both 'active' and 'starting' (in case host hasn't initialized yet)
+      console.log('[GameList] Querying games with:', {
+        userId,
+        statuses: ['active', 'starting']
+      });
+
       const q = query(
         collection(this.db, 'games'),
         where('playerUserIds', 'array-contains', userId),
@@ -77,7 +87,7 @@ export class GameList {
       );
 
       const snapshot = await getDocs(q);
-      console.log(`[GameList] Found ${snapshot.docs.length} games`);
+      console.log(`[GameList] Found ${snapshot.docs.length} games for userId ${userId}`);
 
       this.games = snapshot.docs.map(doc => {
         const data = doc.data();
@@ -96,6 +106,11 @@ export class GameList {
       });
     } catch (error) {
       console.error('[GameList] Error loading games:', error);
+      // Check if it's an index error
+      if (error.message?.includes('index')) {
+        console.error('[GameList] INDEX ERROR - May need to create Firestore index!');
+        console.error('[GameList] Error details:', error.message);
+      }
       this.games = [];
     }
 
@@ -114,10 +129,18 @@ export class GameList {
       `;
     } else if (this.games.length === 0) {
       const userId = this.authManager.getUserId();
+      const userEmail = this.authManager.getUser()?.email || 'unknown';
       content = `
         <p class="mp-no-games">No active games found.</p>
         <p class="mp-no-games-hint">Games you create or join will appear here.</p>
-        <p class="mp-no-games-hint" style="font-size: 0.75em; color: #666;">Your ID: ${userId ? userId.slice(-8) : 'not logged in'}</p>
+        <p class="mp-no-games-hint" style="font-size: 0.75em; color: #666;">
+          Email: ${userEmail}<br>
+          Full ID: ${userId || 'not logged in'}<br>
+          Short ID: ${userId ? '...' + userId.slice(-8) : 'N/A'}
+        </p>
+        <p class="mp-no-games-hint" style="font-size: 0.7em; color: #888; margin-top: 8px;">
+          Check browser console for detailed debug info.
+        </p>
       `;
     } else {
       content = `

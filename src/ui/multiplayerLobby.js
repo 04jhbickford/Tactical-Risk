@@ -52,13 +52,17 @@ export class MultiplayerLobby {
   }
 
   show() {
+    console.log('[MultiplayerLobby] show() called, mode:', this.mode);
     this.el.classList.remove('hidden');
+    this.el.style.display = 'flex'; // Ensure visible
     this._subscribeToLobby();
     this._render();
   }
 
   hide() {
+    console.log('[MultiplayerLobby] hide() called');
     this.el.classList.add('hidden');
+    this.el.style.display = 'none'; // Force hide with display none
     if (this.unsubscribe) {
       this.unsubscribe();
       this.unsubscribe = null;
@@ -429,6 +433,7 @@ export class MultiplayerLobby {
                   </div>
                   <div class="mp-player-details">
                     <span class="mp-player-name">${player.displayName}</span>
+                    <span class="mp-player-id" style="font-size: 0.65em; color: #888; margin-left: 4px;">(${player.oderId ? '...' + player.oderId.slice(-6) : 'no-id'})</span>
                     <div class="mp-player-badges">
                       ${player.isHost ? '<span class="badge host">HOST</span>' : ''}
                       ${isAI ? `<span class="badge ai">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : ''}

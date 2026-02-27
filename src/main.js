@@ -622,6 +622,16 @@ async function init() {
     try {
       console.log('[MP] startMultiplayerGame called with:', { gameId, lobbyData });
 
+      // CRITICAL: Hide all multiplayer overlays immediately
+      if (multiplayerLobby) {
+        multiplayerLobby.hide();
+      }
+      if (gameListUI) {
+        gameListUI.hide();
+      }
+      // Also hide the main lobby just in case
+      lobby.hide();
+
       // Initialize game state
       gameState = new GameState(setup, territories, continents);
       gameState.isMultiplayer = true;
@@ -1123,6 +1133,10 @@ async function init() {
                 gameListUI = new GameList(
                   // onSelectGame
                   (gameId, game) => {
+                    console.log('[Main] onSelectGame called, hiding overlays');
+                    // Hide ALL multiplayer overlays before starting game
+                    multiplayerLobby.hide();
+                    gameListUI.hide();
                     startMultiplayerGame(gameId, game);
                   },
                   // onBack
@@ -1131,6 +1145,8 @@ async function init() {
                   }
                 );
               }
+              // Hide multiplayer lobby while showing game list
+              multiplayerLobby.hide();
               gameListUI.show();
             } else {
               // Back to main lobby

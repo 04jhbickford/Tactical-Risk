@@ -1,7 +1,7 @@
 // Modern Lobby UI for Tactical Risk
 // Clean two-stage flow: Play Mode Selection → Game Setup
 
-export const GAME_VERSION = 'V2.41';
+export const GAME_VERSION = 'V2.43';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
@@ -562,10 +562,12 @@ export class Lobby {
     this.mode = 'main';
     this._render();
     this.el.classList.remove('hidden');
+    this.el.style.display = 'flex'; // Ensure visible
   }
 
   hide() {
     this.el.classList.add('hidden');
+    this.el.style.display = 'none'; // Force hide
   }
 
   destroy() {
