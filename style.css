@@ -2306,6 +2306,28 @@ html, body {
   color: #e2e8f0;
 }
 
+/* Identity Box */
+.mp-identity-box {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.mp-identity-details {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.mp-identity-details strong {
+  color: #94a3b8;
+}
+
+.mp-user-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: #475569;
+}
+
 /* MP Menu Grid */
 .mp-menu-grid {
   display: grid;
@@ -16031,6 +16053,35 @@ html, body {
 .pp-waiting-hint {
   font-size: 0.85em;
   color: #888;
+}
+
+/* Presence Indicators (Online Status) */
+.pp-presence-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.pp-presence-dot.presence-online {
+  background: #4CAF50;
+  box-shadow: 0 0 4px #4CAF50;
+}
+
+.pp-presence-dot.presence-idle {
+  background: #FFC107;
+  box-shadow: 0 0 4px #FFC107;
+}
+
+.pp-presence-dot.presence-offline {
+  background: #666;
+}
+
+/* Highlight "You" player card */
+.pp-player-card.is-me {
+  border-left: 3px solid #4CAF50;
 }
 
 /* AI Player Styles */

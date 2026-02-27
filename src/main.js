@@ -50,6 +50,7 @@ import { getAuthManager } from './multiplayer/auth.js';
 import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
+import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -600,6 +601,7 @@ async function init() {
   // Multiplayer state
   let syncManager = null;
   let multiplayerGuard = null;
+  let presenceManager = null;
   let authScreen = null;
   let multiplayerLobby = null;
   let gameListUI = null;
@@ -608,6 +610,7 @@ async function init() {
   initializeFirebase();
   const authManager = getAuthManager();
   const lobbyManager = getLobbyManager();
+  presenceManager = getPresenceManager();
 
   if (isFirebaseConfigured()) {
     authManager.initialize();
@@ -781,6 +784,14 @@ async function init() {
       }
     });
 
+    // Start presence tracking
+    presenceManager.start(gameId);
+
+    // Subscribe to presence updates for player panel
+    presenceManager.subscribe((presence) => {
+      playerPanel.setPresenceData(presence);
+    });
+
     // Wire up all the UI components (same as local game)
     wireUpGameComponents();
 
@@ -841,6 +852,11 @@ async function init() {
     });
 
     hud.setOnExitToLobby(() => {
+      // Stop presence tracking
+      if (presenceManager) {
+        presenceManager.stop();
+      }
+
       // Stop sync manager if multiplayer
       if (syncManager) {
         syncManager.stopSync();

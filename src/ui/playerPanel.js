@@ -53,6 +53,9 @@ export class PlayerPanel {
     this.syncLog = [];
     this.maxSyncLogEntries = 20;
 
+    // Player presence data (green/yellow/red indicators)
+    this.presenceData = {};
+
     // Inline air landing state
     this.airLandingData = null;  // { airUnitsToLand, combatTerritory, isRetreating }
     this.airLandingIndex = 0;
@@ -99,6 +102,24 @@ export class PlayerPanel {
   setMultiplayerState(syncManager, localUserId) {
     this.syncManager = syncManager;
     this.localUserId = localUserId;
+  }
+
+  // Set presence data for online indicators
+  setPresenceData(presenceData) {
+    this.presenceData = presenceData || {};
+    this._render();
+  }
+
+  // Get presence state for a player (returns 'online', 'idle', or 'offline')
+  _getPlayerPresence(oderId) {
+    const presence = this.presenceData[oderId];
+    if (!presence) return 'offline';
+
+    // Check if stale (> 2 minutes)
+    const age = Date.now() - (presence.lastSeen || 0);
+    if (age > 120000) return 'offline';
+
+    return presence.state || 'offline';
   }
 
   setActionCallback(callback) {
@@ -653,18 +674,33 @@ export class PlayerPanel {
     playerStats.sort((a, b) => b.territories - a.territories);
 
     // Player cards
+    const isMultiplayer = this.gameState.isMultiplayer;
+
     for (const stats of playerStats) {
       const p = stats.player;
       const flagSrc = p.flag ? `assets/flags/${p.flag}` : null;
       const isActive = stats.isCurrentTurn;
       const isEliminated = !stats.hasCapital && stats.territories === 0;
+      const isMe = isMultiplayer && p.oderId === this.localUserId;
+
+      // Presence indicator for multiplayer (not for AI)
+      let presenceHtml = '';
+      if (isMultiplayer && !p.isAI) {
+        const presence = this._getPlayerPresence(p.oderId);
+        const presenceClass = presence === 'online' ? 'presence-online' :
+                              presence === 'idle' ? 'presence-idle' : 'presence-offline';
+        const presenceTitle = presence === 'online' ? 'Online (active)' :
+                              presence === 'idle' ? 'Online (idle)' : 'Offline';
+        presenceHtml = `<span class="pp-presence-dot ${presenceClass}" title="${presenceTitle}"></span>`;
+      }
 
       html += `
-        <div class="pp-player-card ${isActive ? 'active' : ''} ${isEliminated ? 'eliminated' : ''}"
+        <div class="pp-player-card ${isActive ? 'active' : ''} ${isEliminated ? 'eliminated' : ''} ${isMe ? 'is-me' : ''}"
              style="--player-color: ${p.color}">
           <div class="pp-player-header">
+            ${presenceHtml}
             ${flagSrc ? `<img src="${flagSrc}" class="pp-player-flag" alt="${p.name}">` : ''}
-            <span class="pp-player-name" style="color: ${p.color}">${p.name}</span>
+            <span class="pp-player-name" style="color: ${p.color}">${p.name}${isMe ? ' (You)' : ''}</span>
             ${isActive ? '<span class="pp-turn-indicator">◀ Turn</span>' : ''}
             ${!stats.hasCapital ? '<span class="pp-capital-lost">⚠ Capital Lost</span>' : ''}
           </div>

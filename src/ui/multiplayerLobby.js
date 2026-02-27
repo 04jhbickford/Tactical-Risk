@@ -133,8 +133,17 @@ export class MultiplayerLobby {
   }
 
   _renderMenu(user) {
+    // Show clear identity for debugging
+    const userIdShort = user?.id ? user.id.slice(-8) : 'unknown';
+
     return `
-      <p class="mp-welcome">Welcome, <strong>${user?.displayName || 'Player'}</strong></p>
+      <div class="mp-identity-box">
+        <p class="mp-welcome">Welcome, <strong>${user?.displayName || 'Player'}</strong></p>
+        <p class="mp-identity-details">
+          Logged in as: <strong>${user?.email || 'unknown'}</strong>
+          <span class="mp-user-id">(ID: ...${userIdShort})</span>
+        </p>
+      </div>
 
       <div class="mp-menu-grid four-col">
         <button class="mp-menu-card" data-action="create">
