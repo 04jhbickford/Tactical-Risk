@@ -733,10 +733,10 @@ export class PlayerPanel {
 
     // In multiplayer, find the LOCAL player's stats (not the current turn player)
     // In single player, show current turn player's stats
-    const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
+    const hasLocalUser = isMultiplayer && this.localUserId;
     let localPlayerStats = null;
 
-    if (isMultiplayer) {
+    if (hasLocalUser) {
       // Find player whose oderId matches the local user
       localPlayerStats = playerStats.find(s => s.player.oderId === this.localUserId);
     } else {
