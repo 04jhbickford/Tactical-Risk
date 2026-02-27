@@ -242,12 +242,17 @@ export class GameList {
 
     // Game items - click to join
     this.el.querySelectorAll('.mp-game-item').forEach(item => {
-      item.addEventListener('click', () => {
+      item.addEventListener('click', async () => {
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
+        console.log('[GameList] Game clicked:', { gameId, game });
         if (game && this.onSelectGame) {
           this.hide();
-          this.onSelectGame(gameId, game);
+          console.log('[GameList] Calling onSelectGame...');
+          await this.onSelectGame(gameId, game);
+          console.log('[GameList] onSelectGame completed');
+        } else {
+          console.warn('[GameList] No game found or no callback:', { game, hasCallback: !!this.onSelectGame });
         }
       });
     });

@@ -619,9 +619,12 @@ async function init() {
 
   // Function to start a multiplayer game
   const startMultiplayerGame = async (gameId, lobbyData) => {
-    // Initialize game state
-    gameState = new GameState(setup, territories, continents);
-    gameState.isMultiplayer = true;
+    try {
+      console.log('[MP] startMultiplayerGame called with:', { gameId, lobbyData });
+
+      // Initialize game state
+      gameState = new GameState(setup, territories, continents);
+      gameState.isMultiplayer = true;
 
     // Create sync manager
     syncManager = createSyncManager(gameId, gameState);
@@ -797,6 +800,12 @@ async function init() {
 
     // Start with map overview
     camera.dirty = true;
+    console.log('[MP] Game started successfully');
+
+    } catch (error) {
+      console.error('[MP] Error starting multiplayer game:', error);
+      alert('Error starting game: ' + error.message);
+    }
   };
 
   // Function to wire up all game components (shared between local and multiplayer)
