@@ -21,6 +21,7 @@ export class SyncManager {
     this.isActivePlayer = false;
     this.isHost = false; // Whether this client is the game host
     this.isPushing = false;
+    this.isLoadingRemoteState = false; // Flag to prevent push during remote state load
     this.unsubscribe = null;
     this._listeners = [];
     this._pendingPush = null;
@@ -34,6 +35,11 @@ export class SyncManager {
   // Get current user ID
   get userId() {
     return this.authManager.getUserId();
+  }
+
+  // Check if currently loading remote state (to prevent push during load)
+  isLoading() {
+    return this.isLoadingRemoteState;
   }
 
   // Subscribe to state changes
@@ -102,9 +108,11 @@ export class SyncManager {
         console.log(`[Sync] Loading newer state (init): ${this.localVersion} -> ${newData.stateVersion}`);
         this.localVersion = newData.stateVersion;
 
-        // Load new state
+        // Load new state - set flag to prevent subscription from pushing back
         if (newData.state) {
+          this.isLoadingRemoteState = true;
           this.gameState.loadFromJSON(newData.state);
+          this.isLoadingRemoteState = false;
         }
 
         // Update active player status
@@ -159,7 +167,9 @@ export class SyncManager {
         console.log(`  players in state:`, data.state.players?.map((p, i) => `[${i}] ${p.name} (oderId: ${p.oderId})`));
 
         this.localVersion = data.stateVersion;
+        this.isLoadingRemoteState = true;
         this.gameState.loadFromJSON(data.state);
+        this.isLoadingRemoteState = false;
         this._updateActivePlayer(data.currentPlayerId);
 
         console.log(`[Sync] After load - currentPlayer: ${this.gameState.currentPlayer?.name} (oderId: ${this.gameState.currentPlayer?.oderId})`);
@@ -189,9 +199,11 @@ export class SyncManager {
             console.log(`[Sync] Loading newer state: ${this.localVersion} -> ${newData.stateVersion}`);
             this.localVersion = newData.stateVersion;
 
-            // Load new state
+            // Load new state - set flag to prevent subscription from pushing back
             if (newData.state) {
+              this.isLoadingRemoteState = true;
               this.gameState.loadFromJSON(newData.state);
+              this.isLoadingRemoteState = false;
             }
 
             // Update active player status

@@ -786,8 +786,9 @@ async function init() {
 
     // Set up gameState observer to push changes
     // Host pushes all state changes (including AI turns), others only push their own turns
+    // IMPORTANT: Don't push if we're loading remote state (prevents feedback loop)
     gameState.subscribe(() => {
-      if (syncManager && (syncManager.checkIsActivePlayer() || syncManager.isHost)) {
+      if (syncManager && !syncManager.isLoading() && (syncManager.checkIsActivePlayer() || syncManager.isHost)) {
         playerPanel.logSyncEvent('state_push', {
           version: syncManager.localVersion + 1,
           currentPlayer: gameState.currentPlayer?.name,
