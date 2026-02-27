@@ -24,8 +24,9 @@ const HEARTBEAT_INTERVAL = 30000; // Update every 30 seconds
 
 export class PresenceManager {
   constructor() {
-    this.db = getFirebaseDb();
-    this.authManager = getAuthManager();
+    // Lazy load db and authManager to avoid initialization order issues
+    this._db = null;
+    this._authManager = null;
     this.gameId = null;
     this.presenceRef = null;
     this.unsubscribe = null;
@@ -34,6 +35,20 @@ export class PresenceManager {
     this.playerPresence = {}; // { oderId: { state, lastSeen, displayName } }
     this._listeners = [];
     this._boundActivityHandler = this._onActivity.bind(this);
+  }
+
+  get db() {
+    if (!this._db) {
+      this._db = getFirebaseDb();
+    }
+    return this._db;
+  }
+
+  get authManager() {
+    if (!this._authManager) {
+      this._authManager = getAuthManager();
+    }
+    return this._authManager;
   }
 
   // Start tracking presence for a game
