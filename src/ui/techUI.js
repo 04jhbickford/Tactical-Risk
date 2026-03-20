@@ -68,23 +68,37 @@ export class TechUI {
 
     // If we have a breakthrough, show tech selection
     if (this.breakthrough) {
-      html += `
-        <div class="tech-breakthrough">
-          <div class="tech-breakthrough-title">Breakthrough!</div>
-          <div class="tech-breakthrough-desc">Choose a technology to unlock:</div>
-          <div class="tech-options">
-            ${availableTechs.map(techId => {
-              const tech = TECHNOLOGIES[techId];
-              return `
-                <button class="tech-option" data-tech="${techId}">
-                  <span class="tech-option-name">${tech.name}</span>
-                  <span class="tech-option-desc">${tech.description}</span>
-                </button>
-              `;
-            }).join('')}
+      // Check if there are any available techs to unlock
+      if (availableTechs.length === 0) {
+        // All techs already unlocked - show message and continue button
+        html += `
+          <div class="tech-breakthrough">
+            <div class="tech-breakthrough-title">Breakthrough!</div>
+            <div class="tech-breakthrough-desc" style="color: #888;">
+              You've already unlocked all technologies! Your research breakthrough has no effect.
+            </div>
+            <button class="tech-btn done" data-action="done" style="margin-top: 12px;">Continue</button>
           </div>
-        </div>
-      `;
+        `;
+      } else {
+        html += `
+          <div class="tech-breakthrough">
+            <div class="tech-breakthrough-title">Breakthrough!</div>
+            <div class="tech-breakthrough-desc">Choose a technology to unlock:</div>
+            <div class="tech-options">
+              ${availableTechs.map(techId => {
+                const tech = TECHNOLOGIES[techId];
+                return `
+                  <button class="tech-option" data-tech="${techId}">
+                    <span class="tech-option-name">${tech.name}</span>
+                    <span class="tech-option-desc">${tech.description}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
     } else if (this.lastRolls) {
       // Show roll results - horizontal row like combat
       html += `

@@ -93,10 +93,46 @@ export class CombatUI {
       .filter(u => u.owner === player.id)
       .map(u => ({ ...u }));
 
+    // Include aircraft from carriers as separate combat units
+    // In A&A rules, carrier-based aircraft launch and participate in combat
+    const attackerCarriers = attackers.filter(u => u.type === 'carrier');
+    for (const carrier of attackerCarriers) {
+      if (carrier.aircraft && carrier.aircraft.length > 0) {
+        for (const aircraft of carrier.aircraft) {
+          // Find if we already have this type of aircraft in attackers
+          const existing = attackers.find(u => u.type === aircraft.type && u.owner === aircraft.owner);
+          if (existing) {
+            existing.quantity = (existing.quantity || 1) + 1;
+          } else {
+            attackers.push({ type: aircraft.type, owner: aircraft.owner, quantity: 1, fromCarrier: true });
+          }
+        }
+        // Clear aircraft from carrier - they're now in combat separately
+        // They will need to land after combat (on this carrier or another valid location)
+        carrier.aircraft = [];
+      }
+    }
+
     // Exclude factories from combat - they are captured, not destroyed
     const defenders = units
       .filter(u => u.owner !== player.id && !this.gameState.areAllies(player.id, u.owner) && u.type !== 'factory')
       .map(u => ({ ...u }));
+
+    // Include aircraft from defender carriers as combat units
+    const defenderCarriers = defenders.filter(u => u.type === 'carrier');
+    for (const carrier of defenderCarriers) {
+      if (carrier.aircraft && carrier.aircraft.length > 0) {
+        for (const aircraft of carrier.aircraft) {
+          const existing = defenders.find(u => u.type === aircraft.type && u.owner === aircraft.owner);
+          if (existing) {
+            existing.quantity = (existing.quantity || 1) + 1;
+          } else {
+            defenders.push({ type: aircraft.type, owner: aircraft.owner, quantity: 1, fromCarrier: true });
+          }
+        }
+        carrier.aircraft = [];
+      }
+    }
 
     // Check for AA guns and attacking aircraft
     const aaGuns = defenders.filter(u => u.type === 'aaGun');
@@ -106,10 +142,11 @@ export class CombatUI {
     });
 
     // A&A Submarine Rules: Check for submarines and destroyers
-    const attackerSubs = attackers.filter(u => u.type === 'submarine');
-    const defenderSubs = defenders.filter(u => u.type === 'submarine');
-    const attackerHasDestroyer = attackers.some(u => u.type === 'destroyer');
-    const defenderHasDestroyer = defenders.some(u => u.type === 'destroyer');
+    // IMPORTANT: Must check quantity > 0 to ensure units are actually present, not just empty entries
+    const attackerSubs = attackers.filter(u => u.type === 'submarine' && u.quantity > 0);
+    const defenderSubs = defenders.filter(u => u.type === 'submarine' && u.quantity > 0);
+    const attackerHasDestroyer = attackers.some(u => u.type === 'destroyer' && u.quantity > 0);
+    const defenderHasDestroyer = defenders.some(u => u.type === 'destroyer' && u.quantity > 0);
     // Submarines have first strike if opposing side has no destroyer
     const attackerSubsHaveFirstStrike = attackerSubs.length > 0 && !defenderHasDestroyer;
     const defenderSubsHaveFirstStrike = defenderSubs.length > 0 && !attackerHasDestroyer;
@@ -323,13 +360,14 @@ export class CombatUI {
     this.combatState.aaResults = { rolls, hits };
     this.combatState.aaFired = true;
 
-    // If there are hits, let the attacker choose which aircraft to lose
+    // A&A Rule: AA fire casualties are automatic - attacker doesn't choose
+    // The AA gun owner decides, and by convention cheapest aircraft are lost first
     if (hits > 0) {
       this.combatState.pendingAACasualties = hits;
-      this.combatState.selectedAACasualties = {};
-      // Pre-select cheapest as default suggestion
+      // Auto-select casualties (cheapest aircraft first)
       this.combatState.selectedAACasualties = this._selectCheapestAircraftCasualties(attackers, hits);
-      this.combatState.phase = 'selectAACasualties';
+      // Immediately apply AA casualties without user selection
+      this._applyAACasualties();
     } else {
       // No hits - move to combat
       this._proceedAfterAAFire();
@@ -1935,6 +1973,9 @@ export class CombatUI {
         html += `</div></div>`;
       }
 
+      // A&A Rule: Land units from amphibious assault cannot retreat - they must fight to the death
+      const isAmphibiousAssault = this.gameState.hasAmphibiousAssault(this.currentTerritory);
+
       html += `
         <button class="combat-btn roll" data-action="roll">
           <span class="btn-icon">🎲</span> Roll Dice
@@ -1942,7 +1983,10 @@ export class CombatUI {
         <button class="combat-btn auto" data-action="auto-battle">
           <span class="btn-icon">⚡</span> Auto Battle
         </button>
-        <button class="combat-btn retreat" data-action="retreat">Retreat</button>
+        ${isAmphibiousAssault ?
+          `<button class="combat-btn retreat" disabled title="Amphibious assault units cannot retreat">Retreat</button>` :
+          `<button class="combat-btn retreat" data-action="retreat">Retreat</button>`
+        }
       `;
     } else if (phase === 'selectRetreat') {
       // Select retreat destination (A&A rule: all units go to one territory)

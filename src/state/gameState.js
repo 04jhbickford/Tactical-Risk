@@ -192,6 +192,10 @@ export class GameState {
     this.isMultiplayer = false;
     this.syncManager = null; // Reference to SyncManager for pushing state changes
 
+    // Turn events for turn summary modal (multiplayer)
+    // Tracks battles, territory captures, etc. for showing what happened during other players' turns
+    this.turnEvents = [];
+
     // Build lookups
     this.territoryByName = {};
     this.landTerritories = [];
@@ -488,6 +492,34 @@ export class GameState {
 
   isCapital(territoryName) {
     return this.territoryState[territoryName]?.isCapital || false;
+  }
+
+  // Get effective IPC value for a territory (capitals are worth 10 IPCs)
+  getEffectiveIpc(territoryName) {
+    const t = this.territoryByName[territoryName];
+    if (!t || t.isWater) return 0;
+
+    // Capitals are always worth 10 IPCs
+    if (this.isCapital(territoryName)) {
+      return 10;
+    }
+
+    return t.production || 0;
+  }
+
+  // Get factory capacity for a territory (capital factory = 20, other factories = 5)
+  // Returns null if no factory present
+  getFactoryCapacity(territoryName) {
+    const units = this.units[territoryName] || [];
+    const hasFactory = units.some(u => u.type === 'factory');
+    if (!hasFactory) return null;
+
+    // Check if this is a capital
+    if (this.isCapital(territoryName)) {
+      return 20;
+    }
+
+    return 5;
   }
 
   getCapital(playerId) {
@@ -3015,26 +3047,30 @@ export class GameState {
     });
 
     if (attackers.length === 0 || combatDefenders.length === 0) {
-      // Attacker wins if there are no combat defenders (factories/AA captured)
-      if (attackers.length > 0 && allDefenders.length > 0) {
-        // Capture territory and transfer factory/AA gun ownership
+      // Attacker wins if there are no combat defenders
+      if (attackers.length > 0) {
+        // Capture territory - either from enemy defenders (factories/AA) or undefended enemy territory
         const t = this.territoryByName[territory];
         if (!t?.isWater) {
-          this.territoryState[territory].owner = player.id;
-          // Transfer factory and AA gun ownership (captured, not destroyed - A&A Anniversary rules)
-          for (const unit of units) {
-            if (unit.type === 'factory' || unit.type === 'aaGun') {
-              unit.owner = player.id;
-              // Ensure unit has quantity (safeguard)
-              if (!unit.quantity || unit.quantity < 1) {
-                unit.quantity = 1;
+          const currentOwner = this.territoryState[territory]?.owner;
+          // Capture if territory belongs to enemy or neutral
+          if (!currentOwner || (currentOwner !== player.id && !this.areAllies(player.id, currentOwner))) {
+            this.territoryState[territory].owner = player.id;
+            // Transfer factory and AA gun ownership (captured, not destroyed - A&A Anniversary rules)
+            for (const unit of units) {
+              if (unit.type === 'factory' || unit.type === 'aaGun') {
+                unit.owner = player.id;
+                // Ensure unit has quantity (safeguard)
+                if (!unit.quantity || unit.quantity < 1) {
+                  unit.quantity = 1;
+                }
               }
             }
-          }
-          // Award Risk card for conquering
-          if (!this.conqueredThisTurn[player.id]) {
-            this.conqueredThisTurn[player.id] = true;
-            this.awardRiskCard(player.id);
+            // Award Risk card for conquering
+            if (!this.conqueredThisTurn[player.id]) {
+              this.conqueredThisTurn[player.id] = true;
+              this.awardRiskCard(player.id);
+            }
           }
         }
       }
@@ -3113,6 +3149,9 @@ export class GameState {
         // Land battle won - capture territory
         const defender = allDefenders[0]?.owner;
         this.territoryState[territory].owner = player.id;
+
+        // Log territory capture for turn summary modal (multiplayer)
+        this.logTerritoryCapture(territory, defender, player.id);
 
         // Transfer factory and AA gun ownership to the winner (captured, not destroyed - A&A Anniversary rules)
         const territoryUnits = this.units[territory] || [];
@@ -3717,6 +3756,19 @@ export class GameState {
       timestamp: Date.now(),
       ...result
     });
+
+    // Also add to turnEvents for turn summary modal (multiplayer)
+    this.turnEvents.push({
+      type: 'combat',
+      playerId: this.currentPlayer?.id,
+      timestamp: Date.now(),
+      territory: result.territory,
+      attacker: result.attacker,
+      defender: result.defender,
+      outcome: result.winner === result.attacker ? 'attacker' : 'defender',
+      attackerLosses: result.attackerLosses,
+      defenderLosses: result.defenderLosses
+    });
   }
 
   // Get combat log for display
@@ -3727,6 +3779,35 @@ export class GameState {
   // Clear combat log (called at start of new round)
   clearCombatLog() {
     this.combatLog = [];
+  }
+
+  // --- Turn Events for Turn Summary Modal ---
+
+  // Add a territory captured event
+  logTerritoryCapture(territory, fromPlayer, toPlayer) {
+    this.turnEvents.push({
+      type: 'territory_captured',
+      playerId: toPlayer,
+      timestamp: Date.now(),
+      territory,
+      fromPlayer,
+      toPlayer
+    });
+  }
+
+  // Get turn events since a given index
+  getTurnEventsSince(index) {
+    return this.turnEvents.slice(index);
+  }
+
+  // Get the current index (length) of turn events
+  getTurnEventsLastIndex() {
+    return this.turnEvents.length;
+  }
+
+  // Clear turn events (called when starting a new game)
+  clearTurnEvents() {
+    this.turnEvents = [];
   }
 
   // --- Tech Research System ---
@@ -4202,10 +4283,13 @@ export class GameState {
     }
     this.units[coastalTerritory] = coastalUnits;
 
-    // Mark as amphibious assault if unloading during combat move to enemy territory
+    // Mark as amphibious assault if unloading during combat move to non-friendly territory
+    // This includes enemy territories AND undefended/neutral territories (for shore bombardment)
     if (this.turnPhase === TURN_PHASES.COMBAT_MOVE) {
       const owner = this.getOwner(coastalTerritory);
-      if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
+      // Mark as amphibious if: no owner (undefended), or enemy owned, or not an ally
+      const isNonFriendly = !owner || (owner !== player.id && !this.areAllies(player.id, owner));
+      if (isNonFriendly) {
         this.amphibiousTerritories.add(coastalTerritory);
 
         // Track amphibious assault details for naval combat dependency
@@ -4297,10 +4381,13 @@ export class GameState {
     }
     this.units[coastalTerritory] = coastalUnits;
 
-    // Mark as amphibious assault if unloading during combat move to enemy territory
+    // Mark as amphibious assault if unloading during combat move to non-friendly territory
+    // This includes enemy territories AND undefended/neutral territories (for shore bombardment)
     if (this.turnPhase === TURN_PHASES.COMBAT_MOVE) {
       const owner = this.getOwner(coastalTerritory);
-      if (owner && owner !== player.id && !this.areAllies(player.id, owner)) {
+      // Mark as amphibious if: no owner (undefended), or enemy owned, or not an ally
+      const isNonFriendly = !owner || (owner !== player.id && !this.areAllies(player.id, owner));
+      if (isNonFriendly) {
         this.amphibiousTerritories.add(coastalTerritory);
 
         // Track amphibious assault details for naval combat dependency
@@ -4628,7 +4715,7 @@ export class GameState {
 
   toJSON() {
     return {
-      version: 10, // v10: Added multiplayer support
+      version: 11, // v11: Added turn events for turn summary modal
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
       teamsEnabled: this.teamsEnabled,
@@ -4656,6 +4743,8 @@ export class GameState {
       friendlyTerritoriesAtTurnStart: Array.from(this.friendlyTerritoriesAtTurnStart || []),
       // v9: Save factories at turn start for mobilization validation
       factoriesAtTurnStart: Array.from(this.factoriesAtTurnStart || []),
+      // v11: Turn events for turn summary modal (multiplayer)
+      turnEvents: this.turnEvents,
     };
   }
 
@@ -4705,6 +4794,9 @@ export class GameState {
       // This allows placing on any currently owned factory (less restrictive, but better than broken)
       this.factoriesAtTurnStart = new Set(this._getFactoryTerritories(this.currentPlayer?.id));
     }
+
+    // v11: Restore turn events for turn summary modal
+    this.turnEvents = data.turnEvents || [];
 
     // Reset per-turn state on load (fresh state for the turn)
     this.rocketsUsedThisTurn = {};

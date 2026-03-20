@@ -43,6 +43,7 @@ import { BugTracker } from './ui/bugTracker.js';
 import { AirLandingUI } from './ui/airLandingUI.js';
 import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
+import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 
 // Multiplayer imports
 import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
@@ -397,10 +398,11 @@ async function init() {
 
             // Handle cargo unloads (specific units selected for amphibious assault)
             if (data.cargoUnloads?.length > 0) {
-              // Check if destination is enemy territory (for amphibious assault marking)
+              // Check if destination is non-friendly territory (for amphibious assault marking)
+              // This includes enemy territories AND undefended/neutral territories
               const destOwner = gameState.getOwner(data.to);
-              const isEnemyTerritory = destOwner && destOwner !== gameState.currentPlayer.id &&
-                !gameState.areAllies(gameState.currentPlayer.id, destOwner);
+              const isNonFriendlyTerritory = !destOwner ||
+                (destOwner !== gameState.currentPlayer.id && !gameState.areAllies(gameState.currentPlayer.id, destOwner));
 
               for (const cargoUnload of data.cargoUnloads) {
                 const transport = transports.find(t => t.id === cargoUnload.transportId);
@@ -449,8 +451,8 @@ async function init() {
                     }
                     gameState.units[data.to] = destUnits;
 
-                    // Mark as amphibious assault if unloading to enemy territory during combat move
-                    if (isEnemyTerritory && gameState.turnPhase === TURN_PHASES.COMBAT_MOVE) {
+                    // Mark as amphibious assault if unloading to non-friendly territory during combat move
+                    if (isNonFriendlyTerritory && gameState.turnPhase === TURN_PHASES.COMBAT_MOVE) {
                       if (!gameState.amphibiousTerritories) gameState.amphibiousTerritories = new Set();
                       gameState.amphibiousTerritories.add(data.to);
                     }
@@ -557,6 +559,14 @@ async function init() {
       case 'next-phase':
         const prevPlayer = gameState.currentPlayer;
         const prevRound = gameState.round;
+
+        // In multiplayer, set optimistic waiting state BEFORE nextPhase
+        // This prevents brief interaction window when turn passes to another player
+        if (gameState.isMultiplayer && gameState.turnPhase === TURN_PHASES.COLLECT_INCOME) {
+          // COLLECT_INCOME phase will pass turn to next player
+          playerPanel.setWaitingForSync(true);
+        }
+
         gameState.nextPhase();
         camera.dirty = true;
 
@@ -605,6 +615,11 @@ async function init() {
   let authScreen = null;
   let multiplayerLobby = null;
   let gameListUI = null;
+
+  // Turn summary modal for showing what happened during other players' turns
+  const turnSummaryModal = new TurnSummaryModal();
+  turnSummaryModal.setUnitDefs(unitDefs);
+  let lastTurnEventIndex = 0; // Track where we left off in turn events
 
   // Initialize Firebase (if configured)
   initializeFirebase();
@@ -764,6 +779,9 @@ async function init() {
     // Set up sync manager reference in gameState
     gameState.syncManager = syncManager;
 
+    // Initialize turn event index for turn summary modal
+    lastTurnEventIndex = gameState.getTurnEventsLastIndex();
+
     // Subscribe to sync events
     syncManager.subscribe((event, data) => {
       // Log all sync events to debug tab
@@ -775,12 +793,46 @@ async function init() {
 
       if (event === 'state_updated' || event === 'turn_changed') {
         camera.dirty = true;
+
+        // Clear optimistic waiting state when we receive any sync update
+        // This handles both turn returns and state updates
+        if (data.isActivePlayer) {
+          playerPanel.setWaitingForSync(false);
+        }
+
         // Update player panel to reflect turn change
         playerPanel._render();
 
         if (event === 'turn_changed' && data.isActivePlayer) {
           showNotification("It's your turn!");
+
+          // Show turn summary modal with events from other players' turns
+          const events = gameState.getTurnEventsSince(lastTurnEventIndex);
+          lastTurnEventIndex = gameState.getTurnEventsLastIndex();
+          if (events.length > 0) {
+            turnSummaryModal.setGameState(gameState);
+            turnSummaryModal.show(events);
+          }
         }
+      }
+
+      // Handle auth errors - redirect to login
+      if (event === 'auth_error' && data?.needsReauth) {
+        console.warn('[Main] Auth error detected - returning to lobby');
+        showNotification('Session expired. Please sign in again.');
+
+        // Stop sync and clean up
+        if (syncManager) {
+          syncManager.stopSync();
+          syncManager = null;
+        }
+        if (presenceManager) {
+          presenceManager.stop();
+        }
+        gameState = null;
+
+        // Return to lobby
+        lobby.show();
       }
     });
 
