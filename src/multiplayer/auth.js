@@ -109,6 +109,13 @@ export class AuthManager {
         await updateProfile(result.user, { displayName });
       }
 
+      // Eagerly set currentUser (same race condition as signInWithEmail)
+      this.currentUser = {
+        id: result.user.uid,
+        email: result.user.email,
+        displayName: displayName || result.user.email?.split('@')[0] || 'Player',
+        phoneNumber: result.user.phoneNumber
+      };
       return { success: true, user: result.user };
     } catch (error) {
       return { success: false, error: this._getErrorMessage(error) };
@@ -123,6 +130,14 @@ export class AuthManager {
 
     try {
       const result = await signInWithEmailAndPassword(this.auth, email, password);
+      // Set currentUser eagerly so isLoggedIn() is true immediately — onAuthStateChanged
+      // fires asynchronously (after a Firestore write) so getUser() would be null otherwise
+      this.currentUser = {
+        id: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName || result.user.email?.split('@')[0] || 'Player',
+        phoneNumber: result.user.phoneNumber
+      };
       return { success: true, user: result.user };
     } catch (error) {
       return { success: false, error: this._getErrorMessage(error) };
@@ -172,6 +187,13 @@ export class AuthManager {
     try {
       const result = await this.confirmationResult.confirm(code);
       this.confirmationResult = null;
+      // Eagerly set currentUser (same race condition as signInWithEmail)
+      this.currentUser = {
+        id: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName || result.user.phoneNumber || 'Player',
+        phoneNumber: result.user.phoneNumber
+      };
       return { success: true, user: result.user };
     } catch (error) {
       return { success: false, error: this._getErrorMessage(error) };
