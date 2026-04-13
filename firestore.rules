@@ -1,0 +1,38 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users can read/write their own profile; other authenticated users can read profiles
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Lobbies: any authenticated user can create, read, or update lobbies.
+    // Only the host (creator) can delete a lobby.
+    match /lobbies/{lobbyId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.hostId;
+    }
+
+    // Games: any authenticated user can create, read, or update games.
+    // Only the host can delete a game.
+    match /games/{gameId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.hostId;
+    }
+
+    // Presence: authenticated users can manage their own presence records
+    match /presence/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
