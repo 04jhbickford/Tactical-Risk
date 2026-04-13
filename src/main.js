@@ -712,7 +712,7 @@ async function init() {
     } else if (shouldInitialize && playersData) {
       // Initialize the game (person who clicked Start)
       const players = playersData.map(p => {
-        const factionDef = setup.risk.factions.find(f => f.id === p.factionId);
+        const factionDef = setup.risk.factions.find(f => f.id === p.factionId) || {};
         return {
           ...factionDef,
           id: p.factionId,

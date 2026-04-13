@@ -4706,11 +4706,9 @@ export class GameState {
     for (const cb of this._listeners) {
       cb(this);
     }
-
-    // Push state to server if multiplayer
-    if (this.isMultiplayer && this.syncManager) {
-      this.syncManager.pushState();
-    }
+    // Note: multiplayer state push is handled by the subscription in main.js,
+    // which correctly guards against pushing during remote state loads (isLoading check).
+    // Do NOT push directly here — it bypasses that guard.
   }
 
   toJSON() {

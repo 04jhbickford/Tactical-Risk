@@ -64,14 +64,20 @@ export class LobbyManager {
     const user = this.authManager.getUser();
     if (!user) return { success: false, error: 'Not logged in' };
 
-    // Generate unique code
-    let code = generateLobbyCode();
-    let attempts = 0;
-    while (attempts < 10) {
-      const existing = await this._findLobbyByCode(code);
-      if (!existing) break;
+    // Generate unique code (inside try/catch — _findLobbyByCode can throw on Firestore errors)
+    let code;
+    try {
       code = generateLobbyCode();
-      attempts++;
+      let attempts = 0;
+      while (attempts < 10) {
+        const existing = await this._findLobbyByCode(code);
+        if (!existing) break;
+        code = generateLobbyCode();
+        attempts++;
+      }
+    } catch (error) {
+      console.error('Error generating lobby code:', error);
+      return { success: false, error: 'Failed to connect to server. Check your connection and try again.' };
     }
 
     const lobbyId = `lobby_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

@@ -80,6 +80,11 @@ export class MultiplayerLobby {
   }
 
   _subscribeToLobby() {
+    // Clean up any existing subscription before registering a new one
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
     this.unsubscribe = this.lobbyManager.subscribe((lobby) => {
       // Check if game is starting
       if (lobby?.status === 'starting' && lobby.gameId) {
@@ -513,10 +518,13 @@ export class MultiplayerLobby {
 
             if (isHost && !lobby.isPublished) {
               // Host hasn't published yet - show Create Game
-              return `<button class="mp-action-btn primary" data-action="publish"
-                        ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
+              const needsSetup = !currentPlayer?.factionId || !currentPlayer?.color;
+              return `
+                <button class="mp-action-btn primary" data-action="publish" ${needsSetup ? 'disabled' : ''}>
                   Create Game
-                </button>`;
+                </button>
+                ${needsSetup ? '<p class="mp-action-hint">Select a faction and color above to continue</p>' : ''}
+              `;
             } else if (canStart) {
               // Can start (host always, or anyone when full)
               return `<button class="mp-action-btn start" data-action="start"
@@ -792,21 +800,35 @@ export class MultiplayerLobby {
     const isPrivate = form.querySelector('#create-private').checked;
     const password = isPrivate ? form.querySelector('#create-password').value : null;
 
-    const result = await this.lobbyManager.createLobby(name, {
-      maxPlayers,
-      startingIPCs,
-      password: password || null,
-      teamsEnabled: false // Team mode can be enabled in the lobby
-    });
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
 
-    if (!result.success) {
+    try {
+      const result = await this.lobbyManager.createLobby(name, {
+        maxPlayers,
+        startingIPCs,
+        password: password || null,
+        teamsEnabled: false // Team mode can be enabled in the lobby
+      });
+
+      if (!result.success) {
+        const errorEl = form.querySelector('#create-error');
+        if (errorEl) {
+          errorEl.textContent = result.error;
+          errorEl.classList.remove('hidden');
+        }
+        if (submitBtn) submitBtn.disabled = false;
+      }
+      // On success: lobby subscription will update mode to 'lobby'
+    } catch (error) {
+      console.error('Error creating lobby:', error);
       const errorEl = form.querySelector('#create-error');
       if (errorEl) {
-        errorEl.textContent = result.error;
+        errorEl.textContent = 'Unexpected error. Please try again.';
         errorEl.classList.remove('hidden');
       }
+      if (submitBtn) submitBtn.disabled = false;
     }
-    // Lobby subscription will update mode to 'lobby'
   }
 
   async _handleJoin(form) {
