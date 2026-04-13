@@ -118,26 +118,30 @@ export class LobbyManager {
 
   // Find lobby by code
   async _findLobbyByCode(code) {
+    // Query only on 'code' — compound queries (code + status) require a composite
+    // Firestore index that may not be configured. Filter status client-side instead.
     const q = query(
       collection(this.db, 'lobbies'),
-      where('code', '==', code.toUpperCase()),
-      where('status', '==', 'waiting')
+      where('code', '==', code.toUpperCase())
     );
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    const waiting = snapshot.docs.find(d => d.data().status === 'waiting');
+    return waiting ? { id: waiting.id, ...waiting.data() } : null;
   }
 
   // Find game by lobby code (for rejoining started games)
   async findGameByCode(code) {
+    // Single-field query only — compound query (lobbyCode + status) needs a composite index
     const q = query(
       collection(this.db, 'games'),
-      where('lobbyCode', '==', code.toUpperCase()),
-      where('status', 'in', ['starting', 'active'])
+      where('lobbyCode', '==', code.toUpperCase())
     );
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
-    return { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
+    const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status));
+    if (!active) return null;
+    return { id: active.id, ...active.data() };
   }
 
   // Get all open public lobbies (no password, waiting status)
