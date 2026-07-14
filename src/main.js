@@ -610,6 +610,10 @@ async function init() {
     }
   };
 
+  // Kick the AI whenever the tab becomes visible/hidden again — background-tab
+  // timer throttling can leave an AI turn parked until the next trigger
+  document.addEventListener('visibilitychange', () => checkAI());
+
   // Multiplayer state
   let syncManager = null;
   let multiplayerGuard = null;

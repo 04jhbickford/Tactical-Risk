@@ -78,6 +78,13 @@ export class AIController {
     if (this._checkTimeout) {
       clearTimeout(this._checkTimeout);
     }
+    // In a hidden tab run the check on a microtask instead of a throttled
+    // timer, so AI turns keep flowing while the window is in the background
+    if (typeof document !== 'undefined' && document.hidden) {
+      this._checkTimeout = null;
+      Promise.resolve().then(() => this.checkAndProcessAI());
+      return;
+    }
     this._checkTimeout = setTimeout(() => {
       this._checkTimeout = null;
       this.checkAndProcessAI();
@@ -1161,6 +1168,13 @@ export class AIController {
   }
 
   _delay(ms) {
+    // Hidden tab: skip cosmetic delays entirely. Nobody is watching, and
+    // browsers throttle chained timers in hidden tabs so hard (≥1s each,
+    // eventually 1/minute) that AI turns would stall for minutes — in
+    // multiplayer this froze the game whenever the host alt-tabbed away.
+    if (typeof document !== 'undefined' && document.hidden) {
+      return Promise.resolve();
+    }
     // In skip mode, use minimal delays
     const actualDelay = this.skipMode ? Math.min(ms, 50) : ms;
     return new Promise(resolve => setTimeout(resolve, actualDelay));
