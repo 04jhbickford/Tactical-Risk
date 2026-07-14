@@ -16226,6 +16226,25 @@ html, body {
   filter: grayscale(0.8);
 }
 
+/* Visible ✕ over surrendered players' flags — the title tooltip is
+   hover-only, which doesn't exist on touch */
+.turn-order-item.out {
+  position: relative;
+}
+
+.turn-order-item.out::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef5350;
+  font-size: 14px;
+  font-weight: 700;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
+}
+
 .legend-out {
   font-size: 9px;
   font-weight: 700;

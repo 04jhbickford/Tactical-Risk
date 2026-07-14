@@ -1668,6 +1668,12 @@ async function init() {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
+        // Touch tap: hover doesn't exist, so peek the territory tooltip at the
+        // tap point (auto-hidden by tooltip.hide() on the next tap's mousedown).
+        // Real mouse events never have fromTouch — desktop behaviour unchanged.
+        if (e.fromTouch && gameState) {
+          tooltip.show(hit, e.clientX, e.clientY);
+        }
       } else {
         selectedTerritory = null;
         playerPanel.setSelectedTerritory(null);

@@ -16,14 +16,18 @@
 // compatibility mouse events, so nothing fires twice.
 
 function synthMouse(target, type, x, y) {
-  target.dispatchEvent(new MouseEvent(type, {
+  const ev = new MouseEvent(type, {
     clientX: x,
     clientY: y,
     button: 0,
     bubbles: true,
     cancelable: true,
     view: window
-  }));
+  });
+  // Marker so handlers can offer touch-specific behaviour (e.g. tap-to-peek
+  // tooltips) without affecting real mouse events
+  ev.fromTouch = true;
+  target.dispatchEvent(ev);
 }
 
 function pinchStateOf(e) {
