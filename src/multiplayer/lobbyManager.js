@@ -167,6 +167,35 @@ export class LobbyManager {
     }
   }
 
+  // Get the current user's own games that are in progress (for the Open Games
+  // screen — a started game is no longer a 'waiting' lobby, so without this it
+  // would silently vanish from the list even though the player is in it)
+  async getMyActiveGames() {
+    if (!this.db) return [];
+
+    const user = this.authManager.getUser();
+    if (!user) return [];
+
+    try {
+      const q = query(
+        collection(this.db, 'games'),
+        where('playerUserIds', 'array-contains', user.id),
+        where('status', 'in', ['active', 'starting'])
+      );
+      const snapshot = await getDocs(q);
+      const games = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      games.sort((a, b) => {
+        const aTime = a.updatedAt?.toMillis?.() || 0;
+        const bTime = b.updatedAt?.toMillis?.() || 0;
+        return bTime - aTime;
+      });
+      return games;
+    } catch (error) {
+      console.error('Error getting my active games:', error);
+      return [];
+    }
+  }
+
   // Join a lobby by code (or rejoin a started game by code)
   async joinLobby(code, password = null) {
     if (!this.db) return { success: false, error: 'Not connected' };

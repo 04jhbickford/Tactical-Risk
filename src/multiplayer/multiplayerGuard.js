@@ -70,20 +70,24 @@ export class MultiplayerGuard {
         gameState[methodName] = (...args) => {
           // Check if multiplayer and not active player
           if (gameState.isMultiplayer && this.syncManager) {
-            const isActive = this.syncManager.checkIsActivePlayer();
-            const isHost = this.syncManager.isHost;
-            const currentPlayer = gameState.currentPlayer;
             const userId = this.syncManager.userId;
+            // AI authority = host, or the failover client when the host is offline
+            const hasAIAuthority = this.syncManager.hasAIAuthority();
+            const currentPlayer = gameState.currentPlayer;
+            // Use live oderId comparison instead of the cached isActivePlayer flag.
+            // The cached flag lags by the push debounce + network round-trip, creating
+            // a window where the previous active player can act on the new player's turn.
+            const isActive = currentPlayer?.oderId === userId;
 
-            console.log(`[Guard] ${methodName}: isActive=${isActive}, isHost=${isHost}, currentPlayer=${currentPlayer?.name} (oderId=${currentPlayer?.oderId}), myUserId=${userId}`);
+            console.log(`[Guard] ${methodName}: isActive=${isActive}, aiAuthority=${hasAIAuthority}, currentPlayer=${currentPlayer?.name} (oderId=${currentPlayer?.oderId}), myUserId=${userId}`);
 
-            if (!isActive && !isHost) {
+            if (!isActive && !hasAIAuthority) {
               console.warn(`[Guard] BLOCKED ${methodName} - not your turn`);
               return { success: false, error: 'Not your turn' };
             }
-            // Host can act for AI players
-            if (!isActive && isHost && !currentPlayer?.isAI) {
-              console.warn(`[Guard] BLOCKED ${methodName} - host but current player is not AI`);
+            // AI authority may act for AI players only — never for another human
+            if (!isActive && hasAIAuthority && !currentPlayer?.isAI) {
+              console.warn(`[Guard] BLOCKED ${methodName} - AI authority but current player is not AI`);
               return { success: false, error: 'Not your turn' };
             }
           }
@@ -107,7 +111,8 @@ export class MultiplayerGuard {
   isActionAllowed(gameState) {
     if (!gameState.isMultiplayer) return true;
     if (!this.syncManager) return true;
-    return this.syncManager.checkIsActivePlayer();
+    // Live check (same as wrapGameState) — the cached flag can lag turn changes
+    return gameState.currentPlayer?.oderId === this.syncManager.userId;
   }
 
   // Get a user-friendly message for blocked actions

@@ -6205,6 +6205,17 @@ html, body {
   gap: 12px;
 }
 
+/* Inline spinner for waiting state (embedded in Actions tab) */
+.pp-waiting-spinner-inline {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  animation: pp-spin 1s linear infinite;
+}
+
 .pp-waiting-header {
   display: flex;
   align-items: center;
@@ -16196,4 +16207,167 @@ html, body {
 
 .mp-ai-dialog .mp-form-buttons {
   margin-top: 20px;
+}
+
+/* Subheaders in the Open Games browse view (Your games in progress / Open lobbies) */
+.mp-section-subheader {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 14px 0 8px;
+}
+
+/* Surrendered players in the HUD turn order and legend */
+.turn-order-item.out,
+.legend-item.out {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+}
+
+.legend-out {
+  font-size: 9px;
+  font-weight: 700;
+  color: #ef9a9a;
+  margin-left: 4px;
+  letter-spacing: 0.05em;
+}
+
+/* Leave/surrender button on game rows in My Games */
+.mp-leave-game {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  background: rgba(244, 67, 54, 0.12);
+  color: #ef9a9a;
+  border: 1px solid rgba(244, 67, 54, 0.35);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.mp-leave-game:hover {
+  background: rgba(244, 67, 54, 0.28);
+  color: #ffcdd2;
+}
+
+.mp-leave-game:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* ========================================
+   Turn Summary Modal (Multiplayer)
+   Shows what happened during other players' turns
+   ======================================== */
+
+.turn-summary-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.turn-summary-modal.hidden {
+  display: none;
+}
+
+.turn-summary-content {
+  background: #1a1a2e;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.turn-summary-title {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  text-align: center;
+}
+
+.turn-summary-events {
+  margin-bottom: 20px;
+}
+
+.turn-summary-player {
+  margin-bottom: 16px;
+}
+
+.turn-summary-player-header {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid #888;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.turn-summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.turn-summary-event {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #ccc;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.turn-summary-icon {
+  color: #888;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.turn-summary-territory {
+  color: #fff;
+  font-weight: 500;
+}
+
+.turn-summary-losses {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+}
+
+.turn-summary-ok {
+  width: 100%;
+  padding: 14px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.turn-summary-ok:hover {
+  background: #43A047;
+}
+
+.turn-summary-ok:active {
+  background: #388E3C;
 }

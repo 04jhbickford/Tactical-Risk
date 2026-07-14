@@ -4,6 +4,7 @@
     "indexes": "firestore.indexes.json"
   },
   "hosting": {
+    "predeploy": ["node tools/predeploy-check.mjs"],
     "public": ".",
     "ignore": [
       "firebase.json",

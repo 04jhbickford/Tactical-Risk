@@ -101,7 +101,8 @@ export class HUD {
           const p = this.gameState.players[i];
           const isCurrent = i === currentIdx;
           const isPast = i < currentIdx;
-          const cls = isCurrent ? 'current' : isPast ? 'past' : '';
+          let cls = isCurrent ? 'current' : isPast ? 'past' : '';
+          if (p.surrendered) cls += ' out';
           const flagSrc = p.flag ? `assets/flags/${p.flag}` : null;
 
           if (i > 0) {
@@ -109,7 +110,7 @@ export class HUD {
           }
 
           html += `
-            <div class="turn-order-item ${cls}">
+            <div class="turn-order-item ${cls}" ${p.surrendered ? 'title="Surrendered"' : ''}>
               ${flagSrc ? `<img src="${flagSrc}" class="turn-order-flag" alt="${p.name}">` : `<span style="color:${p.color}">●</span>`}
             </div>
           `;
@@ -123,13 +124,14 @@ export class HUD {
     if (this.gameState && this.gameState.players.length > 0) {
       for (const p of this.gameState.players) {
         const isActive = this.gameState.currentPlayer?.id === p.id;
-        const activeClass = isActive ? ' active' : '';
+        let itemClass = isActive ? ' active' : '';
+        if (p.surrendered) itemClass += ' out';
         const flagSrc = p.flag ? `assets/flags/${p.flag}` : null;
 
         html += `
-          <span class="legend-item${activeClass}">
+          <span class="legend-item${itemClass}" ${p.surrendered ? 'title="Surrendered"' : ''}>
             ${flagSrc ? `<img src="${flagSrc}" class="legend-flag" alt="${p.name}">` : `<span class="legend-dot" style="background:${p.color}"></span>`}
-            <span class="legend-name">${p.name}</span>
+            <span class="legend-name">${p.name}</span>${p.surrendered ? '<span class="legend-out">OUT</span>' : ''}
           </span>`;
       }
     }

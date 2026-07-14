@@ -1047,12 +1047,17 @@ export class GameState {
       factoryEntry.quantity = Math.max(0, factoryEntry.quantity - 1);
     }
 
-    this.currentPlayerIndex++;
-    if (this.currentPlayerIndex >= this.players.length) {
-      this.currentPlayerIndex = 0;
-      this.phase = GAME_PHASES.UNIT_PLACEMENT;
-      this.unitsPlacedThisRound = 0;
-    }
+    // Advance to the next non-surrendered player
+    let capGuard = 0;
+    do {
+      this.currentPlayerIndex++;
+      if (this.currentPlayerIndex >= this.players.length) {
+        this.currentPlayerIndex = 0;
+        this.phase = GAME_PHASES.UNIT_PLACEMENT;
+        this.unitsPlacedThisRound = 0;
+      }
+      capGuard++;
+    } while (this.players[this.currentPlayerIndex]?.surrendered && capGuard < this.players.length);
 
     this._notify();
     return true;
@@ -1382,18 +1387,11 @@ export class GameState {
     this.unitsPlacedThisRound = 0;
     this.placementHistory = []; // Clear undo history for this round
 
-    // Move to next player
-    this.currentPlayerIndex++;
-    if (this.currentPlayerIndex >= this.players.length) {
-      this.currentPlayerIndex = 0;
-      this.placementRound++;
-    }
-
     // Check if all players have finished placing - either no units left OR no placeable units
     const anyPlayerCanPlace = this.players.some(p => {
+      if (p.surrendered) return false;
       const hasUnits = this.hasUnitsToPlace(p.id);
       if (!hasUnits) return false;
-      // If unitDefs provided, check if units are actually placeable
       if (unitDefs) {
         return this.hasPlaceableUnits(p.id, unitDefs);
       }
@@ -1401,11 +1399,41 @@ export class GameState {
     });
 
     if (!anyPlayerCanPlace) {
-      // All units placed (or unplaceable), move to playing phase
+      // All units placed (or unplaceable) — advance index once (original behaviour) then
+      // transition to the playing phase so the correct player goes first.
+      this.currentPlayerIndex++;
+      if (this.currentPlayerIndex >= this.players.length) {
+        this.currentPlayerIndex = 0;
+      }
+      // Don't hand the first playing turn to a surrendered player
+      let firstTurnGuard = 0;
+      while (this.players[this.currentPlayerIndex]?.surrendered && firstTurnGuard < this.players.length) {
+        this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+        firstTurnGuard++;
+      }
       this.phase = GAME_PHASES.PLAYING;
       this.turnPhase = TURN_PHASES.DEVELOP_TECH;
-      // Initialize friendly territories for first turn
       this._initFriendlyTerritoriesAtTurnStart();
+    } else {
+      // Advance to the next player who still has units to place, skipping fully-deployed
+      // and surrendered players. Without this a fully-deployed player must manually click
+      // "Next Player" every round even though they have nothing to place.
+      let iterations = 0;
+      do {
+        this.currentPlayerIndex++;
+        if (this.currentPlayerIndex >= this.players.length) {
+          this.currentPlayerIndex = 0;
+          this.placementRound++;
+        }
+        iterations++;
+        const p = this.players[this.currentPlayerIndex];
+        if (p.surrendered) continue;
+        const hasUnits = this.hasUnitsToPlace(p.id);
+        const canPlace = hasUnits && (!unitDefs || this.hasPlaceableUnits(p.id, unitDefs));
+        if (canPlace) break;
+        // Safety guard: anyPlayerCanPlace confirmed someone can place, so this loop
+        // will always find a candidate within one full cycle.
+      } while (iterations < this.players.length);
     }
 
     this._notify();
@@ -1799,13 +1827,50 @@ export class GameState {
     this._notify();
   }
 
+  // A player is out of play if they surrendered, or are fully eliminated
+  // (no territories and no units anywhere, including carried aircraft/cargo).
+  // Out-of-play players keep their slot in the players array so saved games and
+  // colors stay stable, but they never get a turn again — otherwise a wiped-out
+  // player who never logs back in would stall a multiplayer game forever.
+  _isOutOfPlay(player) {
+    if (!player) return false;
+    if (player.surrendered) return true;
+
+    const ownsTerritory = Object.values(this.territoryState).some(s => s.owner === player.id);
+    if (ownsTerritory) return false;
+
+    for (const units of Object.values(this.units)) {
+      for (const u of units) {
+        if (u.owner === player.id && (u.quantity || 1) > 0) return false;
+        if (u.aircraft?.some(a => a.owner === player.id)) return false;
+        if (u.cargo?.some(c => c.owner === player.id)) return false;
+      }
+    }
+    return true;
+  }
+
   nextTurn() {
-    this.currentPlayerIndex++;
-    if (this.currentPlayerIndex >= this.players.length) {
-      this.currentPlayerIndex = 0;
-      this.round++;
-      // Clear combat log at start of new round
-      this.clearCombatLog();
+    // Advance to the next player still in the game
+    let advanceGuard = 0;
+    do {
+      this.currentPlayerIndex++;
+      if (this.currentPlayerIndex >= this.players.length) {
+        this.currentPlayerIndex = 0;
+        this.round++;
+        // Clear combat log at start of new round
+        this.clearCombatLog();
+      }
+      advanceGuard++;
+    } while (this._isOutOfPlay(this.players[this.currentPlayerIndex]) && advanceGuard < this.players.length);
+
+    // Last player standing wins (everyone else surrendered or was eliminated)
+    if (!this.gameOver) {
+      const alive = this.players.filter(p => !this._isOutOfPlay(p));
+      if (alive.length === 1) {
+        this.gameOver = true;
+        this.winner = alive[0].name;
+        this.winCondition = 'Last player standing';
+      }
     }
     // Reset turn state - start with tech development phase
     this.turnPhase = TURN_PHASES.DEVELOP_TECH;

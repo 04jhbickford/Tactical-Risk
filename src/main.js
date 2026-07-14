@@ -382,6 +382,7 @@ async function init() {
 
       case 'finish-placement':
         gameState.finishPlacementRound(unitDefs);
+        syncManager?.pushStateNow(); // immediate push — no debounce
         camera.dirty = true;
         // Don't recenter camera during initial deployment - let player explore freely
         break;
@@ -568,6 +569,7 @@ async function init() {
         }
 
         gameState.nextPhase();
+        syncManager?.pushStateNow(); // immediate push — no debounce
         camera.dirty = true;
 
         // Log phase change or turn start
@@ -683,6 +685,31 @@ async function init() {
 
     // Set host flag on syncManager (for AI control - original host controls AI)
     syncManager.setIsHost(isHost);
+
+    // Host-failover authority: if the host goes offline, the first online
+    // non-surrendered human (in turn order) takes over running AI turns so the
+    // game doesn't stall forever on an AI's turn. Concurrent takeovers are safe:
+    // pushes are transaction-guarded, the loser aborts and reloads.
+    const hostOderId = playersData?.find(p => p.isHost)?.oderId || lobbyData?.hostId || null;
+    let wasFailoverAuthority = false;
+    syncManager.setAuthorityCheck(() => {
+      if (!gameState || !presenceManager || !hostOderId) return false;
+      let isAuthority = false;
+      if (presenceManager.getPlayerPresence(hostOderId) === 'offline') {
+        const me = authManager.getUser();
+        const fallback = gameState.players?.find(p =>
+          !p.isAI && !p.surrendered &&
+          presenceManager.getPlayerPresence(p.oderId) !== 'offline'
+        );
+        isAuthority = !!fallback && fallback.oderId === me?.id;
+      }
+      if (isAuthority && !wasFailoverAuthority) {
+        console.warn('[MP] Host appears offline — this client is taking over AI turns');
+        showNotification('Host is offline — you are now running the AI players.');
+      }
+      wasFailoverAuthority = isAuthority;
+      return isAuthority;
+    });
 
     console.log('[MP] Starting game:', {
       gameId,
@@ -816,6 +843,13 @@ async function init() {
         }
       }
 
+      // Surface sync failures — a silently dropped push looks like "the game ate
+      // my move" to the player
+      if (event === 'push_failed') {
+        showNotification('Connection issue — your last action may not have saved. Retrying on your next action.');
+      }
+      // push_stale is handled automatically (state reloads); no user action needed
+
       // Handle auth errors - redirect to login
       if (event === 'auth_error' && data?.needsReauth) {
         console.warn('[Main] Auth error detected - returning to lobby');
@@ -840,7 +874,7 @@ async function init() {
     // Host pushes all state changes (including AI turns), others only push their own turns
     // IMPORTANT: Don't push if we're loading remote state (prevents feedback loop)
     gameState.subscribe(() => {
-      if (syncManager && !syncManager.isLoading() && (syncManager.checkIsActivePlayer() || syncManager.isHost)) {
+      if (syncManager && !syncManager.isLoading() && (syncManager.checkIsActivePlayer() || syncManager.hasAIAuthority())) {
         playerPanel.logSyncEvent('state_push', {
           version: syncManager.localVersion + 1,
           currentPlayer: gameState.currentPlayer?.name,
@@ -853,9 +887,12 @@ async function init() {
     // Start presence tracking
     presenceManager.start(gameId);
 
-    // Subscribe to presence updates for player panel
+    // Subscribe to presence updates for player panel.
+    // Also re-check AI on every presence tick: if the host went offline during
+    // an AI turn, this is what wakes the failover client up to take over.
     presenceManager.subscribe((presence) => {
       playerPanel.setPresenceData(presence);
+      checkAI();
     });
 
     // Wire up all the UI components (same as local game)
@@ -876,11 +913,13 @@ async function init() {
     // Check if there are AI players
     const hasAIPlayers = gameState.players?.some(p => p.isAI);
 
-    // Initialize AI controller for local games OR multiplayer games with AI (host only runs AI)
-    // In multiplayer, only the host should run AI actions to avoid conflicts
-    const shouldInitAI = !gameState.isMultiplayer || (hasAIPlayers && syncManager?.isHost);
-
-    if (shouldInitAI || hasAIPlayers) {
+    // Initialize AI controller whenever the game has AI players. In multiplayer
+    // the setCanAct gate below decides who actually RUNS the AI: normally only
+    // the host — if every client ran it, they would all play the AI's turn and
+    // push conflicting states (the V2.46 "deployment turn keeps reverting" bug).
+    // Non-host clients keep an idle controller so they can take over via the
+    // host-failover authority if the host goes offline.
+    if (hasAIPlayers) {
       aiController = new AIController();
       aiController.setUnitDefs(unitDefs);
       aiController.setActionLog(actionLog);
@@ -891,6 +930,9 @@ async function init() {
       aiController.setOnStatusUpdate((message) => {
         console.log('[AI Status]', message);
       });
+      // Authority gate: in multiplayer only the host (or the offline-host
+      // failover client) runs AI turns
+      aiController.setCanAct(() => !gameState.isMultiplayer || syncManager?.hasAIAuthority() === true);
     }
 
     // Wire up components
@@ -899,6 +941,7 @@ async function init() {
       const prevPlayer = gameState.currentPlayer;
       const prevRound = gameState.round;
       gameState.nextPhase();
+      syncManager?.pushStateNow(); // immediate push — no debounce
       camera.dirty = true;
 
       // Log phase change or turn start
@@ -1098,6 +1141,7 @@ async function init() {
       // Auto-advance from tech phase when done
       if (gameState.turnPhase === TURN_PHASES.DEVELOP_TECH) {
         gameState.nextPhase();
+        syncManager?.pushStateNow(); // immediate push — no debounce
       }
     });
 

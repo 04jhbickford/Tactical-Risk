@@ -13,6 +13,7 @@ export class AIController {
     this.unitDefs = null;
     this.skipMode = false; // Fast-forward AI moves
     this.onStatusUpdate = null; // Callback for AI status messages
+    this.canActCheck = null; // Optional authority gate (multiplayer: host only)
     this._checkTimeout = null; // For debouncing AI checks
     this._unsubscribe = null; // Game state subscription
     this.actionLog = null; // Action log for logging AI moves
@@ -30,6 +31,12 @@ export class AIController {
 
   setOnStatusUpdate(callback) {
     this.onStatusUpdate = callback;
+  }
+
+  // Gate AI processing on an authority check. In multiplayer only the host may
+  // run AI turns — every other client must wait for the host's pushes.
+  setCanAct(callback) {
+    this.canActCheck = callback;
   }
 
   setActionLog(actionLog) {
@@ -118,6 +125,9 @@ export class AIController {
   async checkAndProcessAI() {
     if (this.isProcessing) return false;
     if (!this.gameState) return false;
+
+    // Not authoritative (e.g. non-host multiplayer client) — never run AI turns
+    if (this.canActCheck && !this.canActCheck()) return false;
 
     // Don't process during lobby phase
     if (this.gameState.phase === GAME_PHASES.LOBBY) return false;

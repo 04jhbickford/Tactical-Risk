@@ -62,6 +62,9 @@ export class PlayerPanel {
     this.airLandingSelections = {};
     this.onAirLandingComplete = null;
 
+    // Optimistic waiting state for multiplayer (prevents brief interaction after End Phase)
+    this.isWaitingForSync = false;
+
     // Create panel element
     this.el = document.getElementById('sidebar');
     this.el.innerHTML = '';
@@ -102,6 +105,12 @@ export class PlayerPanel {
   setMultiplayerState(syncManager, localUserId) {
     this.syncManager = syncManager;
     this.localUserId = localUserId;
+  }
+
+  // Set optimistic waiting state (called before nextPhase to lock UI immediately)
+  setWaitingForSync(waiting) {
+    this.isWaitingForSync = waiting;
+    this._render();
   }
 
   // Set presence data for online indicators
@@ -223,9 +232,12 @@ export class PlayerPanel {
     const currentPlayerOderId = player?.oderId;
 
     // It's our turn if: not multiplayer, OR syncManager says so, OR current player is us
+    // Also check isWaitingForSync - if true, we're waiting for sync after clicking End Phase
     const isLocalPlayerTurn = !isMultiplayer ||
-      this.syncManager?.checkIsActivePlayer() ||
-      (localUserId && currentPlayerOderId === localUserId);
+      (!this.isWaitingForSync && (
+        this.syncManager?.checkIsActivePlayer() ||
+        (localUserId && currentPlayerOderId === localUserId)
+      ));
 
     let html = '';
 
@@ -235,13 +247,8 @@ export class PlayerPanel {
     // Phase indicator
     html += this._renderPhaseIndicator(phase, turnPhase);
 
-    // Multiplayer waiting indicator - only show when waiting for ANOTHER player
-    // Never show "Waiting for X" when X is the local player
-    const isWaitingForOther = isMultiplayer && !isLocalPlayerTurn &&
-      (!localUserId || currentPlayerOderId !== localUserId);
-    if (isWaitingForOther) {
-      html += this._renderWaitingIndicator(player);
-    }
+    // Note: Waiting state is now shown inline in Actions tab, not as overlay
+    // This allows Players, Territory, Log tabs to remain fully functional while waiting
 
     // Tab navigation
     html += this._renderTabs();
@@ -485,22 +492,26 @@ export class PlayerPanel {
     let html = '<div class="pp-actions-tab">';
 
     // In multiplayer, check if it's the local player's turn
+    // Also check isWaitingForSync for optimistic UI lock after clicking End Phase
     const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
     const isLocalPlayerTurn = !isMultiplayer ||
-      this.syncManager?.checkIsActivePlayer() ||
-      (player?.oderId === this.localUserId);
+      (!this.isWaitingForSync && (
+        this.syncManager?.checkIsActivePlayer() ||
+        (player?.oderId === this.localUserId)
+      ));
 
-    // If multiplayer and not our turn, show waiting message
+    // If multiplayer and not our turn (or waiting for sync), show waiting message
     if (isMultiplayer && !isLocalPlayerTurn) {
       const flagSrc = player?.flag ? `assets/flags/${player.flag}` : null;
       html += `
         <div class="pp-waiting-turn">
+          <div class="pp-waiting-spinner-inline"></div>
           <div class="pp-waiting-header">
             ${flagSrc ? `<img src="${flagSrc}" class="pp-waiting-flag" alt="${player.name}">` : ''}
             <span style="color: ${player.color}">${player.name}</span> is playing
           </div>
           <div class="pp-waiting-phase">${this._getPhaseDisplayName(phase, turnPhase)}</div>
-          <div class="pp-waiting-hint">You'll be notified when it's your turn</div>
+          <div class="pp-waiting-hint">You can view the map while waiting</div>
         </div>`;
       html += '</div>';
       return html;

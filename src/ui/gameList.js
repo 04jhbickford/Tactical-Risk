@@ -12,6 +12,7 @@ import {
 import { getFirebaseDb } from '../multiplayer/firebase.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
+import { leaveGame } from '../multiplayer/surrender.js';
 
 export class GameList {
   constructor(onSelectGame, onBack) {
@@ -72,6 +73,15 @@ export class GameList {
       return;
     }
 
+    // Validate token before making Firestore queries
+    const isTokenValid = await this.authManager.validateToken();
+    if (!isTokenValid) {
+      console.warn('[GameList] Token validation failed - user needs to re-login');
+      this.games = [];
+      this.isLoading = false;
+      return;
+    }
+
     try {
       // Query games where user is a player
       // Include both 'active' and 'starting' (in case host hasn't initialized yet)
@@ -106,6 +116,16 @@ export class GameList {
       });
     } catch (error) {
       console.error('[GameList] Error loading games:', error);
+
+      // Check if it's an auth error - if so, handle re-authentication
+      const authResult = await this.authManager.handleFirebaseError(error);
+      if (authResult.needsReauth) {
+        console.warn('[GameList] Auth error detected - user needs to re-login');
+        this.games = [];
+        this.isLoading = false;
+        return;
+      }
+
       // Check if it's an index error
       if (error.message?.includes('index')) {
         console.error('[GameList] INDEX ERROR - May need to create Firestore index!');
@@ -229,6 +249,7 @@ export class GameList {
             ${statusHtml}
           </div>
         </button>
+        <button class="mp-leave-game" data-leave-game="${game.id}" title="Leave this game (surrender)">Leave</button>
         ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}
       </div>
     `;
@@ -276,6 +297,32 @@ export class GameList {
           console.log('[GameList] onSelectGame completed');
         } else {
           console.warn('[GameList] No game found or no callback:', { game, hasCallback: !!this.onSelectGame });
+        }
+      });
+    });
+
+    // Leave game (surrender) buttons
+    this.el.querySelectorAll('[data-leave-game]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const gameId = btn.dataset.leaveGame;
+        const game = this.games.find(g => g.id === gameId);
+        const isStarted = game?.stateVersion > 0;
+
+        const message = isStarted
+          ? 'Leave this game? You will surrender: your territories become neutral, your units are removed, and the game continues without you. This cannot be undone.'
+          : 'Leave this game? It has not started yet — you will simply be removed from it.';
+        if (!confirm(message)) return;
+
+        btn.disabled = true;
+        const userId = this.authManager.getUserId();
+        const result = await leaveGame(gameId, userId);
+        if (result.success) {
+          await this._loadGames();
+          this._render();
+        } else {
+          btn.disabled = false;
+          alert('Failed to leave game: ' + (result.error || 'unknown error'));
         }
       });
     });

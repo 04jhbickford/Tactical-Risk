@@ -1,7 +1,7 @@
 // Modern Lobby UI for Tactical Risk
 // Clean two-stage flow: Play Mode Selection → Game Setup
 
-export const GAME_VERSION = 'V2.46';
+export const GAME_VERSION = 'V2.49';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
@@ -49,11 +49,15 @@ export class Lobby {
   }
 
   _create() {
+    console.log('[Lobby] _create() called');
     this.el = document.createElement('div');
     this.el.id = 'lobby';
     this.el.className = 'lobby-overlay modern';
+    console.log('[Lobby] Element created, calling _render()');
     this._render();
+    console.log('[Lobby] _render() complete, appending to body');
     document.body.appendChild(this.el);
+    console.log('[Lobby] Element appended. Display:', getComputedStyle(this.el).display, 'Visibility:', getComputedStyle(this.el).visibility);
   }
 
   _render() {

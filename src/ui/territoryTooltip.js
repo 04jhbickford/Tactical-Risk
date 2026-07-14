@@ -68,7 +68,8 @@ export class TerritoryTooltip {
       const units = this.gameState.getUnitsAt(t.name);
       const hasFactory = units.some(u => u.type === 'factory');
       if (hasFactory) {
-        indicators.push(`<span class="tt-indicator factory">🏭 Factory</span>`);
+        const capacity = this.gameState.getFactoryCapacity(t.name);
+        indicators.push(`<span class="tt-indicator factory">🏭 Factory (${capacity} units/turn)</span>`);
       }
       const hasAA = units.some(u => u.type === 'aaGun');
       if (hasAA) {
@@ -81,8 +82,9 @@ export class TerritoryTooltip {
 
     // Production & Continent for land, "Sea Zone" label for water
     if (isLand) {
+      const effectiveIpc = this.gameState?.getEffectiveIpc(t.name) ?? (t.production || 0);
       html += `<div class="tt-stats">`;
-      html += `<span class="tt-ipc">💰 ${t.production || 0} IPC</span>`;
+      html += `<span class="tt-ipc">💰 ${effectiveIpc} IPC</span>`;
       if (continent) {
         html += `<span class="tt-continent" style="border-color:${continent.color}">${continent.name} (+${continent.bonus})</span>`;
       }

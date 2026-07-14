@@ -304,7 +304,13 @@ export class MultiplayerLobby {
     const user = this.authManager.getUser();
 
     try {
-      const lobbies = await this.lobbyManager.getOpenLobbies();
+      // Load joinable lobbies and the user's own in-progress games in parallel.
+      // A started game is no longer a 'waiting' lobby, so without the second
+      // query the player's current game would be invisible on this screen.
+      const [lobbies, myGames] = await Promise.all([
+        this.lobbyManager.getOpenLobbies(),
+        this.lobbyManager.getMyActiveGames()
+      ]);
 
       // Sort: user's own lobbies first, then by creation time
       const sortedLobbies = [...lobbies].sort((a, b) => {
@@ -315,13 +321,48 @@ export class MultiplayerLobby {
         return 0; // Keep original order otherwise
       });
 
-      if (sortedLobbies.length === 0) {
+      let myGamesHtml = '';
+      if (myGames.length > 0) {
+        myGamesHtml = `
+          <div class="mp-section-subheader">Your games in progress</div>
+          <div class="mp-games-list">
+            ${myGames.map(game => {
+              const players = game.lobbyData?.players || [];
+              const playerNames = players.map(p => p.displayName).join(', ');
+              const isMyTurn = game.currentPlayerId === user?.id;
+              const round = game.state?.round || 1;
+              const isStarting = game.status === 'starting';
+              return `
+                <div class="mp-game-row own-lobby">
+                  <button class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-resume-game-id="${game.id}">
+                    <div class="mp-game-info">
+                      <span class="mp-game-name">${playerNames || 'Game in progress'}</span>
+                      <span class="mp-game-details">${isStarting ? 'Starting' : `Round ${round}`} · ${players.length} players</span>
+                    </div>
+                    <span class="mp-game-join">${isMyTurn ? 'Your Turn!' : 'Resume'}</span>
+                  </button>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <div class="mp-section-subheader">Open lobbies</div>
+        `;
+      }
+
+      if (sortedLobbies.length === 0 && myGames.length === 0) {
         container.innerHTML = `
           <p class="mp-no-games">No open games available.</p>
           <p class="mp-no-games-hint">Create a game or check back later.</p>
         `;
+      } else if (sortedLobbies.length === 0) {
+        container.innerHTML = `
+          ${myGamesHtml}
+          <p class="mp-no-games-hint">No open lobbies to join right now.</p>
+        `;
+        this._bindResumeGameButtons(container, myGames);
       } else {
         container.innerHTML = `
+          ${myGamesHtml}
           <div class="mp-games-list">
             ${sortedLobbies.map(lobby => {
               const isOwnLobby = lobby.hostId === user?.id;
@@ -343,8 +384,8 @@ export class MultiplayerLobby {
           </div>
         `;
 
-        // Bind click events for game items
-        container.querySelectorAll('.mp-game-item').forEach(item => {
+        // Bind click events for lobby items (resume buttons are bound separately)
+        container.querySelectorAll('.mp-game-item[data-code]').forEach(item => {
           item.addEventListener('click', async () => {
             const code = item.dataset.code;
             const result = await this.lobbyManager.joinLobby(code, null);
@@ -359,6 +400,8 @@ export class MultiplayerLobby {
             }
           });
         });
+
+        this._bindResumeGameButtons(container, myGames);
 
         // Bind admin delete buttons
         if (isAdmin) {
@@ -384,6 +427,22 @@ export class MultiplayerLobby {
         <p class="mp-no-games">Failed to load games.</p>
       `;
     }
+  }
+
+  // Wire up "Your games in progress" rows in the Open Games view
+  _bindResumeGameButtons(container, myGames) {
+    container.querySelectorAll('[data-resume-game-id]').forEach(item => {
+      item.addEventListener('click', () => {
+        const gameId = item.dataset.resumeGameId;
+        const game = myGames.find(g => g.id === gameId);
+        if (game) {
+          this.hide();
+          if (this.onStart) {
+            this.onStart(gameId, game);
+          }
+        }
+      });
+    });
   }
 
   _renderLobby(user) {

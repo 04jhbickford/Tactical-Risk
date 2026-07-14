@@ -6,6 +6,7 @@ import {
   getDoc,
   updateDoc,
   onSnapshot,
+  runTransaction,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getFirebaseDb } from './firebase.js';
@@ -30,6 +31,22 @@ export class SyncManager {
   // Set whether this client is the host (controls AI players)
   setIsHost(isHost) {
     this.isHost = isHost;
+  }
+
+  // Optional extra authority check (host-failover: when the host is offline,
+  // one designated fallback client may run AI turns and push their state)
+  setAuthorityCheck(fn) {
+    this.authorityCheck = fn;
+  }
+
+  // True if this client may act for AI players (host, or failover authority)
+  hasAIAuthority() {
+    if (this.isHost) return true;
+    try {
+      return this.authorityCheck ? this.authorityCheck() === true : false;
+    } catch {
+      return false;
+    }
   }
 
   // Get current user ID
@@ -131,8 +148,17 @@ export class SyncManager {
           isActivePlayer: this.isActivePlayer
         });
       }
-    }, (error) => {
+    }, async (error) => {
       console.error('SyncManager: Subscription error', error);
+
+      // Check if this is an auth error that needs re-login
+      const authResult = await this.authManager.handleFirebaseError(error);
+      if (authResult.needsReauth) {
+        console.warn('[Sync] Auth error - user needs to re-login');
+        this._notifyListeners('auth_error', { needsReauth: true });
+        return;
+      }
+
       this._notifyListeners('error', error);
     });
 
@@ -222,8 +248,17 @@ export class SyncManager {
               isActivePlayer: this.isActivePlayer
             });
           }
-        }, (error) => {
+        }, async (error) => {
           console.error('SyncManager: Subscription error', error);
+
+          // Check if this is an auth error that needs re-login
+          const authResult = await this.authManager.handleFirebaseError(error);
+          if (authResult.needsReauth) {
+            console.warn('[Sync] Auth error - user needs to re-login');
+            this._notifyListeners('auth_error', { needsReauth: true });
+            return;
+          }
+
           this._notifyListeners('error', error);
         });
 
@@ -261,14 +296,15 @@ export class SyncManager {
 
   // Push state to Firestore (called after local state changes)
   async pushState() {
-    // Allow push if: 1) We're the active player, OR 2) We're the host (for AI turns)
-    const canPush = this.isActivePlayer || this.isHost;
+    // Allow push if: 1) We're the active player, OR 2) We may act for AI
+    // (host, or failover authority when the host is offline)
+    const canPush = this.isActivePlayer || this.hasAIAuthority();
     if (!canPush) {
       console.warn('SyncManager: Non-active non-host player attempted to push state');
       return false;
     }
 
-    // Debounce rapid updates
+    // Debounce rapid updates (fine-grained actions like unit placement/movement)
     if (this._pendingPush) {
       clearTimeout(this._pendingPush);
     }
@@ -280,6 +316,21 @@ export class SyncManager {
         resolve(result);
       }, 100); // 100ms debounce
     });
+  }
+
+  // Push immediately without debounce — used for phase and turn transitions so that
+  // a hard refresh mid-turn restores the correct phase rather than a stale earlier one.
+  async pushStateNow() {
+    const canPush = this.isActivePlayer || this.hasAIAuthority();
+    if (!canPush) return false;
+
+    // Cancel any pending debounced push — this one supersedes it
+    if (this._pendingPush) {
+      clearTimeout(this._pendingPush);
+      this._pendingPush = null;
+    }
+
+    return this._doPush();
   }
 
   async _doPush() {
@@ -295,14 +346,40 @@ export class SyncManager {
       const currentPlayer = this.gameState.currentPlayer;
       const currentPlayerId = currentPlayer?.oderId || null;
 
-      await updateDoc(gameRef, {
-        state,
-        stateVersion: this.localVersion + 1,
-        currentPlayerId,
-        updatedAt: serverTimestamp()
+      // Transaction-guarded write: never clobber a state that is newer than the
+      // one this client is based on. Two clients pushing concurrently (e.g. a
+      // stale tab, or a host/active-player race) would otherwise overwrite each
+      // other since both stamp localVersion + 1.
+      const pushedVersion = await runTransaction(this.db, async (transaction) => {
+        const snapshot = await transaction.get(gameRef);
+        if (!snapshot.exists()) return null;
+
+        const remoteVersion = snapshot.data().stateVersion || 0;
+        if (remoteVersion > this.localVersion) {
+          // Remote is ahead of us — abort, the subscription will deliver it
+          console.warn(`[Sync] Push aborted: remote v${remoteVersion} > local v${this.localVersion}`);
+          return -1;
+        }
+
+        transaction.update(gameRef, {
+          state,
+          stateVersion: remoteVersion + 1,
+          currentPlayerId,
+          updatedAt: serverTimestamp()
+        });
+        return remoteVersion + 1;
       });
 
-      this.localVersion++;
+      if (pushedVersion === null) return false;
+      if (pushedVersion === -1) {
+        this._notifyListeners('push_stale', { localVersion: this.localVersion });
+        // The winning update's snapshot may have been skipped while isPushing was
+        // set — reload explicitly so this client doesn't sit on stale state
+        this._reloadRemoteState();
+        return false;
+      }
+
+      this.localVersion = pushedVersion;
 
       // Update active player if turn changed
       if (currentPlayerId !== this._lastCurrentPlayerId) {
@@ -316,6 +393,34 @@ export class SyncManager {
       return false;
     } finally {
       this.isPushing = false;
+    }
+  }
+
+  // Re-fetch the game doc and load it if newer than local (used after a stale
+  // push, when the winning snapshot may have arrived during our isPushing window)
+  async _reloadRemoteState() {
+    if (!this.db || !this.gameId) return;
+    try {
+      const snapshot = await getDoc(doc(this.db, 'games', this.gameId));
+      if (!snapshot.exists()) return;
+
+      const data = snapshot.data();
+      if (data.stateVersion > this.localVersion) {
+        console.log(`[Sync] Reloading after stale push: ${this.localVersion} -> ${data.stateVersion}`);
+        this.localVersion = data.stateVersion;
+        if (data.state) {
+          this.isLoadingRemoteState = true;
+          this.gameState.loadFromJSON(data.state);
+          this.isLoadingRemoteState = false;
+        }
+        this._updateActivePlayer(data.currentPlayerId);
+        this._notifyListeners('state_updated', {
+          version: this.localVersion,
+          currentPlayerId: data.currentPlayerId
+        });
+      }
+    } catch (error) {
+      console.error('[Sync] Reload after stale push failed', error);
     }
   }
 

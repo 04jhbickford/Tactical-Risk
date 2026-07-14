@@ -239,6 +239,39 @@ export class AuthManager {
     }
   }
 
+  // Verify the current session still has a usable auth token.
+  // getIdToken() returns the cached token and transparently refreshes an
+  // expired one; it only throws if the refresh itself fails (revoked session,
+  // disabled account, no network).
+  async validateToken() {
+    if (!this.auth?.currentUser) return false;
+    try {
+      await this.auth.currentUser.getIdToken();
+      return true;
+    } catch (error) {
+      console.warn('[Auth] Token validation failed:', error?.code || error);
+      return false;
+    }
+  }
+
+  // Inspect a Firestore/Firebase error and decide whether the user needs to
+  // sign in again. Returns { needsReauth: boolean }.
+  async handleFirebaseError(error) {
+    const code = error?.code || '';
+
+    if (code === 'unauthenticated' || code.startsWith('auth/')) {
+      return { needsReauth: true };
+    }
+
+    if (code === 'permission-denied') {
+      // Could be an expired session OR a genuine rules denial — check the token
+      const tokenValid = await this.validateToken();
+      return { needsReauth: !tokenValid };
+    }
+
+    return { needsReauth: false };
+  }
+
   // Check if user is logged in
   isLoggedIn() {
     return this.currentUser !== null;
