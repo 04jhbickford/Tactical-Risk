@@ -45,6 +45,7 @@ import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
 import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
+import { HandoffScreen } from './ui/handoffScreen.js';
 
 // Multiplayer imports
 import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
@@ -623,6 +624,9 @@ async function init() {
   let multiplayerLobby = null;
   let gameListUI = null;
 
+  // Pass-and-play handoff overlay (hotseat games only)
+  const handoffScreen = new HandoffScreen();
+
   // Turn summary modal for showing what happened during other players' turns
   const turnSummaryModal = new TurnSummaryModal();
   turnSummaryModal.setUnitDefs(unitDefs);
@@ -942,6 +946,8 @@ async function init() {
 
     // Wire up components
     hud.setGameState(gameState);
+    // Pass-and-play handoff overlay (self-disables for multiplayer/AI-only)
+    handoffScreen.setGameState(gameState);
     hud.setNextPhaseCallback(() => {
       const prevPlayer = gameState.currentPlayer;
       const prevRound = gameState.round;
@@ -1713,10 +1719,36 @@ async function init() {
 
   // Keyboard
   window.addEventListener('keydown', (e) => {
+    // Never intercept keys while the user is typing in a form field
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
     if (e.key === 'Escape') {
       selectedTerritory = null;
       playerPanel.setSelectedTerritory(null);
       camera.dirty = true;
+    }
+
+    // Space / Enter: press the primary advance button (End Phase / Done /
+    // Deploy / Confirm Move) — whatever the sidebar currently shows. Clicking
+    // the visible button inherits every context guard the mouse path has.
+    if ((e.key === ' ' || e.key === 'Enter') && gameState) {
+      // Handoff overlay open: confirm it instead of acting through it
+      const handoffBtn = document.querySelector('.handoff-overlay:not(.hidden) .handoff-start-btn');
+      if (handoffBtn) {
+        e.preventDefault();
+        handoffBtn.click();
+        return;
+      }
+      const sidebar = document.getElementById('sidebar');
+      const advanceBtn =
+        sidebar?.querySelector('[data-action="confirm-placement"]:not([disabled])') ||
+        sidebar?.querySelector('[data-action="finish-placement"]:not([disabled])') ||
+        sidebar?.querySelector('[data-action="next-phase"]:not([disabled])');
+      if (advanceBtn) {
+        e.preventDefault();
+        advanceBtn.click();
+      }
     }
 
     if (e.ctrlKey && e.key === 's') {

@@ -16443,6 +16443,71 @@ html, body {
   background: rgba(76, 175, 80, 0.5);
 }
 
+/* ---------- Pass-and-play handoff overlay ---------- */
+.handoff-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000; /* above sidebar, HUD, tooltips and popups */
+  background: rgba(8, 10, 20, 0.97);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.handoff-overlay.hidden {
+  display: none;
+}
+
+.handoff-content {
+  text-align: center;
+  padding: 32px;
+}
+
+.handoff-label {
+  font-size: 16px;
+  color: #8a93a8;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 20px;
+}
+
+.handoff-flag {
+  width: 96px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  margin-bottom: 16px;
+}
+
+.handoff-name {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 28px;
+}
+
+.handoff-start-btn {
+  min-width: 220px;
+  min-height: 52px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  background: #4CAF50;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.handoff-start-btn:hover {
+  background: #43A047;
+}
+
+.handoff-hint {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #667;
+}
+
 /* ---------- P2: touch-target sizing ----------
    Applies ONLY when the primary pointer is coarse (finger). Desktop with a
    mouse/trackpad — including touch-screen laptops — is unaffected. 44px per

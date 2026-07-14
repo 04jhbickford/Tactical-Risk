@@ -719,11 +719,21 @@ export class MultiplayerLobby {
       await this.lobbyManager.toggleReady();
     });
 
-    this.el.querySelector('[data-action="start"]')?.addEventListener('click', async () => {
+    this.el.querySelector('[data-action="start"]')?.addEventListener('click', async (e) => {
+      // Disable during the async create — a double-click here used to create
+      // TWO game documents in Firestore
+      const btn = e.currentTarget;
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Starting…';
       const result = await this.lobbyManager.startGame();
       if (!result.success) {
         alert(result.error);
+        btn.disabled = false;
+        btn.textContent = originalText;
       }
+      // On success the lobby subscription transitions everyone into the game
     });
 
     // Publish lobby (make visible in Open Games, then go to browse)
