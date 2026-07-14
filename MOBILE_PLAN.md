@@ -1,8 +1,28 @@
-# Phase 2 — Tablet/Mobile Support Plan (BACKLOG — not greenlit)
+# Phase 2 — Tablet/Mobile Support Plan
 
-Scope queued by James on 7.13.26. **Do not start until explicitly greenlit.**
-Desktop is primary; every change must be feature-detected (`pointer: coarse`,
+Greenlit 7.14.26; implemented in V2.50 (commits 9db8a35 → this one).
+Desktop is primary; every change is feature-detected (`pointer: coarse`,
 touch events) or breakpoint-gated so mouse+keyboard desktop play is untouched.
+
+## Status
+
+- ✅ P0-1/2/3: `src/input/touchInput.js` — tap/pan/pinch on the map (synthesizes
+  the same mouse/wheel events desktop uses; pinch-release can't phantom-tap),
+  minimap tap/drag, 44px on-screen zoom buttons. Tap-based unit movement works
+  through the existing click flow (tap source → sidebar steppers → tap dest →
+  Confirm Move) AND touch-drag works via synthesis.
+- ✅ P1: tap-to-peek territory tooltip (fromTouch-marked events only); visible
+  ✕ overlay on surrendered players in the turn-order strip.
+- ✅ P2: `pointer: coarse` 44px targets (steppers, tabs, swatches, menus,
+  minimap 300×171); ≤900px breakpoint (280px sidebar, 2-col grids); all
+  gameplay popups capped at 90dvh with scroll on coarse/short viewports.
+- ✅ P3: dvh fallbacks for the two 100vh sites; viewport meta hardened
+  (user-scalable=no, viewport-fit=cover) so page-zoom can't fight canvas
+  pinch; touch-action/user-select guards (done in P0); presence unload on
+  mobile is covered by the existing 2-minute staleness timeout.
+- ⬜ REMAINING: verification on a physical iPad/Android tablet (gesture feel,
+  Safari quirks, full multiplayer session start-to-finish on device). All
+  in-browser verification so far used synthetic TouchEvents in Chromium.
 
 ## Findings from the V2.49 end-to-end review (desktop audit)
 
