@@ -830,6 +830,12 @@ async function init() {
       if (event === 'state_updated' || event === 'turn_changed') {
         camera.dirty = true;
 
+        // Async-play awareness: flag the browser tab while it's your turn so a
+        // backgrounded player can see it at a glance
+        document.title = syncManager?.checkIsActivePlayer()
+          ? '● Your turn — Tactical Risk'
+          : 'Tactical Risk';
+
         // Clear optimistic waiting state when we receive any sync update
         // This handles both turn returns and state updates
         if (data.isActivePlayer) {
@@ -862,6 +868,7 @@ async function init() {
       // Handle auth errors - redirect to login
       if (event === 'auth_error' && data?.needsReauth) {
         console.warn('[Main] Auth error detected - returning to lobby');
+        document.title = 'Tactical Risk';
         showNotification('Session expired. Please sign in again.');
 
         // Stop sync and clean up
@@ -899,8 +906,30 @@ async function init() {
     // Subscribe to presence updates for player panel.
     // Also re-check AI on every presence tick: if the host went offline during
     // an AI turn, this is what wakes the failover client up to take over.
+    // And surface connect/disconnect transitions as toasts so live players
+    // know who's actually at the table.
+    let lastPresenceStates = null;
     presenceManager.subscribe((presence) => {
       playerPanel.setPresenceData(presence);
+
+      const myId = authManager.getUser()?.id;
+      if (lastPresenceStates) {
+        for (const [oderId, info] of Object.entries(presence || {})) {
+          if (oderId === myId) continue;
+          const prev = lastPresenceStates[oderId];
+          const wasOffline = !prev || prev === 'offline';
+          const isOffline = info.state === 'offline';
+          if (wasOffline && !isOffline) {
+            showNotification(`${info.displayName || 'A player'} is back online`);
+          } else if (!wasOffline && isOffline) {
+            showNotification(`${info.displayName || 'A player'} went offline`);
+          }
+        }
+      }
+      lastPresenceStates = Object.fromEntries(
+        Object.entries(presence || {}).map(([id, info]) => [id, info.state])
+      );
+
       checkAI();
     });
 
@@ -978,6 +1007,7 @@ async function init() {
     });
 
     hud.setOnExitToLobby(() => {
+      document.title = 'Tactical Risk';
       // Stop presence tracking
       if (presenceManager) {
         presenceManager.stop();

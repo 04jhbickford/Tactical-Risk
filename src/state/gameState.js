@@ -1060,6 +1060,7 @@ export class GameState {
     } while (this.players[this.currentPlayerIndex]?.surrendered && capGuard < this.players.length);
 
     this._notify();
+    this.autoSave(); // Persist setup progress — losing capitals to a closed tab is brutal
     return true;
   }
 
@@ -1437,6 +1438,7 @@ export class GameState {
     }
 
     this._notify();
+    this.autoSave(); // Persist deployment progress for hotseat resume
   }
 
   // Add unit to pending purchases (PURCHASE phase) - units placed during MOBILIZE
@@ -4908,6 +4910,10 @@ export class GameState {
 
   // Auto-save to localStorage for pass-and-play
   autoSave() {
+    // Online games persist in Firestore — never write them to the local
+    // autosave slot, or they'd overwrite a hotseat save AND show up in
+    // "My Games" as a broken 'local' game with no sync manager
+    if (this.isMultiplayer) return false;
     try {
       const data = JSON.stringify(this.toJSON());
       localStorage.setItem('tacticalRisk_autoSave', data);

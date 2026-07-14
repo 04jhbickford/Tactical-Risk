@@ -1,5 +1,62 @@
 # Tactical Risk — Bug & Debug Log
 
+---
+
+## 7.14.26 — V2.52 pass-and-play / save-state / multiplayer-mode audit
+
+Systematic audit of all play modes and their combinations. Findings:
+
+### Mode support matrix (verified against code)
+
+| Mode | Supported? | Notes |
+|---|---|---|
+| Pure pass-and-play (1 device, 2+ humans, optional AI) | ✅ | Handoff overlay on every human→human transition (V2.51); localStorage autosave + lobby "My Games → Continue" resume |
+| Pure online, live | ✅ | Firestore sync, presence indicators, host runs AI, host-failover if host offline |
+| Pure online, async | ✅ | State persists in Firestore indefinitely; rejoin via My Games / Open Games; NEW: tab title flags "● Your turn" for backgrounded tabs |
+| Mixed (hotseat pair + remote players) | ❌ by design | One signed-in account = one player; the multiplayer lobby has no "add local player" option, so the scenario cannot be constructed — it fails safely by being unofferable, not silently. Roadmapped in PHASE_4_PLAN.md |
+| Reconnect / resume online | ✅ | Rejoin loads latest Firestore state; presence shows the player again; NEW: "X is back online / went offline" toasts |
+
+### Real gaps found and FIXED in V2.52
+
+1. **Online games clobbered the hotseat autosave.** `gameState.autoSave()`
+   had no multiplayer guard, so every online turn overwrote the local
+   autosave slot — and "My Games → Continue" would then load a broken
+   half-multiplayer state with no sync manager. Fixed: autosave is now
+   local-games-only (online persistence is Firestore's job).
+2. **Setup phases never autosaved.** Autosave only ran on nextTurn/nextPhase
+   (playing phase), so a hotseat game closed during capital placement or
+   deployment was silently lost despite the resume UI existing. Fixed:
+   `placeCapital` and `finishPlacementRound` now autosave.
+3. **No async-turn awareness.** A backgrounded/async player had no signal
+   it was their turn without switching to the tab. Fixed: browser tab title
+   becomes "● Your turn — Tactical Risk" while it's your turn (reset on
+   turn end / exit / auth error). Push/email notifications roadmapped.
+4. **No connect/disconnect visibility.** Presence dots existed (and only
+   work as of the V2.51 rules deploy) but transitions were silent. Fixed:
+   "X is back online" / "X went offline" toasts for other players.
+
+### Audit answers with no code change needed
+
+- **Handoff overlay context**: fires only when `!isMultiplayer` and ≥2
+  human players — verified in V2.51 (fires per human→human transition in
+  hotseat incl. setup phases; never in online or vs-AI games). The
+  mixed-device ordering question is moot while mixed mode is unsupported.
+- **Mid-turn refresh (online)**: phase/turn transitions push immediately
+  (`pushStateNow`); fine-grained actions debounce 100ms, so at most the
+  final click before a hard-close is lost. Rejoin restores the latest
+  pushed state and correct turn.
+- **Write races**: `_doPush` runs in a Firestore transaction — a stale
+  client's push aborts and triggers a state reload (V2.49, re-verified).
+  Two clients cannot both win the same version number.
+- **Stall behavior — documented, not changed**: async games have no turn
+  timer (hang forever by design until someone acts; Leave/surrender and
+  admin delete are the escape hatches). Live human disconnect mid-turn
+  blocks the game until they return (host-failover only covers AI turns).
+  Turn timers / skip-votes are roadmapped in PHASE_4_PLAN.md. Hotseat
+  idle: no timeout, intentionally.
+
+---
+
 Running list of playtest debug rounds. Newest first. Status values:
 **OPEN** / **FIXED (pending live verification)** / **VERIFIED**.
 
