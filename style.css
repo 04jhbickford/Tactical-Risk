@@ -16440,3 +16440,100 @@ html, body {
 .zoom-btn:active {
   background: rgba(76, 175, 80, 0.5);
 }
+
+/* ---------- P2: touch-target sizing ----------
+   Applies ONLY when the primary pointer is coarse (finger). Desktop with a
+   mouse/trackpad — including touch-screen laptops — is unaffected. 44px per
+   Apple HIG. */
+@media (pointer: coarse) {
+  .pp-qty-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  .pp-tab {
+    min-height: 44px;
+    font-size: 12px;
+  }
+
+  .color-swatch {
+    width: 44px;
+    height: 44px;
+  }
+
+  .color-option {
+    width: 40px;
+    height: 40px;
+  }
+
+  .mp-refresh-btn,
+  .mp-admin-delete,
+  .mp-leave-game,
+  .back-btn,
+  .copy-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .hud-menu-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .hud-menu-item {
+    min-height: 44px;
+  }
+
+  .pp-action-btn {
+    min-height: 44px;
+  }
+
+  .mp-game-item {
+    min-height: 56px;
+  }
+
+  /* Minimap: finger-jumpable size */
+  #minimap {
+    width: 300px;
+    height: 171px;
+  }
+
+  /* Keep zoom controls clear of the larger minimap */
+  #zoom-controls {
+    bottom: 110px;
+  }
+}
+
+/* ---------- P2: tablet layout breakpoints ---------- */
+
+/* Portrait tablets / narrow windows: slimmer sidebar leaves room for the map */
+@media (max-width: 900px) {
+  #sidebar {
+    width: 280px;
+  }
+
+  .player-grid.modern {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mp-menu-grid.four-col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Short or coarse-pointer viewports: every popup must scroll rather than
+   overflow the screen (dvh tracks the real visible height on mobile Safari) */
+@media (pointer: coarse), (max-height: 820px) {
+  .combat-popup,
+  .tech-popup,
+  .purchase-panel,
+  .air-landing-panel,
+  .movement-panel,
+  .turn-summary-content,
+  .victory-content,
+  .rules-panel {
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+}
