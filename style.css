@@ -16371,3 +16371,53 @@ html, body {
 .turn-summary-ok:active {
   background: #388E3C;
 }
+
+/* ========================================
+   Phase 2 — Touch / tablet support
+   Additive only: none of this changes desktop pointer behaviour.
+   ======================================== */
+
+/* Map canvases: no browser gestures (scroll/double-tap-zoom), no long-press
+   text selection or callouts. touch-action:none is what lets our touch
+   handlers own the gesture stream. */
+#mapCanvas,
+#minimap {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* On-screen zoom controls (bottom-right). 44px targets per Apple HIG. */
+#zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 50;
+}
+
+.zoom-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(20, 24, 38, 0.85);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.zoom-btn:hover {
+  background: rgba(50, 60, 90, 0.9);
+}
+
+.zoom-btn:active {
+  background: rgba(76, 175, 80, 0.5);
+}

@@ -44,6 +44,7 @@ import { AirLandingUI } from './ui/airLandingUI.js';
 import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
 import { TurnSummaryModal } from './ui/turnSummaryModal.js';
+import { initTouchInput, initZoomControls } from './input/touchInput.js';
 
 // Multiplayer imports
 import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
@@ -1677,6 +1678,13 @@ async function init() {
   });
 
   canvas.addEventListener('wheel', (e) => camera.onWheel(e), { passive: false });
+
+  // Touch support (tablet/mobile): translates touch gestures into the same
+  // synthetic mouse/wheel events handled above. Additive — desktop mouse
+  // handling is untouched. Pinch-zoom enabled on the main map only.
+  initTouchInput(canvas, { enablePinch: true });
+  initTouchInput(document.getElementById('minimap'));
+  initZoomControls(canvas);
 
   canvas.addEventListener('mouseleave', () => {
     tooltip.hide();
