@@ -33,7 +33,10 @@
 html, body {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  /* clip (not hidden): the off-canvas sidebar's translateX(100%) creates
+     scroll overflow that `hidden` still lets touch/programmatic scrolling
+     reach, shifting centered overlays sideways on tablets */
+  overflow: clip;
   background: #1a1a2e;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #e0e0e0;
@@ -249,7 +252,10 @@ html, body {
 }
 
 #sidebar.hidden {
-  transform: translateX(100%);
+  /* display:none, not translateX(100%): a transformed off-canvas element
+     still contributes scroll overflow, which shifted centered lobby
+     overlays and allowed sideways touch-scrolling on tablets */
+  display: none;
 }
 
 #sidebarClose {
@@ -653,6 +659,19 @@ html, body {
   flex: 1;
   min-width: 50%;
   background: url('assets/Pictures/grok-image-702f41b9-ce2d-4291-a3b2-4f29bd8e8695.png') center top / cover no-repeat;
+}
+
+/* Tablet and below: drop the splash-art half and center the menu card.
+   With the art's min-width:50% + the 420px card, narrow viewports overflow
+   (50% of 820 + 420 = 830px) and the card gets clipped at the right edge. */
+@media (max-width: 900px) {
+  .lobby-overlay::before {
+    display: none;
+  }
+
+  .lobby-overlay {
+    justify-content: center;
+  }
 }
 
 .lobby-overlay.hidden {
@@ -16558,6 +16577,20 @@ html, body {
 
   .mp-game-item {
     min-height: 56px;
+  }
+
+  /* Multiplayer join flow (the tablet-as-client path): auth tabs, menu
+     cards, and every action/submit button reach 44px */
+  .auth-tab,
+  .auth-back-btn,
+  .auth-submit-btn,
+  .mp-action-btn,
+  .mp-primary-btn,
+  .mp-secondary-btn,
+  .mp-menu-card,
+  .game-action-btn,
+  .lobby-mode-card {
+    min-height: 44px;
   }
 
   /* Minimap: finger-jumpable size */
