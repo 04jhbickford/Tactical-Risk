@@ -2,6 +2,40 @@
 
 ---
 
+## 7.21.26 — V2.55 robustness audit (compositions × play modes × version upgrades)
+
+Systematic audit against `ROBUSTNESS_MATRIX.md`, backed by an executable
+N-client harness (`tools/robustness-harness.mjs`, 33 checks, all green).
+
+### Dimension C (version upgrade) — NEW capability, not a bug fix
+
+Mid-game redeploys previously had no signal: a tab left open across a deploy
+kept running old code with no prompt to refresh. Added:
+
+- `src/version.js` — dependency-free `GAME_VERSION` / `SCHEMA_VERSION` /
+  `compareGameVersions` (fail-safe: a missing or malformed stamp never prompts).
+- Every game-doc push now stamps `clientVersion` + `schemaVersion`. Old clients
+  ignore the extra doc-level fields; state schema (v11) is unchanged.
+- On loading a doc written by a strictly-newer client, syncManager fires a
+  one-shot `version_outdated` event → main.js shows a persistent, dismissible
+  "refresh to update" banner. Non-blocking on purpose: an async player mid-turn
+  must still be able to finish.
+
+### Bug (surfaced during the audit) — lobby init crash
+
+Extracting the version constant into `src/version.js` and re-exporting it from
+`lobby.js` via a bare `export { GAME_VERSION } from '../version.js'` left the
+name undefined *inside* lobby.js, so `_renderMainMenu` threw
+`GAME_VERSION is not defined` and init aborted. Fixed by importing locally and
+re-exporting. Caught by in-browser verification (would have broken every load).
+
+### Refactor
+
+Pure surrender transform extracted to `src/multiplayer/surrenderCore.js` (no
+Firebase imports) so the harness exercises the exact live-session logic.
+
+---
+
 ## 7.20.26 — V2.53 playtest (2 humans + 2 easy AI) → fixed in V2.54
 
 ### Bug 2 (deployment turn-stuck) — ROOT CAUSE

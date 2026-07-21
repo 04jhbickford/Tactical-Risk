@@ -66,6 +66,18 @@ Distinct things that DO vary with time and are tested explicitly:
 - [x] Network flake ≡ delayed snapshot + stale push → transaction abort +
       reload (B-series in harness)
 
+## Implementation status (V2.55)
+
+Dimension C is now code-backed, not just documented:
+- `src/version.js` — `GAME_VERSION` / `SCHEMA_VERSION` / `compareGameVersions`.
+- `syncManager` stamps `clientVersion` + `schemaVersion` on every push and
+  fires a one-shot `version_outdated` event on a strictly-newer writer.
+- `main.js` renders the persistent refresh banner.
+- Harness `C`-series covers version ordering, the banner predicate, the
+  fail-safe (missing/garbled stamp → no banner), and emitted-schema parity.
+
+All 33 harness checks (A1–A4, S, N, C) pass: `node tools/robustness-harness.mjs`.
+
 ## Known intentional behaviors (not defects)
 
 - A human's turn waits indefinitely (turn timers cut by James, 7.14.26).
