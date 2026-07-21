@@ -700,21 +700,36 @@ async function init() {
     // game doesn't stall forever on an AI's turn. Concurrent takeovers are safe:
     // pushes are transaction-guarded, the loser aborts and reloads.
     const hostOderId = playersData?.find(p => p.isHost)?.oderId || lobbyData?.hostId || null;
+    // The host must be CONTINUOUSLY offline this long before anyone takes over
+    // AI duty. Without this grace, a simple host page-refresh (which deletes
+    // their presence doc via beforeunload) made another client seize authority
+    // instantly — two clients then ran the same AI turns concurrently and
+    // interleaved conflicting states (the V2.53 "deployment stuck" playtest bug).
+    const FAILOVER_GRACE_MS = 90000;
+    let hostOfflineSince = null;
     let wasFailoverAuthority = false;
     syncManager.setAuthorityCheck(() => {
       if (!gameState || !presenceManager || !hostOderId) return false;
       let isAuthority = false;
       if (presenceManager.getPlayerPresence(hostOderId) === 'offline') {
-        const me = authManager.getUser();
-        const fallback = gameState.players?.find(p =>
-          !p.isAI && !p.surrendered &&
-          presenceManager.getPlayerPresence(p.oderId) !== 'offline'
-        );
-        isAuthority = !!fallback && fallback.oderId === me?.id;
+        if (hostOfflineSince === null) hostOfflineSince = Date.now();
+        if (Date.now() - hostOfflineSince >= FAILOVER_GRACE_MS) {
+          const me = authManager.getUser();
+          const fallback = gameState.players?.find(p =>
+            !p.isAI && !p.surrendered &&
+            presenceManager.getPlayerPresence(p.oderId) !== 'offline'
+          );
+          isAuthority = !!fallback && fallback.oderId === me?.id;
+        }
+      } else {
+        hostOfflineSince = null;
       }
       if (isAuthority && !wasFailoverAuthority) {
-        console.warn('[MP] Host appears offline — this client is taking over AI turns');
-        showNotification('Host is offline — you are now running the AI players.');
+        console.warn('[MP] Host offline for 90s+ — this client is taking over AI turns');
+        showNotification('Host has been offline a while — you are now running the AI players.');
+      } else if (!isAuthority && wasFailoverAuthority) {
+        console.warn('[MP] Host is back — returning AI control');
+        showNotification('Host is back — they are running the AI players again.');
       }
       wasFailoverAuthority = isAuthority;
       return isAuthority;
