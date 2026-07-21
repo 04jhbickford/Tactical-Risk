@@ -2,9 +2,12 @@
 // Clean two-stage flow: Play Mode Selection → Game Setup
 
 // Version constants live in src/version.js (dependency-free) so the multiplayer
-// sync path can import them without pulling in UI code. Re-exported here for the
-// many UI modules that already import GAME_VERSION from lobby.js.
-export { GAME_VERSION } from '../version.js';
+// sync path can import them without pulling in UI code. Imported for local use
+// (the version badge) AND re-exported for the many UI modules that already
+// import GAME_VERSION from lobby.js. A bare `export … from` would satisfy those
+// importers but leave GAME_VERSION undefined inside this module.
+import { GAME_VERSION } from '../version.js';
+export { GAME_VERSION };
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
