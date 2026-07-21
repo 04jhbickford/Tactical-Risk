@@ -11,6 +11,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
+import { GAME_VERSION, compareGameVersions } from '../version.js';
 
 export class SyncManager {
   constructor(gameId, gameState) {
@@ -26,6 +27,23 @@ export class SyncManager {
     this.unsubscribe = null;
     this._listeners = [];
     this._pendingPush = null;
+    this._versionOutdatedNotified = false; // fire the refresh banner at most once
+  }
+
+  // Dimension C (version-upgrade robustness): every game doc records the
+  // clientVersion that last wrote it. If we ever load a doc written by a
+  // strictly-newer app version, a redeploy happened while this tab stayed open —
+  // surface a one-shot 'version_outdated' event so the UI can prompt a refresh.
+  // Older clients simply ignore the extra doc-level field, and a missing/garbled
+  // stamp never triggers the banner (compareGameVersions fails safe).
+  _checkRemoteVersion(newData) {
+    if (this._versionOutdatedNotified) return;
+    const remote = newData?.clientVersion;
+    if (remote && compareGameVersions(remote, GAME_VERSION) > 0) {
+      this._versionOutdatedNotified = true;
+      console.warn(`[Sync] Doc written by newer client ${remote} (we are ${GAME_VERSION}) — prompting refresh`);
+      this._notifyListeners('version_outdated', { remoteVersion: remote, localVersion: GAME_VERSION });
+    }
   }
 
   // Set whether this client is the host (controls AI players)
@@ -110,6 +128,8 @@ export class SyncManager {
       const newData = snapshot.data();
 
       console.log(`[Sync] onSnapshot (init): version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
+
+      this._checkRemoteVersion(newData);
 
       // Skip if this is our own update (but still check turn changes)
       if (this.isPushing) {
@@ -220,6 +240,8 @@ export class SyncManager {
           const newData = snapshot.data();
 
           console.log(`[Sync] onSnapshot: version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
+
+          this._checkRemoteVersion(newData);
 
           // Skip if this is our own update (but still check turn changes)
           if (this.isPushing) {
@@ -375,6 +397,8 @@ export class SyncManager {
           state,
           stateVersion: remoteVersion + 1,
           currentPlayerId,
+          clientVersion: GAME_VERSION,
+          schemaVersion: state.version ?? null,
           updatedAt: serverTimestamp()
         });
         return remoteVersion + 1;
@@ -452,6 +476,8 @@ export class SyncManager {
         state,
         stateVersion: 1,
         currentPlayerId,
+        clientVersion: GAME_VERSION,
+        schemaVersion: state.version ?? null,
         status: 'active',
         updatedAt: serverTimestamp()
       });

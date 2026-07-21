@@ -1,7 +1,10 @@
 // Modern Lobby UI for Tactical Risk
 // Clean two-stage flow: Play Mode Selection → Game Setup
 
-export const GAME_VERSION = 'V2.54';
+// Version constants live in src/version.js (dependency-free) so the multiplayer
+// sync path can import them without pulling in UI code. Re-exported here for the
+// many UI modules that already import GAME_VERSION from lobby.js.
+export { GAME_VERSION } from '../version.js';
 
 // AI Difficulty levels
 const AI_DIFFICULTIES = [

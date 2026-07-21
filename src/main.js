@@ -89,6 +89,31 @@ function showNotification(message, duration = 3000) {
   }, duration);
 }
 
+// Persistent "a newer version is live" banner (Dimension C). Shown when the
+// game doc was written by a strictly-newer app version — a redeploy happened
+// while this tab stayed open. Non-blocking on purpose: an async player mid-turn
+// must still be able to finish; the schema is what governs actual compatibility.
+// Stays until the user reloads (or dismisses).
+function showVersionBanner(remoteVersion) {
+  if (document.getElementById('version-banner')) return; // one banner only
+  const banner = document.createElement('div');
+  banner.id = 'version-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;background:#b45309;color:#fff;padding:10px 16px;font-size:14px;display:flex;align-items:center;justify-content:center;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4);';
+  const label = document.createElement('span');
+  label.textContent = `A newer version (${remoteVersion}) is live. Refresh to update.`;
+  const refreshBtn = document.createElement('button');
+  refreshBtn.textContent = 'Refresh';
+  refreshBtn.style.cssText = 'background:#fff;color:#b45309;border:none;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer;';
+  refreshBtn.onclick = () => window.location.reload();
+  const dismissBtn = document.createElement('button');
+  dismissBtn.textContent = '✕';
+  dismissBtn.setAttribute('aria-label', 'Dismiss');
+  dismissBtn.style.cssText = 'background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;line-height:1;';
+  dismissBtn.onclick = () => banner.remove();
+  banner.append(label, refreshBtn, dismissBtn);
+  document.body.appendChild(banner);
+}
+
 async function init() {
   // Load data
   const [territoriesRes, continentsRes, setupRes, unitsRes] = await Promise.all([
@@ -879,6 +904,12 @@ async function init() {
         showNotification('Connection issue — your last action may not have saved. Retrying on your next action.');
       }
       // push_stale is handled automatically (state reloads); no user action needed
+
+      // A newer app version wrote the game doc (redeploy while this tab stayed
+      // open) — show the persistent refresh banner (Dimension C)
+      if (event === 'version_outdated') {
+        showVersionBanner(data?.remoteVersion);
+      }
 
       // Handle auth errors - redirect to login
       if (event === 'auth_error' && data?.needsReauth) {

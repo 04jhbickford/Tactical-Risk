@@ -16,6 +16,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const { GameState, GAME_PHASES, TURN_PHASES } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { AIController } = await import(pathToFileURL(join(root, 'src/ai/aiController.js')));
 const { applySurrenderToState } = await import(pathToFileURL(join(root, 'src/multiplayer/surrenderCore.js')));
+const { GAME_VERSION, SCHEMA_VERSION, compareGameVersions } = await import(pathToFileURL(join(root, 'src/version.js')));
 
 // ---------- fixtures ----------
 const unitDefs = { infantry: { isLand: true, attack: 1, defense: 2, cost: 3, move: 1 } };
@@ -258,6 +259,34 @@ console.log('=== N: permanent no-show ===');
   doc.stateVersion++; doc.currentPlayerId = doc.state.players[doc.state.currentPlayerIndex].oderId;
   const done = await driveDeployment(doc, [h0]);
   check('N2: after surrender escape, game completes', done === true && doc.state.phase === 'playing');
+}
+
+console.log('=== C: version-upgrade robustness (Dimension C) ===');
+{
+  // The refresh banner fires iff a game doc was written by a strictly-newer
+  // app version. This is exactly compareGameVersions(remote, local) > 0 — the
+  // same predicate syncManager._checkRemoteVersion uses to notify the UI.
+  const outdated = (remote, local) => compareGameVersions(remote, local) > 0;
+
+  check('C1: ordering — older < newer', compareGameVersions('V2.54', 'V2.55') < 0);
+  check('C1: ordering — equal', compareGameVersions('V2.55', 'V2.55') === 0);
+  check('C1: ordering — newer > older', compareGameVersions('V2.55', 'V2.54') > 0);
+  check('C1: minor rolls into major boundary', compareGameVersions('V2.9', 'V2.10') < 0);
+  check('C1: major dominates minor', compareGameVersions('V3.0', 'V2.99') > 0);
+
+  // A stale tab (older client) reading a doc a newer client just wrote → banner.
+  check('C2: old client sees newer writer → banner', outdated('V2.56', GAME_VERSION) === true);
+  // Same version, or a doc an OLDER client wrote → no banner (we are not behind).
+  check('C2: same version → no banner', outdated(GAME_VERSION, GAME_VERSION) === false);
+  check('C2: older writer → no banner', outdated('V2.53', GAME_VERSION) === false);
+  // Missing / malformed stamp (old doc predating the field) → fail safe, no banner.
+  check('C2: missing stamp → no banner (fail safe)', outdated(undefined, GAME_VERSION) === false);
+  check('C2: garbage stamp → no banner (fail safe)', outdated('banana', GAME_VERSION) === false);
+
+  // schemaVersion the doc carries must match the schema the running code emits,
+  // or an old client could silently load a shape it can't represent.
+  const emitted = composition(1, 1).version;
+  check('C3: emitted schema matches SCHEMA_VERSION constant', emitted === SCHEMA_VERSION);
 }
 
 console.log(failures === 0 ? '\nALL MATRIX CELLS PASS' : `\n${failures} FAILURES`);
