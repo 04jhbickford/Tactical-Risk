@@ -1,11 +1,13 @@
 // Verify the live site matches the local checkout.
 // Usage: node tools/verify-deployed.mjs [siteUrl]
 //
-// Fetches src/ui/lobby.js from the deployed site, extracts GAME_VERSION, and
+// Fetches src/version.js from the deployed site, extracts GAME_VERSION, and
 // compares it with the local file. Run this after any deploy — it catches the
 // "we thought we deployed it" failure mode from the other direction.
 
 import { readFileSync } from 'fs';
+
+const VERSION_FILE = 'src/version.js';
 
 const siteUrl = (process.argv[2] || 'https://tactical-risk.web.app').replace(/\/$/, '');
 
@@ -14,12 +16,12 @@ function extractVersion(source) {
   return m ? m[1] : null;
 }
 
-const localVersion = extractVersion(readFileSync('src/ui/lobby.js', 'utf8'));
+const localVersion = extractVersion(readFileSync(VERSION_FILE, 'utf8'));
 
 try {
-  const res = await fetch(`${siteUrl}/src/ui/lobby.js`, { cache: 'no-store' });
+  const res = await fetch(`${siteUrl}/${VERSION_FILE}`, { cache: 'no-store' });
   if (!res.ok) {
-    console.error(`[verify-deployed] Could not fetch ${siteUrl}/src/ui/lobby.js — HTTP ${res.status}`);
+    console.error(`[verify-deployed] Could not fetch ${siteUrl}/${VERSION_FILE} — HTTP ${res.status}`);
     process.exit(1);
   }
   const liveVersion = extractVersion(await res.text());
