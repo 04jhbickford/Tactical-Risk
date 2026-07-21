@@ -2,6 +2,64 @@
 
 ---
 
+## 7.20.26 — V2.53 playtest (2 humans + 2 easy AI) → fixed in V2.54
+
+### Bug 2 (deployment turn-stuck) — ROOT CAUSE
+
+Robert (host) refreshed his tab mid-game. `presenceManager` DELETES the
+presence doc on unload, and `getPlayerPresence` treats a missing doc as
+instantly OFFLINE — so Bastion's client saw "host offline" for the few
+seconds of the refresh, seized AI authority via the V2.52 host-failover,
+and BOTH clients ran the AI deployment turns concurrently. The V2.49
+transactions prevented same-version clobber but the two runners
+interleaved semantically divergent states: the turn rewound
+(doc currentPlayerId=British-AI vs state currentPlayerIndex=0/Bastion in
+the debug dump), and a racing client that transiently computed
+phase=PLAYING ran tech→purchase AI logic, pushing the impossible
+`phase=unit_placement + turnPhase=purchase` combination that wedged the
+game. (Presence rules only started working in V2.51's deploy — this
+failover path had never fired in a real game before this playtest.)
+
+Fixes (V2.54):
+1. Failover requires the host to be CONTINUOUSLY offline for 90s before
+   takeover (refresh windows no longer trigger it), with clear toasts on
+   takeover and on returning control.
+2. AIController re-checks authority BETWEEN actions and aborts a
+   mid-run AI turn the moment authority is lost.
+3. `nextPhase()` refuses to run outside the PLAYING phase (turnPhase
+   corruption structurally impossible).
+4. `loadFromJSON` normalizes invalid phase/turnPhase combinations —
+   the currently wedged live game self-heals on next load+push.
+5. Same-version snapshots with a different currentPlayerId now load the
+   doc state (doc is authoritative) instead of only flipping the cached
+   flag.
+- Verified by a 2-client race harness (real GameState+AIController vs a
+  mock transactional doc, 11/11 assertions): host-refresh no longer
+  hands over authority; under forced instant-takeover contention the
+  second writer lands ZERO writes (7 transaction aborts); corrupted docs
+  normalize on load.
+
+### Bug 1 — game missing from My Games before start
+
+A pre-start game exists only as a `waiting` LOBBY doc; My Games queried
+only the `games` collection. Fixed: My Games now shows a "Waiting to
+start" section with lobbies you're a member of; tapping one returns you
+to that lobby.
+
+### Bug 3 — sidebar said one player, state said another
+
+Two contributors: (a) the sidebar trusted the cached `isActivePlayer`
+flag OR'd with the state check, so it could disagree with what the guard
+actually allowed; now both use the identical live state check.
+(b) The same-version/different-player snapshot case updated the flag
+without loading state (see fix 5 above). ("Sean" vs "Bastion" is the
+same person — account display name vs table name; the debug dump's
+state was authoritative and consistent with the HUD.)
+
+---
+
+---
+
 ## 7.14.26 — V2.52 pass-and-play / save-state / multiplayer-mode audit
 
 Systematic audit of all play modes and their combinations. Findings:
