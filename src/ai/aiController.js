@@ -39,6 +39,13 @@ export class AIController {
     this.canActCheck = callback;
   }
 
+  // Re-checked BETWEEN AI actions too: a failover client must abandon an
+  // in-progress AI turn the moment the real host comes back, or the two
+  // clients interleave conflicting states (the V2.53 deployment-stuck bug).
+  _hasAuthority() {
+    return !this.canActCheck || this.canActCheck() === true;
+  }
+
   setActionLog(actionLog) {
     this.actionLog = actionLog;
   }
@@ -176,6 +183,8 @@ export class AIController {
     const phase = this.gameState.phase;
     const turnPhase = this.gameState.turnPhase;
 
+    if (!this._hasAuthority()) return;
+
     // Handle different game phases
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
       await this._handleCapitalPlacement(aiPlayer, player);
@@ -254,6 +263,9 @@ export class AIController {
     const maxThisRound = Math.min(limit, totalRemaining);
 
     while (placedThisRound < maxThisRound) {
+      // Authority may have shifted mid-turn (host returned) — stop immediately
+      if (!this._hasAuthority()) return;
+
       // Find a unit type that can actually be placed
       let unitType = null;
       let isNaval = false;
@@ -298,6 +310,7 @@ export class AIController {
 
     // Finish placement round after placing units
     await this._delay(300);
+    if (!this._hasAuthority()) return;
     this.gameState.finishPlacementRound(this.unitDefs);
     this._notifyAction('finishPlacement', {});
   }

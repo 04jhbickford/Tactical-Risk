@@ -23,6 +23,7 @@ export class GameList {
     this.lobbyManager = getLobbyManager();
     this.el = null;
     this.games = [];
+    this.waitingLobbies = []; // lobbies I'm in that haven't started yet
     this.isLoading = false;
   }
 
@@ -114,6 +115,18 @@ export class GameList {
         const bTime = b.updatedAt?.toMillis?.() || 0;
         return bTime - aTime;
       });
+
+      // Also include lobbies I'm in that haven't started yet. A pre-start
+      // game only exists as a 'waiting' LOBBY document — without this, it
+      // showed under Open Games but was missing from My Games entirely.
+      const lobbyQuery = query(
+        collection(this.db, 'lobbies'),
+        where('status', '==', 'waiting')
+      );
+      const lobbySnapshot = await getDocs(lobbyQuery);
+      this.waitingLobbies = lobbySnapshot.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(l => l.players?.some(p => p.oderId === userId));
     } catch (error) {
       console.error('[GameList] Error loading games:', error);
 
@@ -143,11 +156,32 @@ export class GameList {
 
     let content = '';
 
+    let lobbiesHtml = '';
+    if (!this.isLoading && this.waitingLobbies.length > 0) {
+      lobbiesHtml = `
+        <div class="mp-section-subheader">Waiting to start</div>
+        <div class="mp-games-list">
+          ${this.waitingLobbies.map(lobby => `
+            <div class="mp-game-row own-lobby">
+              <button class="mp-game-item" data-lobby-code="${lobby.code}">
+                <div class="mp-game-info">
+                  <span class="mp-game-name">${lobby.name}</span>
+                  <span class="mp-game-details">${lobby.players.length}/${lobby.settings?.maxPlayers || '?'} players · Code ${lobby.code}</span>
+                </div>
+                <div class="mp-game-status"><span class="mp-waiting">In lobby</span></div>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+        ${this.games.length > 0 ? '<div class="mp-section-subheader">In progress</div>' : ''}
+      `;
+    }
+
     if (this.isLoading) {
       content = `
         <div class="mp-games-loading">Loading your games...</div>
       `;
-    } else if (this.games.length === 0) {
+    } else if (this.games.length === 0 && this.waitingLobbies.length === 0) {
       const userId = this.authManager.getUserId();
       const userEmail = this.authManager.getUser()?.email || 'unknown';
       content = `
@@ -164,6 +198,7 @@ export class GameList {
       `;
     } else {
       content = `
+        ${lobbiesHtml}
         <div class="mp-games-list">
           ${this.games.map(game => this._renderGameItem(game, user, isAdmin)).join('')}
         </div>
@@ -284,8 +319,24 @@ export class GameList {
       this._render();
     });
 
+    // Waiting-lobby items — rejoin the lobby and return to the lobby screen
+    this.el.querySelectorAll('.mp-game-item[data-lobby-code]').forEach(item => {
+      item.addEventListener('click', async () => {
+        const code = item.dataset.lobbyCode;
+        const result = await this.lobbyManager.joinLobby(code, null);
+        if (!result.success) {
+          alert(result.error);
+          return;
+        }
+        this.hide();
+        // onBack shows the multiplayer lobby; its subscription switches to
+        // lobby mode automatically now that currentLobby is set
+        if (this.onBack) this.onBack();
+      });
+    });
+
     // Game items - click to join
-    this.el.querySelectorAll('.mp-game-item').forEach(item => {
+    this.el.querySelectorAll('.mp-game-item[data-game-id]').forEach(item => {
       item.addEventListener('click', async () => {
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);

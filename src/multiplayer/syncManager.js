@@ -140,7 +140,17 @@ export class SyncManager {
           currentPlayerId: newData.currentPlayerId
         });
       } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-        // Turn changed without version bump (shouldn't happen, but handle it)
+        // Doc-level current player differs from ours at the same version —
+        // our local state has DIVERGED from the doc (seen in the V2.53
+        // playtest when two AI runners raced). The doc is authoritative:
+        // load its state instead of just flipping the cached flag, or the
+        // sidebar and the actual game state disagree about whose turn it is.
+        if (newData.state) {
+          this.isLoadingRemoteState = true;
+          this.gameState.loadFromJSON(newData.state);
+          this.isLoadingRemoteState = false;
+          this.localVersion = newData.stateVersion || this.localVersion;
+        }
         console.log(`[Sync] Turn changed without version bump (init): ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
         this._updateActivePlayer(newData.currentPlayerId);
         this._notifyListeners('turn_changed', {

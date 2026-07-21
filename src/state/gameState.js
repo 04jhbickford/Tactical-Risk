@@ -1943,6 +1943,15 @@ export class GameState {
 
   // Advance to the next turn phase
   nextPhase() {
+    // Turn phases only exist inside the PLAYING phase. Refusing to advance
+    // here makes setup-phase turnPhase corruption structurally impossible —
+    // in the V2.53 playtest a racing client pushed phase=unit_placement with
+    // turnPhase=purchase, wedging the game.
+    if (this.phase !== GAME_PHASES.PLAYING) {
+      console.warn(`nextPhase() ignored: game phase is '${this.phase}', not playing`);
+      return;
+    }
+
     let currentIndex = TURN_PHASE_ORDER.indexOf(this.turnPhase);
 
     while (currentIndex < TURN_PHASE_ORDER.length - 1) {
@@ -4827,6 +4836,14 @@ export class GameState {
     this.round = data.round;
     this.phase = data.phase;
     this.turnPhase = data.turnPhase || TURN_PHASES.DEVELOP_TECH;
+    // Self-heal: outside the PLAYING phase the only valid turnPhase is the
+    // initial one. Older builds could push corrupted combinations (e.g.
+    // unit_placement + purchase); normalize on load so a wedged game
+    // recovers as soon as any client loads and re-pushes it.
+    if (this.phase !== GAME_PHASES.PLAYING && this.turnPhase !== TURN_PHASES.DEVELOP_TECH) {
+      console.warn(`[Load] Normalizing invalid turnPhase '${this.turnPhase}' during '${this.phase}'`);
+      this.turnPhase = TURN_PHASES.DEVELOP_TECH;
+    }
     this.territoryState = data.territoryState;
     this.units = data.units;
     this.playerState = data.playerState;

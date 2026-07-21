@@ -231,13 +231,12 @@ export class PlayerPanel {
     const localUserId = this.syncManager?.userId;
     const currentPlayerOderId = player?.oderId;
 
-    // It's our turn if: not multiplayer, OR syncManager says so, OR current player is us
-    // Also check isWaitingForSync - if true, we're waiting for sync after clicking End Phase
+    // It's our turn only if the LOADED STATE says the current player is us —
+    // the same live check the multiplayer guard enforces. (The cached
+    // isActivePlayer flag can lag or diverge from state; trusting it here let
+    // the sidebar disagree with what actions were actually allowed.)
     const isLocalPlayerTurn = !isMultiplayer ||
-      (!this.isWaitingForSync && (
-        this.syncManager?.checkIsActivePlayer() ||
-        (localUserId && currentPlayerOderId === localUserId)
-      ));
+      (!this.isWaitingForSync && !!localUserId && currentPlayerOderId === localUserId);
 
     let html = '';
 
@@ -491,14 +490,12 @@ export class PlayerPanel {
   _renderActionsTab(phase, turnPhase, player) {
     let html = '<div class="pp-actions-tab">';
 
-    // In multiplayer, check if it's the local player's turn
-    // Also check isWaitingForSync for optimistic UI lock after clicking End Phase
+    // In multiplayer, it's our turn only if the loaded state's current player
+    // is us — mirrors the guard's live check so the view can never allow (or
+    // hide) actions the guard would decide differently on
     const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
     const isLocalPlayerTurn = !isMultiplayer ||
-      (!this.isWaitingForSync && (
-        this.syncManager?.checkIsActivePlayer() ||
-        (player?.oderId === this.localUserId)
-      ));
+      (!this.isWaitingForSync && player?.oderId === this.localUserId);
 
     // If multiplayer and not our turn (or waiting for sync), show waiting message
     if (isMultiplayer && !isLocalPlayerTurn) {
