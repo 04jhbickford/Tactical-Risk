@@ -23,7 +23,7 @@ Rules (enforced by `tools/predeploy-check.mjs`, wired into `firebase.json` prede
    Do not use `ALLOW_DIRTY_DEPLOY=1` except in a genuine emergency.
 3. **After every deploy run** `node tools/verify-deployed.mjs` — it compares the
    live site's `GAME_VERSION` against the local checkout and fails on mismatch.
-4. **Bump `GAME_VERSION`** in `src/ui/lobby.js` for every deployed change so
+4. **Bump `GAME_VERSION`** in `src/version.js` for every deployed change so
    playtesters can confirm which build they're on.
 5. **Worktree hygiene:** before assuming a past fix landed, check
    `git -C ".claude/worktrees/<name>" status --short` — a clean branch pointer
