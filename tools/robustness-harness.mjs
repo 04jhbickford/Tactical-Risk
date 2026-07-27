@@ -55,15 +55,21 @@ function composition(humans, ais, unitsEach = 12) {
 
 // ---------- mock Firestore ----------
 class MockDoc {
-  constructor(json) { this.stateVersion = 1; this.state = json; this.currentPlayerId = json.players[0].oderId; this.writes = []; }
+  constructor(json) { this.stateVersion = 1; this.state = json; this.currentPlayerId = json.players[0].oderId; this.writes = []; this.failNext = 0; }
 }
 
 class Client {
-  constructor(name, oderId, doc, { isHost = false, authorityFn = null } = {}) {
+  constructor(name, oderId, doc, { isHost = false, authorityFn = null, manualPush = false } = {}) {
     this.name = name; this.oderId = oderId; this.doc = doc;
     this.isHost = isHost; this.authorityFn = authorityFn || (() => false);
+    this.manualPush = manualPush;
     this.localVersion = doc.stateVersion;
     this.aborted = 0;
+    this.pushFailures = 0;
+    this.reloadedOnExhaust = 0;
+    this.coalesced = 0;
+    this._inFlight = null;
+    this._dirty = false;
     this.gs = new GameState({ risk: { factions: [] } }, territories, []);
     this.gs.isMultiplayer = true;
     this.gs.unitDefs = unitDefs;
@@ -73,6 +79,7 @@ class Client {
     // action is being pushed (the live currentPlayer already moved on).
     this.gs.subscribe(() => {
       if (this.loading) return;
+      if (this.manualPush) return; // scenario drives pushes explicitly
       if (this.cachedActive || this.hasAIAuthority()) this.push();
     });
     this.ai = new AIController();
@@ -98,6 +105,51 @@ class Client {
     this.loading = false;
     this.localVersion = this.doc.stateVersion;
     this.cachedActive = this.doc.currentPlayerId === this.oderId; // _updateActivePlayer on snapshot
+  }
+  // Commit one write if not stale and not injected-to-fail. Mirrors _pushOnce:
+  // returns 'ok' | 'stale' | 'fail'. doc.failNext lets a scenario inject
+  // transient transaction failures.
+  _pushOnce() {
+    if (this.doc.stateVersion > this.localVersion) { this.aborted++; this.load(); return 'stale'; }
+    if (this.doc.failNext > 0) { this.doc.failNext--; this.pushFailures++; return 'fail'; }
+    this.doc.stateVersion += 1;
+    this.doc.state = structuredClone(this.gs.toJSON());
+    this.doc.currentPlayerId = this.gs.currentPlayer?.oderId || null;
+    this.doc.writes.push({ by: this.name, v: this.doc.stateVersion, idx: this.doc.state.currentPlayerIndex, phase: this.doc.state.phase, turnPhase: this.doc.state.turnPhase });
+    this.localVersion = this.doc.stateVersion;
+    this.cachedActive = this.doc.currentPlayerId === this.oderId;
+    return 'ok';
+  }
+  // OLD (V2.55) buggy semantics: on failure, silently drop and return false —
+  // local state stays advanced, doc stays frozen → divergence. Used only to
+  // REPRODUCE Bug 1 in the harness before proving the fix.
+  pushOldBuggy() {
+    if (this.doc.stateVersion > this.localVersion) { this.load(); return false; }
+    if (this.doc.failNext > 0) { this.doc.failNext--; this.pushFailures++; return false; }
+    return this._pushOnce() === 'ok';
+  }
+  // NEW (V2.56) semantics: retry transient failures, then RELOAD authoritative
+  // truth on exhaustion so the client never proceeds on un-persisted state.
+  async pushWithRetry(maxAttempts = 3) {
+    for (let a = 1; a <= maxAttempts; a++) {
+      const r = this._pushOnce();
+      if (r === 'ok') return { status: 'ok' };
+      if (r === 'stale') return { status: 'stale' };
+      // r === 'fail' → retry
+    }
+    this.reloadedOnExhaust++;
+    this.load(); // snap back to last confirmed truth
+    return { status: 'exhausted' };
+  }
+  // Serialize + coalesce (Fix 1): one push in flight; changes during flight
+  // collapse into a single follow-up.
+  async coalescedPush(maxAttempts = 3) {
+    if (this._inFlight) { this._dirty = true; return this._inFlight; }
+    this._inFlight = (async () => this.pushWithRetry(maxAttempts))();
+    let result;
+    try { result = await this._inFlight; } finally { this._inFlight = null; }
+    if (this._dirty) { this._dirty = false; this.coalesced++; return this.coalescedPush(maxAttempts); }
+    return result;
   }
   // human deployment turn: place up to 6 units then finish the round
   humanDeploy() {
@@ -275,7 +327,10 @@ console.log('=== C: version-upgrade robustness (Dimension C) ===');
   check('C1: major dominates minor', compareGameVersions('V3.0', 'V2.99') > 0);
 
   // A stale tab (older client) reading a doc a newer client just wrote → banner.
-  check('C2: old client sees newer writer → banner', outdated('V2.56', GAME_VERSION) === true);
+  // Derive a strictly-newer version from GAME_VERSION so this stays correct
+  // across version bumps (was hardcoded 'V2.56', which broke when we shipped it).
+  const bumpMinor = (v) => { const m = /^V?(\d+)\.(\d+)/.exec(v); return `V${m[1]}.${Number(m[2]) + 1}`; };
+  check('C2: old client sees newer writer → banner', outdated(bumpMinor(GAME_VERSION), GAME_VERSION) === true);
   // Same version, or a doc an OLDER client wrote → no banner (we are not behind).
   check('C2: same version → no banner', outdated(GAME_VERSION, GAME_VERSION) === false);
   check('C2: older writer → no banner', outdated('V2.53', GAME_VERSION) === false);
@@ -287,6 +342,114 @@ console.log('=== C: version-upgrade robustness (Dimension C) ===');
   // or an old client could silently load a shape it can't represent.
   const emitted = composition(1, 1).version;
   check('C3: emitted schema matches SCHEMA_VERSION constant', emitted === SCHEMA_VERSION);
+}
+
+console.log('=== P: push-failure persistence (Bug 1 — Robert/Bastion sequence) ===');
+{
+  // Robert (host, user_0) plays his turn locally; the waiting human is user_1.
+  // In the V2.55 playtest Robert advanced combat→mobilize→next turn locally but
+  // NONE of it committed (doc frozen at v132) — he then "played ahead" and could
+  // act on the next player's turn after a refresh, because Firestore still said
+  // it was his turn.
+  const doc = new MockDoc(composition(2, 0, 6));
+  const robert = new Client('robert', 'user_0', doc, { isHost: true, manualPush: true });
+  const baseVersion = doc.stateVersion;
+  const baseCurrent = doc.currentPlayerId;
+  const baseIdx = doc.state.currentPlayerIndex;
+
+  // Robert plays his turn — finishPlacementRound advances the LOCAL turn past him.
+  robert.humanDeploy();
+  check('P0: Robert local turn advanced past his own turn', robert.gs.currentPlayerIndex !== baseIdx);
+
+  // --- REPRODUCE the bug with OLD (V2.55) semantics: every push fails silently
+  doc.failNext = 99;
+  const buggy = robert.pushOldBuggy();
+  check('P1 (repro): buggy push silently drops (returns false)', buggy === false);
+  check('P1 (repro): doc frozen at last committed version', doc.stateVersion === baseVersion && doc.currentPlayerId === baseCurrent);
+  check('P1 (repro): Robert DIVERGED — local ahead of un-moved doc', robert.gs.currentPlayerIndex !== doc.state.currentPlayerIndex);
+
+  // --- FIX with NEW (V2.56) semantics: retry, then reload authoritative truth
+  doc.failNext = 99; // connection still down
+  const res = await robert.pushWithRetry(3);
+  check('P2: push retried to exhaustion', res.status === 'exhausted' && robert.pushFailures >= 3);
+  check('P2: doc turn NEVER passed without a committed write', doc.stateVersion === baseVersion && doc.currentPlayerId === baseCurrent);
+  check('P2: Robert reloaded to Firestore truth (no longer playing ahead)',
+        robert.gs.currentPlayerIndex === baseIdx && robert.localVersion === baseVersion && robert.reloadedOnExhaust === 1);
+
+  // Waiting human's view: Robert is still the current player; no phantom handoff.
+  const waiter = new Client('waiter', 'user_1', doc);
+  check('P3: waiting human still sees Robert as current (no phantom handoff)',
+        doc.currentPlayerId === 'user_0' && waiter.isActive() === false);
+
+  // --- RECOVERY: connection heals; Robert re-plays and the turn commits.
+  doc.failNext = 0;
+  robert.humanDeploy();
+  const ok = await robert.pushWithRetry(3);
+  check('P4: after recovery, push commits and turn advances to the waiting human',
+        ok.status === 'ok' && doc.stateVersion > baseVersion && doc.currentPlayerId === 'user_1');
+  sane(doc, 'P');
+}
+
+console.log('=== P5: serialize + coalesce concurrent pushes (Fix 1) ===');
+{
+  const doc = new MockDoc(composition(1, 1, 6));
+  const h = new Client('h', 'user_0', doc, { isHost: true, manualPush: true });
+  // Fire 5 pushes while one is in flight — they must collapse, not stack.
+  await Promise.all([h.coalescedPush(), h.coalescedPush(), h.coalescedPush(), h.coalescedPush(), h.coalescedPush()]);
+  const commits = doc.writes.filter(w => w.by === 'h').length;
+  check('P5: 5 concurrent pushes coalesced into <=2 commits', commits <= 2 && commits >= 1);
+  check('P5: local version consistent with doc after coalescing', h.localVersion === doc.stateVersion);
+}
+
+console.log('=== B3: turn indicator single source of truth (Bug 3) ===');
+{
+  // A committed handoff to user_1 is in the doc. A stale cached flag on user_0's
+  // client must NOT make it think it's still their turn — live derivation wins.
+  const doc = new MockDoc(composition(2, 0, 6));
+  doc.state.currentPlayerIndex = 1;
+  doc.currentPlayerId = 'user_1';
+  doc.stateVersion = 2;
+  const c = new Client('c', 'user_0', doc, { isHost: true });
+  c.cachedActive = true; // simulate a stale flag left by a failed push
+  check('B3: live-derived active check ignores stale cached flag', c.isActive() === false);
+  check('B3: live check agrees with doc truth', c.isActive() === (doc.currentPlayerId === 'user_0'));
+}
+
+console.log('=== B2: AI-when-unattended policy (Bug 2) ===');
+{
+  const { anyHumanPresent, mayRunAI, DEFAULT_AI_RUNS_WHEN_UNATTENDED } =
+    await import(pathToFileURL(join(root, 'src/multiplayer/aiPolicy.js')));
+  const players = [{ oderId: 'user_0', isAI: false }, { oderId: 'ai_0', isAI: true }];
+  const allOffline = () => 'offline';
+  const humanOnline = (id) => (id === 'user_0' ? 'online' : 'offline');
+
+  check('B2: default policy pauses AI when unattended', DEFAULT_AI_RUNS_WHEN_UNATTENDED === false);
+  check('B2: no human present → absent', anyHumanPresent(players, allOffline) === false);
+  check('B2: human online → present', anyHumanPresent(players, humanOnline) === true);
+  check('B2: surrendered human does not count as present',
+        anyHumanPresent([{ oderId: 'u', isAI: false, surrendered: true }], () => 'online') === false);
+  check('B2: default gate PAUSES AI with no human present',
+        mayRunAI({ aiHasAuthority: true, runsWhenUnattended: false, humanPresent: false }) === false);
+  check('B2: default gate RUNS AI with a human present',
+        mayRunAI({ aiHasAuthority: true, runsWhenUnattended: false, humanPresent: true }) === true);
+  check('B2: configured unattended override runs AI with no human',
+        mayRunAI({ aiHasAuthority: true, runsWhenUnattended: true, humanPresent: false }) === true);
+  check('B2: no authority never runs AI regardless of policy',
+        mayRunAI({ aiHasAuthority: false, runsWhenUnattended: true, humanPresent: true }) === false);
+}
+
+console.log('=== B4: roll logging present + gameplay unchanged (Bug 4) ===');
+{
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.unitDefs = unitDefs;
+  const before = gs.getRollLog().length;
+  const out = gs._rollCombatWithRolls([{ type: 'infantry', quantity: 20, owner: 'x' }], 'attack', unitDefs);
+  const log = gs.getRollLog();
+  check('B4: getRollLog exists and captured each die', log.length === before + 20 && out.rolls.length === 20);
+  check('B4: rolls are valid d6 values with context + timestamp',
+        log.every(r => r.roll >= 1 && r.roll <= 6 && typeof r.t === 'number' && typeof r.context === 'string'));
+  check('B4: roll log NOT serialized into toJSON (stays out of Firestore)',
+        gs.toJSON()._rollLog === undefined && gs.toJSON().rollLog === undefined);
 }
 
 console.log(failures === 0 ? '\nALL MATRIX CELLS PASS' : `\n${failures} FAILURES`);

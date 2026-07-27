@@ -54,6 +54,7 @@ import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
+import { anyHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -1026,8 +1027,22 @@ async function init() {
         console.log('[AI Status]', message);
       });
       // Authority gate: in multiplayer only the host (or the offline-host
-      // failover client) runs AI turns
-      aiController.setCanAct(() => !gameState.isMultiplayer || syncManager?.hasAIAuthority() === true);
+      // failover client) runs AI turns. Bug 2: additionally, unless the game is
+      // configured to run AI unattended, AI turns pause when no human is present
+      // so an abandoned game truly stops rather than churning AI turns.
+      aiController.setCanAct(() => {
+        if (!gameState.isMultiplayer) return true;
+        const aiHasAuthority = syncManager?.hasAIAuthority() === true;
+        const humanPresent = anyHumanPresent(
+          gameState.players || [],
+          (oderId) => presenceManager?.getPlayerPresence(oderId) ?? 'offline'
+        );
+        return mayRunAI({
+          aiHasAuthority,
+          runsWhenUnattended: gameState.aiRunsWhenUnattended === true,
+          humanPresent
+        });
+      });
     }
 
     // Wire up components

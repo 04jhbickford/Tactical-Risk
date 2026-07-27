@@ -3275,6 +3275,26 @@ export class GameState {
     return result;
   }
 
+  // Central d6 roller (Bug 4). Every die in the game funnels through here so
+  // rolls can be logged for empirical fairness auditing. Gameplay is UNCHANGED:
+  // still an unseeded Math.random() d6 — there is no seeding anywhere. The
+  // "predetermined rolls" report was a byproduct of Bug 1 (the same combat
+  // re-resolved across refreshes on un-persisted state → similar outcomes).
+  // The log is in-memory only (never serialized into toJSON / Firestore) and
+  // bounded to the last 500 rolls; inspect via getRollLog() from the console.
+  _rollDie(context = 'combat') {
+    const roll = Math.floor(Math.random() * 6) + 1;
+    if (!this._rollLog) this._rollLog = [];
+    this._rollLog.push({ t: Date.now(), context, roll });
+    if (this._rollLog.length > 500) this._rollLog.shift();
+    return roll;
+  }
+
+  // Snapshot of recent die rolls for auditing (Bug 4 investigation aid).
+  getRollLog() {
+    return this._rollLog ? this._rollLog.slice() : [];
+  }
+
   _rollCombatWithRolls(units, type, unitDefs) {
     let hits = 0;
     const rolls = [];
@@ -3285,7 +3305,7 @@ export class GameState {
       const hitValue = type === 'attack' ? def.attack : def.defense;
 
       for (let i = 0; i < unit.quantity; i++) {
-        const roll = Math.floor(Math.random() * 6) + 1;
+        const roll = this._rollDie(`combat:${type}`);
         rolls.push({ unit: unit.type, roll, hit: roll <= hitValue });
         if (roll <= hitValue) hits++;
       }
@@ -3331,7 +3351,7 @@ export class GameState {
         if (unit.type === 'battleship' || unit.type === 'cruiser') {
           const bombardValue = def.attack;
           for (let i = 0; i < unit.quantity; i++) {
-            const roll = Math.floor(Math.random() * 6) + 1;
+            const roll = this._rollDie('bombard');
             const isHit = roll <= bombardValue;
             rolls.push({ unit: unit.type, roll, hit: isHit, source: connName });
             if (isHit) hits++;
@@ -3918,7 +3938,7 @@ export class GameState {
     let breakthrough = false;
 
     for (let i = 0; i < techState.techTokens; i++) {
-      const roll = Math.floor(Math.random() * 6) + 1;
+      const roll = this._rollDie('tech');
       rolls.push(roll);
       if (roll === 6) breakthrough = true;
     }
@@ -4819,6 +4839,10 @@ export class GameState {
       factoriesAtTurnStart: Array.from(this.factoriesAtTurnStart || []),
       // v11: Turn events for turn summary modal (multiplayer)
       turnEvents: this.turnEvents,
+      // Additive config (no schema bump): AI-when-unattended policy (Bug 2).
+      // Default false = AI pauses when no human is present. Old clients ignore
+      // the extra field; a missing field loads as false. See aiPolicy.js.
+      aiRunsWhenUnattended: this.aiRunsWhenUnattended ?? false,
     };
   }
 
@@ -4879,6 +4903,10 @@ export class GameState {
 
     // v11: Restore turn events for turn summary modal
     this.turnEvents = data.turnEvents || [];
+
+    // AI-when-unattended policy (Bug 2). Default false: pause AI when no human
+    // is present. Older docs without the field load as the safe default.
+    this.aiRunsWhenUnattended = data.aiRunsWhenUnattended ?? false;
 
     // Reset per-turn state on load (fresh state for the turn)
     this.rocketsUsedThisTurn = {};
