@@ -901,7 +901,15 @@ async function init() {
       // Surface sync failures — a silently dropped push looks like "the game ate
       // my move" to the player
       if (event === 'push_failed') {
-        showNotification('Connection issue — your last action may not have saved. Retrying on your next action.');
+        // Transient failure; _doPush retries with backoff. Only warn softly.
+        showNotification('Connection hiccup — retrying to save your last action…');
+      }
+      // Retries exhausted: local state has been snapped back to the server's
+      // last confirmed truth, so the client can't proceed on un-persisted state.
+      if (event === 'push_exhausted') {
+        showNotification('Could not save — game re-synced to the last confirmed state. Please retry your move.');
+        camera.dirty = true;
+        playerPanel._render();
       }
       // push_stale is handled automatically (state reloads); no user action needed
 
@@ -936,7 +944,10 @@ async function init() {
     // Host pushes all state changes (including AI turns), others only push their own turns
     // IMPORTANT: Don't push if we're loading remote state (prevents feedback loop)
     gameState.subscribe(() => {
-      if (syncManager && !syncManager.isLoading() && (syncManager.checkIsActivePlayer() || syncManager.hasAIAuthority())) {
+      // Push gate uses canPushLocalChange() (cached-flag authorization), NOT the
+      // live checkIsActivePlayer() — a turn-ENDING action has already advanced
+      // the live currentPlayer, so a live check would drop that final push.
+      if (syncManager && !syncManager.isLoading() && syncManager.canPushLocalChange()) {
         playerPanel.logSyncEvent('state_push', {
           version: syncManager.localVersion + 1,
           currentPlayer: gameState.currentPlayer?.name,

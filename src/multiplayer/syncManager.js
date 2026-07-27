@@ -27,6 +27,12 @@ export class SyncManager {
     this.unsubscribe = null;
     this._listeners = [];
     this._pendingPush = null;
+    // Serialize + coalesce pushes (V2.56): only one _doPush transaction may be
+    // in flight at a time. If local state changes while a push is running, we set
+    // _pushDirty and re-push exactly once on completion, instead of firing racing
+    // transactions that contend and throw (the V2.55 push-failure storm).
+    this._pushInFlight = null;
+    this._pushDirty = false;
     this._versionOutdatedNotified = false; // fire the refresh banner at most once
   }
 
@@ -365,69 +371,145 @@ export class SyncManager {
     return this._doPush();
   }
 
+  // Serialize + coalesce entry point. Guarantees a single in-flight push; a
+  // change that lands mid-push is captured by one coalesced follow-up rather
+  // than a second concurrent transaction. Callers still get a boolean.
   async _doPush() {
     if (!this.db || !this.gameId) return false;
 
-    this.isPushing = true;
+    // A push is already running — mark dirty so it re-runs once when it settles,
+    // and share that push's outcome with this caller.
+    if (this._pushInFlight) {
+      this._pushDirty = true;
+      return this._pushInFlight;
+    }
 
+    this._pushInFlight = (async () => {
+      this.isPushing = true;
+      try {
+        return await this._runPushWithRetry();
+      } finally {
+        this.isPushing = false;
+      }
+    })();
+
+    let result;
     try {
-      const gameRef = doc(this.db, 'games', this.gameId);
-      const state = this.gameState.toJSON();
+      result = await this._pushInFlight;
+    } finally {
+      this._pushInFlight = null;
+    }
 
-      // Get current player's userId for turn tracking
-      const currentPlayer = this.gameState.currentPlayer;
-      const currentPlayerId = currentPlayer?.oderId || null;
+    // State changed while we were pushing — flush it in a single follow-up push.
+    if (this._pushDirty) {
+      this._pushDirty = false;
+      return this._doPush();
+    }
+    return result;
+  }
 
-      // Transaction-guarded write: never clobber a state that is newer than the
-      // one this client is based on. Two clients pushing concurrently (e.g. a
-      // stale tab, or a host/active-player race) would otherwise overwrite each
-      // other since both stamp localVersion + 1.
-      const pushedVersion = await runTransaction(this.db, async (transaction) => {
-        const snapshot = await transaction.get(gameRef);
-        if (!snapshot.exists()) return null;
+  // Retry transient transaction failures with small backoff. On exhaustion we
+  // reload the authoritative doc so this client never proceeds on (or hands the
+  // turn off from) un-persisted local state — the root cause of the V2.55
+  // "playing ahead / playing another player's turn" bug: local state advanced
+  // optimistically, the push silently failed, and the game marched on.
+  async _runPushWithRetry() {
+    const MAX_ATTEMPTS = 3;
+    let lastError = null;
 
-        const remoteVersion = snapshot.data().stateVersion || 0;
-        if (remoteVersion > this.localVersion) {
-          // Remote is ahead of us — abort, the subscription will deliver it
-          console.warn(`[Sync] Push aborted: remote v${remoteVersion} > local v${this.localVersion}`);
-          return -1;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      try {
+        const outcome = await this._pushOnce();
+
+        if (outcome.status === 'gone') return false; // doc deleted
+        if (outcome.status === 'stale') {
+          this._notifyListeners('push_stale', { localVersion: this.localVersion });
+          // The winning update's snapshot may have been skipped while isPushing
+          // was set — reload explicitly so we don't sit on stale state.
+          await this._reloadRemoteState();
+          return false;
         }
 
-        transaction.update(gameRef, {
-          state,
-          stateVersion: remoteVersion + 1,
-          currentPlayerId,
-          clientVersion: GAME_VERSION,
-          schemaVersion: state.version ?? null,
-          updatedAt: serverTimestamp()
+        // status === 'ok'
+        this.localVersion = outcome.version;
+        if (outcome.currentPlayerId !== this._lastCurrentPlayerId) {
+          this._updateActivePlayer(outcome.currentPlayerId);
+        }
+        return true;
+      } catch (error) {
+        lastError = error;
+        // Capture the attempted PAYLOAD, not just the raw error — blind
+        // "push_failed: <error>" logging is what stalled the V2.55 diagnosis.
+        const currentPlayer = this.gameState?.currentPlayer;
+        this._notifyListeners('push_failed', {
+          attemptedVersion: this.localVersion + 1,
+          currentPlayerId: currentPlayer?.oderId ?? null,
+          phase: this.gameState?.turnPhase ?? null,
+          attempt,
+          willRetry: attempt < MAX_ATTEMPTS,
+          error: error?.message || String(error)
         });
-        return remoteVersion + 1;
-      });
-
-      if (pushedVersion === null) return false;
-      if (pushedVersion === -1) {
-        this._notifyListeners('push_stale', { localVersion: this.localVersion });
-        // The winning update's snapshot may have been skipped while isPushing was
-        // set — reload explicitly so this client doesn't sit on stale state
-        this._reloadRemoteState();
-        return false;
+        console.error(`SyncManager: Push failed (attempt ${attempt}/${MAX_ATTEMPTS})`, error);
+        if (attempt < MAX_ATTEMPTS) {
+          await this._delay(this._backoffMs(attempt));
+        }
       }
-
-      this.localVersion = pushedVersion;
-
-      // Update active player if turn changed
-      if (currentPlayerId !== this._lastCurrentPlayerId) {
-        this._updateActivePlayer(currentPlayerId);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('SyncManager: Push failed', error);
-      this._notifyListeners('push_failed', error);
-      return false;
-    } finally {
-      this.isPushing = false;
     }
+
+    // Retries exhausted. Snap local state back to the last confirmed truth so a
+    // never-committed local advance can't diverge the game.
+    this._notifyListeners('push_exhausted', {
+      attemptedVersion: this.localVersion + 1,
+      error: lastError?.message || String(lastError)
+    });
+    await this._reloadRemoteState();
+    return false;
+  }
+
+  // A single transaction-guarded write attempt. Never clobbers a state newer
+  // than the one this client is based on: two clients pushing concurrently
+  // (stale tab, or a host/active-player race) would otherwise overwrite each
+  // other since both stamp localVersion + 1. Returns a status object; a thrown
+  // transaction error propagates to the retry loop.
+  async _pushOnce() {
+    const gameRef = doc(this.db, 'games', this.gameId);
+    const state = this.gameState.toJSON();
+    const currentPlayer = this.gameState.currentPlayer;
+    const currentPlayerId = currentPlayer?.oderId || null;
+
+    const pushedVersion = await runTransaction(this.db, async (transaction) => {
+      const snapshot = await transaction.get(gameRef);
+      if (!snapshot.exists()) return null;
+
+      const remoteVersion = snapshot.data().stateVersion || 0;
+      if (remoteVersion > this.localVersion) {
+        console.warn(`[Sync] Push aborted: remote v${remoteVersion} > local v${this.localVersion}`);
+        return -1;
+      }
+
+      transaction.update(gameRef, {
+        state,
+        stateVersion: remoteVersion + 1,
+        currentPlayerId,
+        clientVersion: GAME_VERSION,
+        schemaVersion: state.version ?? null,
+        updatedAt: serverTimestamp()
+      });
+      return remoteVersion + 1;
+    });
+
+    if (pushedVersion === null) return { status: 'gone' };
+    if (pushedVersion === -1) return { status: 'stale' };
+    return { status: 'ok', version: pushedVersion, currentPlayerId };
+  }
+
+  // Exponential backoff with jitter (~150ms, ~300ms) between push retries.
+  _backoffMs(attempt) {
+    return 150 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 100);
+  }
+
+  _delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Re-fetch the game doc and load it if newer than local (used after a stale
@@ -494,9 +576,26 @@ export class SyncManager {
     }
   }
 
-  // Check if we're the active player
+  // Single source of truth for "is it my turn" — DERIVED FROM LIVE STATE, not
+  // the cached isActivePlayer flag (which lags a push debounce + network
+  // round-trip and goes stale exactly when a push fails). Guard, sidebar,
+  // title, and debug panel all read this so they can never disagree about whose
+  // turn it is (Bugs 1 & 3). Falls back to the cached flag only before any state
+  // has loaded (currentPlayer not yet available).
   checkIsActivePlayer() {
+    const cp = this.gameState?.currentPlayer;
+    if (cp && cp.oderId != null) return cp.oderId === this.userId;
     return this.isActivePlayer;
+  }
+
+  // Push AUTHORIZATION — deliberately uses the cached flag, NOT live state.
+  // Rationale: your own turn-ENDING action advances the live currentPlayer to
+  // the next player before the notify fires, so a live check would refuse to
+  // push the very transition that ends your turn (leaving it stranded locally —
+  // the exact V2.55 failure). The cached flag stays true across that final push
+  // because it only updates once the push confirms. AI authority may always push.
+  canPushLocalChange() {
+    return this.isActivePlayer || this.hasAIAuthority();
   }
 
   // Get the current player ID from Firestore
