@@ -2,6 +2,74 @@
 
 ---
 
+## 7.27.26 — V2.56 push-persistence fix (Robert's V2.55 playtest, 4 bugs)
+
+Harness now at **59 checks, all green** (`tools/robustness-harness.mjs`).
+
+### Bug 1 (GAME-BREAKING) — push-persistence failure, not turn-authority
+
+Root cause: Robert's client advanced its *local* state through
+combat → mobilize → the next player's turn, but **none of it committed to
+Firestore** — the doc stayed frozen at v132, phase=combat. Every downstream
+symptom (lost combat, "playing ahead," being able to act on the next player's
+turn after refresh) fell out of that one fact: after refresh, Firestore
+authoritatively said it was still Robert's turn, so he legitimately re-controlled
+his own un-ended turn.
+
+Decisive evidence: Robert and Bastion both reported Local Version 132 — they
+*agreed*, so the doc genuinely never moved. The `state_push: version=133` log
+lines were NOT commit confirmations; they were logged in `gameState.subscribe`
+(main.js) as `localVersion + 1` on every notify, *before* the debounced push ran.
+15 notifies at v132 → 15 "133" lines, zero commits. `push_failed` events were
+real transaction throws that `_doPush` swallowed with no retry and no rollback.
+
+Fixes (all in `src/multiplayer/syncManager.js`):
+1. **Serialize + coalesce `_doPush`** — one in-flight transaction; a change
+   during flight sets `_pushDirty` and re-pushes once on completion. Kills the
+   contention storm from racing debounced/`pushStateNow` transactions.
+2. **Retry transient failures** (3× exp backoff + jitter). On exhaustion,
+   **reload the authoritative doc** so a client can never proceed on (or hand
+   the turn off from) un-persisted state. New `push_exhausted` event → user sees
+   "re-synced to last confirmed state."
+3. **`checkIsActivePlayer()` now derives from live `gameState.currentPlayer`** —
+   single source of truth for title/guard/debug. New `canPushLocalChange()`
+   keeps the cached-flag *push authorization* (so a turn-ending push, which has
+   already advanced the live currentPlayer, still fires).
+4. **`push_failed` now logs the payload** `{attemptedVersion, currentPlayerId,
+   phase, attempt, error}` instead of the bare error — no more blind debugging.
+
+Harness reproduces the exact Robert/Bastion sequence with old semantics (local
+diverges, doc frozen), then proves the fix (client reloads to truth, the waiting
+human never sees a phantom handoff, recovery commits cleanly).
+
+### Bug 2 — AI ran even when no human was present (see PHASE_4_PLAN.md)
+
+Default is now **wait-for-human-present**: AI pauses when no non-AI,
+non-surrendered player is connected, resumes on reconnect. Configurable via
+doc-level `aiRunsWhenUnattended` (additive field, no schema bump). Policy logic
+in `src/multiplayer/aiPolicy.js`; three options + trade-offs documented in
+PHASE_4_PLAN.md.
+
+### Bug 3 — turn indicator flipped back and forth — RESOLVED by Bug 1 fix #3
+
+The cached-flag divergence was the cause; live-derived `checkIsActivePlayer()`
+means guard, sidebar, title, and debug panel now share one source. Verified in
+the harness (B3): a stale cached flag can no longer make a client think it's
+still their turn.
+
+### Bug 4 — "dice rolls seem predetermined" — INVESTIGATION ONLY, no gameplay change
+
+Rolls are unseeded `Math.floor(Math.random()*6)+1` — there is no seeding
+anywhere in the code. The "predetermined" impression was almost certainly a
+byproduct of Bug 1: Robert re-resolved the *identical* combat repeatedly across
+refreshes (same un-persisted state each time → similar outcomes). Added a central
+`gameState._rollDie(context)` that all three d6 sites route through, logging each
+roll (value + context + timestamp) to a bounded in-memory ring buffer
+(`getRollLog()`, 500 entries, never serialized to Firestore) so future fairness
+claims can be checked empirically. Distribution is unchanged.
+
+---
+
 ## 7.21.26 — V2.55 robustness audit (compositions × play modes × version upgrades)
 
 Systematic audit against `ROBUSTNESS_MATRIX.md`, backed by an executable

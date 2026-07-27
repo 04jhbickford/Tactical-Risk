@@ -108,6 +108,44 @@ Full WCAG 2.1 AA sweep as a later **L** pass.
 
 ---
 
+## AI-when-unattended policy (Bug 2 — decided V2.56)
+
+From Robert's V2.55 playtest: a game with AI players kept advancing AI turns
+even when no human was present to watch, so an abandoned game never truly
+paused. Three options, with the mechanism to switch between them already wired
+(doc-level flag `aiRunsWhenUnattended`, evaluated by `src/multiplayer/aiPolicy.js`
+`mayRunAI()`; presence via `presenceManager.getPlayerPresence`):
+
+1. **Anyone-can-take-over (legacy V2.54 behavior).** AI runs whenever *some*
+   client with authority is open — host, or a failover client after the 90s
+   grace. Set `aiRunsWhenUnattended = true`.
+   - *Pro:* AI never stalls; an all-AI stretch fast-forwards while any tab is open.
+   - *Con:* a game nobody is watching keeps churning AI turns; combined with
+     async play, a player can return to find the AI has run many rounds unattended.
+
+2. **Wait-for-human-present (DEFAULT, implemented V2.56).** AI turns only run
+   while at least one non-AI, non-surrendered player is connected
+   (`anyHumanPresent`). When the last human disconnects, AI pauses; it resumes
+   the moment a human reconnects. `aiRunsWhenUnattended = false` (default).
+   - *Pro:* an unattended game truly pauses; a returning player sees the game
+     where they left it, not N AI rounds later.
+   - *Con:* presence is heartbeat-based — a human with a backgrounded-but-open
+     tab still counts as "present," so this pauses only on genuine disconnect,
+     not on an idle open tab. Acceptable: the intent is to stop *abandoned*
+     games, and a live tab is cheap to keep the AI flowing.
+
+3. **Host-only, no failover (not chosen).** Only the host ever runs AI; if the
+   host is gone, the game waits regardless of who else is present.
+   - *Pro:* simplest authority model, zero concurrent-runner risk.
+   - *Con:* one host disconnect freezes the game for everyone until they return —
+     the exact fragility the 90s failover grace was added to avoid.
+
+Revisit trigger: if playtesters report AI stalling when they *want* it to keep
+going (option 1's use case), expose `aiRunsWhenUnattended` as a lobby toggle
+rather than a Firestore-console-only flag.
+
+---
+
 ## Suggested sequencing
 
 1. **V2.54**: #2 AI stalemate + #4 sound (library tier)
