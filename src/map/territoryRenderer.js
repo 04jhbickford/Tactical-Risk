@@ -36,6 +36,12 @@ export class TerritoryRenderer {
     'Finland Norway': { x: 0, y: -60 },
   };
 
+  // Sampled directly from map/baseTiles/*.png (the dominant flat open-ocean
+  // shade, away from the near-coast glow and the deep-water gradient). Used
+  // to mask the baked-in rectangular sea-zone blocks in the tile art so the
+  // painted-over water reads as a continuation of the same ocean, not a seam.
+  static OCEAN_BASE_COLOR = '#44C5BD';
+
   constructor(territories, continents) {
     this.territories = territories;
     this.continents = continents;
@@ -143,6 +149,43 @@ export class TerritoryRenderer {
         this.flagImages[player.flag] = img;
       }
     }
+  }
+
+  /**
+   * Mask the baked-in rectangular sea-zone blocks in the base map tiles by
+   * painting the accurate water polygons (the same geometry used for click
+   * hit-testing) in the map art's base ocean color. Visual only — hit-test
+   * geometry in TerritoryMap is untouched, so sea zones stay clickable.
+   */
+  renderWaterMask(ctx) {
+    ctx.save();
+
+    // Solid fill covers the baked rectangle with the correct irregular shape.
+    ctx.fillStyle = TerritoryRenderer.OCEAN_BASE_COLOR;
+    for (const t of this.territories) {
+      if (!t.isWater) continue;
+      for (const poly of t.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
+    }
+
+    // Soft feather along the polygon edge so the mask blends into the PNG's
+    // anti-aliased coastline instead of leaving a second hard seam.
+    ctx.strokeStyle = TerritoryRenderer.OCEAN_BASE_COLOR;
+    ctx.shadowColor = TerritoryRenderer.OCEAN_BASE_COLOR;
+    ctx.shadowBlur = 4;
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.6;
+    for (const t of this.territories) {
+      if (!t.isWater) continue;
+      for (const poly of t.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._strokePoly(ctx, poly);
+      }
+    }
+
+    ctx.restore();
   }
 
   /** Fill land territory polygons with continent color (Risk style) */
@@ -1014,9 +1057,15 @@ export class TerritoryRenderer {
     ctx.save();
 
     if (territory.isWater) {
-      // Sea zones: subtle blue highlight, no fill to avoid covering islands
+      // Sea zones: brighter semi-transparent fill + dashed glow outline so
+      // hover is unambiguous even though the zone has no land mass to fill.
       ctx.shadowColor = '#40c4ff';
       ctx.shadowBlur = 12;
+      ctx.fillStyle = 'rgba(100, 210, 255, 0.28)';
+      for (const poly of territory.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
       ctx.strokeStyle = 'rgba(64, 196, 255, 0.7)';
       ctx.lineWidth = 3;
       ctx.setLineDash([8, 4]);
@@ -1054,6 +1103,26 @@ export class TerritoryRenderer {
   /** Draw selection highlight */
   renderSelected(ctx, territory) {
     if (!territory) return;
+
+    if (territory.isWater) {
+      // Sea zones: brighter fill + thicker solid outline than hover, so
+      // selected-vs-hovered is never ambiguous for a zone with no land fill.
+      ctx.shadowColor = '#40c4ff';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = 'rgba(120, 220, 255, 0.4)';
+      for (const poly of territory.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
+      ctx.strokeStyle = 'rgba(140, 225, 255, 0.95)';
+      ctx.lineWidth = 4;
+      for (const poly of territory.polygons) {
+        if (!poly || poly.length < 3) continue;
+        this._strokePoly(ctx, poly);
+      }
+      ctx.shadowBlur = 0;
+      return;
+    }
 
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 12;

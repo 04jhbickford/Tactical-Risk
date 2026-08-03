@@ -1903,6 +1903,10 @@ async function init() {
         // Render layers
         mapRenderer.render(ctx, localViewport);
 
+        // Mask baked-in rectangular sea-zone artwork with accurate water
+        // polygon fills (visual only — click hit-testing is unaffected)
+        territoryRenderer.renderWaterMask(ctx);
+
         // Continent indicators FIRST (underneath ownership)
         territoryRenderer.renderContinentIndicators(ctx);
 
