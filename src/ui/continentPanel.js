@@ -1,5 +1,7 @@
 // Sidebar panel showing continent bonuses and player stats
 
+import { shouldShowPurchase } from '../state/gameState.js';
+
 export class ContinentPanel {
   constructor(continents) {
     this.continents = continents;
@@ -225,7 +227,7 @@ export class ContinentPanel {
         html += `
           <div class="rc-trade">
             <span class="rc-trade-value">Trade value: <strong>${nextValue} IPCs</strong></span>
-            ${turnPhase === 'purchase' ? `
+            ${shouldShowPurchase(this.gameState.phase, turnPhase) ? `
               <button class="rc-trade-btn" data-action="trade-cards">Cash In</button>
             ` : `
               <span class="rc-trade-note">(Available in Purchase phase)</span>

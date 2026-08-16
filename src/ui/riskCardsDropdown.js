@@ -1,6 +1,6 @@
 // Risk Cards Dropdown - shows cards on the right side with a collapsible panel
 
-import { TURN_PHASES } from '../state/gameState.js';
+import { shouldShowPurchase } from '../state/gameState.js';
 
 export class RiskCardsDropdown {
   constructor() {
@@ -116,7 +116,7 @@ export class RiskCardsDropdown {
               <span>Trade value:</span>
               <strong>${nextValue} IPCs</strong>
             </div>
-            ${turnPhase === TURN_PHASES.PURCHASE ? `
+            ${shouldShowPurchase(this.gameState.phase, turnPhase) ? `
               <button class="rcd-trade-btn" data-action="trade">Cash In Cards</button>
             ` : `
               <button class="rcd-trade-btn disabled" disabled>Cash In Cards</button>

@@ -1,7 +1,7 @@
 // Player-focused panel with tabbed navigation
 // Tabs: Actions, Stats, Territory, Log
 
-import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES, shouldShowTechResearch } from '../state/gameState.js';
+import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES, shouldShowTechResearch, shouldShowPurchase } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import {
@@ -62,12 +62,33 @@ export function shouldShowSpectatorWaiting({ isMultiplayer, localUserId, current
 // A remote snapshot that makes THIS client the current human must drop the
 // optimistic waiting lock. state_updated used to omit isActivePlayer, so
 // `if (data.isActivePlayer)` never cleared and the overlay stuck on own seat.
-export function resolveWaitingForSyncAfterRemoteSnapshot({ isWaitingForSync, isActivePlayer }) {
+// Own seat also drops the lock: host AI finishPlacement can hand the seat
+// back locally while isPushing swallows state_updated / turn_changed.
+export function resolveWaitingForSyncAfterRemoteSnapshot({
+  isWaitingForSync,
+  isActivePlayer,
+  localUserId,
+  currentPlayerOderId,
+}) {
   if (isActivePlayer) return false;
+  if (isCurrentPlayerLocal({ localUserId, currentPlayerOderId })) return false;
+  return !!isWaitingForSync;
+}
+
+// After a local apply (AI / finishPlacement) the loaded seat is truth.
+// You cannot stay waiting-locked on your own seat. Done's optimistic lock
+// is set BEFORE this apply, so double-tap skip of the next seat still holds.
+export function resolveWaitingForSyncAfterStateApply({
+  isWaitingForSync,
+  localUserId,
+  currentPlayerOderId,
+}) {
+  if (isCurrentPlayerLocal({ localUserId, currentPlayerOderId })) return false;
   return !!isWaitingForSync;
 }
 
 // After applying a remote snapshot: isActivePlayer true ⇒ place-units UI.
+// Local AI handoff may leave isActivePlayer stale; own seat still shows place.
 export function shouldShowPlaceUnitsUI({
   isMultiplayer,
   isWaitingForSync,
@@ -75,7 +96,12 @@ export function shouldShowPlaceUnitsUI({
   currentPlayerOderId,
   isActivePlayer,
 }) {
-  const waiting = resolveWaitingForSyncAfterRemoteSnapshot({ isWaitingForSync, isActivePlayer });
+  const waiting = resolveWaitingForSyncAfterRemoteSnapshot({
+    isWaitingForSync,
+    isActivePlayer,
+    localUserId,
+    currentPlayerOderId,
+  });
   return computeIsLocalPlayerTurn({
     isMultiplayer,
     isWaitingForSync: waiting,
@@ -261,8 +287,24 @@ export class PlayerPanel {
 
   setGameState(gameState) {
     this.gameState = gameState;
-    gameState.subscribe(() => this._render());
+    gameState.subscribe(() => {
+      this._unlockWaitingOnOwnSeat();
+      this._render();
+    });
     this._render();
+  }
+
+  // State apply (local AI / finishPlacement or remote load) is the moment
+  // the loaded seat is truth. Drop the Done lock only then — setWaitingForSync
+  // calls _render directly, so the optimistic lock still covers the next seat.
+  _unlockWaitingOnOwnSeat() {
+    if (!this.isWaitingForSync) return;
+    const localUserId = this.localUserId || this.syncManager?.userId;
+    this.isWaitingForSync = resolveWaitingForSyncAfterStateApply({
+      isWaitingForSync: this.isWaitingForSync,
+      localUserId,
+      currentPlayerOderId: this.gameState?.currentPlayer?.oderId,
+    });
   }
 
   setUnitDefs(unitDefs) {
@@ -933,8 +975,8 @@ export class PlayerPanel {
         html += this._renderInlineTech(player);
       }
 
-      // Purchase phase - inline unit purchasing
-      if (turnPhase === TURN_PHASES.PURCHASE) {
+      // Purchase phase - inline unit purchasing (PLAYING only)
+      if (shouldShowPurchase(phase, turnPhase)) {
         html += this._renderInlinePurchase(player);
       }
 

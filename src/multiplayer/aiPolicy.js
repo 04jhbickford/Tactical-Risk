@@ -26,10 +26,25 @@ export function anyHumanPresent(players, presenceOf) {
   });
 }
 
+// A seated human whose client is actually running this page counts as present
+// even if the presence doc is stale (iPhone host background/lock/heartbeat).
+// Abandoned games (no local seated human, no online humans) still pause.
+export function isLocalHumanSeated(players, localUserId) {
+  if (!localUserId || !Array.isArray(players)) return false;
+  return players.some(p =>
+    p && !p.isAI && !p.surrendered && p.oderId === localUserId
+  );
+}
+
+export function computeHumanPresent({ players, presenceOf, localUserId } = {}) {
+  if (isLocalHumanSeated(players, localUserId)) return true;
+  return anyHumanPresent(players, presenceOf);
+}
+
 // The run gate: may AI turns run right now on THIS client?
 //   aiHasAuthority   — this client is allowed to run AI (host or failover)
 //   runsWhenUnattended — the game's configured policy flag (see default above)
-//   humanPresent     — result of anyHumanPresent(...)
+//   humanPresent     — result of computeHumanPresent(...) / anyHumanPresent(...)
 // AI runs only if this client has authority AND (the game permits unattended AI
 // OR a human is actually present).
 export function mayRunAI({ aiHasAuthority, runsWhenUnattended, humanPresent }) {

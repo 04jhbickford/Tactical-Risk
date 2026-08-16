@@ -2,6 +2,23 @@
 
 ---
 
+## 8.16.26 — V2.75 host stuck on own unit_placement seat; AI paused until a guest is online
+
+Live V2.74 playtest. Guest Robert007 dump 2026-08-16T23:22:14Z: phase=`unit_placement`, leftover constructor `turnPhase=purchase`, round 1, local v40. Current = James (host). Guest `isActivePlayer=false` (correct). Sync: Robert v23, then Hard Bots v24–33 in ~2s, then James current v34–40 for ~80s. Two table reports: (1) stuck on James's turn; (2) AIs only run after another human joins. This game is dead — new game after Vercel is V2.75.
+
+Cause:
+- V2.72/V2.73 waiting lock: human `finish-placement` sets `isWaitingForSync`. Host AI `finishPlacementRound` then `pushStateNow()`; while `isPushing`, `onSnapshot` updates `_updateActivePlayer` but does not fire `state_updated` / `turn_changed`, so the V2.73 clearer never runs when AI hands the seat back to the host.
+- `mayRunAI` required presence-doc `anyHumanPresent`. iPhone host often looks `offline` (background/lock/heartbeat), so AI paused until a guest came online.
+
+Fix (UI/sync safety — SCHEMA 11, no rule/map change, leftover purchase still not healed):
+- After a local or remote state apply, `isWaitingForSync` drops when `currentPlayer.oderId === localUserId`. Done's optimistic lock still covers the next seat (double-tap skip stays illegal). Spectator overlay stays seat-based.
+- A seated local human client counts as present even if the presence doc is stale. Unattended (no local seated human, no online humans) still pauses. `DEFAULT_AI_RUNS_WHEN_UNATTENDED` stays false. Host-only AI writer unchanged.
+- Purchase / trade / buy actions require `phase === PLAYING` (leftover setup `purchase` stays inert).
+
+Harness: `node tools/test-mp-turn-sync.mjs` (host lock after local AI handoff; local-human present), `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, robustness B2.
+
+---
+
 ## 8.16.26 — V2.74 guest stuck on 2nd initial deployment (illegal phase combo)
 
 Live V2.73 playtest. Guest Robert007 (not host), dump 2026-08-16T22:33:53Z: phase=`unit_placement`, turnPhase=`develop_tech`, round 1, local v24, isActivePlayer true. Players: Robert007, Easy Bot, James, Hard Bot. Sync log: Robert `state_push` with `phase: develop_tech` (`gameState.turnPhase` in main.js); Easy Bot also pushed develop_tech. He had not left. Game is dead.

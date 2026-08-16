@@ -2,7 +2,7 @@
 // Flow: Click territory on map (factory or adjacent sea zone), then buy units for that location
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
-import { GAME_PHASES, TURN_PHASES } from '../state/gameState.js';
+import { shouldShowPurchase } from '../state/gameState.js';
 
 export class PurchasePopup {
   constructor() {
@@ -54,9 +54,7 @@ export class PurchasePopup {
   isPurchasePhase() {
     // Must be in PLAYING phase AND PURCHASE turn phase
     // (turnPhase defaults to PURCHASE, so we need to check phase too)
-    return this.gameState &&
-      this.gameState.phase === GAME_PHASES.PLAYING &&
-      this.gameState.turnPhase === TURN_PHASES.PURCHASE;
+    return !!(this.gameState && shouldShowPurchase(this.gameState.phase, this.gameState.turnPhase));
   }
 
   show() {

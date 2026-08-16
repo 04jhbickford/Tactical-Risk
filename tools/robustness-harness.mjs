@@ -451,7 +451,7 @@ console.log('=== B3: turn indicator single source of truth (Bug 3) ===');
 
 console.log('=== B2: AI-when-unattended policy (Bug 2) ===');
 {
-  const { anyHumanPresent, mayRunAI, DEFAULT_AI_RUNS_WHEN_UNATTENDED } =
+  const { anyHumanPresent, mayRunAI, DEFAULT_AI_RUNS_WHEN_UNATTENDED, computeHumanPresent, isLocalHumanSeated } =
     await import(pathToFileURL(join(root, 'src/multiplayer/aiPolicy.js')));
   const players = [{ oderId: 'user_0', isAI: false }, { oderId: 'ai_0', isAI: true }];
   const allOffline = () => 'offline';
@@ -470,6 +470,18 @@ console.log('=== B2: AI-when-unattended policy (Bug 2) ===');
         mayRunAI({ aiHasAuthority: true, runsWhenUnattended: true, humanPresent: false }) === true);
   check('B2: no authority never runs AI regardless of policy',
         mayRunAI({ aiHasAuthority: false, runsWhenUnattended: true, humanPresent: true }) === false);
+  check('B2: seated local human is present even if presence is offline',
+        computeHumanPresent({ players, presenceOf: allOffline, localUserId: 'user_0' }) === true);
+  check('B2: local seated human + stale presence still runs AI',
+        mayRunAI({
+          aiHasAuthority: true,
+          runsWhenUnattended: false,
+          humanPresent: computeHumanPresent({ players, presenceOf: allOffline, localUserId: 'user_0' }),
+        }) === true);
+  check('B2: unattended (no local seated human, all offline) still pauses',
+        computeHumanPresent({ players, presenceOf: allOffline, localUserId: null }) === false);
+  check('B2: surrendered local human is not seated-present',
+        isLocalHumanSeated([{ oderId: 'user_0', isAI: false, surrendered: true }], 'user_0') === false);
 }
 
 console.log('=== B4: roll logging present + gameplay unchanged (Bug 4) ===');

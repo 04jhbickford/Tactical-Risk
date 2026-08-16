@@ -69,6 +69,11 @@ export function shouldShowTechResearch(phase, turnPhase) {
   return phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.DEVELOP_TECH;
 }
 
+/** True only when purchase chrome / trade / buy actions may run. */
+export function shouldShowPurchase(phase, turnPhase) {
+  return phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.PURCHASE;
+}
+
 export function shouldShowInitialDeployment(phase) {
   return phase === GAME_PHASES.UNIT_PLACEMENT;
 }
@@ -1566,6 +1571,9 @@ export class GameState {
   // Add unit to pending purchases (PURCHASE phase) - units placed during MOBILIZE
   // territory parameter specifies where the unit will be placed during mobilize
   addToPendingPurchases(unitType, unitDefs, territory = null) {
+    if (!shouldShowPurchase(this.phase, this.turnPhase)) {
+      return { success: false, error: 'Can only purchase during Purchase phase' };
+    }
     const player = this.currentPlayer;
     if (!player) return { success: false, error: 'No current player' };
 
@@ -2144,7 +2152,7 @@ export class GameState {
 
   // Purchase units (during PURCHASE phase)
   purchaseForMobilization(unitType, quantity, unitDefs) {
-    if (this.turnPhase !== TURN_PHASES.PURCHASE) return false;
+    if (!shouldShowPurchase(this.phase, this.turnPhase)) return false;
 
     const player = this.currentPlayer;
     if (!player) return false;
@@ -4204,8 +4212,8 @@ export class GameState {
 
   // Trade RISK cards for IPCs
   tradeRiskCards(playerId) {
-    // Can only trade during purchase phase
-    if (this.turnPhase !== TURN_PHASES.PURCHASE) {
+    // Can only trade during PLAYING + purchase phase
+    if (!shouldShowPurchase(this.phase, this.turnPhase)) {
       return { success: false, ipcs: 0, error: 'Can only trade cards during Purchase phase' };
     }
 
@@ -4239,8 +4247,8 @@ export class GameState {
 
   // Trade a specific set of RISK cards (for UI selection)
   tradeSpecificCards(playerId, cardSet) {
-    // Can only trade during purchase phase
-    if (this.turnPhase !== TURN_PHASES.PURCHASE) {
+    // Can only trade during PLAYING + purchase phase
+    if (!shouldShowPurchase(this.phase, this.turnPhase)) {
       return { success: false, ipcs: 0, error: 'Can only trade cards during Purchase phase' };
     }
 

@@ -35,7 +35,7 @@ import { HUD } from './ui/hud.js';
 import { Minimap } from './ui/minimap.js';
 import { Lobby } from './ui/lobby.js';
 import { ContinentPanel } from './ui/continentPanel.js';
-import { GameState, GAME_PHASES, TURN_PHASES } from './state/gameState.js';
+import { GameState, GAME_PHASES, TURN_PHASES, shouldShowPurchase } from './state/gameState.js';
 import { VictoryScreen } from './ui/victoryScreen.js';
 import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
@@ -68,7 +68,7 @@ import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
-import { anyHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
+import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -324,7 +324,11 @@ async function init() {
         break;
 
       case 'open-purchase':
-        // Close other modals first
+        // Close other modals first. Purchase is PLAYING-only — leftover
+        // setup turnPhase (constructor purchase) must not open the shop.
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) {
+          break;
+        }
         techUI.hide();
         combatUI.hide();
         purchasePopup.show();
@@ -343,8 +347,8 @@ async function init() {
         break;
 
       case 'trade-cards':
-        // Risk cards can only be traded during the PURCHASE phase
-        if (gameState.turnPhase !== TURN_PHASES.PURCHASE) {
+        // Risk cards can only be traded during PLAYING + PURCHASE
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) {
           console.log('Risk cards can only be traded during the Purchase phase');
           break;
         }
@@ -359,7 +363,7 @@ async function init() {
 
       case 'trade-set':
         // Trade a specific card set (when multiple options exist)
-        if (gameState.turnPhase !== TURN_PHASES.PURCHASE) {
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) {
           console.log('Risk cards can only be traded during the Purchase phase');
           break;
         }
@@ -380,6 +384,7 @@ async function init() {
         break;
 
       case 'undo-purchase':
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) break;
         if (data.unitType) {
           const undoPurchaseResult = gameState.removeFromPendingPurchases(data.unitType, unitDefs);
           if (undoPurchaseResult.success) {
@@ -389,13 +394,14 @@ async function init() {
         break;
 
       case 'clear-purchases':
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) break;
         gameState.clearPendingPurchases(unitDefs);
         camera.dirty = true;
         break;
 
       case 'trade-risk-cards':
-        // Trade Risk cards for IPCs during purchase phase
-        if (gameState.turnPhase === TURN_PHASES.PURCHASE) {
+        // Trade Risk cards for IPCs during PLAYING + purchase phase
+        if (shouldShowPurchase(gameState.phase, gameState.turnPhase)) {
           const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
           if (result.success) {
             actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);
@@ -406,6 +412,7 @@ async function init() {
 
       case 'buy-unit':
         // Inline purchase - add or remove unit from pending purchases
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) break;
         if (data.unitType && data.delta) {
           const def = unitDefs[data.unitType];
           if (!def) break;
@@ -423,6 +430,7 @@ async function init() {
 
       case 'buy-max':
         // Buy maximum affordable units of this type
+        if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) break;
         if (data.unitType) {
           const def = unitDefs[data.unitType];
           if (!def) break;
@@ -990,6 +998,8 @@ async function init() {
         playerPanel.setWaitingForSync(resolveWaitingForSyncAfterRemoteSnapshot({
           isWaitingForSync: playerPanel.isWaitingForSync,
           isActivePlayer,
+          localUserId: playerPanel.localUserId || syncManager.userId,
+          currentPlayerOderId: gameState.currentPlayer?.oderId,
         }));
 
         // Update player panel to reflect turn change
@@ -1154,10 +1164,11 @@ async function init() {
       aiController.setCanAct(() => {
         if (!gameState.isMultiplayer) return true;
         const aiHasAuthority = syncManager?.hasAIAuthority() === true;
-        const humanPresent = anyHumanPresent(
-          gameState.players || [],
-          (oderId) => presenceManager?.getPlayerPresence(oderId) ?? 'offline'
-        );
+        const humanPresent = computeHumanPresent({
+          players: gameState.players || [],
+          presenceOf: (oderId) => presenceManager?.getPlayerPresence(oderId) ?? 'offline',
+          localUserId: syncManager?.userId,
+        });
         return mayRunAI({
           aiHasAuthority,
           runsWhenUnattended: gameState.aiRunsWhenUnattended === true,
@@ -1427,7 +1438,7 @@ async function init() {
     // Continent Panel (includes Risk cards)
     continentPanel.setUnitDefs(unitDefs);
     continentPanel.setOnTradeCards(() => {
-      if (gameState.turnPhase === TURN_PHASES.PURCHASE) {
+      if (shouldShowPurchase(gameState.phase, gameState.turnPhase)) {
         const result = gameState.tradeRiskCards(gameState.currentPlayer.id);
         if (result.success) {
           actionLog.logCardTrade(gameState.currentPlayer, result.ipcs);

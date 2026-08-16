@@ -20,6 +20,7 @@ const {
   TURN_PHASES,
   shouldDrivePlayingTurnPhase,
   shouldShowTechResearch,
+  shouldShowPurchase,
   shouldShowInitialDeployment,
   isSetupPhase,
 } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
@@ -116,7 +117,7 @@ function presentsAsPlaceableSetup(gs) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.74', GAME_VERSION === 'V2.74');
+check('GAME_VERSION is V2.75', GAME_VERSION === 'V2.75');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== nextTurn() during unit_placement is a no-op ===');
@@ -208,6 +209,24 @@ console.log('=== happy path: finishPlacementRound when no one can place ===');
   check('playing paths now run', shouldDrivePlayingTurnPhase(gs.phase) === true);
   check('tech research is live after setup ends',
     shouldShowTechResearch(gs.phase, gs.turnPhase) === true);
+}
+
+console.log('=== leftover purchase does not show purchase chrome or trade ===');
+{
+  const setup = makeSetupTable({ turnPhase: TURN_PHASES.PURCHASE });
+  check('unit_placement + leftover purchase is not purchase chrome',
+    shouldShowPurchase(setup.phase, setup.turnPhase) === false);
+  check('setup trade is refused (no PLAYING)',
+    setup.tradeRiskCards('p1').success === false);
+  check('setup addToPendingPurchases is refused',
+    setup.addToPendingPurchases('infantry', unitDefs).success === false);
+  const playing = makeSetupTable({
+    phase: GAME_PHASES.PLAYING,
+    turnPhase: TURN_PHASES.PURCHASE,
+    unitsToPlace: { p1: [], p2: [], p3: [], p4: [] },
+  });
+  check('PLAYING + purchase still shows purchase chrome',
+    shouldShowPurchase(playing.phase, playing.turnPhase) === true);
 }
 
 console.log('=== nextTurn() still advances during PLAYING ===');

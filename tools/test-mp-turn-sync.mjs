@@ -21,6 +21,7 @@ const {
   isCurrentPlayerLocal,
   shouldShowSpectatorWaiting,
   resolveWaitingForSyncAfterRemoteSnapshot,
+  resolveWaitingForSyncAfterStateApply,
   shouldShowPlaceUnitsUI,
 } = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
@@ -30,7 +31,13 @@ const {
   pickAuthoritativePlacementSnapshot,
 } = await import(pathToFileURL(join(root, 'src/state/placementPass.js')));
 const { createPushQueue } = await import(pathToFileURL(join(root, 'src/multiplayer/pushCoalesce.js')));
-const { mayRunAI } = await import(pathToFileURL(join(root, 'src/multiplayer/aiPolicy.js')));
+const {
+  mayRunAI,
+  anyHumanPresent,
+  computeHumanPresent,
+  isLocalHumanSeated,
+  DEFAULT_AI_RUNS_WHEN_UNATTENDED,
+} = await import(pathToFileURL(join(root, 'src/multiplayer/aiPolicy.js')));
 
 let failures = 0;
 const check = (label, cond) => {
@@ -159,7 +166,7 @@ function makePlacementTable({
 
 console.log('=== V2.72 version + leftover-unit pass predicate ===');
 {
-  check('GAME_VERSION is V2.74', GAME_VERSION === 'V2.74');
+  check('GAME_VERSION is V2.75', GAME_VERSION === 'V2.75');
   check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
   check('round cap allows Done with leftovers still in the pool',
     canFinishPlacementRound({
@@ -469,6 +476,203 @@ console.log('=== V2.73: host vs non-host after mixed capital + AI seats ===');
       }),
       isAI: false,
     }) === false);
+}
+
+console.log('=== V2.75: host waiting lock drops after local AI handoff ===');
+{
+  // Dump table: Hard Bot, Hard Bot, James (host), Robert007 (guest).
+  // James Done → AIs run locally on the host → seat returns to James.
+  // isPushing swallows state_updated, so isActivePlayer can stay stale false.
+  const james = 'kCdPAKp78CbNfdXruyEzZeGhBsD3';
+  const robert = 'sypRcamUvNXDlD7BRyJrYImZg5H2';
+  const players = [
+    { id: 'p0', name: 'Hard Bot', isAI: true },
+    { id: 'p1', name: 'Hard Bot', isAI: true },
+    { id: 'p2', name: 'James', oderId: james, isAI: false },
+    { id: 'p3', name: 'Robert007', oderId: robert, isAI: false },
+  ];
+  const territories = [
+    { name: 'BotA', isWater: false, connections: [] },
+    { name: 'BotB', isWater: false, connections: [] },
+    { name: 'JamesLand', isWater: false, connections: [] },
+    { name: 'RobertLand', isWater: false, connections: [] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = players;
+  gs.currentPlayerIndex = 3;
+  gs.phase = GAME_PHASES.UNIT_PLACEMENT;
+  gs.turnPhase = 'purchase';
+  gs.placementRound = 2;
+  gs.unitsPlacedThisRound = 6;
+  gs.territoryState = {
+    BotA: { owner: 'p0' },
+    BotB: { owner: 'p1' },
+    JamesLand: { owner: 'p2' },
+    RobertLand: { owner: 'p3' },
+  };
+  gs.playerState = {
+    p0: { capitalTerritory: 'BotA' },
+    p1: { capitalTerritory: 'BotB' },
+    p2: { capitalTerritory: 'JamesLand' },
+    p3: { capitalTerritory: 'RobertLand' },
+  };
+  gs.unitsToPlace = {
+    p0: [{ type: 'infantry', quantity: 4 }],
+    p1: [{ type: 'infantry', quantity: 4 }],
+    p2: [{ type: 'infantry', quantity: 4 }],
+    p3: [{ type: 'infantry', quantity: 4 }],
+  };
+
+  check('Done optimistic lock still hides actions on own seat BEFORE apply',
+    computeIsLocalPlayerTurn({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: james,
+      currentPlayerOderId: james,
+    }) === false);
+
+  const afterRobertDone = gs.finishPlacementRound(unitDefs);
+  check('Robert Done hands the seat to an AI (dump v23→v24)',
+    afterRobertDone.ok === true && gs.currentPlayer?.isAI === true);
+  check('host lock stays while the next seat is an AI',
+    resolveWaitingForSyncAfterStateApply({
+      isWaitingForSync: true,
+      localUserId: james,
+      currentPlayerOderId: gs.currentPlayer?.oderId,
+    }) === true);
+
+  let aiPasses = 0;
+  while (gs.currentPlayer?.isAI && gs.phase === GAME_PHASES.UNIT_PLACEMENT && aiPasses < 8) {
+    gs.unitsPlacedThisRound = 6;
+    const pass = gs.finishPlacementRound(unitDefs);
+    if (!pass.ok) break;
+    aiPasses++;
+  }
+  check('local AI finishPlacement hands the seat back to James',
+    gs.currentPlayer?.oderId === james && gs.phase === GAME_PHASES.UNIT_PLACEMENT);
+
+  const hostWaiting = resolveWaitingForSyncAfterStateApply({
+    isWaitingForSync: true,
+    localUserId: james,
+    currentPlayerOderId: gs.currentPlayer?.oderId,
+  });
+  check('host lock drops on own seat after local AI apply', hostWaiting === false);
+  check('stale isActivePlayer=false still shows place-units on own seat',
+    shouldShowPlaceUnitsUI({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: james,
+      currentPlayerOderId: james,
+      isActivePlayer: false,
+    }) === true);
+  check('host spectator overlay stays off on own seat',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: true,
+      localUserId: james,
+      currentPlayerOderId: james,
+    }) === false);
+  check('host Done / place actions show after lock drop',
+    shouldShowBottomTurnActions({
+      isMultiplayer: true,
+      isLocalPlayerTurn: computeIsLocalPlayerTurn({
+        isMultiplayer: true,
+        isWaitingForSync: hostWaiting,
+        localUserId: james,
+        currentPlayerOderId: james,
+      }),
+      isAI: false,
+    }) === true);
+
+  check('guest Robert still waits on James seat',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: true,
+      localUserId: robert,
+      currentPlayerOderId: james,
+    }) === true);
+  check('guest Robert has no place-units on James seat',
+    shouldShowPlaceUnitsUI({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: robert,
+      currentPlayerOderId: james,
+      isActivePlayer: false,
+    }) === false);
+}
+
+console.log('=== V2.75: seated local human counts as present for AI ===');
+{
+  const james = 'kCdPAKp78CbNfdXruyEzZeGhBsD3';
+  const robert = 'sypRcamUvNXDlD7BRyJrYImZg5H2';
+  const players = [
+    { id: 'p0', name: 'Hard Bot', isAI: true },
+    { id: 'p1', name: 'Hard Bot', isAI: true },
+    { id: 'p2', name: 'James', oderId: james, isAI: false },
+    { id: 'p3', name: 'Robert007', oderId: robert, isAI: false },
+  ];
+  const allOffline = () => 'offline';
+  const robertOnline = (id) => (id === robert ? 'online' : 'offline');
+
+  check('DEFAULT_AI_RUNS_WHEN_UNATTENDED stays false',
+    DEFAULT_AI_RUNS_WHEN_UNATTENDED === false);
+  check('presence-only: all offline → absent',
+    anyHumanPresent(players, allOffline) === false);
+  check('iPhone host client is seated even when presence is offline',
+    isLocalHumanSeated(players, james) === true);
+  check('host client counts as present when presence docs are offline',
+    computeHumanPresent({
+      players,
+      presenceOf: allOffline,
+      localUserId: james,
+    }) === true);
+  check('host may run AI while his client is here (presence stale)',
+    mayRunAI({
+      aiHasAuthority: true,
+      runsWhenUnattended: false,
+      humanPresent: computeHumanPresent({
+        players,
+        presenceOf: allOffline,
+        localUserId: james,
+      }),
+    }) === true);
+  check('unattended: no local seated human, no online humans → pause',
+    computeHumanPresent({
+      players,
+      presenceOf: allOffline,
+      localUserId: null,
+    }) === false);
+  check('unattended host-authority still pauses',
+    mayRunAI({
+      aiHasAuthority: true,
+      runsWhenUnattended: false,
+      humanPresent: computeHumanPresent({
+        players,
+        presenceOf: allOffline,
+        localUserId: null,
+      }),
+    }) === false);
+  check('other human online still counts when this client is not seated',
+    computeHumanPresent({
+      players,
+      presenceOf: robertOnline,
+      localUserId: null,
+    }) === true);
+  check('aiRunsWhenUnattended still overrides a fully empty table',
+    mayRunAI({
+      aiHasAuthority: true,
+      runsWhenUnattended: true,
+      humanPresent: false,
+    }) === true);
+  check('non-host never runs AI even if locally seated',
+    mayRunAI({
+      aiHasAuthority: false,
+      runsWhenUnattended: false,
+      humanPresent: true,
+    }) === false);
+  check('surrendered local human does not count as seated',
+    isLocalHumanSeated(
+      [{ oderId: james, isAI: false, surrendered: true }],
+      james,
+    ) === false);
 }
 
 console.log(failures === 0 ? '\nALL MP TURN-SYNC CHECKS PASS' : `\n${failures} FAILURES`);
