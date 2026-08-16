@@ -9,8 +9,13 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const { clampTooltipToMapArea, resolveMapRightEdge } =
-  await import(pathToFileURL(join(root, 'src/ui/territoryTooltip.js')));
+const {
+  clampTooltipToMapArea,
+  resolveMapRightEdge,
+  shouldHidePhoneTooltipOn,
+  shouldToggleOffPhoneTooltip,
+  PHONE_TOOLTIP_Z_INDEX,
+} = await import(pathToFileURL(join(root, 'src/ui/territoryTooltip.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
 const {
@@ -34,6 +39,8 @@ const {
   boundsFromPoints,
   territoryFitPoint,
   PHONE_MIN_ZOOM_FLOOR,
+  shouldHighlightPhoneLegalTerritories,
+  collectPhoneLegalTerritoryNames,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { resolvePhaseHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
@@ -47,7 +54,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.64', GAME_VERSION === 'V2.64');
+check('GAME_VERSION is V2.65', GAME_VERSION === 'V2.65');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -229,6 +236,14 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     && /\.lobby-phone-card \{/.test(phoneBlock));
   check('phone hides the permanent tab bar',
     /\.pp-tabs \{\s*display:\s*none/.test(phoneBlock));
+  check('unscoped territory tooltip stays z-index 100',
+    /\.territory-tooltip \{[\s\S]*?z-index:\s*100/.test(beforePhone));
+  check('phone tooltip z-index is under the HUD / menu sheet',
+    /html\.mobile-shell \.territory-tooltip[\s\S]*?z-index:\s*40/.test(phoneBlock)
+    && PHONE_TOOLTIP_Z_INDEX === 40
+    && PHONE_TOOLTIP_Z_INDEX < 70);
+  check('phone tooltip text is lifted off the dark card',
+    /html\.mobile-shell \.territory-tooltip \.tt-header[\s\S]*?color:\s*#f8fafc/.test(phoneBlock));
 }
 
 console.log('=== V2.64 phone chrome tree (not desktop restack) ===');
@@ -273,6 +288,47 @@ check('owned-land bbox is used; worldwide span falls back',
   && boundsFromPoints([{ x: 10, y: 10 }, { x: 3000, y: 20 }]) === null);
 check('territory.center is preferred for fit points',
   territoryFitPoint({ center: [120, 80], polygons: [[[0, 0], [10, 0]]] }).x === 120);
+
+console.log('=== V2.65 phone tooltip dismiss + legal-land highlight ===');
+check('phone hides tooltip on menu open',
+  shouldHidePhoneTooltipOn({ mobile: true, reason: 'menu-open' }) === true);
+check('phone hides tooltip on tap-away / fit / phase / turn',
+  shouldHidePhoneTooltipOn({ mobile: true, reason: 'tap-away' })
+  && shouldHidePhoneTooltipOn({ mobile: true, reason: 'fit' })
+  && shouldHidePhoneTooltipOn({ mobile: true, reason: 'phase-change' })
+  && shouldHidePhoneTooltipOn({ mobile: true, reason: 'turn-change' }));
+check('desktop does not auto-hide tooltip on menu open',
+  shouldHidePhoneTooltipOn({ mobile: false, reason: 'menu-open' }) === false);
+check('phone second tap on the same territory toggles off',
+  shouldToggleOffPhoneTooltip({
+    mobile: true, fromTouch: true, visibleName: 'Germany', tappedName: 'Germany',
+  }) === true);
+check('phone tap on a different territory does not toggle off',
+  shouldToggleOffPhoneTooltip({
+    mobile: true, fromTouch: true, visibleName: 'Germany', tappedName: 'France',
+  }) === false);
+check('desktop mouse does not use tap-to-toggle',
+  shouldToggleOffPhoneTooltip({
+    mobile: false, fromTouch: false, visibleName: 'Germany', tappedName: 'Germany',
+  }) === false);
+check('phone Place Capital highlights current player owned land',
+  shouldHighlightPhoneLegalTerritories({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === true);
+check('phone Initial Deployment highlights current player owned land',
+  shouldHighlightPhoneLegalTerritories({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
+check('desktop setup does not add the phone legal highlight',
+  shouldHighlightPhoneLegalTerritories({ mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false);
+check('legal names are the current player\'s land only',
+  JSON.stringify(collectPhoneLegalTerritoryNames({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    playerId: 'germans',
+    territories: [
+      { name: 'Germany', isWater: false },
+      { name: 'France', isWater: false },
+      { name: 'Baltic Sea Zone', isWater: true },
+    ],
+    getOwner: (n) => (n === 'Germany' ? 'germans' : 'british'),
+  })) === JSON.stringify(['Germany']));
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

@@ -2,6 +2,26 @@
 
 ---
 
+## 8.16.26 — V2.65 phone tooltip + owned-land highlight (V2.64 390 playtest)
+
+Live V2.64 at 390×844 passed as a separate phone UX (landing cards, setup cards, Fit shows the world, full-screen menu, unit tray + gold halo). Desktop 1280 unchanged.
+
+Blockers / nits on phone:
+1. Territory info card stayed pinned mid-screen after a tap. It survived turn changes, sat on top of the ⋯ menu and Territory panel (tooltip is `position:fixed` on `body` at z-index 100; the menu sheet lives inside `#hud` at z-index 70), and persisted after resize to desktop. Cause: every canvas tap re-showed the card; chrome taps never hid it.
+2. Place Capital / Initial Deployment: owned land was invisible until he probed — continent fill only, no legal-territory cue.
+3. Tooltip text read dark-on-dark through the 75% glass card.
+
+Fix (phone-only — `html.mobile-shell` / `@media (max-width: 480px)`):
+- Tap-to-toggle + 2s auto-dismiss. Hide on tap-away (HUD / tray / Fit), menu open, phase/turn change, Fit, and leaving the phone shell. z-index 40 so the card sits under the menu sheet. Desktop hover tooltip unchanged (z-index 100).
+- Soft gold fill + outline on the current player's owned land during Place Capital and Initial Deployment. Fit-to-owned uses that player's land in both setup phases.
+- Opaque card + `#f8fafc` text; faction names use `readableFactionTextColor`.
+
+Desktop ≥901 and tablet 481–900 stay frozen. SCHEMA_VERSION stays 11. Rules / combat / Firebase / turn email / CSS-zoom / second JS client unchanged.
+
+Harness: `node tools/test-tablet-chrome.mjs` (tooltip hide-on-menu / z-index 40 / legal-land names). Existing `test-possessive.mjs`, `test-recent-move-display.mjs`, `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
+
+---
+
 ## 8.16.26 — V2.64 separate phone chrome tree (James V2.63 playtest)
 
 James on V2.63 (phone): better than the desktop squeeze, but still hard. Menu lived in a cramped ⋯ dropdown over the HUD. Default zoom could not show the board (min zoom 0.4 ≈ a couple of territories). Setup pieces were 8px tokens on a zoomed-in map — he could not see remaining units.

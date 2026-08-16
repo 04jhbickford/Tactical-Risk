@@ -13,6 +13,7 @@ export class HUD {
     this.menuOpen = false;
     this.menuTab = null;
     this.menuTabProvider = null;
+    this.onMenuOpen = null;
     this.el = document.getElementById('hud');
     this._render();
 
@@ -28,6 +29,10 @@ export class HUD {
 
   setMenuTabProvider(fn) {
     this.menuTabProvider = fn;
+  }
+
+  setOnMenuOpen(fn) {
+    this.onMenuOpen = fn;
   }
 
   setOnRulesToggle(callback) {
@@ -269,6 +274,7 @@ export class HUD {
         e.stopPropagation();
         this.menuOpen = !this.menuOpen;
         if (!this.menuOpen) this.menuTab = null;
+        if (this.menuOpen && typeof this.onMenuOpen === 'function') this.onMenuOpen();
         if (isMobileShell()) this._render();
         else this._updateMenuState();
       });

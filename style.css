@@ -17597,6 +17597,34 @@ html, body {
     font-weight: 700;
     letter-spacing: 0.3px;
   }
+
+  /* Under #hud (70) so the full-screen menu sheet covers the card.
+     Desktop / tablet keep unscoped z-index: 100. */
+  html.mobile-shell .territory-tooltip,
+  html.mobile-shell .unit-tooltip {
+    z-index: 40;
+    background: rgba(12, 16, 28, 0.96);
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    max-width: min(280px, calc(100vw - 24px));
+  }
+
+  html.mobile-shell .territory-tooltip .tt-header,
+  html.mobile-shell .territory-tooltip .tt-unit-name,
+  html.mobile-shell .territory-tooltip .tt-unit-qty,
+  html.mobile-shell .territory-tooltip .tt-adjacent-label,
+  html.mobile-shell .territory-tooltip .tt-adjacent-count,
+  html.mobile-shell .territory-tooltip .tt-continent,
+  html.mobile-shell .territory-tooltip .tt-continent-title,
+  html.mobile-shell .territory-tooltip .tt-continent-count,
+  html.mobile-shell .territory-tooltip .tt-type,
+  html.mobile-shell .territory-tooltip .tt-player-name {
+    color: #f8fafc;
+  }
+
+  html.mobile-shell .territory-tooltip .tt-ipc {
+    color: #fde68a;
+  }
 }
 
 /* Handoff hides live chrome (not painted underneath). Class-gated so
@@ -17606,7 +17634,9 @@ html.mobile-shell.handoff-active #sidebar,
 html.mobile-shell.handoff-active .player-panel,
 html.mobile-shell.handoff-active #zoom-controls,
 html.mobile-shell.handoff-active #minimap,
-html.mobile-shell.handoff-active .phone-menu-sheet {
+html.mobile-shell.handoff-active .phone-menu-sheet,
+html.mobile-shell.handoff-active .territory-tooltip,
+html.mobile-shell.handoff-active .unit-tooltip {
   display: none !important;
 }
 

@@ -211,20 +211,14 @@ export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
   const phase = gameState?.phase;
   const playerId = gameState?.currentPlayer?.id;
 
-  if (phase === GAME_PHASES.UNIT_PLACEMENT && playerId && territories) {
+  if (
+    (phase === GAME_PHASES.UNIT_PLACEMENT || phase === GAME_PHASES.CAPITAL_PLACEMENT)
+    && playerId && territories
+  ) {
     const pts = collectPhoneFitPoints(territories, (t) => {
       if (t.isWater) return false;
       return gameState.getOwner?.(t.name) === playerId;
     });
-    const bounds = boundsFromPoints(pts);
-    if (bounds) {
-      camera.fitBounds(bounds, insets);
-      return;
-    }
-  }
-
-  if (phase === GAME_PHASES.CAPITAL_PLACEMENT && territories) {
-    const pts = collectPhoneFitPoints(territories, (t) => !t.isWater && !!gameState?.getOwner?.(t.name));
     const bounds = boundsFromPoints(pts);
     if (bounds) {
       camera.fitBounds(bounds, insets);
@@ -248,6 +242,29 @@ export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
 
 export function worldFitBounds() {
   return { minX: 0, minY: 0, maxX: MAP_WIDTH, maxY: MAP_HEIGHT };
+}
+
+export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
+  return !!mobile && (
+    phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT
+  );
+}
+
+export function collectPhoneLegalTerritoryNames({
+  mobile,
+  phase,
+  playerId,
+  territories,
+  getOwner,
+} = {}) {
+  if (!shouldHighlightPhoneLegalTerritories({ mobile, phase }) || !playerId) return [];
+  const list = Array.isArray(territories) ? territories : Object.values(territories || {});
+  const names = [];
+  for (const t of list) {
+    if (!t || t.isWater) continue;
+    if (getOwner?.(t.name) === playerId) names.push(t.name);
+  }
+  return names;
 }
 
 // Faction swatch keeps the raw color. Text on the dark HUD must stay readable.

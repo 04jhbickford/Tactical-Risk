@@ -68,6 +68,9 @@ export class TerritoryRenderer {
     // Territories highlighted from action log
     this.highlightedTerritories = [];
 
+    // Phone setup: current player's legal (owned) land. Desktop unused.
+    this.phoneLegalNames = new Set();
+
     // Movement arrow for action log hover
     this.movementArrowFrom = null;
     this.movementArrowTo = null;
@@ -80,6 +83,38 @@ export class TerritoryRenderer {
     this._externalEdgesCache = {};
     this._territoryCenterCache = {};
     this._precomputeCaches();
+  }
+
+  setPhoneLegalTerritories(names) {
+    this.phoneLegalNames = new Set(Array.isArray(names) ? names : []);
+  }
+
+  renderPhoneLegalHighlights(ctx) {
+    if (!this.phoneLegalNames.size) return;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(250, 204, 21, 0.20)';
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = 'rgba(250, 204, 21, 0.45)';
+    ctx.shadowBlur = 8;
+
+    for (const t of this.territories) {
+      if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
+      for (const poly of t.polygons || []) {
+        if (!poly || poly.length < 3) continue;
+        this._fillPoly(ctx, poly);
+      }
+      if (t.polygons?.length === 1) {
+        this._strokePoly(ctx, t.polygons[0]);
+      } else if (t.polygons?.length > 1) {
+        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+        this._strokeEdges(ctx, externalEdges);
+      }
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   /** Set territories to highlight from action log hover */

@@ -46,7 +46,8 @@ import { UnitTooltip } from './ui/unitTooltip.js';
 import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
-import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit } from './ui/mobileShell.js';
+import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
+import { shouldHidePhoneTooltipOn, shouldToggleOffPhoneTooltip } from './ui/territoryTooltip.js';
 
 initMobileShell();
 
@@ -182,8 +183,15 @@ async function init() {
   // Player panel (replaces territory-focused sidebar)
   const playerPanel = new PlayerPanel();
   playerPanel.setUnitDefs(unitDefs);
+  const hidePhoneTooltips = (reason) => {
+    if (!shouldHidePhoneTooltipOn({ mobile: isMobileShell(), reason })) return;
+    tooltip.hide();
+    unitTooltip.hide();
+  };
+
   const fitPhoneCamera = () => {
     if (!isMobileShell() || !camera) return;
+    hidePhoneTooltips('fit');
     camera.usePhoneMinZoom = true;
     applyPhoneCameraFit(camera, { gameState, territories });
   };
@@ -193,10 +201,23 @@ async function init() {
     hud._render();
     playerPanel._render();
     if (active) fitPhoneCamera();
-    else camera.onResize();
+    else {
+      hidePhoneTooltips('resize-leave-phone');
+      tooltip.hide();
+      unitTooltip.hide();
+      territoryRenderer.setPhoneLegalTerritories([]);
+      camera.onResize();
+    }
   });
 
   hud.setMenuTabProvider((tab) => playerPanel.renderMenuTabHTML(tab));
+  hud.setOnMenuOpen(() => hidePhoneTooltips('menu-open'));
+
+  document.addEventListener('pointerdown', (e) => {
+    if (!isMobileShell() || !tooltip.isVisible) return;
+    if (e.target === canvas || canvas.contains(e.target)) return;
+    hidePhoneTooltips('tap-away');
+  }, true);
 
   // Purchase popup overlay
   const purchasePopup = new PurchasePopup();
@@ -1166,6 +1187,7 @@ async function init() {
 
     tooltip.setGameState(gameState);
     unitTooltip.setGameState(gameState);
+    gameState.subscribe(() => { camera.dirty = true; });
     territoryRenderer.setGameState(gameState);
     continentPanel.setGameState(gameState);
     unitRenderer = new UnitRenderer(gameState, territories, unitDefs);
@@ -1447,7 +1469,11 @@ async function init() {
   // Mouse events
   canvas.addEventListener('mousedown', (e) => {
     e.preventDefault();
-    tooltip.hide(); // Hide tooltip when starting interaction
+    // Phone tap-to-toggle: keep the card up through mousedown so mouseup
+    // can close the same territory instead of immediately re-showing it.
+    if (!(e.fromTouch && isMobileShell())) {
+      tooltip.hide();
+    }
     unitTooltip.hide();
 
     // Check if we should start a unit drag (during movement phases)
@@ -1810,16 +1836,28 @@ async function init() {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
-        // Touch tap: hover doesn't exist, so peek the territory tooltip at the
-        // tap point (auto-hidden by tooltip.hide() on the next tap's mousedown).
+        // Touch tap: hover doesn't exist, so peek the territory tooltip.
+        // Phone: tap-to-toggle + auto-dismiss. Tablet keeps the V2.64 peek.
         // Real mouse events never have fromTouch — desktop behaviour unchanged.
-        if (e.fromTouch && gameState) {
+        if (e.fromTouch && gameState && isMobileShell()) {
+          if (shouldToggleOffPhoneTooltip({
+            mobile: true,
+            fromTouch: true,
+            visibleName: tooltip.currentTerritory?.name,
+            tappedName: hit.name,
+          })) {
+            tooltip.hide();
+          } else {
+            tooltip.show(hit, e.clientX, e.clientY);
+          }
+        } else if (e.fromTouch && gameState) {
           tooltip.show(hit, e.clientX, e.clientY);
         }
       } else {
         selectedTerritory = null;
         playerPanel.setSelectedTerritory(null);
         movementUI.cancel();
+        if (isMobileShell()) hidePhoneTooltips('tap-away');
       }
       camera.dirty = true;
     }
@@ -1994,6 +2032,19 @@ async function init() {
           }
         } else {
           territoryRenderer.clearAirMovementVisualization();
+        }
+
+        if (isMobileShell() && gameState) {
+          territoryRenderer.setPhoneLegalTerritories(collectPhoneLegalTerritoryNames({
+            mobile: true,
+            phase: gameState.phase,
+            playerId: gameState.currentPlayer?.id,
+            territories,
+            getOwner: (name) => gameState.getOwner(name),
+          }));
+          territoryRenderer.renderPhoneLegalHighlights(ctx);
+        } else {
+          territoryRenderer.setPhoneLegalTerritories([]);
         }
 
         // Hover + selection

@@ -1,6 +1,31 @@
 // Territory tooltip that appears on hover over the map
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
+import { isMobileShell, readableFactionTextColor } from './mobileShell.js';
+
+// Phone tooltip sits under #hud (70) so the full-screen menu sheet covers it.
+// Desktop / tablet keep the unscoped z-index: 100.
+export const PHONE_TOOLTIP_Z_INDEX = 40;
+export const PHONE_TOOLTIP_AUTO_DISMISS_MS = 2000;
+
+const PHONE_TOOLTIP_HIDE_REASONS = new Set([
+  'tap-away',
+  'menu-open',
+  'phase-change',
+  'turn-change',
+  'fit',
+  'resize-leave-phone',
+  'auto',
+]);
+
+export function shouldHidePhoneTooltipOn({ mobile, reason } = {}) {
+  return !!mobile && PHONE_TOOLTIP_HIDE_REASONS.has(reason);
+}
+
+// Second tap on the same territory closes the card (tap-to-toggle).
+export function shouldToggleOffPhoneTooltip({ mobile, fromTouch, visibleName, tappedName } = {}) {
+  return !!mobile && !!fromTouch && !!visibleName && visibleName === tappedName;
+}
 
 /**
  * Map-right edge used to keep the tooltip out of the Actions panel.
@@ -71,10 +96,26 @@ export class TerritoryTooltip {
     document.body.appendChild(this.el);
 
     this.currentTerritory = null;
+    this._phoneDismissTimer = null;
+    this._phaseKey = null;
   }
 
   setGameState(gameState) {
     this.gameState = gameState;
+    gameState?.subscribe?.(() => {
+      if (!isMobileShell()) {
+        this._phaseKey = null;
+        return;
+      }
+      const key = `${gameState.phase}:${gameState.turnPhase}:${gameState.currentPlayerIndex}`;
+      if (this._phaseKey && this._phaseKey !== key && shouldHidePhoneTooltipOn({
+        mobile: true,
+        reason: gameState.phase !== this._phaseKey.split(':')[0] ? 'phase-change' : 'turn-change',
+      })) {
+        this.hide();
+      }
+      this._phaseKey = key;
+    });
   }
 
   setUnitDefs(unitDefs) {
@@ -104,7 +145,10 @@ export class TerritoryTooltip {
         if (flag) {
           html += `<img src="assets/flags/${flag}" class="tt-flag" alt="">`;
         }
-        html += `<span style="color:${player?.color || '#888'}">${player?.name || owner}</span>`;
+        const ownerColor = isMobileShell()
+          ? readableFactionTextColor(player?.color || '#888')
+          : (player?.color || '#888');
+        html += `<span style="color:${ownerColor}">${player?.name || owner}</span>`;
         html += `</div>`;
       }
 
@@ -296,7 +340,10 @@ export class TerritoryTooltip {
           if (player.flag) {
             html += `<img src="assets/flags/${player.flag}" class="tt-micro-flag" alt="">`;
           }
-          html += `<span style="color:${player.color}">${player.name}</span>`;
+          const rowColor = isMobileShell()
+            ? readableFactionTextColor(player.color)
+            : player.color;
+          html += `<span style="color:${rowColor}">${player.name}</span>`;
           html += `<span class="tt-continent-count">${count}/${total}</span>`;
           if (hasBonus) html += `<span class="tt-continent-bonus-badge">+${continent.bonus}</span>`;
           html += `</div>`;
@@ -337,6 +384,23 @@ export class TerritoryTooltip {
 
     // Position tooltip near cursor but within viewport
     this._position(screenX, screenY);
+    this._armPhoneAutoDismiss();
+  }
+
+  _clearPhoneDismiss() {
+    if (this._phoneDismissTimer) {
+      clearTimeout(this._phoneDismissTimer);
+      this._phoneDismissTimer = null;
+    }
+  }
+
+  _armPhoneAutoDismiss() {
+    this._clearPhoneDismiss();
+    if (!isMobileShell()) return;
+    this._phoneDismissTimer = setTimeout(() => {
+      this._phoneDismissTimer = null;
+      if (shouldHidePhoneTooltipOn({ mobile: true, reason: 'auto' })) this.hide();
+    }, PHONE_TOOLTIP_AUTO_DISMISS_MS);
   }
 
   _getContinentOwnership(continent) {
@@ -392,6 +456,7 @@ export class TerritoryTooltip {
   }
 
   hide() {
+    this._clearPhoneDismiss();
     this.el.classList.add('hidden');
     this.currentTerritory = null;
   }
