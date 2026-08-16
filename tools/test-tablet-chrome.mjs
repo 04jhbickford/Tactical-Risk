@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const {
   clampTooltipToMapArea,
+  clampTooltipToViewport,
   resolveMapRightEdge,
   shouldHidePhoneTooltipOn,
   shouldToggleOffPhoneTooltip,
@@ -41,6 +42,7 @@ const {
   PHONE_MIN_ZOOM_FLOOR,
   shouldHighlightPhoneLegalTerritories,
   collectPhoneLegalTerritoryNames,
+  phoneLegalOutlineWidth,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { resolvePhaseHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
@@ -54,7 +56,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.65', GAME_VERSION === 'V2.65');
+check('GAME_VERSION is V2.66', GAME_VERSION === 'V2.66');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -329,6 +331,45 @@ check('legal names are the current player\'s land only',
     ],
     getOwner: (n) => (n === 'Germany' ? 'germans' : 'british'),
   })) === JSON.stringify(['Germany']));
+
+console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===');
+{
+  const leftoverRail = { left: 110, width: 280 };
+  check('desktop leftover 280px rail still shrinks mapRight',
+    resolveMapRightEdge(leftoverRail, 390) === 110);
+  check('phone ignores leftover sidebar rect (full 390)',
+    resolveMapRightEdge(leftoverRail, 390, { mobile: true }) === 390);
+  const eaten = clampTooltipToMapArea({
+    cursorX: 200,
+    cursorY: 200,
+    width: 280,
+    height: 160,
+    viewportWidth: 390,
+    viewportHeight: 720,
+    mapRight: 110,
+  });
+  check('desktop clamp-to-sidebar still returns null when the rail eats the card',
+    eaten === null);
+  const phonePos = clampTooltipToViewport({
+    cursorX: 200,
+    cursorY: 200,
+    width: 280,
+    height: 160,
+    viewportWidth: 390,
+    viewportHeight: 720,
+  });
+  check('phone viewport clamp always returns a visible box',
+    !!phonePos && phonePos.left >= 0 && phonePos.left + 280 <= 390 + 1);
+  check('phone second tap still toggles without fromTouch (DevTools)',
+    shouldToggleOffPhoneTooltip({
+      mobile: true, visibleName: 'Germany', tappedName: 'Germany',
+    }) === true);
+  check('gold outline is screen-space thick at Fit zoom (not 0.3 CSS px)',
+    phoneLegalOutlineWidth(0.11) >= 8 / 0.11 - 0.01
+    && phoneLegalOutlineWidth(0.11) > 40);
+  check('desktop/tablet outline helper is unused at their default zoom',
+    phoneLegalOutlineWidth(0.5) === 16);
+}
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

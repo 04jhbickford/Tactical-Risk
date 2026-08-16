@@ -1471,7 +1471,8 @@ async function init() {
     e.preventDefault();
     // Phone tap-to-toggle: keep the card up through mousedown so mouseup
     // can close the same territory instead of immediately re-showing it.
-    if (!(e.fromTouch && isMobileShell())) {
+    // DevTools device mode has no fromTouch — still treat it as a phone tap.
+    if (!isMobileShell()) {
       tooltip.hide();
     }
     unitTooltip.hide();
@@ -1836,13 +1837,12 @@ async function init() {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
-        // Touch tap: hover doesn't exist, so peek the territory tooltip.
-        // Phone: tap-to-toggle + auto-dismiss. Tablet keeps the V2.64 peek.
-        // Real mouse events never have fromTouch — desktop behaviour unchanged.
-        if (e.fromTouch && gameState && isMobileShell()) {
+        // Phone: tap-to-toggle + auto-dismiss (DevTools device mode included).
+        // Tablet (fromTouch, not mobile-shell) keeps the V2.64 peek.
+        // Desktop mouse hover is unchanged — no fromTouch, not mobile-shell.
+        if (isMobileShell() && gameState) {
           if (shouldToggleOffPhoneTooltip({
             mobile: true,
-            fromTouch: true,
             visibleName: tooltip.currentTerritory?.name,
             tappedName: hit.name,
           })) {
@@ -2042,7 +2042,7 @@ async function init() {
             territories,
             getOwner: (name) => gameState.getOwner(name),
           }));
-          territoryRenderer.renderPhoneLegalHighlights(ctx);
+          territoryRenderer.renderPhoneLegalHighlights(ctx, camera.zoom);
         } else {
           territoryRenderer.setPhoneLegalTerritories([]);
         }

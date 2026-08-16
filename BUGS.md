@@ -2,6 +2,23 @@
 
 ---
 
+## 8.16.26 — V2.66 phone tooltip actually shows + gold reads at Fit (V2.65 390 playtest)
+
+Live V2.65 at 390×720 (DevTools device mode, `html.mobile-shell` on) failed both V2.65 fixes.
+
+1. **Tooltip never appeared.** `#territoryTooltip` got the right innerHTML (e.g. Baltic Sea Zone) and the V2.65 phone CSS, then stayed `territory-tooltip hidden` / opacity 0. Cause: `_position` → `clampTooltipToMapArea`. On phone `#sidebar` is a full-width bottom tray (or a leftover 280px rail rect from the 900px tree). `mapRight` shrinks, the ~280px card cannot fit, clamp returns null, `hidden` is put back. DevTools clicks also have no `fromTouch`, so the show path was skipped and mousedown hid the card.
+2. **Owned-land gold invisible** in Place Capital and Initial Deployment. `phoneLegalNames` was the current player's land, but `renderPhoneLegalHighlights` used a 20% gold wash on opaque continent fill and a 2.5 **world-px** stroke. At Fit (~0.11) that stroke is ~0.3 CSS px.
+
+Fix (phone-only):
+- Phone ignores the sidebar rect when resolving map-right. Viewport clamp never returns null — do not re-hide after `show()`. Phone clicks show/toggle the card even without `fromTouch` (DevTools). V2.65 dismiss rules stay (tap-away, second tap, 2s, menu, Fit, phase/turn, leave-phone). Desktop hover + clamp-to-sidebar unchanged.
+- Gold fill 55% and a screen-space outline (~8 CSS px = `8 / zoom` world units) so owned land is obvious at Fit on a 390-wide phone.
+
+Desktop ≥901 and tablet 481–900 stay frozen. SCHEMA_VERSION stays 11.
+
+Harness: leftover 280px rail must not hide the phone card; legal names still current-player land only; outline width at 0.11 is >40 world units. Existing harnesses still pass.
+
+---
+
 ## 8.16.26 — V2.65 phone tooltip + owned-land highlight (V2.64 390 playtest)
 
 Live V2.64 at 390×844 passed as a separate phone UX (landing cards, setup cards, Fit shows the world, full-screen menu, unit tray + gold halo). Desktop 1280 unchanged.

@@ -250,6 +250,14 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
   );
 }
 
+// World-space stroke so the outline is ~8 CSS px at any zoom.
+// At Fit (~0.11) a raw 2.5px world stroke is 0.3 CSS px — invisible.
+export function phoneLegalOutlineWidth(zoom) {
+  const z = Number(zoom);
+  if (!Number.isFinite(z) || z <= 0) return 8;
+  return Math.max(8, 8 / z);
+}
+
 export function collectPhoneLegalTerritoryNames({
   mobile,
   phase,

@@ -23,18 +23,46 @@ export function shouldHidePhoneTooltipOn({ mobile, reason } = {}) {
 }
 
 // Second tap on the same territory closes the card (tap-to-toggle).
-export function shouldToggleOffPhoneTooltip({ mobile, fromTouch, visibleName, tappedName } = {}) {
-  return !!mobile && !!fromTouch && !!visibleName && visibleName === tappedName;
+// DevTools device mode sends real mouse events (no fromTouch) — still toggle.
+export function shouldToggleOffPhoneTooltip({ mobile, visibleName, tappedName } = {}) {
+  return !!mobile && !!visibleName && visibleName === tappedName;
 }
 
 /**
  * Map-right edge used to keep the tooltip out of the Actions panel.
  * Hidden / zero-width / off-screen sidebars leave the full viewport.
+ * Phone has no right rail (bottom tray is full-width) — never shrink mapRight
+ * or a leftover 280px layout rect will make clampTooltipToMapArea return null
+ * and _position will re-add `hidden` after show() fills the card.
  */
-export function resolveMapRightEdge(sidebarRect, viewportWidth) {
+export function resolveMapRightEdge(sidebarRect, viewportWidth, { mobile } = {}) {
+  if (mobile) return viewportWidth;
   if (!sidebarRect || !(sidebarRect.width > 0)) return viewportWidth;
   if (sidebarRect.left >= viewportWidth || sidebarRect.left <= 0) return viewportWidth;
   return sidebarRect.left;
+}
+
+/** Phone fallback: always returns a box. Never hide the card. */
+export function clampTooltipToViewport({
+  cursorX,
+  cursorY,
+  width,
+  height,
+  viewportWidth,
+  viewportHeight,
+  padding = 12,
+} = {}) {
+  const maxW = Math.max(1, viewportWidth - padding * 2);
+  const maxH = Math.max(1, viewportHeight - padding * 2);
+  const w = Math.min(width || 0, maxW);
+  const h = Math.min(height || 0, maxH);
+  let left = cursorX + padding;
+  let top = cursorY + padding;
+  if (left + w > viewportWidth - padding) left = cursorX - w - padding;
+  if (top + h > viewportHeight - padding) top = cursorY - h - padding;
+  left = Math.max(padding, Math.min(left, viewportWidth - padding - w));
+  top = Math.max(padding, Math.min(top, viewportHeight - padding - h));
+  return { left, top };
 }
 
 /**
@@ -430,12 +458,13 @@ export class TerritoryTooltip {
   _position(x, y) {
     const padding = 15;
     const rect = this.el.getBoundingClientRect();
+    const mobile = isMobileShell();
     const sidebar = document.getElementById('sidebar');
     const sidebarRect = sidebar && !sidebar.classList.contains('hidden')
       ? sidebar.getBoundingClientRect()
       : null;
-    const mapRight = resolveMapRightEdge(sidebarRect, window.innerWidth);
-    const pos = clampTooltipToMapArea({
+    const mapRight = resolveMapRightEdge(sidebarRect, window.innerWidth, { mobile });
+    const args = {
       cursorX: x,
       cursorY: y,
       width: rect.width,
@@ -444,7 +473,12 @@ export class TerritoryTooltip {
       viewportHeight: window.innerHeight,
       mapRight,
       padding,
-    });
+    };
+    // Phone: never re-hide after show(). A leftover sidebar rail rect must
+    // not eat the card. Desktop / tablet keep clamp-to-sidebar (may dismiss).
+    const pos = mobile
+      ? clampTooltipToViewport(args)
+      : clampTooltipToMapArea(args);
 
     if (!pos) {
       this.el.classList.add('hidden');

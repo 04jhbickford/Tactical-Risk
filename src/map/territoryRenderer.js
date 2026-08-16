@@ -89,15 +89,21 @@ export class TerritoryRenderer {
     this.phoneLegalNames = new Set(Array.isArray(names) ? names : []);
   }
 
-  renderPhoneLegalHighlights(ctx) {
+  renderPhoneLegalHighlights(ctx, zoom = 1) {
     if (!this.phoneLegalNames.size) return;
 
+    // Continent fill is opaque. A 20% gold wash + 2.5 world-px stroke is
+    // invisible at Fit zoom (~0.11 → 0.3 CSS px). Use a strong tint and a
+    // screen-space outline (~8 CSS px).
+    const outline = Math.max(8, 8 / (Number(zoom) || 1));
+
     ctx.save();
-    ctx.fillStyle = 'rgba(250, 204, 21, 0.20)';
-    ctx.strokeStyle = 'rgba(250, 204, 21, 0.9)';
-    ctx.lineWidth = 2.5;
-    ctx.shadowColor = 'rgba(250, 204, 21, 0.45)';
-    ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(255, 214, 32, 0.55)';
+    ctx.strokeStyle = '#ffe566';
+    ctx.lineWidth = outline;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(255, 214, 32, 0.85)';
+    ctx.shadowBlur = outline;
 
     for (const t of this.territories) {
       if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
