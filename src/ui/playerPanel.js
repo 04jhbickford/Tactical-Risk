@@ -7,8 +7,10 @@ import { possessivePhrase } from '../utils/possessive.js';
 import {
   isMobileShell,
   pickMobilePrimaryButtons,
-  shouldCollapseMobileTray,
+  shouldPeekPhoneTray,
   shouldShowPhoneChromeTabs,
+  shouldShowPhonePanelBody,
+  shouldShowPhonePeekUnitRow,
   shouldUsePhonePlacementTray,
 } from './mobileShell.js';
 
@@ -84,6 +86,20 @@ export function resolvePhaseHint(phase, turnPhase) {
   return '';
 }
 
+// Phone peek only. Desktop still reads PHASE_HINTS via resolvePhaseHint
+// (purchase / mobilize / tech stay empty there).
+export function resolvePhonePeekHint(phase, turnPhase) {
+  const base = resolvePhaseHint(phase, turnPhase);
+  if (base) return base;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Tap a unit, then the map';
+  if (phase === GAME_PHASES.PLAYING) {
+    if (turnPhase === TURN_PHASES.PURCHASE) return 'Tap a unit to buy';
+    if (turnPhase === TURN_PHASES.MOBILIZE) return 'Tap a factory, then a unit';
+    if (turnPhase === TURN_PHASES.DEVELOP_TECH) return 'Buy research dice';
+  }
+  return '';
+}
+
 // Display string for a combat-move history row. Empty string = do not render
 // a row (missing units/from/to). Does not change undo or combat resolution.
 export function formatRecentMove(move) {
@@ -125,6 +141,10 @@ export class PlayerPanel {
     this.selectedTerritory = null;
     this.selectedUnitType = null;
     this.activeTab = 'actions';
+    this.trayExpanded = false;
+    this.phoneDetentTab = 'actions';
+    this._peekPhase = null;
+    this._peekTurnPhase = null;
     this.cardsCollapsed = false;
     this.validCardSets = [];
 
@@ -347,14 +367,14 @@ export class PlayerPanel {
 
   _render() {
     if (!this.gameState) {
-      this.el.classList.remove('player-panel--peek');
+      this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
       this.contentEl.innerHTML = '';
       return;
     }
 
     const player = this.gameState.currentPlayer;
     if (!player) {
-      this.el.classList.remove('player-panel--peek');
+      this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
       this.contentEl.innerHTML = '';
       return;
     }
@@ -380,48 +400,65 @@ export class PlayerPanel {
 
     let html = '';
 
-    // Phone Place Capital / idle playing: thin peek (one hint + one CTA).
-    // Phone setup uses a unit tray. Desktop keeps the full sheet + tabs.
+    // Phone: same Actions / placement / tab HTML, different regions.
+    // Default is a peek detent (hint + icon row + one CTA). Expand
+    // reveals one detent of Players / Territory / Log / the full list.
+    // Desktop keeps the full sheet + tabs.
     const mobile = isMobileShell();
-    const collapsePeek = shouldCollapseMobileTray({
+    if (mobile && (this._peekPhase !== phase || this._peekTurnPhase !== turnPhase)) {
+      this.trayExpanded = false;
+      this.phoneDetentTab = 'actions';
+      this._peekPhase = phase;
+      this._peekTurnPhase = turnPhase;
+    }
+    const airLanding = this.isAirLandingActive();
+    const movePending = !!this.movePendingDest;
+    const peek = shouldPeekPhoneTray({
       mobile,
-      phase,
-      turnPhase,
-      airLanding: this.isAirLandingActive(),
-      movePending: !!this.movePendingDest,
+      expanded: this.trayExpanded,
+      airLanding,
+      movePending,
     });
     const phoneTray = shouldUsePhonePlacementTray({ mobile, phase });
-    this.el.classList.toggle('player-panel--peek', collapsePeek);
-    this.el.classList.toggle('player-panel--place-tray', phoneTray && !collapsePeek);
+    this.el.classList.toggle('player-panel--peek', peek);
+    this.el.classList.toggle('player-panel--expanded', mobile && !peek);
+    this.el.classList.toggle('player-panel--place-tray', phoneTray && !peek);
 
-    if (!collapsePeek) {
-      if (mobile) {
-        if (phoneTray) {
-          html += this._renderPhonePlacementTray(player);
-        } else {
-          html += `<div class="pp-tab-content">`;
-          html += this._renderActionsTab(phase, turnPhase, player);
-          html += `</div>`;
-        }
-      } else {
-        // Player header (compact, always visible)
-        html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
-
-        // Phase indicator
-        html += this._renderPhaseIndicator(phase, turnPhase);
-
-        // Note: Waiting state is now shown inline in Actions tab, not as overlay
-        // This allows Players, Territory, Log tabs to remain fully functional while waiting
-
-        if (shouldShowPhoneChromeTabs({ mobile: false })) {
-          html += this._renderTabs();
-        }
-
-        // Tab content
+    if (mobile) {
+      html += this._renderPhoneDetentTabs();
+      html += `<div class="phone-tray-body">`;
+      if (this.phoneDetentTab === 'stats') {
+        html += this._renderStatsTab(player);
+      } else if (this.phoneDetentTab === 'territory') {
+        html += this._renderTerritoryTab(player);
+      } else if (this.phoneDetentTab === 'log') {
+        html += this._renderLogTab();
+      } else if (phoneTray) {
+        html += this._renderPhonePlacementTray(player);
+      } else if (shouldShowPhonePanelBody({ mobile, phase, turnPhase, airLanding, movePending })) {
         html += `<div class="pp-tab-content">`;
-        html += this._renderTabContent(phase, turnPhase, player);
+        html += this._renderActionsTab(phase, turnPhase, player);
         html += `</div>`;
       }
+      html += `</div>`;
+    } else {
+      // Player header (compact, always visible)
+      html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
+
+      // Phase indicator
+      html += this._renderPhaseIndicator(phase, turnPhase);
+
+      // Note: Waiting state is now shown inline in Actions tab, not as overlay
+      // This allows Players, Territory, Log tabs to remain fully functional while waiting
+
+      if (shouldShowPhoneChromeTabs({ mobile: false })) {
+        html += this._renderTabs();
+      }
+
+      // Tab content
+      html += `<div class="pp-tab-content">`;
+      html += this._renderTabContent(phase, turnPhase, player);
+      html += `</div>`;
     }
 
     // Fixed bottom actions bar — hidden for spectators / waiting clients
@@ -533,24 +570,35 @@ export class PlayerPanel {
 
     // Phone: one enabled primary CTA. End Turn and Done never coexist;
     // illegal/disabled actions stay hidden (not greyed over another green).
-    // Tray peek puts PHASE_HINTS (or a more specific warning) next to End ${phase}.
+    // Peek stack: phase hint (own row) + unit/action chips + thumb-zone CTA.
+    const mobile = isMobileShell();
     let peekHint = '';
-    if (isMobileShell()) {
+    let peekRow = '';
+    if (mobile) {
       buttons = pickMobilePrimaryButtons(buttons);
       const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
       const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
-      peekHint = trayOwnsHint ? '' : (warningText || this._getPhaseHint(phase, turnPhase) || '');
+      peekHint = trayOwnsHint
+        ? resolvePhonePeekHint(phase, turnPhase)
+        : (warningText || resolvePhonePeekHint(phase, turnPhase) || '');
       warningHtml = '';
+      peekRow = this._renderPhonePeekRow(player, phase, turnPhase);
     }
 
     // No buttons to show (a warning-only bar is still useful — e.g. naval hint)
-    if (buttons.length === 0 && !warningHtml && !peekHint) return '';
+    if (buttons.length === 0 && !warningHtml && !peekHint && !mobile) return '';
 
-    let html = `<div class="pp-bottom-actions${isMobileShell() ? ' pp-tray-peek' : ''}">`;
+    let html = `<div class="pp-bottom-actions${mobile ? ' pp-tray-peek' : ''}">`;
     if (peekHint) {
       html += `<span class="pp-tray-hint">${peekHint}</span>`;
     }
+    html += peekRow;
     html += warningHtml;
+    if (mobile) html += `<div class="pp-peek-cta-row">`;
+    if (mobile) {
+      const expanded = !!this.trayExpanded;
+      html += `<button type="button" class="phone-tray-toggle" data-action="phone-toggle-tray" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="${expanded ? 'Show map' : 'Show list'}">${expanded ? '▾' : '▴'}</button>`;
+    }
     html += `<div class="pp-bottom-buttons">`;
 
     for (const btn of buttons) {
@@ -566,7 +614,9 @@ export class PlayerPanel {
         </button>`;
     }
 
-    html += `</div></div>`;
+    html += `</div>`;
+    if (mobile) html += `</div>`;
+    html += `</div>`;
     return html;
   }
 
@@ -1649,6 +1699,78 @@ export class PlayerPanel {
         selectedKind,
       }),
     };
+  }
+
+  _renderPhoneDetentTabs() {
+    const tabs = [
+      { id: 'actions', label: 'Units' },
+      { id: 'stats', label: 'Players' },
+      { id: 'territory', label: 'Territory' },
+      { id: 'log', label: 'Log' },
+    ];
+    let html = `<div class="phone-detent-tabs">`;
+    for (const tab of tabs) {
+      const active = this.phoneDetentTab === tab.id ? ' active' : '';
+      html += `<button type="button" class="phone-detent-tab${active}" data-action="phone-detent-tab" data-tab="${tab.id}">${tab.label}</button>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  _renderPhonePeekRow(player, phase, turnPhase) {
+    if (!shouldShowPhonePeekUnitRow({ mobile: true, phase, turnPhase })) return '';
+    let chips = '';
+
+    if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+      const units = (this.gameState.getUnitsToPlace?.(player.id) || []).filter(u => u.quantity > 0);
+      for (const unit of units) {
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        const selected = this.selectedUnitType === unit.type ? ' selected' : '';
+        chips += `
+          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unit.type}" aria-label="${unit.type}">
+            ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
+            <span class="phone-peek-count">${unit.quantity}</span>
+          </button>`;
+      }
+    } else if (turnPhase === TURN_PHASES.PURCHASE) {
+      const pending = this.gameState.getPendingPurchases?.() || [];
+      const factoryTerritories = this._getFactoryTerritories(player.id);
+      const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
+      const hasFactories = factoryTerritories.length > 0;
+      const hasSeaZones = adjacentSeaZones.length > 0;
+      const units = Object.entries(this.unitDefs || {}).filter(([, def]) => {
+        if ((def.isLand || def.isAir || def.isBuilding) && hasFactories) return true;
+        if (def.isSea && hasSeaZones) return true;
+        return false;
+      });
+      for (const [unitType] of units) {
+        const imageSrc = getUnitIconPath(unitType, player.id);
+        const qty = pending.find(p => p.type === unitType)?.quantity || 0;
+        chips += `
+          <button type="button" class="phone-peek-chip${qty > 0 ? ' has-qty' : ''}" data-action="buy-unit" data-unit="${unitType}" data-delta="1" aria-label="Buy ${unitType}">
+            ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
+            ${qty > 0 ? `<span class="phone-peek-count">${qty}</span>` : ''}
+          </button>`;
+      }
+    } else if (turnPhase === TURN_PHASES.MOBILIZE) {
+      const pending = this.gameState.getPendingPurchases?.() || [];
+      const canPlace = !!this.selectedTerritory && this._isValidMobilizeLocation(this.selectedTerritory, player);
+      for (const unit of pending) {
+        if (!unit.quantity) continue;
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        chips += `
+          <button type="button" class="phone-peek-chip${canPlace ? ' can-place' : ''}" data-action="mobilize-unit" data-unit="${unit.type}" aria-label="Deploy ${unit.type}" ${canPlace ? '' : 'disabled'}>
+            ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
+            <span class="phone-peek-count">${unit.quantity}</span>
+          </button>`;
+      }
+    } else if (turnPhase === TURN_PHASES.DEVELOP_TECH) {
+      chips += `<button type="button" class="phone-peek-chip" data-action="tech-dice-delta" data-delta="1" aria-label="Add research die">+</button>`;
+      chips += `<button type="button" class="phone-peek-chip phone-peek-chip-wide" data-action="roll-tech" aria-label="Roll tech">Roll</button>`;
+    }
+
+    if (!chips) return '';
+    return `<div class="phone-peek-row">${chips}</div>`;
   }
 
   _renderPhonePlacementTray(player) {
@@ -2968,6 +3090,21 @@ export class PlayerPanel {
           if (this.onAction && unitType) {
             this.onAction('buy-max', { unitType });
           }
+          return;
+        }
+
+        if (action === 'phone-toggle-tray') {
+          this.trayExpanded = !this.trayExpanded;
+          if (!this.trayExpanded) this.phoneDetentTab = 'actions';
+          this._render();
+          return;
+        }
+
+        if (action === 'phone-detent-tab') {
+          const tab = btn.dataset.tab || 'actions';
+          this.phoneDetentTab = tab;
+          this.trayExpanded = true;
+          this._render();
           return;
         }
 

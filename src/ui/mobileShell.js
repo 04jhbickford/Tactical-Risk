@@ -101,8 +101,8 @@ export function shouldUsePhonePlacementTray({ mobile, phase } = {}) {
   return !!mobile && phase === GAME_PHASES.UNIT_PLACEMENT;
 }
 
-// Purchase / tech / movement / mobilize still need a body. Idle phases
-// (combat resolve, collect income) and Place Capital collapse to peek.
+// Purchase / tech / movement / mobilize still have a body in the DOM.
+// V2.67: that body is a hidden region until the peek tray expands.
 export function shouldShowPhonePanelBody({
   mobile,
   phase,
@@ -123,18 +123,50 @@ export function shouldShowPhonePanelBody({
   return false;
 }
 
-// Place Capital and idle playing phases: thin peek (one hint + one CTA).
-// Do not also render the phase header, body copy, and tab strip.
+// One row of unit/action chips on the peek detent so Purchase /
+// Mobilize / Deploy stay one-handed without opening the full list.
+export function shouldShowPhonePeekUnitRow({ mobile, phase, turnPhase } = {}) {
+  if (!mobile) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
+  if (phase === GAME_PHASES.PLAYING) {
+    return turnPhase === TURN_PHASES.DEVELOP_TECH
+      || turnPhase === TURN_PHASES.PURCHASE
+      || turnPhase === TURN_PHASES.MOBILIZE;
+  }
+  return false;
+}
+
+// Default phone chrome is map + thin peek. Expand is opt-in.
+// Air-landing / move-confirm keep the body up so those flows stay visible.
+export function shouldPeekPhoneTray({
+  mobile,
+  expanded,
+  airLanding,
+  movePending,
+} = {}) {
+  if (!mobile) return false;
+  if (expanded) return false;
+  if (airLanding || movePending) return false;
+  return true;
+}
+
+// Phone always peeks unless expanded (or air-landing / move-confirm).
+// Desktop never collapses. phase/turnPhase kept so existing callers compile.
 export function shouldCollapseMobileTray({
   mobile,
   phase,
   turnPhase,
   airLanding,
   movePending,
+  expanded,
 } = {}) {
-  if (!mobile) return false;
-  return !shouldShowPhonePanelBody({ mobile, phase, turnPhase, airLanding, movePending });
+  void phase;
+  void turnPhase;
+  return shouldPeekPhoneTray({ mobile, expanded, airLanding, movePending });
 }
+
+// Expanded detent cap — one sheet, not a 280px column or 42/50dvh cover.
+export const PHONE_PEEK_EXPANDED_MAX_DVH = 36;
 
 export const PHONE_MIN_ZOOM_FLOOR = 0.10;
 export const PHONE_FIT_PAD_TOP = 64;

@@ -2,6 +2,21 @@
 
 ---
 
+## 8.16.26 — V2.67 phone peek tray (map-first; no persistent 42/50dvh sheet)
+
+On `html.mobile-shell` / max-width 480, Purchase / Mobilize / Initial Deployment / movement rendered the full Actions or placement list. CSS capped `#sidebar` at 42dvh and `.player-panel--place-tray` at 50dvh, so the unit sheet covered about half the 390×844 frame and the map was a sliver.
+
+Fix (phone-only — same DOM, same Actions / End Phase / `phone-select-unit` / `buy-unit` / `mobilize-unit` handlers):
+- Default is a peek detent: phase hint on its own row, one horizontal row of 44px unit/action chips, one primary CTA (≥44×44) above the home indicator, plus a 44px expand handle.
+- Expand is one detent (36dvh) for Units / Players / Territory / Log — not a 280px column and not a persistent 42/50dvh cover.
+- Purchase / Mobilize / Deploy stay completable from the peek chips; expand still has +/− / Max / the full list.
+
+V2.66 tooltip-visible + gold owned-land are untouched. Desktop ≥901 and tablet 481–900 stay frozen. SCHEMA_VERSION stays 11. No CSS-zoom, second JS client, Firebase, legal-mark, Fit, inspect-gesture, or combat-preview work.
+
+Harness: `node tools/test-tablet-chrome.mjs` (peek default, 36dvh expand, 44px chips, hint stacked above CTA, desktop/tablet CSS unchanged). Existing harnesses still pass.
+
+---
+
 ## 8.16.26 — V2.66 phone tooltip actually shows + gold reads at Fit (V2.65 390 playtest)
 
 Live V2.65 at 390×720 (DevTools device mode, `html.mobile-shell` on) failed both V2.65 fixes.

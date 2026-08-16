@@ -17114,9 +17114,59 @@ html, body {
     display: none;
   }
 
-  .player-panel.player-panel--peek {
+  /* V2.67: peek is hint + icon row + CTA, not a 42/50dvh sheet.
+     #sidebar is the same node as .player-panel — id beats two classes. */
+  #sidebar.player-panel--peek,
+  .player-panel.player-panel--peek,
+  #sidebar.player-panel--peek.player-panel--place-tray,
+  .player-panel.player-panel--peek.player-panel--place-tray {
     max-height: none;
     height: auto;
+  }
+
+  #sidebar.player-panel--expanded,
+  .player-panel.player-panel--expanded,
+  #sidebar.player-panel--expanded.player-panel--place-tray,
+  .player-panel.player-panel--expanded.player-panel--place-tray {
+    max-height: 36dvh;
+  }
+
+  .player-panel--peek .phone-tray-body,
+  .player-panel--peek .phone-detent-tabs {
+    display: none;
+  }
+
+  .phone-tray-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .phone-detent-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 8px 12px 0;
+    flex-shrink: 0;
+  }
+
+  .phone-detent-tab {
+    flex: 1 1 0;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 6px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .phone-detent-tab.active {
+    border-color: rgba(250, 204, 21, 0.55);
+    background: rgba(250, 204, 21, 0.12);
+    color: #fde68a;
   }
 
   .pp-tabs {
@@ -17132,27 +17182,118 @@ html, body {
     justify-content: center;
   }
 
-  /* Tray peek: PHASE_HINTS one-liner next to the End ${phase} CTA */
+  /* Tray peek: hint on its own row so the confirm verb cannot crush it */
   .pp-bottom-actions,
   .pp-tray-peek {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: 8px;
     padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    flex-shrink: 0;
+    margin-top: auto;
   }
 
   .pp-tray-hint {
-    flex: 1;
+    display: block;
+    width: 100%;
+    flex: 0 0 auto;
     min-width: 0;
-    font-size: 12px;
-    line-height: 1.3;
-    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.35;
+    color: #e2e8f0;
+  }
+
+  .phone-peek-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+  }
+
+  .phone-peek-chip {
+    position: relative;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f8fafc;
+  }
+
+  .phone-peek-chip.selected,
+  .phone-peek-chip.has-qty,
+  .phone-peek-chip.can-place {
+    border-color: #facc15;
+    background: rgba(250, 204, 21, 0.14);
+  }
+
+  .phone-peek-chip:disabled {
+    opacity: 0.45;
+  }
+
+  .phone-peek-chip-wide {
+    width: auto;
+    min-width: 44px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .phone-peek-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
+
+  .phone-peek-count {
+    position: absolute;
+    right: 2px;
+    bottom: 1px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: #fde68a;
+  }
+
+  .pp-peek-cta-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .phone-tray-toggle {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e2e8f0;
+    font-size: 18px;
   }
 
   .pp-tray-peek .pp-bottom-buttons {
     flex: 1 1 auto;
     min-width: 44px;
     gap: 8px;
+  }
+
+  .pp-peek-cta-row .pp-confirm-btn {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
   }
 
   .pp-bottom-buttons {
@@ -17514,9 +17655,19 @@ html, body {
     display: none;
   }
 
-  /* --- Setup unit tray: remaining pieces, ≥44px rows --- */
+  /* --- Setup unit tray: remaining pieces, ≥44px rows ---
+     Only while expanded. Peek default is height:auto (see --peek). */
   .player-panel.player-panel--place-tray {
     max-height: 50dvh;
+  }
+
+  #sidebar.player-panel--expanded.player-panel--place-tray,
+  .player-panel.player-panel--expanded.player-panel--place-tray {
+    max-height: 36dvh;
+  }
+
+  .player-panel--expanded .phone-place-list {
+    max-height: none;
   }
 
   .phone-place-tray {

@@ -31,10 +31,13 @@ const {
   formatMobilePhaseLabel,
   formatMobilePlayerMeta,
   shouldCollapseMobileTray,
+  shouldPeekPhoneTray,
+  shouldShowPhonePeekUnitRow,
   readableFactionTextColor,
   shouldShowPhoneChromeTabs,
   shouldUsePhonePlacementTray,
   shouldShowPhonePanelBody,
+  PHONE_PEEK_EXPANDED_MAX_DVH,
   phoneUnitIconSize,
   shouldHideUnitsAtZoom,
   boundsFromPoints,
@@ -44,7 +47,7 @@ const {
   collectPhoneLegalTerritoryNames,
   phoneLegalOutlineWidth,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
-const { resolvePhaseHint, PHASE_HINTS } =
+const { resolvePhaseHint, resolvePhonePeekHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_PHASES, TURN_PHASES } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
@@ -56,7 +59,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.66', GAME_VERSION === 'V2.66');
+check('GAME_VERSION is V2.67', GAME_VERSION === 'V2.67');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -208,6 +211,20 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     /\.hud-mobile-phase \{[\s\S]*?font-size:\s*(1[1-9]|[2-9]\d)px/.test(phoneBlock));
   check('phone tray peek class is in the 480 block',
     /pp-tray-peek/.test(phoneBlock) && /pp-tray-hint/.test(phoneBlock));
+  check('phone peek tray is height:auto, not a 42/50dvh sheet',
+    /#sidebar\.player-panel--peek[\s\S]*?max-height:\s*none/.test(phoneBlock));
+  check('phone expanded detent is 36dvh, not a 280px column',
+    /#sidebar\.player-panel--expanded[\s\S]*?max-height:\s*36dvh/.test(phoneBlock)
+    && PHONE_PEEK_EXPANDED_MAX_DVH === 36);
+  check('phone peek hides the tray body until expand',
+    /\.player-panel--peek \.phone-tray-body[\s\S]*?display:\s*none/.test(phoneBlock));
+  check('phone peek chips and toggle are ≥44px',
+    /\.phone-peek-chip \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock)
+    && /\.phone-tray-toggle \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone peek stacks hint above the CTA (hint not crushed)',
+    /\.pp-tray-peek \{[\s\S]*?flex-direction:\s*column/.test(phoneBlock));
+  check('phone peek CTA clears the home indicator',
+    /\.pp-tray-peek \{[\s\S]*?env\(safe-area-inset-bottom/.test(phoneBlock));
   check('phone ☰ / overflow is a 44px target',
     /\.hud-menu-btn \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
   check('phone menu rows are ≥44px',
@@ -253,12 +270,13 @@ check('desktop Place Capital does not collapse the sheet',
   shouldCollapseMobileTray({ mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false);
 check('phone Place Capital collapses to peek (one hint)',
   shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === true);
-check('phone unit-placement uses the placement tray, not peek',
-  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
+check('phone unit-placement keeps the tray in the DOM but peeks by default',
+  shouldPeekPhoneTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
+  && shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
   && shouldUsePhonePlacementTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
 check('desktop unit-placement does not use the phone tray',
   shouldUsePhonePlacementTray({ mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
-check('phone purchase keeps a body (no permanent tabs)',
+check('phone purchase keeps a body region (no permanent tabs)',
   shouldShowPhonePanelBody({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.PURCHASE }) === true
   && shouldShowPhoneChromeTabs({ mobile: true }) === false);
 check('phone idle collect-income is peek only',
@@ -369,6 +387,37 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneLegalOutlineWidth(0.11) > 40);
   check('desktop/tablet outline helper is unused at their default zoom',
     phoneLegalOutlineWidth(0.5) === 16);
+}
+
+console.log('=== V2.67 phone peek tray (map-first; no persistent unit sheet) ===');
+check('desktop never peeks',
+  shouldPeekPhoneTray({ mobile: false, expanded: false }) === false
+  && shouldCollapseMobileTray({ mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+check('phone purchase / deploy / mobilize peek unless expanded',
+  shouldPeekPhoneTray({ mobile: true, expanded: false }) === true
+  && shouldPeekPhoneTray({ mobile: true, expanded: true }) === false
+  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
+  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.PURCHASE }) === true
+  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.MOBILIZE }) === true);
+check('phone air-landing / move-confirm keep the body up',
+  shouldPeekPhoneTray({ mobile: true, airLanding: true }) === false
+  && shouldPeekPhoneTray({ mobile: true, movePending: true }) === false);
+check('desktop purchase hint stays empty (PHASE_HINTS frozen)',
+  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
+check('phone peek hint is readable for purchase / mobilize',
+  resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === 'Tap a unit to buy'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap a factory, then a unit');
+check('phone peek still uses PHASE_HINTS when they exist',
+  resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_HINTS[TURN_PHASES.COMBAT_MOVE]);
+{
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  check('V2.67 peek classes are not in the tablet 900 / desktop tree',
+    !/#sidebar\.player-panel--peek/.test(beforePhone)
+    && !/\.phone-peek-chip \{/.test(beforePhone)
+    && !/\.phone-tray-body \{/.test(beforePhone));
+  check('tablet 481–900 rail is still 280px after V2.67',
+    /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
 }
 
 if (failures) {
