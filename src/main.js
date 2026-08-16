@@ -475,6 +475,12 @@ async function init() {
         }
         break;
 
+      case 'undo-capital':
+        if (gameState.undoLastCapital()) {
+          camera.dirty = true;
+        }
+        break;
+
       case 'open-combat':
         if (combatUI.hasCombats()) {
           // Close other modals first

@@ -22,6 +22,7 @@ export class MultiplayerGuard {
       'placeInitialUnits',
       'finishPlacementRound',
       'undoPlacement',
+      'undoLastCapital',
       // Movement
       'moveUnits',
       // Purchases

@@ -88,8 +88,10 @@ export function resolvePhaseHint(phase, turnPhase) {
 
 // Phone peek only. Desktop still reads PHASE_HINTS via resolvePhaseHint
 // (purchase / mobilize / tech stay empty there).
-export function resolvePhonePeekHint(phase, turnPhase) {
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Tap a unit, then the map';
+export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+    return selectedUnitType ? 'Tap the map to place' : 'Tap a unit, then the map';
+  }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land';
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
@@ -105,6 +107,30 @@ export function resolvePhonePeekHint(phase, turnPhase) {
 export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT && hasPrimaryCta) return false;
   return true;
+}
+
+// After a place, keep the type. If it is exhausted (or never set), peek
+// the first remaining unit so the next land tap places with no tray trip.
+export function resolvePhoneStickyUnitType(selectedUnitType, unitsToPlace) {
+  const remaining = (Array.isArray(unitsToPlace) ? unitsToPlace : [])
+    .filter(u => u && u.quantity > 0);
+  if (selectedUnitType && remaining.some(u => u.type === selectedUnitType)) {
+    return selectedUnitType;
+  }
+  return remaining[0]?.type || null;
+}
+
+export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand } = {}) {
+  return !!mobile && phase === GAME_PHASES.CAPITAL_PLACEMENT && !!tappedIsOwnedLand;
+}
+
+export function shouldShowPhoneSetupUndo({
+  mobile, phase, canUndoPlacement, canUndoCapital,
+} = {}) {
+  if (!mobile) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return !!canUndoPlacement || !!canUndoCapital;
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return !!canUndoCapital;
+  return false;
 }
 
 // Display string for a combat-move history row. Empty string = do not render
@@ -280,6 +306,22 @@ export class PlayerPanel {
         return;
       }
     }
+    if (
+      shouldAutoCommitPhoneCapital({
+        mobile: isMobileShell(),
+        phase: this.gameState?.phase,
+        tappedIsOwnedLand: !!(
+          territory
+          && !territory.isWater
+          && this.gameState?.getOwner?.(territory.name) === this.gameState?.currentPlayer?.id
+        ),
+      })
+      && this.onAction
+    ) {
+      this.onAction('place-capital', { territory: territory.name });
+      this._render();
+      return;
+    }
     this._render();
   }
 
@@ -388,6 +430,12 @@ export class PlayerPanel {
 
     const phase = this.gameState.phase;
     const turnPhase = this.gameState.turnPhase;
+    if (isMobileShell() && phase === GAME_PHASES.UNIT_PLACEMENT) {
+      this.selectedUnitType = resolvePhoneStickyUnitType(
+        this.selectedUnitType,
+        this.gameState.getUnitsToPlace?.(player.id) || [],
+      );
+    }
 
     // Check if it's the local player's turn in multiplayer
     const isMultiplayer = this.gameState.isMultiplayer;
@@ -522,10 +570,11 @@ export class PlayerPanel {
         undoable: !isAttack  // Non-attack moves can be undone
       });
     }
-    // Capital placement
+    // Capital placement — desktop Confirm. Phone one-tap commits in
+    // setSelectedTerritory; do not add a second Confirm verb.
     else if (phase === GAME_PHASES.CAPITAL_PLACEMENT && this.selectedTerritory && !this.selectedTerritory.isWater) {
       const owner = this.gameState.getOwner(this.selectedTerritory.name);
-      if (owner === player.id) {
+      if (owner === player.id && !isMobileShell()) {
         buttons.push({
           action: 'place-capital',
           label: `Place Capital: ${this.selectedTerritory.name}`,
@@ -587,8 +636,8 @@ export class PlayerPanel {
       const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
       peekHint = shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta: buttons.length > 0 })
         ? (trayOwnsHint
-          ? resolvePhonePeekHint(phase, turnPhase)
-          : (warningText || resolvePhonePeekHint(phase, turnPhase) || ''))
+          ? resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType)
+          : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType) || ''))
         : '';
       warningHtml = '';
       peekRow = this._renderPhonePeekRow(player, phase, turnPhase);
@@ -609,6 +658,20 @@ export class PlayerPanel {
       html += `<button type="button" class="phone-tray-toggle" data-action="phone-toggle-tray" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="${expanded ? 'Show map' : 'Show list'}">${expanded ? '▾' : '▴'}</button>`;
     }
     html += `<div class="pp-bottom-buttons">`;
+
+    if (mobile) {
+      const canUndoPlacement = !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
+      const canUndoCapital = !!this.gameState.canUndoLastCapital?.();
+      if (shouldShowPhoneSetupUndo({
+        mobile: true, phase, canUndoPlacement, canUndoCapital,
+      })) {
+        const undoAction = canUndoPlacement ? 'undo-placement' : 'undo-capital';
+        html += `
+        <button class="pp-confirm-btn undoable" data-action="${undoAction}">
+          Undo
+        </button>`;
+      }
+    }
 
     for (const btn of buttons) {
       const disabledClass = btn.disabled ? 'disabled' : '';
@@ -1785,9 +1848,7 @@ export class PlayerPanel {
   _renderPhonePlacementTray(player) {
     const { unitsToPlace, ux, placedThisRound, limit } = this._getInitialPlacementUX(player);
     const remaining = (unitsToPlace || []).filter(u => u.quantity > 0);
-    if (this.selectedUnitType && !remaining.some(u => u.type === this.selectedUnitType)) {
-      this.selectedUnitType = null;
-    }
+    this.selectedUnitType = resolvePhoneStickyUnitType(this.selectedUnitType, remaining);
 
     const selectedName = this.selectedUnitType
       ? this.selectedUnitType.charAt(0).toUpperCase() + this.selectedUnitType.slice(1)

@@ -70,8 +70,15 @@ const {
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { Camera, MAP_WIDTH, MAP_HEIGHT } =
   await import(pathToFileURL(join(root, 'src/map/camera.js')));
-const { resolvePhaseHint, resolvePhonePeekHint, shouldShowPhoneSetupPeekHint, PHASE_HINTS } =
-  await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
+const {
+  resolvePhaseHint,
+  resolvePhonePeekHint,
+  shouldShowPhoneSetupPeekHint,
+  resolvePhoneStickyUnitType,
+  shouldAutoCommitPhoneCapital,
+  shouldShowPhoneSetupUndo,
+  PHASE_HINTS,
+} = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_PHASES, TURN_PHASES } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 
@@ -82,7 +89,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.70', GAME_VERSION === 'V2.70');
+check('GAME_VERSION is V2.71', GAME_VERSION === 'V2.71');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -688,6 +695,60 @@ console.log('=== V2.70 phone Fit is a regional window (never one chip, never pos
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
   check('unscoped tooltip z-index stays 100 after V2.70',
     /\.territory-tooltip \{[\s\S]*?z-index:\s*100/.test(beforePhone));
+}
+
+console.log('=== V2.71 default-first + sticky place; one-tap capital; undo ===');
+check('null selection defaults to the first remaining unit',
+  resolvePhoneStickyUnitType(null, [
+    { type: 'infantry', quantity: 3 },
+    { type: 'tank', quantity: 1 },
+  ]) === 'infantry');
+check('sticky keeps the selected type while it remains',
+  resolvePhoneStickyUnitType('tank', [
+    { type: 'infantry', quantity: 3 },
+    { type: 'tank', quantity: 2 },
+  ]) === 'tank');
+check('exhausted type defaults to the first remaining',
+  resolvePhoneStickyUnitType('infantry', [
+    { type: 'infantry', quantity: 0 },
+    { type: 'artillery', quantity: 1 },
+  ]) === 'artillery');
+check('no remaining units → null',
+  resolvePhoneStickyUnitType('infantry', []) === null);
+check('phone capital tap on owned land auto-commits (desktop does not)',
+  shouldAutoCommitPhoneCapital({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
+  }) === true
+  && shouldAutoCommitPhoneCapital({
+    mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
+  }) === false
+  && shouldAutoCommitPhoneCapital({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: false,
+  }) === false);
+check('phone setup undo is required for place and last capital',
+  shouldShowPhoneSetupUndo({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
+  }) === true
+  && shouldShowPhoneSetupUndo({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, canUndoCapital: true,
+  }) === true
+  && shouldShowPhoneSetupUndo({
+    mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
+  }) === false);
+check('selected type changes the deploy hint to tap the map',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap the map to place'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit, then the map');
+check('place-tap still does not inspect (V2.69 split stays)',
+  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
+  && shouldInspectPhoneHold({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, heldMs: 500, movedPx: 0,
+  }) === true);
+{
+  const src = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('drag-from-chip is not the place verb',
+    !/drag-place|peek-drag|chip-drag/.test(src)
+    && /shouldAutoCommitPhoneCapital/.test(src)
+    && /resolvePhoneStickyUnitType/.test(src));
 }
 
 if (failures) {

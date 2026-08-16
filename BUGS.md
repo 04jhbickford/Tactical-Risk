@@ -2,6 +2,27 @@
 
 ---
 
+## 8.16.26 — V2.71 phone tap-tap-tap place; one-tap capital; undo
+
+James on live V2.70 (390): placement still felt like tray → map → tray → map. The commute is the bug (peek tray at the bottom, land in the middle). Confirm on Place Capital was an extra tap. Drag-from-chip was rejected (more travel; tiny DnD already failed).
+
+Verified in-repo:
+- `selectedUnitType` starts null (no default-first). After a place it stays unless the type is exhausted (`_renderPhonePlacementTray` cleared it to null). V2.69 then ignores land taps with no unit — first tap and post-exhaust taps require a tray trip.
+- Place Capital still pushed a Confirm CTA on phone. Undo lived only in the expanded placement body, hidden by the peek tray.
+
+Fix (phone setup only — same `place-unit` / `place-capital` / `undo-placement` handlers; no drag):
+- Default-peek the first remaining placeable unit on Initial Deployment, and again when the selected type is exhausted. First land tap places.
+- Sticky type after a place. He only opens the tray to change type.
+- Place Capital: tap owned land commits. No Confirm. Miss / water / unowned still do not apply.
+- Peek CTA exposes existing Undo for the current place, and in-memory undo for the last capital (not serialized; SCHEMA 11).
+- V2.69 inspect split stays (place-tap does not open the card; long-press edge chip). V2.67 peek / V2.68 ink / V2.70 Fit stay.
+
+Desktop ≥901 and tablet 481–900 frozen. No minimap-hide, combat toast, or tech/purchase work.
+
+Harness: `node tools/test-tablet-chrome.mjs` (sticky / default-first / one-tap capital / undo predicates; existing peek + gold + Fit + inspect).
+
+---
+
 ## 8.16.26 — V2.70 phone Fit is a regional window (never one chip, never poster)
 
 V2.68 fillFrame killed the teal letterbox, but Fit still framed a single selected tile (Place Capital / first deploy tap) or, for worldwide empires, a world-span set that collapsed to a poster/centroid.

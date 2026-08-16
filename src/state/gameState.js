@@ -179,6 +179,8 @@ export class GameState {
 
     // Placement history for undo: [{ territory, unitType, owner }]
     this.placementHistory = [];
+    // In-memory last capital only (not in toJSON — SCHEMA 11).
+    this._lastCapital = null;
 
     // Mobilization history for undo during MOBILIZE phase: [{ territory, unitType, owner, cost }]
     this.mobilizationHistory = [];
@@ -1046,9 +1048,18 @@ export class GameState {
     // Remove factory from units to place (it's been auto-placed on capital)
     const unitsToPlace = this.unitsToPlace[player.id] || [];
     const factoryEntry = unitsToPlace.find(u => u.type === 'factory');
+    const factoryTaken = !!(factoryEntry && factoryEntry.quantity > 0);
     if (factoryEntry) {
       factoryEntry.quantity = Math.max(0, factoryEntry.quantity - 1);
     }
+
+    const lastCapital = {
+      territory: territoryName,
+      playerId: player.id,
+      playerIndex: this.currentPlayerIndex,
+      prevPhase: this.phase,
+      factoryTaken,
+    };
 
     // Advance to the next non-surrendered player
     let capGuard = 0;
@@ -1062,8 +1073,50 @@ export class GameState {
       capGuard++;
     } while (this.players[this.currentPlayerIndex]?.surrendered && capGuard < this.players.length);
 
+    this._lastCapital = lastCapital;
     this._notify();
     this.autoSave(); // Persist setup progress — losing capitals to a closed tab is brutal
+    return true;
+  }
+
+  canUndoLastCapital() {
+    return !!this._lastCapital && (this.placementHistory || []).length === 0;
+  }
+
+  undoLastCapital() {
+    const last = this._lastCapital;
+    if (!last || (this.placementHistory || []).length > 0) return false;
+
+    const units = this.units[last.territory] || [];
+    const removeOne = (type) => {
+      const entry = units.find(u => u.type === type && u.owner === last.playerId);
+      if (!entry) return;
+      const qty = Number(entry.quantity) || 1;
+      if (qty <= 1) units.splice(units.indexOf(entry), 1);
+      else entry.quantity = qty - 1;
+    };
+    removeOne('aaGun');
+    removeOne('factory');
+    this.units[last.territory] = units;
+
+    if (last.factoryTaken) {
+      const pool = this.unitsToPlace[last.playerId] || [];
+      const factory = pool.find(u => u.type === 'factory');
+      if (factory) factory.quantity++;
+      else pool.push({ type: 'factory', quantity: 1 });
+      this.unitsToPlace[last.playerId] = pool;
+    }
+
+    const state = this.territoryState[last.territory];
+    if (state) state.isCapital = false;
+    if (this.playerState[last.playerId]) {
+      this.playerState[last.playerId].hasPlacedCapital = false;
+      this.playerState[last.playerId].capitalTerritory = null;
+    }
+    this.currentPlayerIndex = last.playerIndex;
+    this.phase = last.prevPhase;
+    this._lastCapital = null;
+    this._notify();
     return true;
   }
 
@@ -1246,6 +1299,7 @@ export class GameState {
             onCarrier: true,
           });
           this.unitsPlacedThisRound++;
+          this._lastCapital = null;
           this._notify();
           return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
         } else if (unitDef.isLand) {
@@ -1278,6 +1332,7 @@ export class GameState {
             onTransport: true,
           });
           this.unitsPlacedThisRound++;
+          this._lastCapital = null;
           this._notify();
           return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
         } else {
@@ -1307,6 +1362,7 @@ export class GameState {
     });
 
     this.unitsPlacedThisRound++;
+    this._lastCapital = null;
 
     this._notify();
     return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
