@@ -21,6 +21,10 @@ export class Camera {
     this._targetX = null;
     this._targetY = null;
 
+    // Phone-only: allow zooming out far enough to see the board.
+    // Desktop / tablet keep BASE_MIN_ZOOM. Set from the phone chrome path.
+    this.usePhoneMinZoom = false;
+
     // Drag state
     this._dragging = false;
     this._dragStartX = 0;
@@ -43,8 +47,36 @@ export class Camera {
     const dpr = devicePixelRatio || 1;
     // Calculate zoom needed to fit map height in viewport
     const zoomForHeight = this.canvas.height / (MAP_HEIGHT * dpr);
+    // Phone: allow zoom-out to fit world width (~0.11 at 390px). Desktop
+    // and tablet keep the 0.4 floor so their default view is unchanged.
+    if (this.usePhoneMinZoom) {
+      const zoomForWidth = this.canvas.width / (MAP_WIDTH * dpr);
+      return Math.max(0.10, Math.min(zoomForWidth, zoomForHeight));
+    }
     // Use the larger of base minimum or calculated minimum
     return Math.max(BASE_MIN_ZOOM, zoomForHeight);
+  }
+
+  /** Fit a world-space box into the canvas. Phone chrome calls this; desktop does not. */
+  fitBounds(bounds, { padding = 16, padTop = 0, padBottom = 0, padLeft = 0, padRight = 0 } = {}) {
+    if (!bounds || !this.canvas) return;
+    const dpr = devicePixelRatio || 1;
+    const cssW = Math.max(1, this.canvas.width / dpr - padding * 2 - padLeft - padRight);
+    const cssH = Math.max(1, this.canvas.height / dpr - padding * 2 - padTop - padBottom);
+    const bw = Math.max(1, bounds.maxX - bounds.minX);
+    const bh = Math.max(1, bounds.maxY - bounds.minY);
+    const zoom = Math.min(cssW / bw, cssH / bh, MAX_ZOOM);
+    this.zoom = Math.max(this.minZoom, zoom);
+    this.x = (bounds.minX + bounds.maxX) / 2;
+    this.y = (bounds.minY + bounds.maxY) / 2;
+    this._targetX = null;
+    this._targetY = null;
+    this._clamp();
+    this.dirty = true;
+  }
+
+  fitWorld(insets = {}) {
+    this.fitBounds({ minX: 0, minY: 0, maxX: MAP_WIDTH, maxY: MAP_HEIGHT }, insets);
   }
 
   /** Convert screen pixel coords to world coords */

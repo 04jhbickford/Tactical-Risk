@@ -46,7 +46,7 @@ import { UnitTooltip } from './ui/unitTooltip.js';
 import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
-import { initMobileShell, onMobileShellChange } from './ui/mobileShell.js';
+import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit } from './ui/mobileShell.js';
 
 initMobileShell();
 
@@ -182,10 +182,21 @@ async function init() {
   // Player panel (replaces territory-focused sidebar)
   const playerPanel = new PlayerPanel();
   playerPanel.setUnitDefs(unitDefs);
-  onMobileShellChange(() => {
+  const fitPhoneCamera = () => {
+    if (!isMobileShell() || !camera) return;
+    camera.usePhoneMinZoom = true;
+    applyPhoneCameraFit(camera, { gameState, territories });
+  };
+
+  onMobileShellChange((active) => {
+    camera.usePhoneMinZoom = !!active;
     hud._render();
     playerPanel._render();
+    if (active) fitPhoneCamera();
+    else camera.onResize();
   });
+
+  hud.setMenuTabProvider((tab) => playerPanel.renderMenuTabHTML(tab));
 
   // Purchase popup overlay
   const purchasePopup = new PurchasePopup();
@@ -1007,6 +1018,10 @@ async function init() {
 
     // Start with map overview
     camera.dirty = true;
+    if (isMobileShell()) {
+      camera.usePhoneMinZoom = true;
+      requestAnimationFrame(fitPhoneCamera);
+    }
     console.log('[MP] Game started successfully');
 
     } catch (error) {
@@ -1412,7 +1427,15 @@ async function init() {
 
     // Start with map overview - no auto-pan
     camera.dirty = true;
+    if (isMobileShell()) {
+      camera.usePhoneMinZoom = true;
+      requestAnimationFrame(fitPhoneCamera);
+    }
   }, handlePlayOnline);
+
+  onMobileShellChange(() => {
+    if (lobby && !lobby.el?.classList.contains('hidden')) lobby._render();
+  });
 
   // Load map tiles
   await mapRenderer.load();
@@ -1809,7 +1832,7 @@ async function init() {
   // handling is untouched. Pinch-zoom enabled on the main map only.
   initTouchInput(canvas, { enablePinch: true });
   initTouchInput(document.getElementById('minimap'));
-  initZoomControls(canvas);
+  initZoomControls(canvas, { onFit: fitPhoneCamera });
 
   canvas.addEventListener('mouseleave', () => {
     tooltip.hide();
@@ -1882,6 +1905,14 @@ async function init() {
   // Render loop
   function render() {
     camera.update();
+
+    if (unitRenderer) {
+      const nextHighlight = isMobileShell() ? playerPanel.selectedUnitType : null;
+      if (unitRenderer.highlightUnitType !== nextHighlight) {
+        unitRenderer.highlightUnitType = nextHighlight;
+        camera.dirty = true;
+      }
+    }
 
     if (camera.dirty) {
       camera.dirty = false;

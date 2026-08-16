@@ -26,6 +26,14 @@ const {
   formatMobilePlayerMeta,
   shouldCollapseMobileTray,
   readableFactionTextColor,
+  shouldShowPhoneChromeTabs,
+  shouldUsePhonePlacementTray,
+  shouldShowPhonePanelBody,
+  phoneUnitIconSize,
+  shouldHideUnitsAtZoom,
+  boundsFromPoints,
+  territoryFitPoint,
+  PHONE_MIN_ZOOM_FLOOR,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { resolvePhaseHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
@@ -206,17 +214,40 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     /\.pp-tab \{[\s\S]*?min-height:\s*44px[\s\S]*?height:\s*44px/.test(phoneBlock));
   check('phone hides compact phase header (one hint)',
     /\.pp-phase\.compact \{[\s\S]*?display:\s*none/.test(phoneBlock));
+  check('Fit button is hidden outside the phone block',
+    /\.zoom-btn-fit \{\s*display:\s*none/.test(beforePhone));
+  check('phone shows a ≥44px Fit control',
+    /\.zoom-btn-fit \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone menu is a full-screen sheet, not only a dropdown',
+    /phone-menu-sheet/.test(phoneBlock) && /phone-menu-row/.test(phoneBlock));
+  check('phone menu rows are ≥44px',
+    /\.phone-menu-row[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone placement tray rows are ≥44px',
+    /\.phone-place-row \{[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone lobby is a full-width tree, not the 50% desktop column',
+    /lobby-phone[\s\S]*?width:\s*100%/.test(phoneBlock)
+    && /\.lobby-phone-card \{/.test(phoneBlock));
+  check('phone hides the permanent tab bar',
+    /\.pp-tabs \{\s*display:\s*none/.test(phoneBlock));
 }
 
-console.log('=== V2.64 one Place Capital hint + readable faction color ===');
+console.log('=== V2.64 phone chrome tree (not desktop restack) ===');
 check('desktop Place Capital does not collapse the sheet',
   shouldCollapseMobileTray({ mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false);
 check('phone Place Capital collapses to peek (one hint)',
   shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === true);
-check('phone unit-placement keeps the actions sheet',
-  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
-check('phone playing phase keeps the actions sheet',
-  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.PLAYING }) === false);
+check('phone unit-placement uses the placement tray, not peek',
+  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
+  && shouldUsePhonePlacementTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
+check('desktop unit-placement does not use the phone tray',
+  shouldUsePhonePlacementTray({ mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+check('phone purchase keeps a body (no permanent tabs)',
+  shouldShowPhonePanelBody({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.PURCHASE }) === true
+  && shouldShowPhoneChromeTabs({ mobile: true }) === false);
+check('phone idle collect-income is peek only',
+  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.COLLECT_INCOME }) === true);
+check('desktop still shows chrome tabs',
+  shouldShowPhoneChromeTabs({ mobile: false }) === true);
 check('peek hint is the single PHASE_HINTS line',
   resolvePhaseHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Click your territory');
 check('dark grey faction text is lifted for contrast',
@@ -229,6 +260,19 @@ check('End Turn and Done still never coexist',
     { action: 'finish-placement', label: 'Done', primary: true },
     { action: 'next-phase', label: 'End Turn', primary: true },
   ]).length === 1);
+check('phone min zoom floor is below desktop 0.4',
+  PHONE_MIN_ZOOM_FLOOR < 0.4 && PHONE_MIN_ZOOM_FLOOR <= 0.12);
+check('phone units stay visible at world-fit zoom',
+  shouldHideUnitsAtZoom(0.11, { mobile: true }) === false
+  && phoneUnitIconSize(0.11, { mobile: true }) >= 20);
+check('desktop units still hide below 0.35',
+  shouldHideUnitsAtZoom(0.11, { mobile: false }) === true
+  && phoneUnitIconSize(0.5, { mobile: false }) === Math.max(14, Math.min(24, 20 * 0.5)));
+check('owned-land bbox is used; worldwide span falls back',
+  !!boundsFromPoints([{ x: 100, y: 100 }, { x: 200, y: 180 }])
+  && boundsFromPoints([{ x: 10, y: 10 }, { x: 3000, y: 20 }]) === null);
+check('territory.center is preferred for fit points',
+  territoryFitPoint({ center: [120, 80], polygons: [[[0, 0], [10, 0]]] }).x === 120);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

@@ -7,6 +7,7 @@
 // import GAME_VERSION from lobby.js. A bare `export … from` would satisfy those
 // importers but leave GAME_VERSION undefined inside this module.
 import { GAME_VERSION } from '../version.js';
+import { isMobileShell } from './mobileShell.js';
 export { GAME_VERSION };
 
 // AI Difficulty levels
@@ -68,31 +69,173 @@ export class Lobby {
 
   _render() {
     let content = '';
+    const phone = isMobileShell();
 
     switch (this.mode) {
       case 'main':
-        content = this._renderMainMenu();
+        content = phone ? this._renderMobileMainMenu() : this._renderMainMenu();
         break;
       case 'local-setup':
-        content = this._renderLocalSetup();
+        content = phone ? this._renderMobileLocalSetup() : this._renderLocalSetup();
         break;
       case 'my-games':
         content = this._renderMyGames();
         break;
       default:
-        content = this._renderMainMenu();
+        content = phone ? this._renderMobileMainMenu() : this._renderMainMenu();
     }
 
     this.el.innerHTML = `
-      <div class="lobby-container modern">
+      <div class="lobby-container modern${phone ? ' lobby-phone' : ''}">
         <div class="lobby-bg-pattern"></div>
-        <div class="lobby-content-wrapper">
+        <div class="lobby-content-wrapper${phone ? ' lobby-phone-wrap' : ''}">
           ${content}
         </div>
       </div>
     `;
 
     this._bindEvents();
+  }
+
+  _renderMobileMainMenu() {
+    const savedGames = this._getSavedGames();
+    const hasSavedGames = savedGames.length > 0;
+
+    return `
+      <div class="lobby-phone-home">
+        <div class="lobby-phone-brand">
+          <h1 class="lobby-phone-logo">Tactical Risk</h1>
+          <p class="lobby-phone-tag">World War II Grand Strategy</p>
+          <span class="lobby-version-badge">${GAME_VERSION}</span>
+        </div>
+
+        <div class="lobby-phone-actions">
+          <button class="lobby-phone-card" data-action="local-play">
+            <span class="lobby-phone-card-kicker">This device</span>
+            <span class="lobby-phone-card-title">Local Play</span>
+            <span class="lobby-phone-card-desc">Friends or AI on this phone</span>
+          </button>
+          <button class="lobby-phone-card lobby-phone-card-online" data-action="online-play">
+            <span class="lobby-phone-card-kicker">Multiplayer</span>
+            <span class="lobby-phone-card-title">Play Online</span>
+            <span class="lobby-phone-card-desc">Create or join a game</span>
+          </button>
+        </div>
+
+        ${hasSavedGames ? `
+          <button class="lobby-phone-saved" data-action="my-games">
+            <span>My Games</span>
+            <span class="saved-count">${savedGames.length}</span>
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  _initFactionDefaults() {
+    const factions = this.setup.risk.factions;
+    factions.forEach((p, i) => {
+      const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
+      if (!this.playerColors[p.id]) {
+        this.playerColors[p.id] = { color: p.color || defaultColor.color, lightColor: p.lightColor || defaultColor.light };
+      }
+      if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
+    });
+    return factions;
+  }
+
+  _renderMobileLocalSetup() {
+    const factions = this._initFactionDefaults();
+    const selectedCount = this.selectedPlayers.length;
+    const canStart = selectedCount >= 2;
+
+    return `
+      <div class="lobby-phone-setup">
+        <div class="lobby-phone-setup-head">
+          <button class="back-btn lobby-phone-back" data-action="back" aria-label="Back">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          </button>
+          <div class="setup-title">
+            <h2>New Local Game</h2>
+            <p>Tap 2–5 factions</p>
+          </div>
+        </div>
+
+        <div class="lobby-phone-factions">
+          ${factions.map((p, i) => this._renderMobileFactionCard(p, i)).join('')}
+        </div>
+
+        <div class="lobby-phone-options">
+          <label class="lobby-phone-option">
+            <span>Starting IPCs</span>
+            <select id="starting-ipcs" class="modern-select compact">
+              <option value="40" ${this.startingIPCs === 40 ? 'selected' : ''}>40</option>
+              <option value="60" ${this.startingIPCs === 60 ? 'selected' : ''}>60</option>
+              <option value="80" ${this.startingIPCs === 80 ? 'selected' : ''}>80</option>
+              <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100</option>
+              <option value="120" ${this.startingIPCs === 120 ? 'selected' : ''}>120</option>
+              <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150</option>
+            </select>
+          </label>
+          <label class="lobby-phone-option lobby-phone-teams">
+            <input type="checkbox" id="teams-enabled" ${this.teamsEnabled ? 'checked' : ''}>
+            <span>Teams</span>
+          </label>
+        </div>
+
+        <div class="setup-footer lobby-phone-start">
+          <button class="start-game-btn ${canStart ? '' : 'disabled'}" data-action="start" ${canStart ? '' : 'disabled'}>
+            ${canStart ? `Start Game (${selectedCount})` : 'Select at least 2 factions'}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  _renderMobileFactionCard(faction, index) {
+    const isSelected = this.selectedPlayers.includes(faction.id);
+    const currentColor = this.playerColors[faction.id];
+    const currentAI = this.playerAI[faction.id] || 'human';
+    const currentTeam = this.playerTeams[faction.id] || null;
+
+    return `
+      <div class="player-card modern lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
+        <div class="lobby-phone-faction-main">
+          <div class="player-avatar" style="border-color: ${currentColor?.color || faction.color}">
+            <img src="assets/flags/${faction.flag}" alt="${faction.name}">
+          </div>
+          <div class="lobby-phone-faction-copy">
+            <span class="lobby-phone-faction-name">${faction.name}</span>
+            ${isSelected ? `<span class="lobby-phone-faction-on">Selected</span>` : `<span class="lobby-phone-faction-off">Tap to add</span>`}
+          </div>
+          <div class="player-select-indicator">${isSelected ? '✓' : ''}</div>
+        </div>
+        ${isSelected ? `
+          <div class="lobby-phone-faction-tools">
+            <div class="color-picker" data-player="${faction.id}">
+              <div class="color-swatch" style="background:${currentColor?.color || faction.color}"></div>
+              <div class="color-dropdown hidden">
+                ${FACTION_COLORS.map(c => `
+                  <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
+                `).join('')}
+              </div>
+            </div>
+            <select class="ai-select modern" data-player="${faction.id}">
+              ${AI_DIFFICULTIES.map(d => `
+                <option value="${d.id}" ${currentAI === d.id ? 'selected' : ''}>${d.name}</option>
+              `).join('')}
+            </select>
+            ${this.teamsEnabled ? `
+              <div class="team-selector">
+                <button class="team-btn ${currentTeam === 1 ? 'active' : ''}" data-player="${faction.id}" data-team="1" style="--team-color: ${TEAM_COLORS[1].color}">1</button>
+                <button class="team-btn ${currentTeam === 2 ? 'active' : ''}" data-player="${faction.id}" data-team="2" style="--team-color: ${TEAM_COLORS[2].color}">2</button>
+                <button class="team-btn neutral ${!currentTeam ? 'active' : ''}" data-player="${faction.id}" data-team="0">-</button>
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+      </div>
+    `;
   }
 
   _renderMainMenu() {
@@ -142,16 +285,7 @@ export class Lobby {
   }
 
   _renderLocalSetup() {
-    const factions = this.setup.risk.factions;
-
-    // Initialize colors and AI for factions
-    factions.forEach((p, i) => {
-      const defaultColor = FACTION_COLORS[i % FACTION_COLORS.length];
-      if (!this.playerColors[p.id]) {
-        this.playerColors[p.id] = { color: p.color || defaultColor.color, lightColor: p.lightColor || defaultColor.light };
-      }
-      if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
-    });
+    const factions = this._initFactionDefaults();
 
     const selectedCount = this.selectedPlayers.length;
     const canStart = selectedCount >= 2;

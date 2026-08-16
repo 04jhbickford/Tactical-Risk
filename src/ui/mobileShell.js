@@ -4,7 +4,8 @@
 // html.mobile-shell once; phone CSS lives in @media (max-width: 480px)
 // and html.mobile-shell. No rules / combat / schema changes here.
 
-import { GAME_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
+import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
+import { MAP_WIDTH, MAP_HEIGHT } from '../map/camera.js';
 
 export const MOBILE_SHELL_MAX_WIDTH = 480;
 export const MOBILE_SHELL_QUERY = `(max-width: ${MOBILE_SHELL_MAX_WIDTH}px)`;
@@ -88,11 +89,165 @@ export function formatMobilePlayerMeta({ ipcs, surrendered } = {}) {
   return parts.join(' · ');
 }
 
-// Place Capital has no real Actions-tab chrome (no unit rows / buy list).
-// Collapse the sheet to a thin peek: one hint + one CTA. Do not also
-// render the phase header, body copy, and tab strip.
-export function shouldCollapseMobileTray({ mobile, phase } = {}) {
-  return !!mobile && phase === GAME_PHASES.CAPITAL_PLACEMENT;
+// Phone in-game chrome: Players / Territory / Log live in the menu sheet.
+// Never keep a permanent 4-tab bar on the map.
+export function shouldShowPhoneChromeTabs({ mobile } = {}) {
+  return !mobile;
+}
+
+// Initial deployment on phone is a tray of remaining units, not the
+// desktop queue/+/-/confirm sheet squeezed into the bottom overlay.
+export function shouldUsePhonePlacementTray({ mobile, phase } = {}) {
+  return !!mobile && phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
+// Purchase / tech / movement / mobilize still need a body. Idle phases
+// (combat resolve, collect income) and Place Capital collapse to peek.
+export function shouldShowPhonePanelBody({
+  mobile,
+  phase,
+  turnPhase,
+  airLanding,
+  movePending,
+} = {}) {
+  if (!mobile) return true;
+  if (airLanding || movePending) return true;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
+  if (phase === GAME_PHASES.PLAYING) {
+    return turnPhase === TURN_PHASES.DEVELOP_TECH
+      || turnPhase === TURN_PHASES.PURCHASE
+      || turnPhase === TURN_PHASES.COMBAT_MOVE
+      || turnPhase === TURN_PHASES.NON_COMBAT_MOVE
+      || turnPhase === TURN_PHASES.MOBILIZE;
+  }
+  return false;
+}
+
+// Place Capital and idle playing phases: thin peek (one hint + one CTA).
+// Do not also render the phase header, body copy, and tab strip.
+export function shouldCollapseMobileTray({
+  mobile,
+  phase,
+  turnPhase,
+  airLanding,
+  movePending,
+} = {}) {
+  if (!mobile) return false;
+  return !shouldShowPhonePanelBody({ mobile, phase, turnPhase, airLanding, movePending });
+}
+
+export const PHONE_MIN_ZOOM_FLOOR = 0.10;
+export const PHONE_FIT_PAD_TOP = 64;
+export const PHONE_FIT_PAD_BOTTOM = 120;
+
+export function phoneUnitIconSize(zoom, { mobile } = {}) {
+  if (mobile) return Math.max(20, Math.min(36, 28 * Math.max(Number(zoom) || 0, 0.35)));
+  return Math.max(14, Math.min(24, 20 * (Number(zoom) || 0)));
+}
+
+export function shouldHideUnitsAtZoom(zoom, { mobile } = {}) {
+  return !mobile && (Number(zoom) || 0) < 0.35;
+}
+
+export function territoryFitPoint(t) {
+  if (!t) return null;
+  if (Array.isArray(t.center) && Number.isFinite(t.center[0]) && Number.isFinite(t.center[1])) {
+    return { x: t.center[0], y: t.center[1] };
+  }
+  const poly = t.polygons?.[0];
+  if (!Array.isArray(poly) || poly.length === 0) return null;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  for (const p of poly) {
+    if (Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1])) {
+      sx += p[0];
+      sy += p[1];
+      n++;
+    }
+  }
+  return n ? { x: sx / n, y: sy / n } : null;
+}
+
+export function boundsFromPoints(points) {
+  if (!Array.isArray(points) || points.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+  if (!Number.isFinite(minX)) return null;
+  // Scattered worldwide sets are a world fit, not a tiny bbox.
+  if (maxX - minX > MAP_WIDTH * 0.7) return null;
+  return { minX, minY, maxX, maxY };
+}
+
+export function collectPhoneFitPoints(territories, predicate) {
+  const list = Array.isArray(territories) ? territories : Object.values(territories || {});
+  const pts = [];
+  for (const t of list) {
+    if (predicate && !predicate(t)) continue;
+    const p = territoryFitPoint(t);
+    if (p) pts.push(p);
+  }
+  return pts;
+}
+
+// Fit the relevant map on phone enter / Fit tap. Desktop camera is untouched.
+export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
+  if (!camera) return;
+  camera.usePhoneMinZoom = true;
+  const insets = {
+    padding: 12,
+    padTop: PHONE_FIT_PAD_TOP,
+    padBottom: PHONE_FIT_PAD_BOTTOM,
+  };
+  const phase = gameState?.phase;
+  const playerId = gameState?.currentPlayer?.id;
+
+  if (phase === GAME_PHASES.UNIT_PLACEMENT && playerId && territories) {
+    const pts = collectPhoneFitPoints(territories, (t) => {
+      if (t.isWater) return false;
+      return gameState.getOwner?.(t.name) === playerId;
+    });
+    const bounds = boundsFromPoints(pts);
+    if (bounds) {
+      camera.fitBounds(bounds, insets);
+      return;
+    }
+  }
+
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT && territories) {
+    const pts = collectPhoneFitPoints(territories, (t) => !t.isWater && !!gameState?.getOwner?.(t.name));
+    const bounds = boundsFromPoints(pts);
+    if (bounds) {
+      camera.fitBounds(bounds, insets);
+      return;
+    }
+  }
+
+  if (phase === GAME_PHASES.PLAYING && gameState && territories) {
+    const pts = collectPhoneFitPoints(territories, (t) => (
+      gameState.players?.some((p) => gameState.getCapital?.(p.id) === t.name)
+    ));
+    const bounds = boundsFromPoints(pts);
+    if (bounds) {
+      camera.fitBounds(bounds, insets);
+      return;
+    }
+  }
+
+  camera.fitWorld(insets);
+}
+
+export function worldFitBounds() {
+  return { minX: 0, minY: 0, maxX: MAP_WIDTH, maxY: MAP_HEIGHT };
 }
 
 // Faction swatch keeps the raw color. Text on the dark HUD must stay readable.

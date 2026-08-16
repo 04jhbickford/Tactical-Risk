@@ -11,16 +11,23 @@ export class HUD {
     this.onRulesToggle = null;
     this.onExitToLobby = null;
     this.menuOpen = false;
+    this.menuTab = null;
+    this.menuTabProvider = null;
     this.el = document.getElementById('hud');
     this._render();
 
     // Close menu when clicking outside
     document.addEventListener('click', (e) => {
-      if (this.menuOpen && !e.target.closest('.hud-menu-container')) {
+      if (this.menuOpen && !e.target.closest('.hud-menu-container') && !e.target.closest('.phone-menu-sheet')) {
         this.menuOpen = false;
+        this.menuTab = null;
         this._updateMenuState();
       }
     });
+  }
+
+  setMenuTabProvider(fn) {
+    this.menuTabProvider = fn;
   }
 
   setOnRulesToggle(callback) {
@@ -190,30 +197,65 @@ export class HUD {
       playersHtml += `</div>`;
     }
 
+    const tabHTML = (this.menuOpen && this.menuTab && this.menuTabProvider)
+      ? this.menuTabProvider(this.menuTab)
+      : '';
+    const tabLabel = this.menuTab === 'stats' ? 'Players'
+      : this.menuTab === 'territory' ? 'Territory'
+      : this.menuTab === 'log' ? 'Log'
+      : '';
+
     this.el.innerHTML = `
       ${identity}
       <div class="hud-menu-container hud-mobile-overflow">
         <button class="hud-menu-btn" data-action="toggle-menu" title="Menu" aria-label="Menu">
           <span class="hud-menu-icon">⋯</span>
         </button>
-        <div class="hud-menu-dropdown ${this.menuOpen ? 'open' : ''}">
-          <div class="hud-mobile-wordmark">Tactical Risk</div>
-          ${playersHtml}
-          <button class="hud-menu-item" data-action="rules">
-            <span class="hud-menu-item-icon">📖</span>
-            <span>Game Rules</span>
-          </button>
-          <button class="hud-menu-item" data-action="exit-lobby">
-            <span class="hud-menu-item-icon">💾</span>
-            <span>Save & Exit</span>
-          </button>
+      </div>
+      <div class="phone-menu-sheet ${this.menuOpen ? 'open' : ''}" id="phone-menu-sheet">
+        <div class="phone-menu-head">
+          <button class="phone-menu-back" data-action="${this.menuTab ? 'menu-home' : 'toggle-menu'}" aria-label="${this.menuTab ? 'Back' : 'Close'}">${this.menuTab ? '←' : '✕'}</button>
+          <span class="phone-menu-title">${tabLabel || 'Menu'}</span>
+          <span class="phone-menu-wordmark">Tactical Risk</span>
         </div>
+        ${this.menuTab ? `
+          <div class="phone-menu-panel">${tabHTML}</div>
+        ` : `
+          <div class="phone-menu-list">
+            <button class="phone-menu-row" data-action="menu-tab" data-tab="stats">
+              <span class="hud-menu-item-icon">📊</span>
+              <span>Players</span>
+            </button>
+            <button class="phone-menu-row" data-action="menu-tab" data-tab="territory">
+              <span class="hud-menu-item-icon">🗺</span>
+              <span>Territory</span>
+            </button>
+            <button class="phone-menu-row" data-action="menu-tab" data-tab="log">
+              <span class="hud-menu-item-icon">📜</span>
+              <span>Log</span>
+            </button>
+            <button class="phone-menu-row" data-action="rules">
+              <span class="hud-menu-item-icon">📖</span>
+              <span>Game Rules</span>
+            </button>
+            <button class="phone-menu-row" data-action="exit-lobby">
+              <span class="hud-menu-item-icon">💾</span>
+              <span>Save & Exit</span>
+            </button>
+          </div>
+          ${playersHtml}
+        `}
       </div>
     `;
     this._bindEvents();
   }
 
   _updateMenuState() {
+    const sheet = this.el.querySelector('.phone-menu-sheet');
+    if (sheet) {
+      sheet.classList.toggle('open', this.menuOpen);
+      return;
+    }
     const dropdown = this.el.querySelector('.hud-menu-dropdown');
     if (dropdown) {
       dropdown.classList.toggle('open', this.menuOpen);
@@ -222,11 +264,29 @@ export class HUD {
 
   _bindEvents() {
     // Menu toggle button
-    const menuBtn = this.el.querySelector('[data-action="toggle-menu"]');
-    menuBtn?.addEventListener('click', (e) => {
+    this.el.querySelectorAll('[data-action="toggle-menu"]').forEach((menuBtn) => {
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.menuOpen = !this.menuOpen;
+        if (!this.menuOpen) this.menuTab = null;
+        if (isMobileShell()) this._render();
+        else this._updateMenuState();
+      });
+    });
+
+    this.el.querySelector('[data-action="menu-home"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      this.menuOpen = !this.menuOpen;
-      this._updateMenuState();
+      this.menuTab = null;
+      this._render();
+    });
+
+    this.el.querySelectorAll('[data-action="menu-tab"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.menuOpen = true;
+        this.menuTab = btn.dataset.tab;
+        this._render();
+      });
     });
 
     // Rules menu item

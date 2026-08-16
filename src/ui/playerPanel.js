@@ -4,7 +4,13 @@
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, pickMobilePrimaryButtons, shouldCollapseMobileTray } from './mobileShell.js';
+import {
+  isMobileShell,
+  pickMobilePrimaryButtons,
+  shouldCollapseMobileTray,
+  shouldShowPhoneChromeTabs,
+  shouldUsePhonePlacementTray,
+} from './mobileShell.js';
 
 // Compact phase hints — phone tray peek reads these next to End ${phase}.
 export const PHASE_HINTS = {
@@ -117,6 +123,7 @@ export class PlayerPanel {
     this.onAction = null;
     this.actionLog = null;
     this.selectedTerritory = null;
+    this.selectedUnitType = null;
     this.activeTab = 'actions';
     this.cardsCollapsed = false;
     this.validCardSets = [];
@@ -227,7 +234,42 @@ export class PlayerPanel {
       this.placementQueue = {}; // Reset placement queue
     }
     this.selectedTerritory = territory;
+
+    // Phone setup: tap a unit type in the tray, then tap the map.
+    // Desktop keeps the queue / +/− / confirm sheet.
+    if (
+      shouldUsePhonePlacementTray({ mobile: isMobileShell(), phase: this.gameState?.phase }) &&
+      this.selectedUnitType &&
+      territory &&
+      this.onAction
+    ) {
+      const player = this.gameState.currentPlayer;
+      if (
+        this._isValidPlacementTerritory(territory, player) &&
+        this._phoneUnitFitsTerritory(this.selectedUnitType, territory)
+      ) {
+        this.onAction('place-unit', { unitType: this.selectedUnitType, territory: territory.name });
+        this._render();
+        return;
+      }
+    }
     this._render();
+  }
+
+  _phoneUnitFitsTerritory(unitType, territory) {
+    const def = this.unitDefs?.[unitType];
+    if (!def || !territory) return false;
+    if (territory.isWater) return !!(def.isSea || def.isAir);
+    return !!(def.isLand || def.isAir || def.isBuilding);
+  }
+
+  renderMenuTabHTML(tab) {
+    if (!this.gameState?.currentPlayer) return '<div class="phone-menu-empty">No game loaded</div>';
+    const player = this.gameState.currentPlayer;
+    if (tab === 'stats') return this._renderStatsTab(player);
+    if (tab === 'territory') return this._renderTerritoryTab(player);
+    if (tab === 'log') return this._renderLogTab();
+    return '';
   }
 
   // Air landing methods
@@ -338,31 +380,48 @@ export class PlayerPanel {
 
     let html = '';
 
-    // Phone Place Capital: thin peek only (one hint + one CTA). The desktop
-    // header / phase row / tabs / body hint repeat the same line three times.
+    // Phone Place Capital / idle playing: thin peek (one hint + one CTA).
+    // Phone setup uses a unit tray. Desktop keeps the full sheet + tabs.
+    const mobile = isMobileShell();
     const collapsePeek = shouldCollapseMobileTray({
-      mobile: isMobileShell(),
+      mobile,
       phase,
+      turnPhase,
+      airLanding: this.isAirLandingActive(),
+      movePending: !!this.movePendingDest,
     });
+    const phoneTray = shouldUsePhonePlacementTray({ mobile, phase });
     this.el.classList.toggle('player-panel--peek', collapsePeek);
+    this.el.classList.toggle('player-panel--place-tray', phoneTray && !collapsePeek);
 
     if (!collapsePeek) {
-      // Player header (compact, always visible)
-      html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
+      if (mobile) {
+        if (phoneTray) {
+          html += this._renderPhonePlacementTray(player);
+        } else {
+          html += `<div class="pp-tab-content">`;
+          html += this._renderActionsTab(phase, turnPhase, player);
+          html += `</div>`;
+        }
+      } else {
+        // Player header (compact, always visible)
+        html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
 
-      // Phase indicator
-      html += this._renderPhaseIndicator(phase, turnPhase);
+        // Phase indicator
+        html += this._renderPhaseIndicator(phase, turnPhase);
 
-      // Note: Waiting state is now shown inline in Actions tab, not as overlay
-      // This allows Players, Territory, Log tabs to remain fully functional while waiting
+        // Note: Waiting state is now shown inline in Actions tab, not as overlay
+        // This allows Players, Territory, Log tabs to remain fully functional while waiting
 
-      // Tab navigation
-      html += this._renderTabs();
+        if (shouldShowPhoneChromeTabs({ mobile: false })) {
+          html += this._renderTabs();
+        }
 
-      // Tab content
-      html += `<div class="pp-tab-content">`;
-      html += this._renderTabContent(phase, turnPhase, player);
-      html += `</div>`;
+        // Tab content
+        html += `<div class="pp-tab-content">`;
+        html += this._renderTabContent(phase, turnPhase, player);
+        html += `</div>`;
+      }
     }
 
     // Fixed bottom actions bar — hidden for spectators / waiting clients
@@ -479,7 +538,8 @@ export class PlayerPanel {
     if (isMobileShell()) {
       buttons = pickMobilePrimaryButtons(buttons);
       const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
-      peekHint = warningText || this._getPhaseHint(phase, turnPhase) || '';
+      const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
+      peekHint = trayOwnsHint ? '' : (warningText || this._getPhaseHint(phase, turnPhase) || '');
       warningHtml = '';
     }
 
@@ -1589,6 +1649,43 @@ export class PlayerPanel {
         selectedKind,
       }),
     };
+  }
+
+  _renderPhonePlacementTray(player) {
+    const { unitsToPlace, ux, placedThisRound, limit } = this._getInitialPlacementUX(player);
+    const remaining = (unitsToPlace || []).filter(u => u.quantity > 0);
+    if (this.selectedUnitType && !remaining.some(u => u.type === this.selectedUnitType)) {
+      this.selectedUnitType = null;
+    }
+
+    const selectedName = this.selectedUnitType
+      ? this.selectedUnitType.charAt(0).toUpperCase() + this.selectedUnitType.slice(1)
+      : '';
+    let hint = 'Tap a unit, then tap the map';
+    if (this.selectedUnitType) hint = `Tap the map to place ${selectedName}`;
+    if (ux.needSeaHint && ux.hint) hint = ux.hint;
+    if (ux.stuckWithNaval && ux.hint) hint = ux.hint;
+
+    let html = `<div class="phone-place-tray">`;
+    html += `<div class="phone-place-meta">${placedThisRound}/${limit} this round</div>`;
+    html += `<div class="phone-place-hint">${hint}</div>`;
+    html += `<div class="phone-place-list">`;
+    for (const unit of remaining) {
+      const imageSrc = getUnitIconPath(unit.type, player.id);
+      const name = unit.type.charAt(0).toUpperCase() + unit.type.slice(1);
+      const selected = this.selectedUnitType === unit.type ? ' selected' : '';
+      html += `
+        <button type="button" class="phone-place-row${selected}" data-action="phone-select-unit" data-unit="${unit.type}">
+          ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-place-icon">` : ''}
+          <span class="phone-place-name">${name}</span>
+          <span class="phone-place-count">×${unit.quantity}</span>
+        </button>`;
+    }
+    if (remaining.length === 0) {
+      html += `<div class="phone-place-empty">All units placed</div>`;
+    }
+    html += `</div></div>`;
+    return html;
   }
 
   // Inline Placement UI - mimics buy phase style
@@ -2871,6 +2968,13 @@ export class PlayerPanel {
           if (this.onAction && unitType) {
             this.onAction('buy-max', { unitType });
           }
+          return;
+        }
+
+        if (action === 'phone-select-unit') {
+          const unitType = btn.dataset.unit;
+          this.selectedUnitType = this.selectedUnitType === unitType ? null : unitType;
+          this._render();
           return;
         }
 

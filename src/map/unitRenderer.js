@@ -1,6 +1,7 @@
 // Renders unit icons at territory centers using sprite images
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
+import { isMobileShell, phoneUnitIconSize, shouldHideUnitsAtZoom } from '../ui/mobileShell.js';
 
 export class UnitRenderer {
   constructor(gameState, territories, unitDefs) {
@@ -11,6 +12,9 @@ export class UnitRenderer {
     for (const t of territories) {
       this.territoryByName[t.name] = t;
     }
+
+    // Phone tray selection — gold halo on matching stacks. Desktop unused.
+    this.highlightUnitType = null;
 
     // Load unit images per faction
     this.factionUnitImages = {}; // factionId -> { unitType -> Image }
@@ -50,9 +54,10 @@ export class UnitRenderer {
   }
 
   render(ctx, zoom) {
-    if (zoom < 0.35) return;
+    const mobile = isMobileShell();
+    if (shouldHideUnitsAtZoom(zoom, { mobile })) return;
 
-    const iconSize = Math.max(14, Math.min(24, 20 * zoom));
+    const iconSize = phoneUnitIconSize(zoom, { mobile });
     const spacingX = iconSize + 4;
     const spacingY = iconSize + 8;
 
@@ -171,7 +176,8 @@ export class UnitRenderer {
         const isFlying = sectionType === 'air';
 
         this._drawUnitIcon(ctx, x, rowY, iconSize, unitInfo.type, color, unitInfo.owner,
-                          isOnCarrier, isOnTransport, unitInfo.damaged || 0, isFlying);
+                          isOnCarrier, isOnTransport, unitInfo.damaged || 0, isFlying,
+                          this.highlightUnitType === unitInfo.type);
 
         if (unitInfo.total > 1) {
           this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, unitInfo.total, zoom);
@@ -201,7 +207,8 @@ export class UnitRenderer {
         const x = startX + col * spacingX;
         const color = this.gameState.getPlayerColor(owner);
 
-        this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport, damaged);
+        this._drawUnitIcon(ctx, x, rowY, iconSize, unitType, color, owner, isOnCarrier, isOnTransport, damaged, false,
+                          this.highlightUnitType === unitType);
 
         if (total > 1) {
           this._drawBadge(ctx, x + iconSize / 2 - 2, rowY - iconSize / 2 + 2, total, zoom);
@@ -518,7 +525,7 @@ export class UnitRenderer {
     return grouped;
   }
 
-  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false, damaged = 0, isFlying = false) {
+  _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false, damaged = 0, isFlying = false, highlight = false) {
     const img = this._getUnitImage(unitType, factionId);
 
     ctx.save();
@@ -566,6 +573,14 @@ export class UnitRenderer {
     ctx.roundRect(x - bgSize / 2, y - bgSize / 2, bgSize, bgSize, 4);
     ctx.fill();
     ctx.stroke();
+
+    if (highlight) {
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.95)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(x - bgSize / 2 - 3, y - bgSize / 2 - 3, bgSize + 6, bgSize + 6, 6);
+      ctx.stroke();
+    }
 
     // Draw damage indicator for battleships
     if (damaged > 0 && unitType === 'battleship') {
@@ -734,9 +749,10 @@ export class UnitRenderer {
    * Returns { territory, unitType, owner, quantity, unitDef } if hit, null otherwise.
    */
   hitTestUnit(worldX, worldY, zoom) {
-    if (zoom < 0.35) return null;
+    const mobile = isMobileShell();
+    if (shouldHideUnitsAtZoom(zoom, { mobile })) return null;
 
-    const iconSize = Math.max(14, Math.min(24, 20 * zoom));
+    const iconSize = phoneUnitIconSize(zoom, { mobile });
     const spacingX = iconSize + 4;
     const spacingY = iconSize + 8;
     const hitRadius = (iconSize + 4) / 2;

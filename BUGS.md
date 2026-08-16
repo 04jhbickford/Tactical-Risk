@@ -2,19 +2,23 @@
 
 ---
 
-## 8.16.26 — V2.64 phone Place Capital polish (V2.63 390px playtest)
+## 8.16.26 — V2.64 separate phone chrome tree (James V2.63 playtest)
 
-Live V2.63 at 390×844 passed the big items (rail gone, map majority, opaque handoff, desktop HUD intact). Place Capital still repeated “Click your territory” three times (sheet header PLACE CAPITAL / CLICK YOUR TERRITORY, body copy, tray peek) and the sheet ate ~28–33% of the screen for pure text. Faction name “Germans” was low-contrast grey next to PLACE CAPITAL. Tab hit targets were short of 44px.
+James on V2.63 (phone): better than the desktop squeeze, but still hard. Menu lived in a cramped ⋯ dropdown over the HUD. Default zoom could not show the board (min zoom 0.4 ≈ a couple of territories). Setup pieces were 8px tokens on a zoomed-in map — he could not see remaining units.
 
-Fix (phone-only — `html.mobile-shell` / `@media (max-width: 480px)`):
-- Collapse Place Capital to a thin peek: one PHASE_HINTS line + one CTA. Hide header / phase row / tabs / body hint (`.pp-phase.compact` was beating the V2.63 `display: none`)
-- Faction name uses `readableFactionTextColor` so the swatch stays raw and the text stays readable on the dark HUD
-- ACTIONS | PLAYERS | TERRITORY | LOG tabs are 44px tall
-- One primary CTA; End Turn and Done still never coexist
+Fix (phone-only — `html.mobile-shell` / `@media (max-width: 480px)`). Same game code, different chrome templates. Desktop ≥901 and tablet 481–900 stay on their existing trees.
 
-Desktop ≥901 and the 481–900 tablet band are unchanged. SCHEMA_VERSION stays 11. Rules / map / combat / Firebase / turn email / territory labels / CSS-zoom / desktop HUD unchanged.
+- **Setup:** full-screen Local / Online cards; faction pick as tappable cards; START GAME sticky. Initial placement is a bottom tray of remaining units (name + count + icon, ≥44px rows). Tap a unit type, then tap the map. Desktop keeps the queue / +/− / confirm sheet.
+- **Map / zoom:** phone min-zoom can fit the world (~0.11 at 390px). Enter + visible **Fit** (≥44px) frame all capitals / owned land / world. Pinch still works. Desktop min-zoom stays 0.4; Fit is `display: none` outside the phone block.
+- **Menu:** full-screen sheet (Players, Territory, Log, Rules, Save & Exit) with 44pt rows. Not a ⋯ dropdown overlapping the HUD.
+- **In-game chrome:** map-first. Idle peek is one hint + one CTA. No permanent 4-tab bar. Phase identity stays on the top bar. Purchase / tech / movement still open a tray body when those phases need it.
+- **Pieces:** phone unit markers stay visible at world-fit zoom (≥20px) and get a gold halo for the selected tray type.
 
-Harness: `node tools/test-tablet-chrome.mjs` (one-hint collapse + contrast + 44px tabs). Existing `test-possessive.mjs`, `test-recent-move-display.mjs`, `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
+Also keeps the V2.63/early-V2.64 phone fixes: one Place Capital hint, readable faction text color, 44px targets.
+
+SCHEMA_VERSION stays 11. Rules / combat math / Firebase / turn email / WhatsApp / territory-label collision / CSS-zoom of the desktop HUD / second JS client unchanged.
+
+Harness: `node tools/test-tablet-chrome.mjs` (phone tray / Fit / menu-sheet / unit-size predicates + existing 480/tablet/desktop split). Existing `test-possessive.mjs`, `test-recent-move-display.mjs`, `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
 
 ---
 

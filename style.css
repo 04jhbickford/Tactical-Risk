@@ -16494,6 +16494,15 @@ html, body {
   background: rgba(76, 175, 80, 0.5);
 }
 
+/* Phone-only Fit control. Desktop / tablet keep +/− only. */
+.zoom-btn-fit {
+  display: none;
+}
+
+.phone-menu-sheet {
+  display: none;
+}
+
 /* ---------- Pass-and-play handoff overlay ---------- */
 .handoff-overlay {
   position: fixed;
@@ -16760,11 +16769,10 @@ html, body {
   }
 }
 
-/* ---------- V2.63 phone chrome (≤480px) ----------
-   iPhone shell only. The V2.61 tablet band (481–900) and desktop ≥901
-   stay on their existing trees — do not copy the tablet 9px phase name
-   or the 280px right rail. Phone rules live only in this query and/or
-   html.mobile-shell. */
+/* ---------- V2.64 phone chrome tree (≤480px) ----------
+   Separate phone UX — not the desktop lobby/HUD squeezed. The V2.61
+   tablet band (481–900) and desktop ≥901 stay on their existing trees.
+   Phone rules live only in this query and/or html.mobile-shell. */
 @media (max-width: 480px) {
   html,
   body {
@@ -17219,6 +17227,376 @@ html, body {
     min-width: 220px;
     min-height: 48px;
   }
+
+  /* --- V2.64 phone lobby (full-screen steps, not 50% desktop column) --- */
+  html.mobile-shell .lobby-container.modern.lobby-phone {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: 100dvh;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  html.mobile-shell .lobby-phone-wrap {
+    max-width: none;
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lobby-phone-home {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .lobby-phone-brand {
+    text-align: center;
+    padding-top: 12px;
+  }
+
+  .lobby-phone-logo {
+    margin: 0;
+    font-size: 32px;
+    letter-spacing: 0.5px;
+  }
+
+  .lobby-phone-tag {
+    margin: 6px 0 0;
+    color: #94a3b8;
+    font-size: 14px;
+  }
+
+  .lobby-phone-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .lobby-phone-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-height: 88px;
+    padding: 16px 18px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #f1f5f9;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .lobby-phone-card-online {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(37, 99, 235, 0.16);
+  }
+
+  .lobby-phone-card-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #93c5fd;
+  }
+
+  .lobby-phone-card-title {
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .lobby-phone-card-desc {
+    font-size: 13px;
+    color: #cbd5e1;
+  }
+
+  .lobby-phone-saved {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 48px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #e2e8f0;
+  }
+
+  .lobby-phone-setup {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    gap: 12px;
+  }
+
+  .lobby-phone-setup-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .lobby-phone-back {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .lobby-phone-factions {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-bottom: 8px;
+  }
+
+  .lobby-phone-faction {
+    min-height: 64px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .lobby-phone-faction.selected {
+    border-color: rgba(74, 222, 128, 0.55);
+    background: rgba(22, 163, 74, 0.14);
+  }
+
+  .lobby-phone-faction-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+  }
+
+  .lobby-phone-faction-copy {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .lobby-phone-faction-name {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .lobby-phone-faction-on,
+  .lobby-phone-faction-off {
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  .lobby-phone-faction-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    min-height: 44px;
+  }
+
+  .lobby-phone-options {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .lobby-phone-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .lobby-phone-start {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* --- Full-screen menu sheet (not a ⋯ dropdown over the HUD) --- */
+  html.mobile-shell .phone-menu-sheet.open {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: #0b1020;
+    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  }
+
+  .phone-menu-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 52px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .phone-menu-back {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    font-size: 18px;
+  }
+
+  .phone-menu-title {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .phone-menu-wordmark {
+    margin-left: auto;
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #64748b;
+  }
+
+  .phone-menu-list {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .phone-menu-row,
+  .phone-menu-sheet .hud-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #f1f5f9;
+    font-size: 16px;
+    text-align: left;
+    width: 100%;
+  }
+
+  .phone-menu-panel {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 12px 16px;
+  }
+
+  .phone-menu-sheet .hud-mobile-players {
+    padding: 8px 12px 16px;
+  }
+
+  /* Tabs live in the menu sheet — not a permanent 4-tab bar on the map */
+  html.mobile-shell .pp-tabs {
+    display: none;
+  }
+
+  /* --- Setup unit tray: remaining pieces, ≥44px rows --- */
+  .player-panel.player-panel--place-tray {
+    max-height: 50dvh;
+  }
+
+  .phone-place-tray {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px 0;
+  }
+
+  .phone-place-meta {
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+  }
+
+  .phone-place-hint {
+    font-size: 13px;
+    color: #e2e8f0;
+  }
+
+  .phone-place-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 32dvh;
+    overflow-y: auto;
+  }
+
+  .phone-place-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f8fafc;
+    width: 100%;
+    text-align: left;
+  }
+
+  .phone-place-row.selected {
+    border-color: #facc15;
+    background: rgba(250, 204, 21, 0.12);
+  }
+
+  .phone-place-icon {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+
+  .phone-place-name {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .phone-place-count {
+    font-size: 15px;
+    font-weight: 700;
+    color: #cbd5e1;
+  }
+
+  html.mobile-shell .zoom-btn-fit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
 }
 
 /* Handoff hides live chrome (not painted underneath). Class-gated so
@@ -17227,7 +17605,8 @@ html.mobile-shell.handoff-active #hud,
 html.mobile-shell.handoff-active #sidebar,
 html.mobile-shell.handoff-active .player-panel,
 html.mobile-shell.handoff-active #zoom-controls,
-html.mobile-shell.handoff-active #minimap {
+html.mobile-shell.handoff-active #minimap,
+html.mobile-shell.handoff-active .phone-menu-sheet {
   display: none !important;
 }
 
