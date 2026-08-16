@@ -1,10 +1,15 @@
-// Phone chrome (V2.63). Visual split only — desktop ≥768px stays on the
-// existing HUD / sidebar tree. matchMedia sets html.mobile-shell once;
-// CSS for the phone layout lives in @media (max-width: 767px) and
-// html.mobile-shell. No rules / combat / schema changes here.
+// Phone chrome (V2.63). Visual split only.
+// iPhone shell is max-width: 480px so the V2.61 tablet band (481–900)
+// and desktop ≥901px stay on their existing trees. matchMedia sets
+// html.mobile-shell once; phone CSS lives in @media (max-width: 480px)
+// and html.mobile-shell. No rules / combat / schema changes here.
 
-export const MOBILE_SHELL_MAX_WIDTH = 767;
+import { GAME_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
+
+export const MOBILE_SHELL_MAX_WIDTH = 480;
 export const MOBILE_SHELL_QUERY = `(max-width: ${MOBILE_SHELL_MAX_WIDTH}px)`;
+export const TABLET_CHROME_MAX_WIDTH = 900;
+export const DESKTOP_MIN_WIDTH = 901;
 
 const listeners = [];
 
@@ -59,6 +64,28 @@ export function pickMobilePrimaryButtons(buttons) {
     : enabled;
   const primary = filtered.find(b => b.primary) || filtered[0];
   return primary ? [primary] : [];
+}
+
+// Always-visible phase identity. Do not copy the tablet 9px / hidden-dots path.
+// Playing: "3/7 Combat Movement". Setup phases keep their name.
+export function formatMobilePhaseLabel(gamePhase, turnPhase) {
+  if (gamePhase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Place Capital';
+  if (gamePhase === GAME_PHASES.UNIT_PLACEMENT) return 'Initial Deployment';
+  if (gamePhase === GAME_PHASES.PLAYING) {
+    const name = TURN_PHASE_NAMES[turnPhase] || 'Playing';
+    const idx = TURN_PHASE_ORDER.indexOf(turnPhase);
+    if (idx >= 0) return `${idx + 1}/${TURN_PHASE_ORDER.length} ${name}`;
+    return name;
+  }
+  return 'Setup';
+}
+
+// Visible chip meta — never title-only IPC / Surrendered.
+export function formatMobilePlayerMeta({ ipcs, surrendered } = {}) {
+  const parts = [];
+  if (Number.isFinite(Number(ipcs))) parts.push(`${Number(ipcs)}$`);
+  if (surrendered) parts.push('OUT');
+  return parts.join(' · ');
 }
 
 export function initMobileShell() {

@@ -1,5 +1,6 @@
 // Unit checks for V2.61 tablet chrome (tooltip clamp predicate)
-// plus V2.63 phone-shell predicates. Desktop ≥768 stays on the V2.61 checks.
+// plus V2.63 phone-shell predicates. iPhone shell is ≤480px; the 481–900
+// tablet band and desktop ≥901 stay on their existing trees.
 // Run: node tools/test-tablet-chrome.mjs
 
 import { readFileSync } from 'fs';
@@ -14,12 +15,20 @@ const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
 const {
   MOBILE_SHELL_MAX_WIDTH,
+  TABLET_CHROME_MAX_WIDTH,
+  DESKTOP_MIN_WIDTH,
   shouldUseMobileShell,
   applyMobileShellClass,
   pickMobilePrimaryButtons,
   shouldHideAllGameChrome,
   shouldHideTurnActionChrome,
+  formatMobilePhaseLabel,
+  formatMobilePlayerMeta,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
+const { resolvePhaseHint, PHASE_HINTS } =
+  await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
+const { GAME_PHASES, TURN_PHASES } =
+  await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 
 let failures = 0;
 const check = (label, cond) => {
@@ -83,11 +92,16 @@ console.log('=== clampTooltipToMapArea: map too narrow to fit ===');
   check('returns null so the tooltip is dismissed', pos === null);
 }
 
-console.log('=== V2.63 mobile shell breakpoint (390×844 vs 1280×800) ===');
-check('breakpoint is 767', MOBILE_SHELL_MAX_WIDTH === 767);
+console.log('=== V2.63 mobile shell breakpoint (480 iPhone / 481–900 tablet / ≥901 desktop) ===');
+check('breakpoint is 480', MOBILE_SHELL_MAX_WIDTH === 480);
+check('tablet band still ends at 900', TABLET_CHROME_MAX_WIDTH === 900);
+check('desktop floor is 901', DESKTOP_MIN_WIDTH === 901);
 check('390px iPhone → mobile shell', shouldUseMobileShell(390) === true);
-check('767px → mobile shell', shouldUseMobileShell(767) === true);
-check('768px desktop → no mobile shell', shouldUseMobileShell(768) === false);
+check('480px → mobile shell', shouldUseMobileShell(480) === true);
+check('481px tablet band → no mobile shell', shouldUseMobileShell(481) === false);
+check('772px V2.61 tablet → no mobile shell', shouldUseMobileShell(772) === false);
+check('900px tablet ceiling → no mobile shell', shouldUseMobileShell(900) === false);
+check('901px desktop → no mobile shell', shouldUseMobileShell(901) === false);
 check('1280×800 desktop → no mobile shell', shouldUseMobileShell(1280) === false);
 {
   const root = { classList: { on: new Set(), toggle(name, force) {
@@ -95,9 +109,33 @@ check('1280×800 desktop → no mobile shell', shouldUseMobileShell(1280) === fa
   }, contains(name) { return this.on.has(name); } } };
   applyMobileShellClass(390, root);
   check('apply at 390 sets mobile-shell', root.classList.contains('mobile-shell'));
+  applyMobileShellClass(772, root);
+  check('apply at 772 clears mobile-shell (tablet band)', !root.classList.contains('mobile-shell'));
   applyMobileShellClass(1280, root);
   check('apply at 1280 clears mobile-shell', !root.classList.contains('mobile-shell'));
 }
+
+console.log('=== V2.63 phase identity (not the tablet 9px / hidden-dots path) ===');
+check('3/7 Combat Movement',
+  formatMobilePhaseLabel(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === '3/7 Combat Movement');
+check('1/7 Develop Tech',
+  formatMobilePhaseLabel(GAME_PHASES.PLAYING, TURN_PHASES.DEVELOP_TECH) === '1/7 Develop Tech');
+check('7/7 Collect Income',
+  formatMobilePhaseLabel(GAME_PHASES.PLAYING, TURN_PHASES.COLLECT_INCOME) === '7/7 Collect Income');
+check('setup phase keeps its name',
+  formatMobilePhaseLabel(GAME_PHASES.UNIT_PLACEMENT, null) === 'Initial Deployment');
+
+console.log('=== V2.63 tray peek PHASE_HINTS + visible IPC/OUT ===');
+check('combat-move hint is the existing PHASE_HINTS line',
+  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_HINTS[TURN_PHASES.COMBAT_MOVE]);
+check('hint text is Click units → enemy territory',
+  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Click units → enemy territory');
+check('purchase phase hint may be empty (still a legal peek)',
+  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
+check('IPC is visible, not title-only',
+  formatMobilePlayerMeta({ ipcs: 24, surrendered: false }) === '24$');
+check('Surrendered is visible OUT',
+  formatMobilePlayerMeta({ ipcs: 0, surrendered: true }) === '0$ · OUT');
 
 console.log('=== V2.63 one primary CTA; End Turn and Done never coexist ===');
 {
@@ -126,18 +164,31 @@ check('no handoff → chrome stays', shouldHideAllGameChrome({ handoffVisible: f
 check('combat hides End Turn / Done / Max', shouldHideTurnActionChrome({ combatVisible: true }) === true);
 check('no combat → turn chrome stays', shouldHideTurnActionChrome({ combatVisible: false }) === false);
 
-console.log('=== V2.63 CSS is phone-scoped; desktop HUD geometry stays ===');
+console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 stay ===');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const unscopedHud = css.match(/^#hud \{[\s\S]*?^\}/m);
   check('unscoped #hud is still 48px', !!unscopedHud && /height:\s*48px/.test(unscopedHud[0]));
-  check('phone layout is inside max-width: 767px',
-    /@media \(max-width:\s*767px\)/.test(css));
+  check('phone layout is inside max-width: 480px',
+    /@media \(max-width:\s*480px\)/.test(css));
+  check('no leftover max-width: 767px phone gate',
+    !/@media \(max-width:\s*767px\)/.test(css));
   check('unscoped zoom still parks left of the 320px panel',
     /#zoom-controls \{[\s\S]*?right:\s*calc\(320px \+ 12px\)/.test(css));
-  const beforePhone = css.split('@media (max-width: 767px)')[0];
+  const beforePhone = css.split('@media (max-width: 480px)')[0];
   check('phone 100dvh is not unscoped on html/body',
     !/html,\s*body \{[^}]*100dvh/.test(beforePhone));
+  check('V2.61 tablet 900px block still hides the legend',
+    /@media \(max-width: 900px\)[\s\S]*\.hud-legend \{\s*display:\s*none/.test(beforePhone));
+  check('V2.61 tablet 900px block still uses 9px phase name',
+    /@media \(max-width: 900px\)[\s\S]*\.hud-phase-name \{\s*font-size:\s*9px/.test(beforePhone));
+  check('V2.61 tablet 900px block still slims the rail to 280px',
+    /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
+  const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';
+  check('phone phase identity is ≥11px',
+    /\.hud-mobile-phase \{[\s\S]*?font-size:\s*(1[1-9]|[2-9]\d)px/.test(phoneBlock));
+  check('phone tray peek class is in the 480 block',
+    /pp-tray-peek/.test(phoneBlock) && /pp-tray-hint/.test(phoneBlock));
 }
 
 if (failures) {

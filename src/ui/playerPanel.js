@@ -6,8 +6,8 @@ import { getUnitIconPath } from '../utils/unitIcons.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import { isMobileShell, pickMobilePrimaryButtons } from './mobileShell.js';
 
-// Compact phase hints
-const PHASE_HINTS = {
+// Compact phase hints — phone tray peek reads these next to End ${phase}.
+export const PHASE_HINTS = {
   [GAME_PHASES.CAPITAL_PLACEMENT]: 'Click your territory',
   [GAME_PHASES.UNIT_PLACEMENT]: 'Click to place units',
   [TURN_PHASES.DEVELOP_TECH]: '',
@@ -68,6 +68,14 @@ export function computeInitialPlacementUX({
   }
 
   return { showDone, needSeaHint, stuckWithNaval, onlyNavalRemain, hint };
+}
+
+// One-line "what now" for the phone tray peek (and the desktop phase row).
+export function resolvePhaseHint(phase, turnPhase) {
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return PHASE_HINTS[GAME_PHASES.CAPITAL_PLACEMENT] || '';
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT] || '';
+  if (phase === GAME_PHASES.PLAYING) return PHASE_HINTS[turnPhase] || '';
+  return '';
 }
 
 // Display string for a combat-move history row. Empty string = do not render
@@ -454,14 +462,22 @@ export class PlayerPanel {
 
     // Phone: one enabled primary CTA. End Turn and Done never coexist;
     // illegal/disabled actions stay hidden (not greyed over another green).
+    // Tray peek puts PHASE_HINTS (or a more specific warning) next to End ${phase}.
+    let peekHint = '';
     if (isMobileShell()) {
       buttons = pickMobilePrimaryButtons(buttons);
+      const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
+      peekHint = warningText || this._getPhaseHint(phase, turnPhase) || '';
+      warningHtml = '';
     }
 
     // No buttons to show (a warning-only bar is still useful — e.g. naval hint)
-    if (buttons.length === 0 && !warningHtml) return '';
+    if (buttons.length === 0 && !warningHtml && !peekHint) return '';
 
-    let html = `<div class="pp-bottom-actions">`;
+    let html = `<div class="pp-bottom-actions${isMobileShell() ? ' pp-tray-peek' : ''}">`;
+    if (peekHint) {
+      html += `<span class="pp-tray-hint">${peekHint}</span>`;
+    }
     html += warningHtml;
     html += `<div class="pp-bottom-buttons">`;
 
@@ -1267,10 +1283,7 @@ export class PlayerPanel {
   }
 
   _getPhaseHint(phase, turnPhase) {
-    if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return PHASE_HINTS[GAME_PHASES.CAPITAL_PLACEMENT];
-    if (phase === GAME_PHASES.UNIT_PLACEMENT) return PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT];
-    if (phase === GAME_PHASES.PLAYING) return PHASE_HINTS[turnPhase] || '';
-    return '';
+    return resolvePhaseHint(phase, turnPhase);
   }
 
   _getContrastColor(hexColor) {

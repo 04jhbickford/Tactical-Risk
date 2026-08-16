@@ -16760,10 +16760,12 @@ html, body {
   }
 }
 
-/* ---------- V2.63 phone chrome (≤767px) ----------
-   Desktop at min-width: 768px is frozen — V2.62 pixel-identical.
-   Phone rules live only in this query and/or html.mobile-shell. */
-@media (max-width: 767px) {
+/* ---------- V2.63 phone chrome (≤480px) ----------
+   iPhone shell only. The V2.61 tablet band (481–900) and desktop ≥901
+   stay on their existing trees — do not copy the tablet 9px phase name
+   or the 280px right rail. Phone rules live only in this query and/or
+   html.mobile-shell. */
+@media (max-width: 480px) {
   html,
   body {
     height: 100dvh;
@@ -16820,6 +16822,11 @@ html, body {
     white-space: nowrap;
   }
 
+  /* Undo the tablet 9px phase name — identity must stay ≥11pt */
+  .hud-phase-name {
+    font-size: 12px;
+  }
+
   html.mobile-shell #hud .hud-title {
     display: inline-block;
     font-size: 14px;
@@ -16870,13 +16877,16 @@ html, body {
   }
 
   .hud-mobile-phase {
-    font-size: 12px;
+    font-size: 12px; /* ≥11pt — not the tablet 9px */
     font-weight: 700;
-    letter-spacing: 0.6px;
+    letter-spacing: 0.4px;
     text-transform: uppercase;
     color: #e0e0e0;
     white-space: nowrap;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .hud-mobile-overflow {
@@ -16930,6 +16940,24 @@ html, body {
     object-fit: cover;
   }
 
+  .hud-mobile-player-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hud-mobile-player-meta {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
+  }
+
+  .hud-mobile-player.out .hud-mobile-player-meta {
+    color: #f87171;
+  }
+
   .hud-menu-btn {
     min-width: 44px;
     min-height: 44px;
@@ -16950,7 +16978,8 @@ html, body {
     height: 100dvh;
   }
 
-  /* Sidebar must not steal map width (the postage-stamp failure) */
+  /* Hide the persistent 280px right rail — it leaves ~110px of map at 390px.
+     Actions + End ${phase} live in this bottom tray instead. */
   #sidebar,
   .player-panel {
     top: auto;
@@ -16958,6 +16987,7 @@ html, body {
     right: 0;
     bottom: 0;
     width: 100%;
+    max-width: none;
     max-height: 42dvh;
     height: auto;
     border-left: none;
@@ -16979,9 +17009,27 @@ html, body {
     min-height: 44px;
   }
 
-  /* One full-width primary CTA above the home indicator */
-  .pp-bottom-actions {
+  /* Tray peek: PHASE_HINTS one-liner next to the End ${phase} CTA */
+  .pp-bottom-actions,
+  .pp-tray-peek {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pp-tray-hint {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.3;
+    color: #cbd5e1;
+  }
+
+  .pp-tray-peek .pp-bottom-buttons {
+    flex: 1 1 auto;
+    min-width: 44px;
+    gap: 8px;
   }
 
   .pp-bottom-buttons {
@@ -17059,7 +17107,7 @@ html, body {
 }
 
 /* Handoff hides live chrome (not painted underneath). Class-gated so
-   desktop ≥768 overlay geometry stays V2.62. */
+   tablet 481–900 and desktop ≥901 overlay geometry stay V2.61/V2.62. */
 html.mobile-shell.handoff-active #hud,
 html.mobile-shell.handoff-active #sidebar,
 html.mobile-shell.handoff-active .player-panel,

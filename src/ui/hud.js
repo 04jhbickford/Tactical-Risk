@@ -2,7 +2,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell } from './mobileShell.js';
+import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta } from './mobileShell.js';
 
 export class HUD {
   constructor() {
@@ -148,12 +148,15 @@ export class HUD {
     this._bindEvents();
   }
 
-  // Phone top bar: {color} {faction} · {PHASE}. Wordmark, full player list,
-  // and settings sit behind ⋯ so five chips never overlap the title.
+  // Phone top bar: {color} {faction} · {3/7 PHASE}. Phase identity stays
+  // ≥11pt — do not copy the tablet 9px / hidden-dots path. Wordmark, full
+  // player list (IPC + visible OUT), and settings sit behind ⋯.
   _renderMobile() {
     const player = this.gameState?.currentPlayer;
     const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY && player;
-    const phaseName = inGame ? this._getPhaseName(this.gameState.phase) : '';
+    const phaseName = inGame
+      ? formatMobilePhaseLabel(this.gameState.phase, this.gameState.turnPhase)
+      : '';
     const flagSrc = inGame && player.flag ? `assets/flags/${player.flag}` : null;
 
     let identity = `<span class="hud-title">Tactical Risk</span>`;
@@ -175,11 +178,13 @@ export class HUD {
       for (const p of this.gameState.players) {
         const pFlag = p.flag ? `assets/flags/${p.flag}` : null;
         const current = this.gameState.currentPlayer?.id === p.id;
+        const ipcs = this.gameState.getIPCs?.(p.id);
+        const meta = formatMobilePlayerMeta({ ipcs, surrendered: p.surrendered });
         playersHtml += `
           <div class="hud-mobile-player${current ? ' current' : ''}${p.surrendered ? ' out' : ''}">
             ${pFlag ? `<img src="${pFlag}" alt="">` : `<span class="hud-mobile-swatch" style="background:${p.color}"></span>`}
-            <span>${p.name}</span>
-            ${p.surrendered ? '<span class="legend-out">OUT</span>' : ''}
+            <span class="hud-mobile-player-name">${p.name}</span>
+            ${meta ? `<span class="hud-mobile-player-meta">${meta}</span>` : ''}
           </div>`;
       }
       playersHtml += `</div>`;
