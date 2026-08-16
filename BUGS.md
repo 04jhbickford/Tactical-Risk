@@ -2,6 +2,25 @@
 
 ---
 
+## 8.16.26 — V2.74 guest stuck on 2nd initial deployment (illegal phase combo)
+
+Live V2.73 playtest. Guest Robert007 (not host), dump 2026-08-16T22:33:53Z: phase=`unit_placement`, turnPhase=`develop_tech`, round 1, local v24, isActivePlayer true. Players: Robert007, Easy Bot, James, Hard Bot. Sync log: Robert `state_push` with `phase: develop_tech` (`gameState.turnPhase` in main.js); Easy Bot also pushed develop_tech. He had not left. Game is dead.
+
+Cause:
+- `loadFromJSON` self-heal treated `develop_tech` as the only valid setup turnPhase, so leftover constructor `unit_placement + purchase` was rewritten to the dump combo, and the dump was then considered already valid (no heal).
+- `nextTurn()` was not PLAYING-guarded (unlike `nextPhase()`). A call during unit_placement leaves phase as unit_placement and sets turnPhase to develop_tech — exact dump.
+- V2.73 waiting-overlay fix does not cover this: guest was already isActivePlayer.
+
+Fix (UI/sync safety — SCHEMA 11, no rule/map change):
+- `nextTurn()` refuses unless `phase === PLAYING`. Setup stays on `finishPlacementRound` / `placeCapital`.
+- Load/apply no longer rewrite leftover `purchase` into `develop_tech`. Setup ignores turnPhase; playing UI / techUI / AI `_handlePlayingPhase` / `nextPhase` / `nextTurn` require PLAYING.
+- Guest on own 2nd deployment seat sees place-units + Done. Spectator overlay stays off when `oderId === localUserId`.
+- Happy path: everyone done → PLAYING + DEVELOP_TECH.
+
+Harness: `node tools/test-setup-phase-guard.mjs` plus existing `test-mp-turn-sync`, `test-placement-ux`, `robustness-harness`.
+
+---
+
 ## 8.16.26 — V2.73 waiting overlay stuck on the active player's own seat
 
 Live V2.72 playtest. James (iPhone, host) created a 4-seat game: Robert007 (desktop Chrome, not host), Easy Bot, James, Hard Bot. Capitals placed (Robert → James; host ran the AI seats). Robert's client then showed HIS unit_placement turn — tab title "Your turn", "Robert007's Turn", INITIAL DEPLOYMENT / CLICK TO PLACE UNITS — but a yellow WAITING badge and the spectator overlay "Robert007 is playing" / "You can view the map while waiting." He could not place.

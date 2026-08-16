@@ -44,6 +44,35 @@ export const TURN_PHASE_NAMES = {
   [TURN_PHASES.COLLECT_INCOME]: 'Collect Income',
 };
 
+// Setup (capital / initial deployment) does not use turnPhase.
+// Leftover values — constructor default `purchase`, or a prior
+// `develop_tech` dummy from the V2.53–V2.73 load heal — are unused
+// storage. Playing UI, techUI, AI `_handlePlayingPhase`, nextPhase,
+// and nextTurn all require phase === PLAYING. Do not "heal" leftover
+// purchase into develop_tech: that rewrite is what made the V2.73
+// dump (unit_placement + develop_tech) look already-valid.
+export function isSetupPhase(phase) {
+  return phase === GAME_PHASES.CAPITAL_PLACEMENT
+    || phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
+export function isPlayingPhase(phase) {
+  return phase === GAME_PHASES.PLAYING;
+}
+
+/** True only when turnPhase may drive tech / purchase / End Phase / AI playing. */
+export function shouldDrivePlayingTurnPhase(phase) {
+  return phase === GAME_PHASES.PLAYING;
+}
+
+export function shouldShowTechResearch(phase, turnPhase) {
+  return phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.DEVELOP_TECH;
+}
+
+export function shouldShowInitialDeployment(phase) {
+  return phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
 // Available technologies (A&A style)
 export const TECHNOLOGIES = {
   jets: { name: 'Jets', description: 'Fighters +1 attack/defense' },
@@ -1945,6 +1974,15 @@ export class GameState {
   }
 
   nextTurn() {
+    // Turn cycle only exists inside PLAYING. Setup must use
+    // finishPlacementRound / placeCapital. An unguarded call during
+    // unit_placement leaves phase as unit_placement and sets
+    // turnPhase to develop_tech — the V2.73 dump combo.
+    if (this.phase !== GAME_PHASES.PLAYING) {
+      console.warn(`nextTurn() ignored: game phase is '${this.phase}', not playing`);
+      return;
+    }
+
     // Advance to the next player still in the game
     let advanceGuard = 0;
     do {
@@ -4965,14 +5003,12 @@ export class GameState {
     this.round = data.round;
     this.phase = data.phase;
     this.turnPhase = data.turnPhase || TURN_PHASES.DEVELOP_TECH;
-    // Self-heal: outside the PLAYING phase the only valid turnPhase is the
-    // initial one. Older builds could push corrupted combinations (e.g.
-    // unit_placement + purchase); normalize on load so a wedged game
-    // recovers as soon as any client loads and re-pushes it.
-    if (this.phase !== GAME_PHASES.PLAYING && this.turnPhase !== TURN_PHASES.DEVELOP_TECH) {
-      console.warn(`[Load] Normalizing invalid turnPhase '${this.turnPhase}' during '${this.phase}'`);
-      this.turnPhase = TURN_PHASES.DEVELOP_TECH;
-    }
+    // Load AND apply (syncManager uses this method) share one rule:
+    // setup phases ignore turnPhase. Do not rewrite leftover `purchase`
+    // into `develop_tech` — that "heal" created/preserved the V2.73
+    // dump (unit_placement + develop_tech) and then treated it as valid.
+    // Playing UI / techUI / AI playing paths require phase === PLAYING.
+    this._normalizeAfterLoad();
     this.territoryState = data.territoryState;
     this.units = data.units;
     this.playerState = data.playerState;
@@ -5023,6 +5059,14 @@ export class GameState {
     this.conqueredThisTurn = {};
 
     this._notify();
+  }
+
+  // After load/apply: a wedged setup doc must present as setup, not
+  // Research. turnPhase is unused storage until phase === PLAYING.
+  _normalizeAfterLoad() {
+    if (isSetupPhase(this.phase)) {
+      return;
+    }
   }
 
   saveToFile() {

@@ -331,7 +331,12 @@ async function init() {
         break;
 
       case 'open-tech':
-        // Close other modals first
+        // Close other modals first. Tech is PLAYING-only — leftover
+        // setup turnPhase (develop_tech dummy) must not open Research.
+        if (gameState.phase !== GAME_PHASES.PLAYING ||
+            gameState.turnPhase !== TURN_PHASES.DEVELOP_TECH) {
+          break;
+        }
         purchasePopup.hide();
         combatUI.hide();
         techUI.show();
@@ -439,8 +444,10 @@ async function init() {
         break;
 
       case 'roll-tech':
-        // Inline tech roll - show centered dice result instead of modal
-        if (data.diceCount > 0) {
+        // Inline tech roll - PLAYING + DEVELOP_TECH only
+        if (gameState.phase === GAME_PHASES.PLAYING &&
+            gameState.turnPhase === TURN_PHASES.DEVELOP_TECH &&
+            data.diceCount > 0) {
           techUI.performInlineRoll(data.diceCount);
           camera.dirty = true;
         }
@@ -1366,8 +1373,10 @@ async function init() {
     techUI.setGameState(gameState);
     techUI.setOnComplete(() => {
       camera.dirty = true;
-      // Auto-advance from tech phase when done
-      if (gameState.turnPhase === TURN_PHASES.DEVELOP_TECH) {
+      // Auto-advance from tech phase when done. Require PLAYING —
+      // leftover setup turnPhase must not drive nextPhase / tech UI.
+      if (gameState.phase === GAME_PHASES.PLAYING &&
+          gameState.turnPhase === TURN_PHASES.DEVELOP_TECH) {
         gameState.nextPhase();
         syncManager?.pushStateNow(); // immediate push — no debounce
       }

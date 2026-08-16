@@ -1,7 +1,7 @@
 // Player-focused panel with tabbed navigation
 // Tabs: Actions, Stats, Territory, Log
 
-import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES } from '../state/gameState.js';
+import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES, shouldShowTechResearch } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import {
@@ -928,8 +928,8 @@ export class PlayerPanel {
 
     // Playing phase actions
     if (phase === GAME_PHASES.PLAYING) {
-      // Tech phase - inline research
-      if (turnPhase === TURN_PHASES.DEVELOP_TECH) {
+      // Tech phase - inline research (PLAYING only; leftover setup turnPhase is inert)
+      if (shouldShowTechResearch(phase, turnPhase)) {
         html += this._renderInlineTech(player);
       }
 
@@ -1847,7 +1847,7 @@ export class PlayerPanel {
             <span class="phone-peek-count">${unit.quantity}</span>
           </button>`;
       }
-    } else if (turnPhase === TURN_PHASES.PURCHASE) {
+    } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.PURCHASE) {
       const pending = this.gameState.getPendingPurchases?.() || [];
       const factoryTerritories = this._getFactoryTerritories(player.id);
       const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
@@ -1867,7 +1867,7 @@ export class PlayerPanel {
             ${qty > 0 ? `<span class="phone-peek-count">${qty}</span>` : ''}
           </button>`;
       }
-    } else if (turnPhase === TURN_PHASES.MOBILIZE) {
+    } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE) {
       const pending = this.gameState.getPendingPurchases?.() || [];
       const canPlace = !!this.selectedTerritory && this._isValidMobilizeLocation(this.selectedTerritory, player);
       for (const unit of pending) {
@@ -1879,7 +1879,7 @@ export class PlayerPanel {
             <span class="phone-peek-count">${unit.quantity}</span>
           </button>`;
       }
-    } else if (turnPhase === TURN_PHASES.DEVELOP_TECH) {
+    } else if (shouldShowTechResearch(phase, turnPhase)) {
       chips += `<button type="button" class="phone-peek-chip" data-action="tech-dice-delta" data-delta="1" aria-label="Add research die">+</button>`;
       chips += `<button type="button" class="phone-peek-chip phone-peek-chip-wide" data-action="roll-tech" aria-label="Roll tech">Roll</button>`;
     }

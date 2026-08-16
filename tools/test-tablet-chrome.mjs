@@ -89,7 +89,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.73', GAME_VERSION === 'V2.73');
+check('GAME_VERSION is V2.74', GAME_VERSION === 'V2.74');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');

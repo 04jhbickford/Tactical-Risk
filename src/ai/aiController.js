@@ -319,6 +319,8 @@ export class AIController {
   // PLAYING PHASE (all turn phases)
   // ============================================
   async _handlePlayingPhase(aiPlayer, player, turnPhase) {
+    // Leftover setup turnPhase must never run tech / purchase / End Phase.
+    if (this.gameState.phase !== GAME_PHASES.PLAYING) return;
     switch (turnPhase) {
       case TURN_PHASES.DEVELOP_TECH:
         await this._handleTechResearch(aiPlayer, player);

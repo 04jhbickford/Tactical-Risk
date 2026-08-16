@@ -1,6 +1,6 @@
 // Tech Research UI - popup for developing technologies during DEVELOP_TECH phase
 
-import { TECHNOLOGIES } from '../state/gameState.js';
+import { TECHNOLOGIES, shouldShowTechResearch } from '../state/gameState.js';
 
 export class TechUI {
   constructor() {
@@ -30,6 +30,9 @@ export class TechUI {
   }
 
   show() {
+    if (!shouldShowTechResearch(this.gameState?.phase, this.gameState?.turnPhase)) {
+      return;
+    }
     this.diceCount = 0;
     this.lastRolls = null;
     this.breakthrough = false;
@@ -290,6 +293,9 @@ export class TechUI {
   // Inline roll - shows centered dice result instead of full modal
   async performInlineRoll(diceCount) {
     if (diceCount <= 0) return;
+    if (!shouldShowTechResearch(this.gameState?.phase, this.gameState?.turnPhase)) {
+      return;
+    }
 
     const player = this.gameState.currentPlayer;
     if (!player) return;
