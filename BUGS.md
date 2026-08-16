@@ -2,6 +2,26 @@
 
 ---
 
+## 8.16.26 — V2.76 AA fire silent; phone rotate swaps chrome; empty rematch after push_exhausted
+
+Live V2.75 playtest. Unit placement PASSED. Guest Robert007 dump 2026-08-16T23:49:45Z: playing / combat, local v89, isActivePlayer true, not host. Sync: v85 purchase; v86–87 combat_move; v88–89 combat; v90 combat ×3; push_failed ×3 (version undefined); push_exhausted. James + Robert: AA unclear; phone rotate horizontal→vertical weirdly changes UI; yellow toast then the same Anglo-Sudan Egypt combat again with no enemy units.
+
+This game may still be playable — new build is V2.76; do not abandon the table.
+
+Cause:
+- `_rollAAFire()` applied casualties and `_proceedAfterAAFire()` immediately. The readable block (dice + “AA Fire Results: N hit(s)”) only rendered on `selectAACasualties`, which the manual path never stayed on. Auto-battle blipped through AA in 150ms.
+- `shouldUseMobileShell` / `initMobileShell` were width-only (`≤480` / `max-width: 480px`). iPhone landscape is 667–932 × ~390, so rotate dropped `html.mobile-shell` into the 481–900 tablet tree; rotate back restored phone chrome.
+- `push_exhausted` → `syncFromAuthoritativeState` → `showNextCombat` rebuilt attackers/defenders from current units on `combatQueue[0]`. If the commit landed (defenders gone) but the territory stayed in the queue, it reopened a 0-enemy rematch. Exact toast: “Could not save — game re-synced to the last confirmed state. Please retry your move.”
+
+Fix (UI / chrome / queue skip — SCHEMA 11, no rule/map/odds change):
+- After AA rolls, stay on `aaResults`: who shot (defending AA), dice, hits, which aircraft died (cheapest first, no attacker choice). Continue proceeds. Auto-battle paints then pauses 600ms. One-line action-log entry.
+- Phone if width ≤480, or (height provided AND height ≤480 AND width <901). `initMobileShell` uses innerWidth + innerHeight and re-applies on resize / orientationchange. Desktop ≥901 and tablet 481–900 (no height / tall) stay frozen.
+- Never show a combat against zero enemy combat units (factory excluded; AA-only still a fight). Empty queue heads dequeue as already resolved. If both sides remain, reopen the real fight. `_reloadRemoteState({force:true})` still restores pre-combat armies when the commit did not land.
+
+Harness: `node tools/test-combat-ui.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
+
+---
+
 ## 8.16.26 — V2.75 host stuck on own unit_placement seat; AI paused until a guest is online
 
 Live V2.74 playtest. Guest Robert007 dump 2026-08-16T23:22:14Z: phase=`unit_placement`, leftover constructor `turnPhase=purchase`, round 1, local v40. Current = James (host). Guest `isActivePlayer=false` (correct). Sync: Robert v23, then Hard Bots v24–33 in ~2s, then James current v34–40 for ~80s. Two table reports: (1) stuck on James's turn; (2) AIs only run after another human joins. This game is dead — new game after Vercel is V2.75.

@@ -1461,6 +1461,7 @@ export class PlayerPanel {
         break;
       case 'combat-summary':
       case 'combat':
+      case 'aa-fire':
       case 'capture':
         result.territories = [data.territory].filter(Boolean);
         result.isCombat = true;

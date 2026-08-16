@@ -117,7 +117,7 @@ function presentsAsPlaceableSetup(gs) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.75', GAME_VERSION === 'V2.75');
+check('GAME_VERSION is V2.76', GAME_VERSION === 'V2.76');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== nextTurn() during unit_placement is a no-op ===');

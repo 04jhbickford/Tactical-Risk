@@ -1,8 +1,11 @@
 // Phone chrome (V2.63/V2.64). Visual split only.
 // iPhone shell is max-width: 480px so the V2.61 tablet band (481–900)
-// and desktop ≥901px stay on their existing trees. matchMedia sets
-// html.mobile-shell once; phone CSS lives in @media (max-width: 480px)
-// and html.mobile-shell. No rules / combat / schema changes here.
+// and desktop ≥901px stay on their existing trees. Phone CSS lives in
+// @media (max-width: 480px) and html.mobile-shell.
+// Landscape phones are typically 667–932 wide × ~390 tall — width-only
+// 480px would drop them into the tablet tree. Height ≤480 and width <901
+// keeps that viewport on the phone shell. Desktop ≥901 and tablet 481–900
+// (when height is omitted or >480) stay frozen. No rules / combat / schema changes.
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { MAP_WIDTH, MAP_HEIGHT } from '../map/camera.js';
@@ -14,8 +17,14 @@ export const DESKTOP_MIN_WIDTH = 901;
 
 const listeners = [];
 
-export function shouldUseMobileShell(viewportWidth) {
-  return Number(viewportWidth) <= MOBILE_SHELL_MAX_WIDTH;
+export function shouldUseMobileShell(viewportWidth, viewportHeight) {
+  const width = Number(viewportWidth);
+  if (!Number.isFinite(width)) return false;
+  if (width <= MOBILE_SHELL_MAX_WIDTH) return true;
+  if (viewportHeight == null || viewportHeight === '') return false;
+  const height = Number(viewportHeight);
+  if (!Number.isFinite(height)) return false;
+  return height <= MOBILE_SHELL_MAX_WIDTH && width < DESKTOP_MIN_WIDTH;
 }
 
 export function isMobileShell() {
@@ -33,9 +42,9 @@ function notify(active) {
   }
 }
 
-export function applyMobileShellClass(viewportWidth, root = (typeof document !== 'undefined' ? document.documentElement : null)) {
+export function applyMobileShellClass(viewportWidth, root = (typeof document !== 'undefined' ? document.documentElement : null), viewportHeight) {
   if (!root) return false;
-  const active = shouldUseMobileShell(viewportWidth);
+  const active = shouldUseMobileShell(viewportWidth, viewportHeight);
   root.classList.toggle('mobile-shell', active);
   return active;
 }
@@ -549,13 +558,16 @@ export function readableFactionTextColor(hex) {
 export function initMobileShell() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-  const mq = window.matchMedia(MOBILE_SHELL_QUERY);
   const apply = () => {
-    const active = applyMobileShellClass(window.innerWidth);
+    const active = applyMobileShellClass(window.innerWidth, document.documentElement, window.innerHeight);
     notify(active);
   };
 
   apply();
+  window.addEventListener('resize', apply);
+  window.addEventListener('orientationchange', apply);
+
+  const mq = window.matchMedia(MOBILE_SHELL_QUERY);
   if (typeof mq.addEventListener === 'function') {
     mq.addEventListener('change', apply);
   } else if (typeof mq.addListener === 'function') {

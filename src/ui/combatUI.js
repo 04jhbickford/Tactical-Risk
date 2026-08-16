@@ -3,6 +3,27 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { setShellFlag } from './mobileShell.js';
 
+// Readable AA result step (UI only). Rules unchanged: 1 die per attacking
+// aircraft, hit on 1, cheapest aircraft first, no attacker choice.
+export const AA_RESULT_PHASE = 'aaResults';
+export const AA_RESULT_AUTO_PAUSE_MS = 600;
+
+// Enemy combat units for "is this a real fight?" Factory is captured, not
+// fought. AA-only is still a real fight (AA can shoot aircraft).
+export function getEnemyCombatUnits(units, currentPlayerId, areAllies = () => false) {
+  return (units || []).filter((u) => (
+    !!u
+    && (u.quantity || 0) > 0
+    && u.owner !== currentPlayerId
+    && !areAllies(currentPlayerId, u.owner)
+    && u.type !== 'factory'
+  ));
+}
+
+export function territoryHasEnemyCombatUnits(units, currentPlayerId, areAllies) {
+  return getEnemyCombatUnits(units, currentPlayerId, areAllies).length > 0;
+}
+
 export class CombatUI {
   constructor() {
     this.gameState = null;
@@ -62,9 +83,10 @@ export class CombatUI {
   }
 
   showNextCombat() {
+    const skipped = this._dequeueResolvedCombatHeads();
     if (!this.hasCombats()) {
       this.hide();
-      return;
+      return { shown: false, skipped };
     }
 
     this.currentTerritory = this.gameState.combatQueue[0];
@@ -77,6 +99,27 @@ export class CombatUI {
     if (this.onCombatStart) {
       this.onCombatStart(this.currentTerritory);
     }
+    return { shown: true, skipped };
+  }
+
+  // Queue head with no enemy combat units is already resolved (win committed
+  // or empty). Do not paint a 0-defender rematch. AA-only still counts.
+  _dequeueResolvedCombatHeads() {
+    const skipped = [];
+    if (!this.gameState) return skipped;
+    const playerId = this.gameState.currentPlayer?.id;
+    const areAllies = (a, b) => !!this.gameState.areAllies?.(a, b);
+    while (this.gameState.combatQueue?.length > 0) {
+      const name = this.gameState.combatQueue[0];
+      const units = this.gameState.getUnitsAt?.(name) || this.gameState.units?.[name] || [];
+      if (territoryHasEnemyCombatUnits(units, playerId, areAllies)) break;
+      this.gameState.combatQueue.shift();
+      skipped.push(name);
+    }
+    if (skipped.length > 0) {
+      this.gameState._notify?.();
+    }
+    return skipped;
   }
 
   hide() {
@@ -193,6 +236,7 @@ export class CombatUI {
       winner: null,
       aaFired: false,
       aaResults: null,
+      aaCasualtiesApplied: false,
       bombardmentRolls: bombardmentResult.rolls,
       bombardmentHits: bombardmentResult.hits,
       bombardmentFired: false,
@@ -374,32 +418,53 @@ export class CombatUI {
       this.combatState.pendingAACasualties = hits;
       // Auto-select casualties (cheapest aircraft first)
       this.combatState.selectedAACasualties = this._selectCheapestAircraftCasualties(attackers, hits);
-      // Immediately apply AA casualties without user selection
-      this._applyAACasualties();
+      this._applyAACasualties({ proceed: false });
     } else {
-      // No hits - move to combat
-      this._proceedAfterAAFire();
+      this.combatState.selectedAACasualties = {};
     }
 
+    // Stay on a readable result step (hits and 0-hits). Continue proceeds.
+    this.combatState.phase = AA_RESULT_PHASE;
+    this._logAAFireResults();
     this._render();
   }
 
-  _applyAACasualties() {
-    const { attackers, selectedAACasualties, totalAttackerLosses } = this.combatState;
+  _logAAFireResults() {
+    if (!this.actionLog?.log) return;
+    const { hits } = this.combatState.aaResults || {};
+    const losses = this.combatState.selectedAACasualties || {};
+    const lossStr = Object.entries(losses)
+      .filter(([, n]) => n > 0)
+      .map(([type, n]) => `${n} ${type}`)
+      .join(', ');
+    const territory = this.currentTerritory;
+    const message = hits > 0
+      ? `AA fire at ${territory}: ${hits} hit(s) — ${lossStr} lost`
+      : `AA fire at ${territory}: 0 hits`;
+    this.actionLog.log('aa-fire', { message, territory, hits, losses });
+  }
 
-    // Apply selected AA casualties and track for summary
-    for (const [type, count] of Object.entries(selectedAACasualties)) {
-      const unit = attackers.find(u => u.type === type);
-      if (unit) {
-        unit.quantity -= count;
-        // Track total losses for battle summary
-        totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
+  _applyAACasualties({ proceed = true } = {}) {
+    const { attackers, selectedAACasualties, totalAttackerLosses } = this.combatState;
+    if (selectedAACasualties && !this.combatState.aaCasualtiesApplied) {
+      for (const [type, count] of Object.entries(selectedAACasualties)) {
+        const unit = attackers.find(u => u.type === type);
+        if (unit) {
+          unit.quantity -= count;
+          totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
+        }
       }
+      this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+      this.combatState.aaCasualtiesApplied = true;
     }
 
-    // Remove dead units
-    this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+    if (proceed) {
+      this._proceedAfterAAFire();
+      this._render();
+    }
+  }
 
+  _confirmAAResults() {
     this._proceedAfterAAFire();
     this._render();
   }
@@ -1478,9 +1543,15 @@ export class CombatUI {
   // ahead of what actually committed; leaving that overlay up is a soft-lock.
   syncFromAuthoritativeState() {
     this.hide();
-    if (this.gameState?.turnPhase === 'combat' && this.hasCombats()) {
-      this.showNextCombat();
+    if (this.gameState?.turnPhase !== 'combat' || !this.hasCombats()) {
+      return { shown: false, skipped: [] };
     }
+    const result = this.showNextCombat();
+    if (!result.shown) {
+      if (this.onAllCombatsResolved) this.onAllCombatsResolved();
+      if (this.onCombatComplete) this.onCombatComplete();
+    }
+    return result;
   }
 
   async _autoBattle() {
@@ -1500,6 +1571,11 @@ export class CombatUI {
         }
         if (this.combatState.phase === 'aaFire') {
           this._rollAAFire();
+          // Must paint the AA result (hits and 0-hits) before advancing.
+          await new Promise(r => setTimeout(r, AA_RESULT_AUTO_PAUSE_MS));
+        }
+        if (this.combatState.phase === AA_RESULT_PHASE) {
+          this._confirmAAResults();
           await new Promise(r => setTimeout(r, 150));
         }
         if (this.combatState.phase === 'selectAACasualties') {
@@ -1646,16 +1722,27 @@ export class CombatUI {
       `;
     }
 
-    // AA Results - only show during casualty selection phase (like bombardment)
-    if (this.combatState.aaFired && this.combatState.aaResults && phase === 'selectAACasualties') {
+    // AA Results — shown on the dedicated result step (and leftover select phase)
+    if (this.combatState.aaFired && this.combatState.aaResults &&
+        (phase === 'selectAACasualties' || phase === AA_RESULT_PHASE)) {
       const { rolls, hits } = this.combatState.aaResults;
+      const aaOwner = defenders.find(u => u.type === 'aaGun')?.owner;
+      const aaPlayer = this.gameState.getPlayer(aaOwner) || defenderPlayer;
+      const losses = this.combatState.selectedAACasualties || {};
+      const lossStr = Object.entries(losses)
+        .filter(([, n]) => n > 0)
+        .map(([type, n]) => `${n}× ${type}`)
+        .join(', ');
       html += `
         <div class="aa-results">
+          <div class="aa-title">${aaPlayer?.name || 'Defender'} AA guns fire</div>
+          <div class="aa-desc">Defending anti-aircraft (hits on 1)</div>
           <div class="aa-result-header">AA Fire Results: ${hits} hit(s)</div>
           <div class="dice-display">
             ${rolls.slice(0, 12).map(r => `<div class="die ${r.hit ? 'hit' : 'miss'}">${r.roll}</div>`).join('')}
             ${rolls.length > 12 ? `<span class="dice-more">+${rolls.length - 12}</span>` : ''}
           </div>
+          <div class="aa-desc">${hits > 0 ? `Aircraft lost: ${lossStr} (cheapest first)` : 'No aircraft lost'}</div>
         </div>
       `;
     }
@@ -1848,6 +1935,12 @@ export class CombatUI {
       html += `
         <button class="combat-btn roll" data-action="aa-fire">
           <span class="btn-icon">🎯</span> Fire AA Guns
+        </button>
+      `;
+    } else if (phase === AA_RESULT_PHASE) {
+      html += `
+        <button class="combat-btn confirm" data-action="confirm-aa-results">
+          Continue
         </button>
       `;
     } else if (phase === 'selectAACasualties') {
@@ -2305,7 +2398,7 @@ export class CombatUI {
     const activePhases = phases.filter(p => {
       if (p.id === 'amphibious') return isAmphibious;
       if (p.id === 'bombardment') return bombardmentRolls?.length > 0;
-      if (p.id === 'aaFire' || p.id === 'selectAACasualties') return hasAA;
+      if (p.id === 'aaFire' || p.id === 'selectAACasualties' || p.id === AA_RESULT_PHASE) return hasAA;
       if (p.id === 'submarineFirstStrike') return hasSubmarineFirstStrike;
       return true;
     });
@@ -2313,7 +2406,7 @@ export class CombatUI {
     // Map current phase to display phase
     let displayPhase = currentPhase;
     if (currentPhase === 'selectBombardmentCasualties') displayPhase = 'bombardment';
-    if (currentPhase === 'selectAACasualties') displayPhase = 'aaFire';
+    if (currentPhase === 'selectAACasualties' || currentPhase === AA_RESULT_PHASE) displayPhase = 'aaFire';
 
     const currentIdx = activePhases.findIndex(p => p.id === displayPhase);
 
@@ -2757,6 +2850,9 @@ export class CombatUI {
           case 'aa-fire':
             this._rollAAFire();
             break;
+          case 'confirm-aa-results':
+            this._confirmAAResults();
+            break;
           case 'confirm-aa-casualties':
             this._applyAACasualties();
             break;
@@ -2975,29 +3071,18 @@ export class CombatUI {
   }
 
   _nextCombat() {
-    if (this.gameState.combatQueue.length > 0) {
-      this.currentTerritory = this.gameState.combatQueue[0];
-      this._initCombatState();
-      this._render();
-      // Make sure popup is visible for next combat
-      this.el.classList.remove('hidden');
-      this._syncCombatChromeFlag();
+    if (this.hasCombats()) {
+      const result = this.showNextCombat();
+      if (result?.shown) return;
+    }
+    this.hide();
 
-      // Notify main.js to center camera on combat territory
-      if (this.onCombatStart) {
-        this.onCombatStart(this.currentTerritory);
-      }
-    } else {
-      this.hide();
+    if (this.onAllCombatsResolved) {
+      this.onAllCombatsResolved();
+    }
 
-      // All combats are done - check for pending air landings
-      if (this.onAllCombatsResolved) {
-        this.onAllCombatsResolved();
-      }
-
-      if (this.onCombatComplete) {
-        this.onCombatComplete();
-      }
+    if (this.onCombatComplete) {
+      this.onCombatComplete();
     }
   }
 }

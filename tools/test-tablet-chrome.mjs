@@ -1,6 +1,7 @@
 // Unit checks for V2.61 tablet chrome (tooltip clamp predicate)
-// plus V2.63 phone-shell predicates. iPhone shell is ≤480px; the 481–900
-// tablet band and desktop ≥901 stay on their existing trees.
+// plus V2.63 phone-shell predicates. iPhone shell is ≤480px, or landscape
+// phone (height ≤480 and width <901). The 481–900 tablet band (no height)
+// and desktop ≥901 stay on their existing trees.
 // Run: node tools/test-tablet-chrome.mjs
 
 import { readFileSync } from 'fs';
@@ -89,7 +90,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.75', GAME_VERSION === 'V2.75');
+check('GAME_VERSION is V2.76', GAME_VERSION === 'V2.76');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -155,6 +156,19 @@ check('772px V2.61 tablet → no mobile shell', shouldUseMobileShell(772) === fa
 check('900px tablet ceiling → no mobile shell', shouldUseMobileShell(900) === false);
 check('901px desktop → no mobile shell', shouldUseMobileShell(901) === false);
 check('1280×800 desktop → no mobile shell', shouldUseMobileShell(1280) === false);
+check('390/480 still phone', shouldUseMobileShell(390, 480) === true);
+check('481 with no height still tablet', shouldUseMobileShell(481) === false);
+check('772 with no height still tablet', shouldUseMobileShell(772) === false);
+check('900 with no height still tablet', shouldUseMobileShell(900) === false);
+check('iPhone landscape 844×390 → phone', shouldUseMobileShell(844, 390) === true);
+check('iPhone landscape 667×375 → phone', shouldUseMobileShell(667, 375) === true);
+check('772×390 with height is landscape-phone, not tablet', shouldUseMobileShell(772, 390) === true);
+check('900×390 with height is landscape-phone', shouldUseMobileShell(900, 390) === true);
+check('932×430 width ≥901 stays off phone shell', shouldUseMobileShell(932, 430) === false);
+check('iPhone 844×390 width under 901 → phone', shouldUseMobileShell(844, 390) === true);
+check('desktop 1280×400 stays desktop', shouldUseMobileShell(1280, 400) === false);
+check('iPad portrait 768×1024 not phone', shouldUseMobileShell(768, 1024) === false);
+check('iPad landscape 1024×768 not phone', shouldUseMobileShell(1024, 768) === false);
 {
   const root = { classList: { on: new Set(), toggle(name, force) {
     if (force) this.on.add(name); else this.on.delete(name);
@@ -165,6 +179,12 @@ check('1280×800 desktop → no mobile shell', shouldUseMobileShell(1280) === fa
   check('apply at 772 clears mobile-shell (tablet band)', !root.classList.contains('mobile-shell'));
   applyMobileShellClass(1280, root);
   check('apply at 1280 clears mobile-shell', !root.classList.contains('mobile-shell'));
+  applyMobileShellClass(844, root, 390);
+  check('apply landscape iPhone 844×390 sets mobile-shell', root.classList.contains('mobile-shell'));
+  applyMobileShellClass(1280, root, 400);
+  check('apply short desktop 1280×400 clears mobile-shell', !root.classList.contains('mobile-shell'));
+  applyMobileShellClass(768, root, 1024);
+  check('apply iPad portrait clears mobile-shell', !root.classList.contains('mobile-shell'));
 }
 
 console.log('=== V2.63 phase identity (not the tablet 9px / hidden-dots path) ===');
