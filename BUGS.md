@@ -2,6 +2,22 @@
 
 ---
 
+## 8.16.26 — V2.70 phone Fit is a regional window (never one chip, never poster)
+
+V2.68 fillFrame killed the teal letterbox, but Fit still framed a single selected tile (Place Capital / first deploy tap) or, for worldwide empires, a world-span set that collapsed to a poster/centroid.
+
+Fix (phone Fit only — same `applyPhoneCameraFit` / `fillFrame` path):
+- Window is **owned land + neighbors / legal dests**. Adjacent sea is included so a coastal region still shows coastline.
+- Never a single tile: owned ≤ 1 expands to neighbors; a tiny bbox is padded to a min region.
+- Never the whole poster: worldwide owned uses the capital cluster (or the selected stack’s cluster), then neighbors.
+- fillFrame still fills the map pane height (no teal letterbox).
+
+V2.67 peek tray and V2.68 ink-edge stay. Desktop ≥901 and tablet 481–900 frozen. V2.69 peek-place / inspect predicates stay. SCHEMA_VERSION stays 11.
+
+Harness: `node tools/test-tablet-chrome.mjs` (region vs chip vs poster, coastline neighbor, fillFrame, existing peek + gold + V2.69 tap/inspect).
+
+---
+
 ## 8.16.26 — V2.69 phone setup tap places; inspect is a long-press edge card
 
 James on live V2.68 (390, Place Capital / Initial Deployment): tap land opened the half-screen territory card. Then he had to tap a unit in the tray and tap the same land again to place. The inspect sheet covered the tile (inspect-blocking-commit).

@@ -279,23 +279,173 @@ export function collectPhoneFitPoints(territories, predicate) {
   return pts;
 }
 
-// Fit frames owned land, or the selected stack + dests — not every capital.
+function uniqueNames(list) {
+  const out = [];
+  const seen = new Set();
+  for (const n of Array.isArray(list) ? list : []) {
+    if (!n || seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+  }
+  return out;
+}
+
+export function indexTerritoriesByName(territories) {
+  const list = Array.isArray(territories) ? territories : Object.values(territories || {});
+  const byName = {};
+  for (const t of list) {
+    if (t?.name) byName[t.name] = t;
+  }
+  return byName;
+}
+
+export function neighborNamesOf(name, byName) {
+  const conns = byName?.[name]?.connections;
+  return Array.isArray(conns) ? conns.filter(Boolean) : [];
+}
+
+// Owned + dests. Selected never replaces that set (one-chip Fit).
+// Owned ≤ 1 (Place Capital / first deploy): legal dests / that name, then expand.
 export function collectPhoneFitFocusNames({
   ownedNames = [],
   selectedName,
   destinationNames = [],
 } = {}) {
-  const dests = (Array.isArray(destinationNames) ? destinationNames : []).filter(Boolean);
-  const selected = selectedName || null;
-  if (selected || dests.length) {
-    const names = [];
-    if (selected) names.push(selected);
-    for (const n of dests) {
-      if (n && !names.includes(n)) names.push(n);
-    }
-    return names;
+  const owned = uniqueNames(ownedNames);
+  const dests = uniqueNames(destinationNames);
+  if (owned.length <= 1) return uniqueNames([...owned, ...dests, selectedName]);
+  return uniqueNames([...owned, ...dests]);
+}
+
+export function expandPhoneFitRegionNames(names, territories) {
+  const byName = indexTerritoriesByName(territories);
+  const out = [];
+  const seen = new Set();
+  const add = (n) => {
+    if (!n || seen.has(n)) return;
+    seen.add(n);
+    out.push(n);
+  };
+  for (const name of uniqueNames(names)) {
+    add(name);
+    for (const n of neighborNamesOf(name, byName)) add(n);
   }
-  return (Array.isArray(ownedNames) ? ownedNames : []).filter(Boolean);
+  return out;
+}
+
+function ownedClusterContaining(ownedNames, startName, byName) {
+  const owned = new Set(ownedNames);
+  if (!startName || !owned.has(startName)) return [];
+  const out = [];
+  const seen = new Set([startName]);
+  const stack = [startName];
+  while (stack.length) {
+    const cur = stack.pop();
+    out.push(cur);
+    for (const n of neighborNamesOf(cur, byName)) {
+      if (!owned.has(n) || seen.has(n)) continue;
+      seen.add(n);
+      stack.push(n);
+    }
+  }
+  return out;
+}
+
+function allOwnedClusters(ownedNames, byName) {
+  const seen = new Set();
+  const clusters = [];
+  for (const name of ownedNames) {
+    if (seen.has(name)) continue;
+    const cluster = ownedClusterContaining(ownedNames, name, byName);
+    for (const n of cluster) seen.add(n);
+    if (cluster.length) clusters.push(cluster);
+  }
+  return clusters;
+}
+
+// Worldwide empires: prefer the capital's cluster, else the largest.
+// Never the whole poster. Never a single selected chip.
+export function pickPhoneFitOwnedCluster(ownedNames, territories) {
+  const owned = uniqueNames(ownedNames);
+  if (owned.length <= 1) return owned;
+  const byName = indexTerritoriesByName(territories);
+  const pts = [];
+  for (const name of owned) {
+    const p = territoryFitPoint(byName[name]);
+    if (p) pts.push(p);
+  }
+  if (boundsFromPoints(pts)) return owned;
+  const clusters = allOwnedClusters(owned, byName);
+  const capital = clusters.find(c => c.some(n => byName[n]?.isCapital));
+  if (capital) return capital;
+  clusters.sort((a, b) => b.length - a.length);
+  return clusters[0] || owned;
+}
+
+function destsNearSeed(dests, seed, byName) {
+  const seedSet = new Set(seed);
+  return uniqueNames(dests).filter(d => (
+    seedSet.has(d) || neighborNamesOf(d, byName).some(n => seedSet.has(n))
+  ));
+}
+
+// Regional window: owned + neighbors / legal dests. Includes adjacent sea
+// so a coastal starting region still shows coastline.
+export function resolvePhoneFitRegionNames({
+  ownedNames = [],
+  selectedName,
+  destinationNames = [],
+  territories,
+} = {}) {
+  const byName = indexTerritoriesByName(territories);
+  const owned = uniqueNames(ownedNames);
+  const dests = uniqueNames(destinationNames);
+  let seedOwned = owned;
+  const ownedPts = [];
+  for (const name of owned) {
+    const p = territoryFitPoint(byName[name]);
+    if (p) ownedPts.push(p);
+  }
+  const worldwide = owned.length > 1 && !boundsFromPoints(ownedPts);
+  if (worldwide) {
+    const preferred = owned.includes(selectedName)
+      ? selectedName
+      : (owned.find(n => dests.includes(n)) || null);
+    seedOwned = preferred
+      ? (ownedClusterContaining(owned, preferred, byName) || pickPhoneFitOwnedCluster(owned, territories))
+      : pickPhoneFitOwnedCluster(owned, territories);
+  }
+  const seed = collectPhoneFitFocusNames({
+    ownedNames: seedOwned,
+    selectedName: seedOwned.length <= 1 ? selectedName : null,
+    destinationNames: worldwide ? destsNearSeed(dests, seedOwned, byName) : dests,
+  });
+  return expandPhoneFitRegionNames(seed, territories);
+}
+
+// One chip is not a region. Pad a tiny bbox so Fit never frames a single tile.
+export const PHONE_FIT_MIN_REGION_W = MAP_WIDTH * 0.14;
+export const PHONE_FIT_MIN_REGION_H = MAP_HEIGHT * 0.16;
+
+export function ensurePhoneFitRegionBounds(bounds) {
+  if (!bounds) return null;
+  let { minX, maxX, minY, maxY } = bounds;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  if (maxX - minX < PHONE_FIT_MIN_REGION_W) {
+    minX = cx - PHONE_FIT_MIN_REGION_W / 2;
+    maxX = cx + PHONE_FIT_MIN_REGION_W / 2;
+  }
+  if (maxY - minY < PHONE_FIT_MIN_REGION_H) {
+    minY = cy - PHONE_FIT_MIN_REGION_H / 2;
+    maxY = cy + PHONE_FIT_MIN_REGION_H / 2;
+  }
+  return {
+    minX,
+    maxX,
+    minY: Math.max(0, minY),
+    maxY: Math.min(MAP_HEIGHT, maxY),
+  };
 }
 
 // Fit the relevant map on phone enter / Fit tap. Desktop camera is untouched.
@@ -321,14 +471,15 @@ export function applyPhoneCameraFit(camera, {
       if (gameState.getOwner?.(t.name) === playerId) ownedNames.push(t.name);
     }
   }
-  const focus = collectPhoneFitFocusNames({
+  const focus = resolvePhoneFitRegionNames({
     ownedNames,
     selectedName,
     destinationNames,
+    territories,
   });
   const focusSet = new Set(focus);
   const pts = collectPhoneFitPoints(territories, (t) => focusSet.has(t.name));
-  const bounds = phoneProblemBounds(pts);
+  const bounds = ensurePhoneFitRegionBounds(phoneProblemBounds(pts));
   if (bounds) {
     camera.fitBounds(bounds, { ...insets, fillFrame: true });
     return;

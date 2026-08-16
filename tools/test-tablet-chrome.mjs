@@ -61,6 +61,12 @@ const {
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
   collectPhoneFitFocusNames,
+  expandPhoneFitRegionNames,
+  resolvePhoneFitRegionNames,
+  pickPhoneFitOwnedCluster,
+  ensurePhoneFitRegionBounds,
+  PHONE_FIT_MIN_REGION_W,
+  PHONE_FIT_MIN_REGION_H,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { Camera, MAP_WIDTH, MAP_HEIGHT } =
   await import(pathToFileURL(join(root, 'src/map/camera.js')));
@@ -76,7 +82,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.69', GAME_VERSION === 'V2.69');
+check('GAME_VERSION is V2.70', GAME_VERSION === 'V2.70');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -462,12 +468,12 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
   check('unscoped tooltip z-index stays 100 (V2.66 visibility path untouched)',
     /\.territory-tooltip \{[\s\S]*?z-index:\s*100/.test(beforePhone));
-  check('Fit frames stack+dests when present, else owned — not every capital',
+  check('Fit seed is owned + dests — selected chip does not replace owned',
     JSON.stringify(collectPhoneFitFocusNames({
       ownedNames: ['Germany', 'Poland'],
       selectedName: 'France',
       destinationNames: ['Belgium', 'France'],
-    })) === JSON.stringify(['France', 'Belgium'])
+    })) === JSON.stringify(['Germany', 'Poland', 'Belgium', 'France'])
     && JSON.stringify(collectPhoneFitFocusNames({
       ownedNames: ['Germany', 'Poland'],
     })) === JSON.stringify(['Germany', 'Poland']));
@@ -604,6 +610,84 @@ check('desktop setup land tap still applies',
     /territory-tooltip--edge/.test(phoneBlock)
     && /max-height:\s*88px/.test(phoneBlock)
     && !/territory-tooltip--edge/.test(beforePhone));
+}
+
+console.log('=== V2.70 phone Fit is a regional window (never one chip, never poster) ===');
+{
+  const fake = [
+    { name: 'Germany', isCapital: true, connections: ['Baltic Sea Zone', 'Poland', 'West Europe'], center: [1000, 450] },
+    { name: 'Poland', connections: ['Germany', 'Baltic Sea Zone'], center: [1100, 440] },
+    { name: 'West Europe', connections: ['Germany', 'West Europe Sea Zone'], center: [900, 480] },
+    { name: 'Baltic Sea Zone', isWater: true, connections: ['Germany', 'Poland'], center: [1050, 380] },
+    { name: 'West Europe Sea Zone', isWater: true, connections: ['West Europe'], center: [820, 500] },
+    { name: 'United Kingdom', isCapital: true, connections: ['North Sea Zone', 'Eire'], center: [200, 340] },
+    { name: 'Eire', connections: ['United Kingdom', 'North Sea Zone'], center: [150, 360] },
+    { name: 'North Sea Zone', isWater: true, connections: ['United Kingdom', 'Eire'], center: [220, 300] },
+    { name: 'India', connections: ['India Sea Zone', 'Burma'], center: [3000, 700] },
+    { name: 'Burma', connections: ['India'], center: [3100, 720] },
+    { name: 'India Sea Zone', isWater: true, connections: ['India'], center: [2980, 780] },
+  ];
+  check('owned ≤ 1 seed keeps dests / the name — not an empty chip',
+    JSON.stringify(collectPhoneFitFocusNames({
+      ownedNames: ['Germany'],
+      selectedName: 'Germany',
+    })) === JSON.stringify(['Germany'])
+    && JSON.stringify(collectPhoneFitFocusNames({
+      ownedNames: ['Germany'],
+      destinationNames: ['Germany', 'Poland'],
+    })) === JSON.stringify(['Germany', 'Poland']));
+  const one = resolvePhoneFitRegionNames({
+    ownedNames: ['Germany'],
+    selectedName: 'Germany',
+    territories: fake,
+  });
+  check('owned ≤ 1 expands to neighbors, including coastline sea',
+    one.includes('Germany')
+    && one.includes('Poland')
+    && one.includes('West Europe')
+    && one.includes('Baltic Sea Zone')
+    && one.length > 1);
+  check('selected chip does not shrink a multi-owned seed',
+    JSON.stringify(collectPhoneFitFocusNames({
+      ownedNames: ['Germany', 'Poland'],
+      selectedName: 'Germany',
+    })) === JSON.stringify(['Germany', 'Poland']));
+  const worldOwned = ['United Kingdom', 'Eire', 'India', 'Burma'];
+  const cluster = pickPhoneFitOwnedCluster(worldOwned, fake);
+  check('worldwide owned picks the capital cluster, not India+UK poster',
+    cluster.includes('United Kingdom')
+    && !cluster.includes('India')
+    && !cluster.includes('Burma'));
+  const ukRegion = resolvePhoneFitRegionNames({
+    ownedNames: worldOwned,
+    territories: fake,
+  });
+  check('worldwide Fit is the UK starting region with coastline, not the poster',
+    ukRegion.includes('United Kingdom')
+    && ukRegion.includes('North Sea Zone')
+    && !ukRegion.includes('India')
+    && !ukRegion.includes('Burma'));
+  const indiaFight = resolvePhoneFitRegionNames({
+    ownedNames: worldOwned,
+    selectedName: 'India',
+    destinationNames: ['Burma'],
+    territories: fake,
+  });
+  check('worldwide + selected stack frames that region, not the UK poster',
+    indiaFight.includes('India')
+    && indiaFight.includes('Burma')
+    && indiaFight.includes('India Sea Zone')
+    && !indiaFight.includes('United Kingdom'));
+  const padded = ensurePhoneFitRegionBounds({ minX: 1000, maxX: 1010, minY: 450, maxY: 455 });
+  check('tiny bbox is padded to a region, not a one-tile chip',
+    padded.maxX - padded.minX >= PHONE_FIT_MIN_REGION_W - 0.01
+    && padded.maxY - padded.minY >= PHONE_FIT_MIN_REGION_H - 0.01);
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  check('tablet 481–900 rail is still 280px after V2.70',
+    /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
+  check('unscoped tooltip z-index stays 100 after V2.70',
+    /\.territory-tooltip \{[\s\S]*?z-index:\s*100/.test(beforePhone));
 }
 
 if (failures) {
