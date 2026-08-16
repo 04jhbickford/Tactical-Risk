@@ -2,6 +2,32 @@
 
 ---
 
+## 8.16.26 — V2.60 zoom-vs-Max overlap + empty Recent Moves (V2.59 playtest)
+
+Playtest on live V2.59 (tablet-relevant):
+
+### Bug 1 — map zoom +/− sat on INITIAL DEPLOYMENT Max buttons
+
+`#zoom-controls` is `position: absolute; right: 12px; z-index: 50` on `document.body`. The player panel is 320px at the right edge with z-index 20, so the circular +/− landed on the unit-row Max column. Clicking Max zoomed the map.
+
+Fix (CSS only — `touchInput.js` / zoom math unchanged):
+- Park zoom in the visible map gutter: `right: calc(320px + 12px)`.
+- Raise `.player-panel` to z-index 55 so Max/steppers keep the hit target if they ever overlap.
+
+### Bug 2 — RECENT MOVES row after Confirm Attack was icon-only
+
+A later global `.pp-undo-btn { width: 100% }` (mobilize-era) overrode the compact history-row undo. In the flex row, the full-width button ate `.pp-move-desc` (`overflow: hidden`), so a real Novosibirsk → Evenki National Okrug attack rendered as an empty bar with only ↩.
+
+Fix (display-only):
+- Scope a compact `.pp-move-item .pp-undo-btn` so the description stays visible.
+- Exported `formatRecentMove` — skip rows with no unit/from/to string; do not change undo or `moveHistory` writes.
+
+SCHEMA_VERSION stays 11. Combat math / economy / victory / setup / map / multiplayerGuard / touchInput.js unchanged.
+
+Harness: `node tools/test-recent-move-display.mjs`. Existing `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
+
+---
+
 ## 8.16.26 — V2.59 initial-deploy naval remainder near-lock (V2.58 playtest)
 
 After 18 land/air units, Remaining = 6 (all naval). Selecting a land tile (e.g. Novosibirsk) showed “No land/air units to place”, DEPLOYED 0/6, and **no Done / Next Player button**. A random sea zone greys the naval list and still hides Done. Only a sea zone adjacent to the player’s own coast unlocks +/Max; Done appears after the 6 ships are placed.

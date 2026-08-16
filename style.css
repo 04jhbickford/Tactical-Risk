@@ -4113,7 +4113,8 @@ html, body {
   bottom: 0;
   background: rgba(20, 20, 40, 0.95);
   border-left: 1px solid rgba(255,255,255,0.1);
-  z-index: 20;
+  /* Above #zoom-controls (50) so Max/steppers keep the hit target if they ever overlap */
+  z-index: 55;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -5599,9 +5600,19 @@ html, body {
 
 .pp-move-desc {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Compact undo on a history row. A later global .pp-undo-btn { width: 100% }
+   would otherwise swallow the description (empty-looking row, icon only). */
+.pp-move-item .pp-undo-btn {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 4px 8px;
 }
 
 /* Inline Mobilize UI */
@@ -16439,10 +16450,11 @@ html, body {
   -webkit-touch-callout: none;
 }
 
-/* On-screen zoom controls (bottom-right). 44px targets per Apple HIG. */
+/* On-screen zoom controls: visible-map bottom-right, not viewport-right.
+   The player panel is 320px; sitting at right:12px put +/− on top of Max. */
 #zoom-controls {
   position: absolute;
-  right: 12px;
+  right: calc(320px + 12px);
   bottom: 96px;
   display: flex;
   flex-direction: column;

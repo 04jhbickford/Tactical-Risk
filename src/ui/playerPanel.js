@@ -68,6 +68,36 @@ export function computeInitialPlacementUX({
   return { showDone, needSeaHint, stuckWithNaval, onlyNavalRemain, hint };
 }
 
+// Display string for a combat-move history row. Empty string = do not render
+// a row (missing units/from/to). Does not change undo or combat resolution.
+export function formatRecentMove(move) {
+  if (!move || typeof move !== 'object') return '';
+
+  const units = Array.isArray(move.units) ? move.units : [];
+  const unitStr = units
+    .filter(u => u && typeof u.type === 'string' && u.type.length > 0)
+    .map(u => {
+      const qty = Number(u.quantity);
+      const n = Number.isFinite(qty) && qty > 0 ? qty : 1;
+      return `${n}${u.type.charAt(0)}`;
+    })
+    .join(',');
+
+  const from = typeof move.from === 'string' ? move.from : '';
+  const to = typeof move.to === 'string' ? move.to : '';
+
+  if (unitStr && from && to) return `${unitStr}: ${from} → ${to}`;
+  if (unitStr) return unitStr;
+
+  if (Array.isArray(move.shipIds) && move.shipIds.length > 0 && from && to) {
+    const n = move.shipIds.length;
+    return `${n} ship${n === 1 ? '' : 's'}: ${from} → ${to}`;
+  }
+
+  if (from && to) return `${from} → ${to}`;
+  return '';
+}
+
 export class PlayerPanel {
   constructor() {
     this.gameState = null;
@@ -665,22 +695,26 @@ export class PlayerPanel {
         // Show recent moves with individual undo option (only during combat move phase)
         const moveHistory = this.gameState.moveHistory || [];
         if (turnPhase === TURN_PHASES.COMBAT_MOVE && moveHistory.length > 0) {
-          html += `
+          const recentMoves = moveHistory.slice(-5).reverse();
+          const rows = [];
+          for (let i = 0; i < recentMoves.length; i++) {
+            const desc = formatRecentMove(recentMoves[i]);
+            if (!desc) continue;
+            rows.push({ desc, isLast: i === 0 });
+          }
+          if (rows.length > 0) {
+            html += `
             <div class="pp-move-history">
               <div class="pp-move-header">Recent Moves</div>`;
-          // Show last 5 moves (most recent first)
-          const recentMoves = moveHistory.slice(-5).reverse();
-          for (let i = 0; i < recentMoves.length; i++) {
-            const move = recentMoves[i];
-            const unitStr = move.units.map(u => `${u.quantity}${u.type.charAt(0)}`).join(',');
-            const isLast = i === 0;
-            html += `
-              <div class="pp-move-item ${isLast ? 'last' : ''}">
-                <span class="pp-move-desc">${unitStr}: ${move.from} → ${move.to}</span>
-                ${isLast ? `<button class="pp-undo-btn" data-action="undo-move">↩</button>` : ''}
+            for (const row of rows) {
+              html += `
+              <div class="pp-move-item ${row.isLast ? 'last' : ''}">
+                <span class="pp-move-desc">${row.desc}</span>
+                ${row.isLast ? `<button class="pp-undo-btn" data-action="undo-move">↩</button>` : ''}
               </div>`;
+            }
+            html += `</div>`;
           }
-          html += `</div>`;
         }
       }
 
