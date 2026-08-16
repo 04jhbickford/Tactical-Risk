@@ -1,6 +1,7 @@
 // Enhanced combat resolution UI with dice animation, probability, and casualty selection
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
+import { setShellFlag } from './mobileShell.js';
 
 export class CombatUI {
   constructor() {
@@ -70,6 +71,7 @@ export class CombatUI {
     this._initCombatState();
     this._render();
     this.el.classList.remove('hidden');
+    this._syncCombatChromeFlag();
 
     // Notify main.js to center camera on combat territory
     if (this.onCombatStart) {
@@ -79,10 +81,16 @@ export class CombatUI {
 
   hide() {
     this.el.classList.add('hidden');
+    this._syncCombatChromeFlag();
     this.currentTerritory = null;
     this.combatState = null;
     this.diceAnimation = null;
     this.lastRolls = null;
+  }
+
+  _syncCombatChromeFlag() {
+    const visible = !!this.el && !this.el.classList.contains('hidden');
+    setShellFlag('combat-active', visible);
   }
 
   _initCombatState() {
@@ -1120,6 +1128,7 @@ export class CombatUI {
       if (this.onAirLandingRequired) {
         // Hide combat popup - only show the air landing panel
         this.el.classList.add('hidden');
+        this._syncCombatChromeFlag();
 
         this.onAirLandingRequired({
           airUnitsToLand,
@@ -2972,6 +2981,7 @@ export class CombatUI {
       this._render();
       // Make sure popup is visible for next combat
       this.el.classList.remove('hidden');
+      this._syncCombatChromeFlag();
 
       // Notify main.js to center camera on combat territory
       if (this.onCombatStart) {

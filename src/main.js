@@ -46,6 +46,9 @@ import { UnitTooltip } from './ui/unitTooltip.js';
 import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
+import { initMobileShell, onMobileShellChange } from './ui/mobileShell.js';
+
+initMobileShell();
 
 // Multiplayer imports
 import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
@@ -179,6 +182,10 @@ async function init() {
   // Player panel (replaces territory-focused sidebar)
   const playerPanel = new PlayerPanel();
   playerPanel.setUnitDefs(unitDefs);
+  onMobileShellChange(() => {
+    hud._render();
+    playerPanel._render();
+  });
 
   // Purchase popup overlay
   const purchasePopup = new PurchasePopup();

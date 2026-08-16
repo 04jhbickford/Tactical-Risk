@@ -2,6 +2,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
+import { isMobileShell } from './mobileShell.js';
 
 export class HUD {
   constructor() {
@@ -41,6 +42,11 @@ export class HUD {
   }
 
   _render() {
+    if (isMobileShell()) {
+      this._renderMobile();
+      return;
+    }
+
     // Hamburger menu button
     let html = `
       <div class="hud-menu-container">
@@ -139,6 +145,66 @@ export class HUD {
     html += `</div>`;
 
     this.el.innerHTML = html;
+    this._bindEvents();
+  }
+
+  // Phone top bar: {color} {faction} · {PHASE}. Wordmark, full player list,
+  // and settings sit behind ⋯ so five chips never overlap the title.
+  _renderMobile() {
+    const player = this.gameState?.currentPlayer;
+    const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY && player;
+    const phaseName = inGame ? this._getPhaseName(this.gameState.phase) : '';
+    const flagSrc = inGame && player.flag ? `assets/flags/${player.flag}` : null;
+
+    let identity = `<span class="hud-title">Tactical Risk</span>`;
+    if (inGame) {
+      identity = `
+        <div class="hud-mobile-identity">
+          ${flagSrc
+            ? `<img src="${flagSrc}" class="hud-mobile-flag" alt="">`
+            : `<span class="hud-mobile-swatch" style="background:${player.color}"></span>`}
+          <span class="hud-mobile-faction" style="color:${player.color}">${player.name}</span>
+          <span class="hud-mobile-sep" aria-hidden="true">·</span>
+          <span class="hud-mobile-phase">${phaseName}</span>
+        </div>`;
+    }
+
+    let playersHtml = '';
+    if (this.gameState?.players?.length) {
+      playersHtml = `<div class="hud-mobile-players">`;
+      for (const p of this.gameState.players) {
+        const pFlag = p.flag ? `assets/flags/${p.flag}` : null;
+        const current = this.gameState.currentPlayer?.id === p.id;
+        playersHtml += `
+          <div class="hud-mobile-player${current ? ' current' : ''}${p.surrendered ? ' out' : ''}">
+            ${pFlag ? `<img src="${pFlag}" alt="">` : `<span class="hud-mobile-swatch" style="background:${p.color}"></span>`}
+            <span>${p.name}</span>
+            ${p.surrendered ? '<span class="legend-out">OUT</span>' : ''}
+          </div>`;
+      }
+      playersHtml += `</div>`;
+    }
+
+    this.el.innerHTML = `
+      ${identity}
+      <div class="hud-menu-container hud-mobile-overflow">
+        <button class="hud-menu-btn" data-action="toggle-menu" title="Menu" aria-label="Menu">
+          <span class="hud-menu-icon">⋯</span>
+        </button>
+        <div class="hud-menu-dropdown ${this.menuOpen ? 'open' : ''}">
+          <div class="hud-mobile-wordmark">Tactical Risk</div>
+          ${playersHtml}
+          <button class="hud-menu-item" data-action="rules">
+            <span class="hud-menu-item-icon">📖</span>
+            <span>Game Rules</span>
+          </button>
+          <button class="hud-menu-item" data-action="exit-lobby">
+            <span class="hud-menu-item-icon">💾</span>
+            <span>Save & Exit</span>
+          </button>
+        </div>
+      </div>
+    `;
     this._bindEvents();
   }
 

@@ -16759,3 +16759,319 @@ html, body {
     overflow-y: auto;
   }
 }
+
+/* ---------- V2.63 phone chrome (≤767px) ----------
+   Desktop at min-width: 768px is frozen — V2.62 pixel-identical.
+   Phone rules live only in this query and/or html.mobile-shell. */
+@media (max-width: 767px) {
+  html,
+  body {
+    height: 100dvh;
+    min-height: 100dvh;
+  }
+
+  html.mobile-shell {
+    --mobile-top-bar: calc(48px + env(safe-area-inset-top, 0px));
+    --mobile-cta: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Compact 44–52pt top bar + Dynamic Island inset.
+     overflow must stay visible so the ⋯ dropdown is not clipped. */
+  #hud {
+    height: var(--mobile-top-bar, calc(48px + env(safe-area-inset-top, 0px)));
+    min-height: 44px;
+    padding: env(safe-area-inset-top, 0px) 10px 0 12px;
+    gap: 8px;
+    overflow: visible;
+  }
+
+  html.mobile-shell #hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--mobile-top-bar);
+    z-index: 70;
+  }
+
+  /* Kill the 3-row desktop HUD pieces if JS has not swapped the tree yet */
+  #hud .hud-title,
+  #hud .hud-legend,
+  #hud .hud-turn-order,
+  #hud .hud-phase-progress {
+    display: none;
+  }
+
+  .hud-current-turn {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 8px;
+    gap: 8px;
+  }
+
+  .hud-turn-info {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .hud-player-name,
+  .hud-phase-name {
+    white-space: nowrap;
+  }
+
+  html.mobile-shell #hud .hud-title {
+    display: inline-block;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hud-mobile-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .hud-mobile-flag {
+    width: 28px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .hud-mobile-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+  }
+
+  .hud-mobile-faction {
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .hud-mobile-sep {
+    color: #8a93a8;
+    flex-shrink: 0;
+  }
+
+  .hud-mobile-phase {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: #e0e0e0;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .hud-mobile-overflow {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .hud-mobile-overflow .hud-menu-dropdown {
+    left: auto;
+    right: 0;
+    min-width: min(260px, calc(100vw - 16px));
+    max-height: min(70dvh, 480px);
+    overflow-y: auto;
+  }
+
+  .hud-mobile-wordmark {
+    padding: 12px 16px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #8a93a8;
+  }
+
+  .hud-mobile-players {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .hud-mobile-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .hud-mobile-player.current {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .hud-mobile-player img {
+    width: 24px;
+    height: 18px;
+    border-radius: 2px;
+    object-fit: cover;
+  }
+
+  .hud-menu-btn {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hud-menu-item {
+    min-height: 44px;
+  }
+
+  /* Map is full-bleed; chrome overlays it. Majority of the screen at idle. */
+  #mapCanvas {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100dvh;
+  }
+
+  /* Sidebar must not steal map width (the postage-stamp failure) */
+  #sidebar,
+  .player-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: 42dvh;
+    height: auto;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pp-header,
+  .pp-phase {
+    display: none;
+  }
+
+  .pp-tabs {
+    gap: 8px;
+    padding: 8px 8px 0;
+  }
+
+  .pp-tab {
+    min-height: 44px;
+  }
+
+  /* One full-width primary CTA above the home indicator */
+  .pp-bottom-actions {
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .pp-bottom-buttons {
+    gap: 8px;
+  }
+
+  .pp-confirm-btn {
+    min-height: 48px;
+    width: 100%;
+  }
+
+  .pp-confirm-btn.disabled,
+  .pp-confirm-btn:disabled {
+    display: none;
+  }
+
+  /* Max lives with the unit-count row, not next to zoom */
+  .pp-buy-controls,
+  .pp-qty-controls {
+    gap: 8px;
+  }
+
+  .pp-qty-btn,
+  .pp-max-btn,
+  .pp-qty-btn.max-btn,
+  .mob-max-btn {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .pp-qty-btn.max-btn,
+  .pp-max-btn,
+  .mob-max-btn {
+    width: auto;
+    padding: 0 10px;
+  }
+
+  /* Zoom is optional (pinch is primary). Park it top-left, away from the CTA. */
+  #zoom-controls {
+    right: auto;
+    left: 8px;
+    bottom: auto;
+    top: calc(52px + env(safe-area-inset-top, 0px) + 8px);
+    gap: 8px;
+  }
+
+  .zoom-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  #minimap {
+    width: 120px;
+    height: 68px;
+    left: 8px;
+    bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Pass-the-device: true full-screen, chrome gone, one dismiss control */
+  .handoff-overlay {
+    height: 100dvh;
+    padding: env(safe-area-inset-top, 0px) 16px env(safe-area-inset-bottom, 0px);
+    background: #080a14;
+  }
+
+  .handoff-start-btn {
+    min-width: 220px;
+    min-height: 48px;
+  }
+}
+
+/* Handoff hides live chrome (not painted underneath). Class-gated so
+   desktop ≥768 overlay geometry stays V2.62. */
+html.mobile-shell.handoff-active #hud,
+html.mobile-shell.handoff-active #sidebar,
+html.mobile-shell.handoff-active .player-panel,
+html.mobile-shell.handoff-active #zoom-controls,
+html.mobile-shell.handoff-active #minimap {
+  display: none !important;
+}
+
+/* Auto-battle / combat popup: no End Turn, Done, or Max on the phone */
+html.mobile-shell.combat-active .pp-bottom-actions,
+html.mobile-shell.combat-active .pp-qty-btn.max-btn,
+html.mobile-shell.combat-active .pp-max-btn,
+html.mobile-shell.combat-active .mob-max-btn {
+  display: none !important;
+}

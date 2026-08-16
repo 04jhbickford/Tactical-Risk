@@ -2,6 +2,26 @@
 
 ---
 
+## 8.16.26 — V2.63 desktop-safe iPhone chrome (James V2.62 playtest)
+
+Live V2.62 on iPhone (~390×844) was the desktop HUD stuffed into a phone: map was a ~110px postage stamp beside a 280px sidebar; title + five player chips overlapped; End Turn and Done could stack; Max sat next to zoom +/−; touch targets were 18px; “Pass the device” painted over live chrome; nothing used the Dynamic Island or home-indicator safe areas.
+
+Fix (chrome only — one desktop tree, phone shell via `html.mobile-shell` + `@media (max-width: 767px)`):
+- `viewport-fit=cover` (already on) + `100dvh` + `env(safe-area-inset-*)` on the top bar and bottom CTA
+- Compact 44–52pt top bar: `{color} {faction} · {PHASE}`; wordmark / player list / settings behind ⋯
+- Map is full-bleed; sidebar becomes a bottom overlay (`max-height: 42dvh`) so the map is the majority of the screen at idle
+- One full-width primary CTA (min-height 48px) above the home indicator. End Turn and Done never coexist; illegal/disabled actions stay hidden
+- Max stays on the unit-count row; zoom +/− parks top-left (≥44px, away from the CTA; pinch is primary)
+- Handoff is an opaque full-screen modal that hides HUD / panel / zoom / chips (one dismiss control)
+- Combat / auto-battle hides End Turn, Done, and Max
+- Every phone control ≥44 CSS px with ≥8px gap
+
+Desktop at `min-width: 768px` is unchanged (QA: 390×844 and 1280×800). SCHEMA_VERSION stays 11. Rules / map / combat math / economy / victory / multiplayerGuard / Firebase / touchInput zoom math / territory-label collision / bottom-sheet detents / turn emails unchanged.
+
+Harness: `node tools/test-tablet-chrome.mjs` (mobile-shell predicates + existing 772px tooltip checks). Existing `test-possessive.mjs`, `test-recent-move-display.mjs`, `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
+
+---
+
 ## 8.16.26 — V2.62 turn-badge possessive (V2.61 playtest)
 
 Live V2.61 HUD turn badge read **"Germans's Turn"** (double possessive). Cause: HUD / player-panel / action-log copy concatenated `name + "'s Turn"`.

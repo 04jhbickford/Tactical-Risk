@@ -7,6 +7,7 @@
 // Never shown in multiplayer (each human has their own screen) or for AI turns.
 
 import { GAME_PHASES } from '../state/gameState.js';
+import { setShellFlag } from './mobileShell.js';
 
 export class HandoffScreen {
   constructor() {
@@ -62,6 +63,7 @@ export class HandoffScreen {
       </div>
     `;
     this.el.classList.remove('hidden');
+    setShellFlag('handoff-active', true);
 
     this.el.querySelector('.handoff-start-btn').addEventListener('click', () => {
       this.lastConfirmedPlayerId = player.id;
@@ -71,6 +73,7 @@ export class HandoffScreen {
 
   hide() {
     this.el.classList.add('hidden');
+    setShellFlag('handoff-active', false);
   }
 
   get isVisible() {

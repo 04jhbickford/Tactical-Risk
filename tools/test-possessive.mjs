@@ -18,7 +18,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.62', GAME_VERSION === 'V2.62');
+check('GAME_VERSION is V2.63', GAME_VERSION === 'V2.63');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Stock factions (possessiveName) ===');

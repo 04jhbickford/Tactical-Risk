@@ -4,6 +4,7 @@
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { possessivePhrase } from '../utils/possessive.js';
+import { isMobileShell, pickMobilePrimaryButtons } from './mobileShell.js';
 
 // Compact phase hints
 const PHASE_HINTS = {
@@ -449,6 +450,12 @@ export class PlayerPanel {
         disabled: hasUnresolvedCombats || hasUnplacedUnits,
         primary: true
       });
+    }
+
+    // Phone: one enabled primary CTA. End Turn and Done never coexist;
+    // illegal/disabled actions stay hidden (not greyed over another green).
+    if (isMobileShell()) {
+      buttons = pickMobilePrimaryButtons(buttons);
     }
 
     // No buttons to show (a warning-only bar is still useful — e.g. naval hint)
