@@ -189,6 +189,17 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     /\.hud-mobile-phase \{[\s\S]*?font-size:\s*(1[1-9]|[2-9]\d)px/.test(phoneBlock));
   check('phone tray peek class is in the 480 block',
     /pp-tray-peek/.test(phoneBlock) && /pp-tray-hint/.test(phoneBlock));
+  check('phone ☰ / overflow is a 44px target',
+    /\.hud-menu-btn \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone menu rows are ≥44px',
+    /\.hud-menu-item \{[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone Turn Summary ✕ is a 44px target',
+    /\.turn-summary-close \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone Players tab is a 2-col grid, not 5-col',
+    /\.pp-player-stats \{[\s\S]*?grid-template-columns:\s*1fr 1fr/.test(phoneBlock));
+  check('phone setup pins START GAME above the fold',
+    /\.setup-footer \{[\s\S]*?position:\s*sticky[\s\S]*?bottom:\s*0/.test(phoneBlock)
+    && /\.start-game-btn \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
 }
 
 if (failures) {

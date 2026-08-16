@@ -16,6 +16,10 @@ Fix (chrome only — iPhone shell via `html.mobile-shell` + `@media (max-width: 
 - Combat / auto-battle hides End Turn, Done, and Max
 - Every phone control ≥44 CSS px with ≥8px gap
 - Hover-only facts get a tap equivalent: Surrendered is a visible OUT; IPC is visible on the ⋯ player list (not `title=` only)
+- 390px Place Capital: hide the 280px rail (map-first); phase chip stays visible; one bottom CTA
+- 390px setup: START GAME is sticky above the fold (no scroll to reach it)
+- Phone tap targets: ☰ / ⋯, Turn Summary ✕, and menu rows are ≥44 CSS px
+- Players tab is a 2-column stat grid, not a 5-column desktop table crammed into ~250px
 
 QA: 390×844 (iPhone shell) and 1280×800 (desktop). 772×635 stays on the V2.61 tablet chrome path. SCHEMA_VERSION stays 11. Rules / map / combat math / economy / victory / multiplayerGuard / Firebase / touchInput zoom math / territory-label collision / bottom-sheet detents / turn emails unchanged.
 
