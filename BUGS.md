@@ -9,14 +9,14 @@ James on live V2.68 (390, Place Capital / Initial Deployment): tap land opened t
 Verified in-repo: `setSelectedTerritory` already places when a peek chip is selected. `mouseup` then always called `tooltip.show()` on phone, and the 400ms hover timer could also pop the full card.
 
 Fix (phone setup only — same `place-unit` / Place Capital handlers):
-- Tap owned land during Initial Deployment places if a unit chip is selected. No second tap. No tooltip.
-- No unit selected: tap does not open the card. Peek hint is “Tap a unit, then the map.”
-- Place Capital: tap owned land selects it; one Confirm CTA. No tooltip on that tap.
+- Noun first: peek a unit chip, then one tap on legal land places it. No second tap. No tooltip.
+- No unit peeked: tap does not inspect and does not select. Peek hint is “Tap a unit, then the map.”
+- Place Capital: tap owned land selects it; one Confirm CTA is the verb (no second hint line). Miss / water / unowned taps do not clear a pending confirm. No tooltip on that tap.
 - Long-press (≥500ms, <12px move) opens a small edge chip (name / owner / IPC) under the HUD. Inspect does not place. V2.66 dismiss rules stay when a card is shown.
 
 V2.67 peek tray and V2.68 ink-edge gold stay. Desktop ≥901 and tablet 481–900 frozen. SCHEMA_VERSION stays 11.
 
-Harness: `node tools/test-tablet-chrome.mjs` (tap vs inspect predicates, edge clamp, deploy hint, existing peek + gold + tooltip dismiss).
+Harness: `node tools/test-tablet-chrome.mjs` (noun-first tap, capital confirm kept, peek hint vs Confirm, edge clamp, existing peek + gold + tooltip dismiss).
 
 ---
 

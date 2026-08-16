@@ -54,6 +54,7 @@ import {
   shouldShowPhoneTooltipOnHover,
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
+  shouldApplyPhoneSetupLandTap,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
 } from './ui/territoryTooltip.js';
@@ -1915,6 +1916,22 @@ async function init() {
           camera.dirty = true;
           return;
         }
+        const tappedIsOwnedLand = !!(
+          gameState
+          && !hit.isWater
+          && gameState.getOwner(hit.name) === gameState.currentPlayer?.id
+        );
+        if (isMobileShell() && gameState && !shouldApplyPhoneSetupLandTap({
+          mobile: true,
+          phase: gameState.phase,
+          inspected: phoneInspected,
+          selectedUnitType: playerPanel.selectedUnitType,
+          tappedIsOwnedLand,
+          hasHit: true,
+        })) {
+          camera.dirty = true;
+          return;
+        }
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
         // Phone setup: tap places / selects — do not open the inspect sheet.
@@ -1937,10 +1954,21 @@ async function init() {
           tooltip.show(hit, e.clientX, e.clientY);
         }
       } else {
+        if (isMobileShell()) hidePhoneTooltips('tap-away');
+        if (isMobileShell() && gameState && !shouldApplyPhoneSetupLandTap({
+          mobile: true,
+          phase: gameState.phase,
+          inspected: phoneInspected,
+          selectedUnitType: playerPanel.selectedUnitType,
+          tappedIsOwnedLand: false,
+          hasHit: false,
+        })) {
+          camera.dirty = true;
+          return;
+        }
         selectedTerritory = null;
         playerPanel.setSelectedTerritory(null);
         movementUI.cancel();
-        if (isMobileShell()) hidePhoneTooltips('tap-away');
       }
       camera.dirty = true;
     }

@@ -61,6 +61,29 @@ export function shouldCommitPhoneSetupTap({ mobile, phase, inspected } = {}) {
   return !inspected;
 }
 
+// Noun first on phone setup. Same handlers; this only decides whether a
+// land tap may change selection / place. Inspect is long-press, not a tap.
+// Place Capital: only owned land applies — a miss / water / unowned tap
+// must not clear a pending Confirm CTA.
+export function shouldApplyPhoneSetupLandTap({
+  mobile,
+  phase,
+  inspected,
+  selectedUnitType,
+  tappedIsOwnedLand,
+  hasHit,
+} = {}) {
+  if (!mobile) return true;
+  if (inspected) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+    return !!selectedUnitType && !!hasHit;
+  }
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    return !!tappedIsOwnedLand;
+  }
+  return true;
+}
+
 // Park the inspect chip under the HUD, not on the tapped land.
 export function clampTooltipToPhoneEdge({
   width,

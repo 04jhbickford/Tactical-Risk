@@ -19,6 +19,7 @@ const {
   shouldShowPhoneTooltipOnHover,
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
+  shouldApplyPhoneSetupLandTap,
   clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
   PHONE_INSPECT_HOLD_MS,
@@ -63,7 +64,7 @@ const {
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { Camera, MAP_WIDTH, MAP_HEIGHT } =
   await import(pathToFileURL(join(root, 'src/map/camera.js')));
-const { resolvePhaseHint, resolvePhonePeekHint, PHASE_HINTS } =
+const { resolvePhaseHint, resolvePhonePeekHint, shouldShowPhoneSetupPeekHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_PHASES, TURN_PHASES } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
@@ -536,8 +537,62 @@ check('inspect hold does not commit a setup tap',
   }) === true);
 check('phone deploy hint is Tap a unit, then the map',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit, then the map');
+check('phone capital hint is Tap your land until Confirm is the verb',
+  resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land'
+  && shouldShowPhoneSetupPeekHint({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT, hasPrimaryCta: false,
+  }) === true
+  && shouldShowPhoneSetupPeekHint({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT, hasPrimaryCta: true,
+  }) === false
+  && shouldShowPhoneSetupPeekHint({
+    phase: GAME_PHASES.UNIT_PLACEMENT, hasPrimaryCta: false,
+  }) === true);
 check('desktop deploy PHASE_HINTS stay Click to place units',
   resolvePhaseHint(GAME_PHASES.UNIT_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT]);
+check('desktop capital PHASE_HINTS stay Click your territory',
+  resolvePhaseHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.CAPITAL_PLACEMENT]);
+check('noun-first: deploy tap without a peeked unit does not apply',
+  shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    selectedUnitType: null,
+    tappedIsOwnedLand: true,
+    hasHit: true,
+  }) === false
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    selectedUnitType: 'infantry',
+    tappedIsOwnedLand: true,
+    hasHit: true,
+  }) === true);
+check('place-tap does not clear a pending Place Capital confirm',
+  shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    tappedIsOwnedLand: false,
+    hasHit: true,
+  }) === false
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    tappedIsOwnedLand: false,
+    hasHit: false,
+  }) === false
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    tappedIsOwnedLand: true,
+    hasHit: true,
+  }) === true);
+check('desktop setup land tap still applies',
+  shouldApplyPhoneSetupLandTap({
+    mobile: false,
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    selectedUnitType: null,
+    hasHit: true,
+  }) === true);
 {
   const edge = clampTooltipToPhoneEdge({ width: 180, viewportWidth: 390, padTop: 56 });
   check('inspect chip parks under the HUD, not on the tap',

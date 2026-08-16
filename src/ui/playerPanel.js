@@ -90,6 +90,7 @@ export function resolvePhaseHint(phase, turnPhase) {
 // (purchase / mobilize / tech stay empty there).
 export function resolvePhonePeekHint(phase, turnPhase) {
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Tap a unit, then the map';
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land';
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
   if (phase === GAME_PHASES.PLAYING) {
@@ -98,6 +99,12 @@ export function resolvePhonePeekHint(phase, turnPhase) {
     if (turnPhase === TURN_PHASES.DEVELOP_TECH) return 'Buy research dice';
   }
   return '';
+}
+
+// Place Capital Confirm is the verb. Do not also show a hint line.
+export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT && hasPrimaryCta) return false;
+  return true;
 }
 
 // Display string for a combat-move history row. Empty string = do not render
@@ -578,9 +585,11 @@ export class PlayerPanel {
       buttons = pickMobilePrimaryButtons(buttons);
       const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
       const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
-      peekHint = trayOwnsHint
-        ? resolvePhonePeekHint(phase, turnPhase)
-        : (warningText || resolvePhonePeekHint(phase, turnPhase) || '');
+      peekHint = shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta: buttons.length > 0 })
+        ? (trayOwnsHint
+          ? resolvePhonePeekHint(phase, turnPhase)
+          : (warningText || resolvePhonePeekHint(phase, turnPhase) || ''))
+        : '';
       warningHtml = '';
       peekRow = this._renderPhonePeekRow(player, phase, turnPhase);
     }
