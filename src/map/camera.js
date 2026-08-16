@@ -58,14 +58,26 @@ export class Camera {
   }
 
   /** Fit a world-space box into the canvas. Phone chrome calls this; desktop does not. */
-  fitBounds(bounds, { padding = 16, padTop = 0, padBottom = 0, padLeft = 0, padRight = 0 } = {}) {
+  fitBounds(bounds, {
+    padding = 16,
+    padTop = 0,
+    padBottom = 0,
+    padLeft = 0,
+    padRight = 0,
+    fillFrame = false,
+  } = {}) {
     if (!bounds || !this.canvas) return;
     const dpr = devicePixelRatio || 1;
+    const canvasH = this.canvas.height / dpr;
     const cssW = Math.max(1, this.canvas.width / dpr - padding * 2 - padLeft - padRight);
-    const cssH = Math.max(1, this.canvas.height / dpr - padding * 2 - padTop - padBottom);
+    const cssH = Math.max(1, canvasH - padding * 2 - padTop - padBottom);
     const bw = Math.max(1, bounds.maxX - bounds.minX);
     const bh = Math.max(1, bounds.maxY - bounds.minY);
-    const zoom = Math.min(cssW / bw, cssH / bh, MAX_ZOOM);
+    let zoom = Math.min(cssW / bw, cssH / bh, MAX_ZOOM);
+    // fillFrame: never letterbox the map on the teal canvas. Phone Fit only.
+    if (fillFrame) {
+      zoom = Math.min(MAX_ZOOM, Math.max(zoom, canvasH / MAP_HEIGHT));
+    }
     this.zoom = Math.max(this.minZoom, zoom);
     this.x = (bounds.minX + bounds.maxX) / 2;
     this.y = (bounds.minY + bounds.maxY) / 2;

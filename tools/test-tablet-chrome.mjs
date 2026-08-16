@@ -41,12 +41,19 @@ const {
   phoneUnitIconSize,
   shouldHideUnitsAtZoom,
   boundsFromPoints,
+  phoneProblemBounds,
+  phoneFitZoom,
+  phoneFitLetterboxesMap,
   territoryFitPoint,
   PHONE_MIN_ZOOM_FLOOR,
   shouldHighlightPhoneLegalTerritories,
   collectPhoneLegalTerritoryNames,
   phoneLegalOutlineWidth,
+  PHONE_LEGAL_FILL_ALPHA,
+  PHONE_LEGAL_OUTLINE_CSS_PX,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
+const { Camera, MAP_WIDTH, MAP_HEIGHT } =
+  await import(pathToFileURL(join(root, 'src/map/camera.js')));
 const { resolvePhaseHint, resolvePhonePeekHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_PHASES, TURN_PHASES } =
@@ -59,7 +66,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.67', GAME_VERSION === 'V2.67');
+check('GAME_VERSION is V2.68', GAME_VERSION === 'V2.68');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -382,11 +389,65 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     shouldToggleOffPhoneTooltip({
       mobile: true, visibleName: 'Germany', tappedName: 'Germany',
     }) === true);
-  check('gold outline is screen-space thick at Fit zoom (not 0.3 CSS px)',
-    phoneLegalOutlineWidth(0.11) >= 8 / 0.11 - 0.01
-    && phoneLegalOutlineWidth(0.11) > 40);
-  check('desktop/tablet outline helper is unused at their default zoom',
-    phoneLegalOutlineWidth(0.5) === 16);
+  check('gold outline is a screen-space edge at Fit (not 0.3 CSS px, not 8px glow)',
+    PHONE_LEGAL_OUTLINE_CSS_PX === 3
+    && phoneLegalOutlineWidth(0.11) >= 3 / 0.11 - 0.01
+    && phoneLegalOutlineWidth(0.11) < 40
+    && phoneLegalOutlineWidth(0.11) > 2.5);
+  check('owned-land fill is an edge, not a 55% flood',
+    PHONE_LEGAL_FILL_ALPHA === 0);
+  check('desktop/tablet outline helper stays unused at their default zoom',
+    phoneLegalOutlineWidth(0.5) === 3 / 0.5);
+}
+
+console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
+{
+  const worldZoom = phoneFitZoom({
+    cssW: 366, cssH: 636, canvasH: 844, bw: MAP_WIDTH, bh: MAP_HEIGHT,
+  });
+  check('390 Fit of the world is height-fill, not a letterboxed poster',
+    worldZoom >= 844 / MAP_HEIGHT - 0.001
+    && phoneFitLetterboxesMap({ canvasH: 844, zoom: worldZoom }) === false);
+  const containWorld = Math.min(366 / MAP_WIDTH, 636 / MAP_HEIGHT);
+  check('old contain-the-world zoom letterboxed on 390×844',
+    phoneFitLetterboxesMap({ canvasH: 844, zoom: containWorld }) === true);
+  const germany = phoneFitZoom({
+    cssW: 366, cssH: 636, canvasH: 844, bw: 600, bh: 400,
+  });
+  check('compact owned land still contains the problem and fills height',
+    germany >= 844 / MAP_HEIGHT - 0.001
+    && germany >= Math.min(366 / 600, 636 / 400) - 0.001
+    && phoneFitLetterboxesMap({ canvasH: 844, zoom: germany }) === false);
+  check('worldwide owned land still gets a regional window, not null',
+    !!phoneProblemBounds([{ x: 10, y: 10 }, { x: 3000, y: 20 }])
+    && boundsFromPoints([{ x: 10, y: 10 }, { x: 3000, y: 20 }]) === null);
+  const prevDpr = globalThis.devicePixelRatio;
+  globalThis.devicePixelRatio = 1;
+  try {
+    const cam = new Camera({ width: 390, height: 844 });
+    cam.usePhoneMinZoom = true;
+    cam.fitBounds(
+      { minX: 0, minY: 0, maxX: MAP_WIDTH, maxY: MAP_HEIGHT },
+      { padding: 12, padTop: 64, padBottom: 120, fillFrame: true },
+    );
+    check('Camera.fitBounds(fillFrame) on 390×844 does not letterbox the map',
+      844 / cam.zoom <= MAP_HEIGHT + 1);
+  } finally {
+    if (prevDpr === undefined) delete globalThis.devicePixelRatio;
+    else globalThis.devicePixelRatio = prevDpr;
+  }
+  const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
+  const highlight = rendererSrc.match(/renderPhoneLegalHighlights\([\s\S]*?\n  \}/);
+  check('phone legal highlight has no 55% wash and no glow',
+    !!highlight
+    && !/0\.55/.test(highlight[0])
+    && !/shadowBlur/.test(highlight[0]));
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  check('tablet 481–900 rail is still 280px after V2.68',
+    /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
+  check('unscoped tooltip z-index stays 100 (V2.66 visibility path untouched)',
+    /\.territory-tooltip \{[\s\S]*?z-index:\s*100/.test(beforePhone));
 }
 
 console.log('=== V2.67 phone peek tray (map-first; no persistent unit sheet) ===');

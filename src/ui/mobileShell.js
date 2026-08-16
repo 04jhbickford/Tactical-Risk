@@ -220,6 +220,54 @@ export function boundsFromPoints(points) {
   return { minX, minY, maxX, maxY };
 }
 
+// When owned land spans the world, still return a regional window around
+// the centroid so Fit is not a letterboxed world poster.
+export function phoneProblemBounds(points) {
+  const tight = boundsFromPoints(points);
+  if (tight) return tight;
+  if (!Array.isArray(points) || points.length === 0) return null;
+  let sx = 0;
+  let sy = 0;
+  let n = 0;
+  for (const p of points) {
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+    sx += p.x;
+    sy += p.y;
+    n++;
+  }
+  if (!n) return null;
+  const cx = sx / n;
+  const cy = sy / n;
+  const hw = MAP_WIDTH * 0.16;
+  const hh = MAP_HEIGHT * 0.20;
+  return {
+    minX: cx - hw,
+    maxX: cx + hw,
+    minY: Math.max(0, cy - hh),
+    maxY: Math.min(MAP_HEIGHT, cy + hh),
+  };
+}
+
+// Contain the problem in the padded rect, but never zoom out so far that
+// the 2000-tall map letterboxes on the teal canvas (#3CC0BF).
+export function phoneFitZoom({ cssW, cssH, canvasH, bw, bh, maxZoom = 3 } = {}) {
+  const w = Math.max(1, Number(cssW) || 1);
+  const h = Math.max(1, Number(cssH) || 1);
+  const ch = Math.max(1, Number(canvasH) || h);
+  const boxW = Math.max(1, Number(bw) || 1);
+  const boxH = Math.max(1, Number(bh) || 1);
+  const contain = Math.min(w / boxW, h / boxH);
+  const fillHeight = ch / MAP_HEIGHT;
+  return Math.min(maxZoom, Math.max(contain, fillHeight));
+}
+
+export function phoneFitLetterboxesMap({ canvasH, zoom } = {}) {
+  const z = Number(zoom);
+  const h = Number(canvasH);
+  if (!Number.isFinite(z) || z <= 0 || !Number.isFinite(h) || h <= 0) return true;
+  return h / z > MAP_HEIGHT + 0.5;
+}
+
 export function collectPhoneFitPoints(territories, predicate) {
   const list = Array.isArray(territories) ? territories : Object.values(territories || {});
   const pts = [];
@@ -251,9 +299,9 @@ export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
       if (t.isWater) return false;
       return gameState.getOwner?.(t.name) === playerId;
     });
-    const bounds = boundsFromPoints(pts);
+    const bounds = phoneProblemBounds(pts);
     if (bounds) {
-      camera.fitBounds(bounds, insets);
+      camera.fitBounds(bounds, { ...insets, fillFrame: true });
       return;
     }
   }
@@ -262,14 +310,14 @@ export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
     const pts = collectPhoneFitPoints(territories, (t) => (
       gameState.players?.some((p) => gameState.getCapital?.(p.id) === t.name)
     ));
-    const bounds = boundsFromPoints(pts);
+    const bounds = phoneProblemBounds(pts);
     if (bounds) {
-      camera.fitBounds(bounds, insets);
+      camera.fitBounds(bounds, { ...insets, fillFrame: true });
       return;
     }
   }
 
-  camera.fitWorld(insets);
+  camera.fitWorld({ ...insets, fillFrame: true });
 }
 
 export function worldFitBounds() {
@@ -282,12 +330,15 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
   );
 }
 
-// World-space stroke so the outline is ~8 CSS px at any zoom.
-// At Fit (~0.11) a raw 2.5px world stroke is 0.3 CSS px — invisible.
+// Screen-space owned *edge* — readable at Fit, not a 55% gold flood.
+// 2.5 world-px was 0.3 CSS px at ~0.11 (invisible). 8 CSS px + glow shouted.
+export const PHONE_LEGAL_FILL_ALPHA = 0;
+export const PHONE_LEGAL_OUTLINE_CSS_PX = 3;
+
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
-  if (!Number.isFinite(z) || z <= 0) return 8;
-  return Math.max(8, 8 / z);
+  if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;
+  return Math.max(PHONE_LEGAL_OUTLINE_CSS_PX, PHONE_LEGAL_OUTLINE_CSS_PX / z);
 }
 
 export function collectPhoneLegalTerritoryNames({

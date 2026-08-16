@@ -2,6 +2,24 @@
 
 ---
 
+## 8.16.26 — V2.68 phone Fit fills the frame; gold is an owned edge
+
+James on live V2.66 (390): (1) teal/blue bands above and below the map wasted the frame; (2) the gold owned-land wash shouted.
+
+Verified in-repo:
+- Canvas clear is `#3CC0BF`. `fitBounds` uses contain (`min(cssW/bw, cssH/bh)`). Fitting the 3500×2000 world (or a wide bbox) on 390×844 yields zoom ~0.11, viewport taller than `MAP_HEIGHT`, `_clamp` centers Y, and the extra vertical is empty teal — a world poster, not Fit-to-problem. `boundsFromPoints` also returns null for worldwide span and falls through to `fitWorld`.
+- V2.66 gold was `rgba(255,214,32,0.55)` fill + `8/zoom` stroke + matching `shadowBlur` (the 20% / 2.5 world-px pass was invisible at Fit). Same `renderPhoneLegalHighlights` path.
+
+Fix (phone-only; same highlight + Fit helpers):
+- Owned land is a 3 CSS px gold *edge*, no fill flood, no glow. Still screen-space so it reads at Fit.
+- Fit frames current-player owned land (setup) with `fillFrame`: contain the problem, but never zoom out past `canvasH / MAP_HEIGHT`. Worldwide span uses a regional centroid window instead of a letterboxed poster.
+
+Desktop ≥901 and tablet 481–900 stay frozen. V2.66 tooltip show/dismiss unchanged. SCHEMA_VERSION stays 11. V2.67 peek tray stays. No legal-marks, inspect-gesture, combat-preview, minimap/zoom hide, CSS-zoom, or Firebase.
+
+Harness: `node tools/test-tablet-chrome.mjs` (edge-only gold, 390 Fit does not letterbox, V2.67 peek predicates + tooltip predicates still pass).
+
+---
+
 ## 8.16.26 — V2.67 phone peek tray (map-first; no persistent 42/50dvh sheet)
 
 On `html.mobile-shell` / max-width 480, Purchase / Mobilize / Initial Deployment / movement rendered the full Actions or placement list. CSS capped `#sidebar` at 42dvh and `.player-panel--place-tray` at 50dvh, so the unit sheet covered about half the 390×844 frame and the map was a sliver.

@@ -1,5 +1,7 @@
 // Renders territory overlays: ownership colors, outlines, continent borders, hover/selection, labels
 
+import { phoneLegalOutlineWidth, PHONE_LEGAL_FILL_ALPHA } from '../ui/mobileShell.js';
+
 // Cross-water connections that should be drawn as visual lines on the map
 // These are land-to-land connections that cross water (like Alaska-Kamchatka in Risk)
 // Land bridges - allow land movement between these territories (no naval required)
@@ -92,24 +94,25 @@ export class TerritoryRenderer {
   renderPhoneLegalHighlights(ctx, zoom = 1) {
     if (!this.phoneLegalNames.size) return;
 
-    // Continent fill is opaque. A 20% gold wash + 2.5 world-px stroke is
-    // invisible at Fit zoom (~0.11 → 0.3 CSS px). Use a strong tint and a
-    // screen-space outline (~8 CSS px).
-    const outline = Math.max(8, 8 / (Number(zoom) || 1));
+    // Owned *edge* only. V2.66 55% wash + 8 CSS px glow shouted over the
+    // continent. Screen-space stroke stays readable at Fit; no fill flood.
+    const outline = phoneLegalOutlineWidth(zoom);
 
     ctx.save();
-    ctx.fillStyle = 'rgba(255, 214, 32, 0.55)';
-    ctx.strokeStyle = '#ffe566';
+    ctx.strokeStyle = '#e6c84a';
     ctx.lineWidth = outline;
     ctx.lineJoin = 'round';
-    ctx.shadowColor = 'rgba(255, 214, 32, 0.85)';
-    ctx.shadowBlur = outline;
+    if (PHONE_LEGAL_FILL_ALPHA > 0) {
+      ctx.fillStyle = `rgba(255, 214, 32, ${PHONE_LEGAL_FILL_ALPHA})`;
+    }
 
     for (const t of this.territories) {
       if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
-      for (const poly of t.polygons || []) {
-        if (!poly || poly.length < 3) continue;
-        this._fillPoly(ctx, poly);
+      if (PHONE_LEGAL_FILL_ALPHA > 0) {
+        for (const poly of t.polygons || []) {
+          if (!poly || poly.length < 3) continue;
+          this._fillPoly(ctx, poly);
+        }
       }
       if (t.polygons?.length === 1) {
         this._strokePoly(ctx, t.polygons[0]);
@@ -119,7 +122,6 @@ export class TerritoryRenderer {
       }
     }
 
-    ctx.shadowBlur = 0;
     ctx.restore();
   }
 
