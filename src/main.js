@@ -189,11 +189,16 @@ async function init() {
     unitTooltip.hide();
   };
 
+  let getPhoneFitFocus = () => ({
+    selectedName: playerPanel.selectedTerritory?.name || selectedTerritory?.name || null,
+    destinationNames: playerPanel.movePendingDest ? [playerPanel.movePendingDest] : [],
+  });
+
   const fitPhoneCamera = () => {
     if (!isMobileShell() || !camera) return;
     hidePhoneTooltips('fit');
     camera.usePhoneMinZoom = true;
-    applyPhoneCameraFit(camera, { gameState, territories });
+    applyPhoneCameraFit(camera, { gameState, territories, ...getPhoneFitFocus() });
   };
 
   onMobileShellChange((active) => {
@@ -228,6 +233,18 @@ async function init() {
   const movementUI = new MovementUI();
   movementUI.setUnitDefs(unitDefs);
   movementUI.setTerritories(territories);
+  getPhoneFitFocus = () => {
+    const dests = [];
+    if (playerPanel.movePendingDest) dests.push(playerPanel.movePendingDest);
+    if (movementUI.hasUnitsSelected()) {
+      dests.push(...(movementUI.getValidDestinations() || []));
+    }
+    const src = movementUI.getSelectedSource?.();
+    return {
+      selectedName: src?.name || playerPanel.selectedTerritory?.name || selectedTerritory?.name || null,
+      destinationNames: dests,
+    };
+  };
 
   // Combat UI
   const combatUI = new CombatUI();

@@ -1,6 +1,11 @@
 // Renders territory overlays: ownership colors, outlines, continent borders, hover/selection, labels
 
-import { phoneLegalOutlineWidth, PHONE_LEGAL_FILL_ALPHA } from '../ui/mobileShell.js';
+import {
+  phoneLegalOutlineWidth,
+  PHONE_LEGAL_FILL_ALPHA,
+  PHONE_LEGAL_EDGE_INK,
+  PHONE_LEGAL_EDGE_COLOR,
+} from '../ui/mobileShell.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
 // These are land-to-land connections that cross water (like Alaska-Kamchatka in Risk)
@@ -94,33 +99,38 @@ export class TerritoryRenderer {
   renderPhoneLegalHighlights(ctx, zoom = 1) {
     if (!this.phoneLegalNames.size) return;
 
-    // Owned *edge* only. V2.66 55% wash + 8 CSS px glow shouted over the
-    // continent. Screen-space stroke stays readable at Fit; no fill flood.
+    // Owned *edge* only — dark ink + muted gold hairline. No wash, no glow.
+    // Faction fill stays on the ownership overlay; this edge is a second cue.
     const outline = phoneLegalOutlineWidth(zoom);
 
     ctx.save();
-    ctx.strokeStyle = '#e6c84a';
-    ctx.lineWidth = outline;
     ctx.lineJoin = 'round';
     if (PHONE_LEGAL_FILL_ALPHA > 0) {
       ctx.fillStyle = `rgba(255, 214, 32, ${PHONE_LEGAL_FILL_ALPHA})`;
     }
 
-    for (const t of this.territories) {
-      if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
-      if (PHONE_LEGAL_FILL_ALPHA > 0) {
-        for (const poly of t.polygons || []) {
-          if (!poly || poly.length < 3) continue;
-          this._fillPoly(ctx, poly);
+    const strokeOwned = (color, width) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      for (const t of this.territories) {
+        if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
+        if (PHONE_LEGAL_FILL_ALPHA > 0) {
+          for (const poly of t.polygons || []) {
+            if (!poly || poly.length < 3) continue;
+            this._fillPoly(ctx, poly);
+          }
+        }
+        if (t.polygons?.length === 1) {
+          this._strokePoly(ctx, t.polygons[0]);
+        } else if (t.polygons?.length > 1) {
+          const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
+          this._strokeEdges(ctx, externalEdges);
         }
       }
-      if (t.polygons?.length === 1) {
-        this._strokePoly(ctx, t.polygons[0]);
-      } else if (t.polygons?.length > 1) {
-        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
-        this._strokeEdges(ctx, externalEdges);
-      }
-    }
+    };
+
+    strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
+    strokeOwned(PHONE_LEGAL_EDGE_COLOR, Math.max(outline * 0.45, outline - 8));
 
     ctx.restore();
   }

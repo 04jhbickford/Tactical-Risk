@@ -11,8 +11,8 @@ Verified in-repo:
 - V2.66 gold was `rgba(255,214,32,0.55)` fill + `8/zoom` stroke + matching `shadowBlur` (the 20% / 2.5 world-px pass was invisible at Fit). Same `renderPhoneLegalHighlights` path.
 
 Fix (phone-only; same highlight + Fit helpers):
-- Owned land is a 3 CSS px gold *edge*, no fill flood, no glow. Still screen-space so it reads at Fit.
-- Fit frames current-player owned land (setup) with `fillFrame`: contain the problem, but never zoom out past `canvasH / MAP_HEIGHT`. Worldwide span uses a regional centroid window instead of a letterboxed poster.
+- Owned land is a 2 CSS px **ink edge** (dark `#2a1f08` + muted gold `#c9a227`), no fill flood, no glow. Faction fill is never the only owned cue. Still screen-space so it reads at Fit.
+- Fit frames **owned / selected stack / dests** with `fillFrame`: contain the problem, but never zoom out past `canvasH / MAP_HEIGHT`. No all-capitals world poster. Worldwide span uses a regional centroid window instead of letterboxed teal.
 
 Desktop ≥901 and tablet 481–900 stay frozen. V2.66 tooltip show/dismiss unchanged. SCHEMA_VERSION stays 11. V2.67 peek tray stays. No legal-marks, inspect-gesture, combat-preview, minimap/zoom hide, CSS-zoom, or Firebase.
 

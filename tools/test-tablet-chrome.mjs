@@ -51,6 +51,9 @@ const {
   phoneLegalOutlineWidth,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_OUTLINE_CSS_PX,
+  PHONE_LEGAL_EDGE_INK,
+  PHONE_LEGAL_EDGE_COLOR,
+  collectPhoneFitFocusNames,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { Camera, MAP_WIDTH, MAP_HEIGHT } =
   await import(pathToFileURL(join(root, 'src/map/camera.js')));
@@ -389,15 +392,19 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     shouldToggleOffPhoneTooltip({
       mobile: true, visibleName: 'Germany', tappedName: 'Germany',
     }) === true);
-  check('gold outline is a screen-space edge at Fit (not 0.3 CSS px, not 8px glow)',
-    PHONE_LEGAL_OUTLINE_CSS_PX === 3
-    && phoneLegalOutlineWidth(0.11) >= 3 / 0.11 - 0.01
-    && phoneLegalOutlineWidth(0.11) < 40
+  check('gold outline is a 2 CSS px ink edge at Fit (not 0.3 CSS px, not 8px glow)',
+    PHONE_LEGAL_OUTLINE_CSS_PX === 2
+    && phoneLegalOutlineWidth(0.11) >= 2 / 0.11 - 0.01
+    && phoneLegalOutlineWidth(0.11) < 30
     && phoneLegalOutlineWidth(0.11) > 2.5);
   check('owned-land fill is an edge, not a 55% flood',
     PHONE_LEGAL_FILL_ALPHA === 0);
+  check('owned edge is ink + gold, not faction color alone',
+    PHONE_LEGAL_EDGE_INK === '#2a1f08'
+    && PHONE_LEGAL_EDGE_COLOR === '#c9a227'
+    && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_EDGE_INK);
   check('desktop/tablet outline helper stays unused at their default zoom',
-    phoneLegalOutlineWidth(0.5) === 3 / 0.5);
+    phoneLegalOutlineWidth(0.5) === 2 / 0.5);
 }
 
 console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
@@ -448,6 +455,18 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
   check('unscoped tooltip z-index stays 100 (V2.66 visibility path untouched)',
     /\.territory-tooltip \{[\s\S]*?z-index:\s*100/.test(beforePhone));
+  check('Fit frames stack+dests when present, else owned — not every capital',
+    JSON.stringify(collectPhoneFitFocusNames({
+      ownedNames: ['Germany', 'Poland'],
+      selectedName: 'France',
+      destinationNames: ['Belgium', 'France'],
+    })) === JSON.stringify(['France', 'Belgium'])
+    && JSON.stringify(collectPhoneFitFocusNames({
+      ownedNames: ['Germany', 'Poland'],
+    })) === JSON.stringify(['Germany', 'Poland']));
+  check('phone legal highlight uses ink + gold edge colors',
+    /PHONE_LEGAL_EDGE_INK/.test(rendererSrc)
+    && /PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc));
 }
 
 console.log('=== V2.67 phone peek tray (map-first; no persistent unit sheet) ===');

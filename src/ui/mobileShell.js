@@ -279,8 +279,32 @@ export function collectPhoneFitPoints(territories, predicate) {
   return pts;
 }
 
+// Fit frames owned land, or the selected stack + dests — not every capital.
+export function collectPhoneFitFocusNames({
+  ownedNames = [],
+  selectedName,
+  destinationNames = [],
+} = {}) {
+  const dests = (Array.isArray(destinationNames) ? destinationNames : []).filter(Boolean);
+  const selected = selectedName || null;
+  if (selected || dests.length) {
+    const names = [];
+    if (selected) names.push(selected);
+    for (const n of dests) {
+      if (n && !names.includes(n)) names.push(n);
+    }
+    return names;
+  }
+  return (Array.isArray(ownedNames) ? ownedNames : []).filter(Boolean);
+}
+
 // Fit the relevant map on phone enter / Fit tap. Desktop camera is untouched.
-export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
+export function applyPhoneCameraFit(camera, {
+  gameState,
+  territories,
+  selectedName,
+  destinationNames,
+} = {}) {
   if (!camera) return;
   camera.usePhoneMinZoom = true;
   const insets = {
@@ -288,35 +312,27 @@ export function applyPhoneCameraFit(camera, { gameState, territories } = {}) {
     padTop: PHONE_FIT_PAD_TOP,
     padBottom: PHONE_FIT_PAD_BOTTOM,
   };
-  const phase = gameState?.phase;
   const playerId = gameState?.currentPlayer?.id;
-
-  if (
-    (phase === GAME_PHASES.UNIT_PLACEMENT || phase === GAME_PHASES.CAPITAL_PLACEMENT)
-    && playerId && territories
-  ) {
-    const pts = collectPhoneFitPoints(territories, (t) => {
-      if (t.isWater) return false;
-      return gameState.getOwner?.(t.name) === playerId;
-    });
-    const bounds = phoneProblemBounds(pts);
-    if (bounds) {
-      camera.fitBounds(bounds, { ...insets, fillFrame: true });
-      return;
+  const ownedNames = [];
+  if (playerId && territories) {
+    const list = Array.isArray(territories) ? territories : Object.values(territories || {});
+    for (const t of list) {
+      if (!t || t.isWater) continue;
+      if (gameState.getOwner?.(t.name) === playerId) ownedNames.push(t.name);
     }
   }
-
-  if (phase === GAME_PHASES.PLAYING && gameState && territories) {
-    const pts = collectPhoneFitPoints(territories, (t) => (
-      gameState.players?.some((p) => gameState.getCapital?.(p.id) === t.name)
-    ));
-    const bounds = phoneProblemBounds(pts);
-    if (bounds) {
-      camera.fitBounds(bounds, { ...insets, fillFrame: true });
-      return;
-    }
+  const focus = collectPhoneFitFocusNames({
+    ownedNames,
+    selectedName,
+    destinationNames,
+  });
+  const focusSet = new Set(focus);
+  const pts = collectPhoneFitPoints(territories, (t) => focusSet.has(t.name));
+  const bounds = phoneProblemBounds(pts);
+  if (bounds) {
+    camera.fitBounds(bounds, { ...insets, fillFrame: true });
+    return;
   }
-
   camera.fitWorld({ ...insets, fillFrame: true });
 }
 
@@ -330,10 +346,13 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
   );
 }
 
-// Screen-space owned *edge* — readable at Fit, not a 55% gold flood.
-// 2.5 world-px was 0.3 CSS px at ~0.11 (invisible). 8 CSS px + glow shouted.
+// Screen-space owned *edge* — Polytopia/Civ border ink, not a wash.
+// 2.5 world-px was 0.3 CSS px at ~0.11 (invisible). 8 CSS px + 55% fill shouted.
+// Ink + muted gold so faction fill is never the only owned cue.
 export const PHONE_LEGAL_FILL_ALPHA = 0;
-export const PHONE_LEGAL_OUTLINE_CSS_PX = 3;
+export const PHONE_LEGAL_OUTLINE_CSS_PX = 2;
+export const PHONE_LEGAL_EDGE_INK = '#2a1f08';
+export const PHONE_LEGAL_EDGE_COLOR = '#c9a227';
 
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
