@@ -25,6 +25,21 @@ const TABS = [
   { id: 'debug', label: 'Debug', icon: '🔧', multiplayerOnly: true },
 ];
 
+// Live "is it my turn?" check — same predicate the Actions tab and the
+// multiplayer guard use. Exported so the bottom-bar visibility rule can be
+// unit-tested without constructing a DOM-backed PlayerPanel.
+export function computeIsLocalPlayerTurn({ isMultiplayer, isWaitingForSync, localUserId, currentPlayerOderId }) {
+  return !isMultiplayer ||
+    (!isWaitingForSync && !!localUserId && currentPlayerOderId === localUserId);
+}
+
+// Primary End-phase / confirm bar is only for the local human whose turn it is.
+export function shouldShowBottomTurnActions({ isMultiplayer, isLocalPlayerTurn, isAI }) {
+  if (isAI) return false;
+  if (isMultiplayer && !isLocalPlayerTurn) return false;
+  return true;
+}
+
 export class PlayerPanel {
   constructor() {
     this.gameState = null;
@@ -165,6 +180,15 @@ export class PlayerPanel {
     this._render();
   }
 
+  // After a failed push reloads authoritative state, drop optimistic waiting
+  // and put the Actions tab in front so mobilize/combat placement is visible
+  // (the grey End-phase bar alone is not enough to unstick the player).
+  revealActionsAfterResync() {
+    this.isWaitingForSync = false;
+    this.activeTab = 'actions';
+    this.clearAirLanding();
+  }
+
   isAirLandingActive() {
     return this.airLandingData && this.airLandingData.airUnitsToLand?.length > 0;
   }
@@ -235,8 +259,12 @@ export class PlayerPanel {
     // the same live check the multiplayer guard enforces. (The cached
     // isActivePlayer flag can lag or diverge from state; trusting it here let
     // the sidebar disagree with what actions were actually allowed.)
-    const isLocalPlayerTurn = !isMultiplayer ||
-      (!this.isWaitingForSync && !!localUserId && currentPlayerOderId === localUserId);
+    const isLocalPlayerTurn = computeIsLocalPlayerTurn({
+      isMultiplayer,
+      isWaitingForSync: this.isWaitingForSync,
+      localUserId,
+      currentPlayerOderId
+    });
 
     let html = '';
 
@@ -257,8 +285,8 @@ export class PlayerPanel {
     html += this._renderTabContent(phase, turnPhase, player);
     html += `</div>`;
 
-    // Fixed bottom actions bar
-    const bottomActions = this._renderBottomActions(phase, turnPhase, player);
+    // Fixed bottom actions bar — hidden for spectators / waiting clients
+    const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn);
     if (bottomActions) {
       html += bottomActions;
     }
@@ -267,9 +295,17 @@ export class PlayerPanel {
     this._bindEvents();
   }
 
-  _renderBottomActions(phase, turnPhase, player) {
-    // Don't show for AI
-    if (player.isAI) return '';
+  _renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn = true) {
+    // Don't show for AI, or for a multiplayer client that is not the active player.
+    // The Actions tab already hides on this predicate; the bottom bar used to
+    // ignore it and drew the current player's green End-phase button for everyone.
+    if (!shouldShowBottomTurnActions({
+      isMultiplayer: !!this.gameState?.isMultiplayer,
+      isLocalPlayerTurn,
+      isAI: player.isAI
+    })) {
+      return '';
+    }
 
     let buttons = [];
     let warningHtml = '';
@@ -348,7 +384,8 @@ export class PlayerPanel {
       if (hasUnresolvedCombats) {
         warningHtml = `<div class="pp-bottom-warning">⚠️ Resolve all battles before advancing</div>`;
       } else if (hasUnplacedUnits) {
-        warningHtml = `<div class="pp-bottom-warning">⚠️ Place all ${unplacedUnits} unit${unplacedUnits > 1 ? 's' : ''} before advancing</div>`;
+        const unitWord = unplacedUnits > 1 ? 'units' : 'unit';
+        warningHtml = `<div class="pp-bottom-warning">⚠️ Place all ${unplacedUnits} purchased ${unitWord} first — click a factory (or adjacent sea zone) on the map, then use + / All in the Actions tab</div>`;
       }
 
       buttons.push({
@@ -494,8 +531,12 @@ export class PlayerPanel {
     // is us — mirrors the guard's live check so the view can never allow (or
     // hide) actions the guard would decide differently on
     const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
-    const isLocalPlayerTurn = !isMultiplayer ||
-      (!this.isWaitingForSync && player?.oderId === this.localUserId);
+    const isLocalPlayerTurn = computeIsLocalPlayerTurn({
+      isMultiplayer,
+      isWaitingForSync: this.isWaitingForSync,
+      localUserId: this.localUserId,
+      currentPlayerOderId: player?.oderId
+    });
 
     // If multiplayer and not our turn (or waiting for sync), show waiting message
     if (isMultiplayer && !isLocalPlayerTurn) {

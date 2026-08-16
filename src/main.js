@@ -902,15 +902,19 @@ async function init() {
       // Surface sync failures — a silently dropped push looks like "the game ate
       // my move" to the player
       if (event === 'push_failed') {
-        // Transient failure; _doPush retries with backoff. Only warn softly.
-        showNotification('Connection hiccup — retrying to save your last action…');
+        // Transient failure; _doPush retries with backoff. One toast per cycle
+        // (not one per attempt) — auto-battle used to spam "connecting error".
+        if (data?.attempt === 1) {
+          showNotification('Connection hiccup — retrying to save your last action…');
+        }
       }
       // Retries exhausted: local state has been snapped back to the server's
       // last confirmed truth, so the client can't proceed on un-persisted state.
       if (event === 'push_exhausted') {
         showNotification('Could not save — game re-synced to the last confirmed state. Please retry your move.');
         camera.dirty = true;
-        playerPanel._render();
+        combatUI.syncFromAuthoritativeState();
+        playerPanel.revealActionsAfterResync();
       }
       // push_stale is handled automatically (state reloads); no user action needed
 

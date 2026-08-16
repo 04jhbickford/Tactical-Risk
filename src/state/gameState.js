@@ -214,6 +214,9 @@ export class GameState {
     }
 
     this._listeners = [];
+    // Depth counter: auto-battle (and similar bursts) pause per-step notifies
+    // so Firestore is not hammered; resume flushes a single notify.
+    this._notifyPauseDepth = 0;
 
     // Individual ship tracking (for carriers/transports with cargo)
     this._shipIdCounter = 0;
@@ -4798,7 +4801,17 @@ export class GameState {
     };
   }
 
+  pauseNotifications() {
+    this._notifyPauseDepth++;
+  }
+
+  resumeNotifications({ flush = true } = {}) {
+    if (this._notifyPauseDepth > 0) this._notifyPauseDepth--;
+    if (this._notifyPauseDepth === 0 && flush) this._notify();
+  }
+
   _notify() {
+    if (this._notifyPauseDepth > 0) return;
     for (const cb of this._listeners) {
       cb(this);
     }
