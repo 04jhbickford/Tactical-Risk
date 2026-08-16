@@ -40,6 +40,34 @@ export function shouldShowBottomTurnActions({ isMultiplayer, isLocalPlayerTurn, 
   return true;
 }
 
+// Initial-deployment Actions-panel UX. Display-only: ships still cannot be
+// placed on land. selectedKind is 'owned-land' | 'valid-sea' | 'other'.
+export function computeInitialPlacementUX({
+  placedThisRound = 0,
+  limit = 6,
+  totalRemaining = 0,
+  landAirRemaining = 0,
+  navalRemaining = 0,
+  hasPlaceable = false,
+  totalQueued = 0,
+  selectedKind = 'other',
+} = {}) {
+  const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
+  const showDone = canFinish && totalQueued === 0;
+  const onlyNavalRemain = landAirRemaining === 0 && navalRemaining > 0;
+  const needSeaHint = onlyNavalRemain && hasPlaceable && !showDone && selectedKind !== 'valid-sea';
+  const stuckWithNaval = onlyNavalRemain && !hasPlaceable;
+
+  let hint = null;
+  if (needSeaHint) {
+    hint = 'Click a sea zone adjacent to a coastal territory you own to place ships.';
+  } else if (stuckWithNaval && showDone) {
+    hint = 'No legal sea zone to place remaining ships. Continue to the next player.';
+  }
+
+  return { showDone, needSeaHint, stuckWithNaval, onlyNavalRemain, hint };
+}
+
 export class PlayerPanel {
   constructor() {
     this.gameState = null;
@@ -352,23 +380,19 @@ export class PlayerPanel {
         });
       }
     }
-    // Initial unit placement - Done button
+    // Initial unit placement - Done button (or a sea-zone hint when ships remain)
     else if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
-      const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
-      const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
-      const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
-      const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
-      const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
-      const showDoneButton = canFinish && totalQueued === 0;
+      const { ux } = this._getInitialPlacementUX(player);
 
-      if (showDoneButton) {
+      if (ux.showDone) {
         buttons.push({
           action: 'finish-placement',
           label: 'Done - Next Player →',
           disabled: false,
           primary: true
         });
+      } else if (ux.needSeaHint && ux.hint) {
+        warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
       }
     }
 
@@ -396,8 +420,8 @@ export class PlayerPanel {
       });
     }
 
-    // No buttons to show
-    if (buttons.length === 0) return '';
+    // No buttons to show (a warning-only bar is still useful — e.g. naval hint)
+    if (buttons.length === 0 && !warningHtml) return '';
 
     let html = `<div class="pp-bottom-actions">`;
     html += warningHtml;
@@ -1452,16 +1476,68 @@ export class PlayerPanel {
     return html;
   }
 
-  // Inline Placement UI - mimics buy phase style
-  _renderInlinePlacement(player) {
+  // Shared inputs for the initial-deploy Done button and naval-remainder hint.
+  _getInitialPlacementUX(player) {
     const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
     const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
     const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
     const unitsToPlace = this.gameState.getUnitsToPlace?.(player.id) || [];
     const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
-    const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
+    const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
+
+    const landAirRemaining = unitsToPlace.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def && (def.isLand || def.isAir || def.isBuilding) && u.quantity > 0;
+    }).reduce((sum, u) => sum + u.quantity, 0);
+    const navalRemaining = unitsToPlace.filter(u => {
+      const def = this.unitDefs?.[u.type];
+      return def?.isSea && u.quantity > 0;
+    }).reduce((sum, u) => sum + u.quantity, 0);
+
+    const isValidPlacement = !!(this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player));
+    const selectedKind = isValidPlacement && this.selectedTerritory.isWater
+      ? 'valid-sea'
+      : isValidPlacement ? 'owned-land' : 'other';
+
+    return {
+      placedThisRound,
+      totalRemaining,
+      limit,
+      unitsToPlace,
+      hasPlaceable,
+      totalQueued,
+      landAirRemaining,
+      navalRemaining,
+      isValidPlacement,
+      isWater: !!this.selectedTerritory?.isWater,
+      ux: computeInitialPlacementUX({
+        placedThisRound,
+        limit,
+        totalRemaining,
+        landAirRemaining,
+        navalRemaining,
+        hasPlaceable,
+        totalQueued,
+        selectedKind,
+      }),
+    };
+  }
+
+  // Inline Placement UI - mimics buy phase style
+  _renderInlinePlacement(player) {
+    const {
+      placedThisRound,
+      unitsToPlace,
+      totalQueued,
+      landAirRemaining,
+      isValidPlacement,
+      isWater,
+      ux,
+    } = this._getInitialPlacementUX(player);
+    const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
     const canUndo = this.gameState.placementHistory && this.gameState.placementHistory.length > 0;
     const slotsRemaining = limit - placedThisRound;
+    const showDoneButton = ux.showDone;
 
     // Separate units by category
     const landUnits = unitsToPlace.filter(u => {
@@ -1477,31 +1553,12 @@ export class PlayerPanel {
       return def?.isSea && u.quantity > 0;
     });
 
-    // Calculate actual remaining - only count units that can actually be placed
-    // Land/Air units can always be placed on owned territories
-    const landAirRemaining = [...landUnits, ...airUnits].reduce((sum, u) => sum + u.quantity, 0);
-    // Naval units need valid sea zones - check if player has any
-    const hasValidSeaZones = this.gameState.getPlayerTerritories?.(player.id)?.some(tName => {
-      const t = this.gameState.territoryByName?.[tName];
-      if (!t || t.isWater) return false;
-      return t.connections?.some(conn => {
-        const ct = this.gameState.territoryByName?.[conn];
-        return ct?.isWater;
-      });
-    }) || false;
-    const navalRemaining = hasValidSeaZones ? navalUnits.reduce((sum, u) => sum + u.quantity, 0) : 0;
-    const actualRemaining = landAirRemaining + navalRemaining;
+    // Pool remaining (including leftover ships). Stuck naval is still counted so
+    // the player sees why Done is offered — they are not skipped onto land.
+    const actualRemaining = landAirRemaining + navalUnits.reduce((sum, u) => sum + u.quantity, 0);
 
     // Initialize placement queue if not exists
     if (!this.placementQueue) this.placementQueue = {};
-
-    // Check if selected territory is valid for placement
-    const isValidPlacement = this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player);
-    const isWater = this.selectedTerritory?.isWater;
-
-    // Calculate total queued early so we can show Done button
-    const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
-    const showDoneButton = canFinish && totalQueued === 0;
 
     // Calculate deployed this round (confirmed + queued)
     const deployedThisRound = placedThisRound + totalQueued;
@@ -1527,9 +1584,13 @@ export class PlayerPanel {
             <span class="pp-selected-icon">${isWater ? '🌊' : '🏔'}</span>
             <span class="pp-selected-name">${this.selectedTerritory.name}</span>
           </div>`;
+      } else if (ux.needSeaHint && ux.hint) {
+        html += `<div class="pp-hint">${ux.hint}</div>`;
       } else {
         html += `<div class="pp-hint">Click a territory you own to place units</div>`;
       }
+    } else if (ux.stuckWithNaval && ux.hint) {
+      html += `<div class="pp-hint">${ux.hint}</div>`;
     }
 
     // Unit list with +/- controls (like buy phase)
@@ -1579,7 +1640,13 @@ export class PlayerPanel {
           html += airUnits.map(renderPlacementRow).join('');
         }
         if (landUnits.length === 0 && airUnits.length === 0) {
-          html += `<div class="pp-placement-done-msg">No land/air units to place</div>`;
+          if (ux.needSeaHint && ux.hint) {
+            html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+          } else if (ux.stuckWithNaval && ux.hint) {
+            html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+          } else {
+            html += `<div class="pp-placement-done-msg">No land/air units to place</div>`;
+          }
         }
       } else {
         // Sea zone - show naval units and air units if carrier with space exists
@@ -1628,7 +1695,12 @@ export class PlayerPanel {
         }
       }
     } else {
-      // Show summary of all remaining units when no territory selected
+      // Show summary of all remaining units when no valid placement tile is selected
+      if (ux.needSeaHint && ux.hint) {
+        html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+      } else if (ux.stuckWithNaval && ux.hint) {
+        html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+      }
       html += `<div class="pp-unit-category-label">Land (${landUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
       for (const unit of landUnits) {
         const imageSrc = getUnitIconPath(unit.type, player.id);
@@ -1679,6 +1751,11 @@ export class PlayerPanel {
     if (!this.territories) return false;
     const seaZone = this.territories[territory.name];
     if (!seaZone) return false;
+
+    // Same setup rule as hasPlaceableUnits / placeInitialUnit: enemy-occupied
+    // seas are not legal naval drops (does not change combat or movement).
+    const existingUnits = this.gameState.units?.[territory.name] || [];
+    if (existingUnits.some(u => u.owner !== player.id)) return false;
 
     for (const connName of seaZone.connections || []) {
       const conn = this.territories[connName];

@@ -5165,6 +5165,17 @@ html, body {
   border-radius: 6px;
 }
 
+.pp-placement-sea-hint {
+  font-size: 12px;
+  color: #ffcc66;
+  text-align: center;
+  padding: 10px;
+  background: rgba(255, 165, 0, 0.12);
+  border: 1px solid rgba(255, 165, 0, 0.35);
+  border-radius: 6px;
+  line-height: 1.4;
+}
+
 /* Inline Movement UI */
 .pp-inline-movement {
   background: rgba(0,0,0,0.2);
