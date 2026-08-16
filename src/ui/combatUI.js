@@ -1464,60 +1464,83 @@ export class CombatUI {
     this.gameState._notify();
   }
 
+  // Rebuild combat UI from the authoritative gameState after a failed push
+  // reloads the last confirmed doc. Local combatState can be several rounds
+  // ahead of what actually committed; leaving that overlay up is a soft-lock.
+  syncFromAuthoritativeState() {
+    this.hide();
+    if (this.gameState?.turnPhase === 'combat' && this.hasCombats()) {
+      this.showNextCombat();
+    }
+  }
+
   async _autoBattle() {
-    // Run combat to completion automatically
-    while (this.combatState.phase !== 'resolved' && this.combatState.phase !== 'airLanding') {
-      if (this.combatState.phase === 'bombardment') {
-        this._fireBombardment();
-        await new Promise(r => setTimeout(r, 150));
+    // One notify (and therefore one Firestore push) for the whole auto-battle
+    // instead of a push per combat round — rapid per-round notifies were
+    // exhausting retries and leaving the client on un-persisted combat state.
+    this.gameState?.pauseNotifications?.();
+    try {
+      while (this.combatState.phase !== 'resolved' && this.combatState.phase !== 'airLanding') {
+        if (this.combatState.phase === 'bombardment') {
+          this._fireBombardment();
+          await new Promise(r => setTimeout(r, 150));
+        }
+        if (this.combatState.phase === 'selectBombardmentCasualties') {
+          this._applyBombardmentCasualties();
+          await new Promise(r => setTimeout(r, 150));
+        }
+        if (this.combatState.phase === 'aaFire') {
+          this._rollAAFire();
+          await new Promise(r => setTimeout(r, 150));
+        }
+        if (this.combatState.phase === 'selectAACasualties') {
+          this._applyAACasualties();
+          await new Promise(r => setTimeout(r, 150));
+        }
+        // A&A Submarine Rules: Handle submarine first strike phase
+        if (this.combatState.phase === 'submarineFirstStrike') {
+          this._rollSubmarineFirstStrike();
+          await new Promise(r => setTimeout(r, 150));
+        }
+        if (this.combatState.phase === 'ready') {
+          await this._animateDiceRoll();
+          await new Promise(r => setTimeout(r, 100));
+        }
+        if (this.combatState.phase === 'selectCasualties') {
+          this._applyCasualties();
+          await new Promise(r => setTimeout(r, 150));
+        }
       }
-      if (this.combatState.phase === 'selectBombardmentCasualties') {
-        this._applyBombardmentCasualties();
-        await new Promise(r => setTimeout(r, 150));
+
+      // Handle air landing phase
+      // If external UI is connected, let the user select landings manually
+      // Otherwise auto-select closest valid landing for each air unit
+      if (this.combatState.phase === 'airLanding') {
+        if (this.onAirLandingRequired) {
+          // External UI will handle this - don't auto-select
+          // The callback was already called in _checkAirLanding
+        } else {
+          // No external UI - auto-select landings
+          const { airUnitsToLand } = this.combatState;
+          for (const airUnit of airUnitsToLand) {
+            if (airUnit.landingOptions.length > 0) {
+              // Select the closest landing option (use unit ID for individual tracking)
+              const unitKey = airUnit.id || airUnit.type;
+              this.combatState.selectedLandings[unitKey] = airUnit.landingOptions[0].territory;
+            }
+          }
+          this._confirmAirLandings();
+        }
       }
-      if (this.combatState.phase === 'aaFire') {
-        this._rollAAFire();
-        await new Promise(r => setTimeout(r, 150));
-      }
-      if (this.combatState.phase === 'selectAACasualties') {
-        this._applyAACasualties();
-        await new Promise(r => setTimeout(r, 150));
-      }
-      // A&A Submarine Rules: Handle submarine first strike phase
-      if (this.combatState.phase === 'submarineFirstStrike') {
-        this._rollSubmarineFirstStrike();
-        await new Promise(r => setTimeout(r, 150));
-      }
-      if (this.combatState.phase === 'ready') {
-        await this._animateDiceRoll();
-        await new Promise(r => setTimeout(r, 100));
-      }
-      if (this.combatState.phase === 'selectCasualties') {
-        this._applyCasualties();
-        await new Promise(r => setTimeout(r, 150));
-      }
+    } finally {
+      this.gameState?.resumeNotifications?.({ flush: true });
     }
 
-    // Handle air landing phase
-    // If external UI is connected, let the user select landings manually
-    // Otherwise auto-select closest valid landing for each air unit
-    if (this.combatState.phase === 'airLanding') {
-      if (this.onAirLandingRequired) {
-        // External UI will handle this - don't auto-select
-        // The callback was already called in _checkAirLanding
-        return; // Exit auto-battle, let user interact with landing UI
-      } else {
-        // No external UI - auto-select landings
-        const { airUnitsToLand } = this.combatState;
-        for (const airUnit of airUnitsToLand) {
-          if (airUnit.landingOptions.length > 0) {
-            // Select the closest landing option (use unit ID for individual tracking)
-            const unitKey = airUnit.id || airUnit.type;
-            this.combatState.selectedLandings[unitKey] = airUnit.landingOptions[0].territory;
-          }
-        }
-        this._confirmAirLandings();
-      }
+    // Persist the completed (or air-landing) battle in one shot — the per-round
+    // notifies were suppressed above, so this is the only Firestore write.
+    const sync = this.gameState?.syncManager;
+    if (sync?.pushStateNow) {
+      await sync.pushStateNow();
     }
   }
 

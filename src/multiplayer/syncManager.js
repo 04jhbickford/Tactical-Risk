@@ -457,12 +457,14 @@ export class SyncManager {
     }
 
     // Retries exhausted. Snap local state back to the last confirmed truth so a
-    // never-committed local advance can't diverge the game.
+    // never-committed local advance can't diverge the game. Reload FIRST so
+    // listeners see the restored doc (force=true: versions are usually equal
+    // after a failed write, and the un-forced path would no-op).
+    await this._reloadRemoteState({ force: true });
     this._notifyListeners('push_exhausted', {
       attemptedVersion: this.localVersion + 1,
       error: lastError?.message || String(lastError)
     });
-    await this._reloadRemoteState();
     return false;
   }
 
@@ -512,28 +514,33 @@ export class SyncManager {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  // Re-fetch the game doc and load it if newer than local (used after a stale
-  // push, when the winning snapshot may have arrived during our isPushing window)
-  async _reloadRemoteState() {
+  // Re-fetch the game doc and apply it. Default: only if remote is newer
+  // (stale-push case). force=true also applies when versions are equal, which
+  // is the exhausted-retry case: local gameState has uncommitted mutations
+  // sitting on the same version the server still holds.
+  async _reloadRemoteState({ force = false } = {}) {
     if (!this.db || !this.gameId) return;
     try {
       const snapshot = await getDoc(doc(this.db, 'games', this.gameId));
       if (!snapshot.exists()) return;
 
       const data = snapshot.data();
-      if (data.stateVersion > this.localVersion) {
-        console.log(`[Sync] Reloading after stale push: ${this.localVersion} -> ${data.stateVersion}`);
-        this.localVersion = data.stateVersion;
+      const remoteVersion = data.stateVersion || 0;
+      if (force || remoteVersion > this.localVersion) {
+        console.log(`[Sync] Reloading remote state: local v${this.localVersion} -> remote v${remoteVersion}${force ? ' (force)' : ''}`);
+        this.localVersion = remoteVersion;
         if (data.state) {
           this.isLoadingRemoteState = true;
           this.gameState.loadFromJSON(data.state);
           this.isLoadingRemoteState = false;
         }
         this._updateActivePlayer(data.currentPlayerId);
-        this._notifyListeners('state_updated', {
-          version: this.localVersion,
-          currentPlayerId: data.currentPlayerId
-        });
+        if (!force) {
+          this._notifyListeners('state_updated', {
+            version: this.localVersion,
+            currentPlayerId: data.currentPlayerId
+          });
+        }
       }
     } catch (error) {
       console.error('[Sync] Reload after stale push failed', error);

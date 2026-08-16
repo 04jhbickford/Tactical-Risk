@@ -401,6 +401,40 @@ console.log('=== P5: serialize + coalesce concurrent pushes (Fix 1) ===');
   check('P5: local version consistent with doc after coalescing', h.localVersion === doc.stateVersion);
 }
 
+console.log('=== P6: auto-battle notify pause + equal-version exhaust reload (V2.58) ===');
+{
+  // Auto-battle used to _notify() every combat round (100ms debounce → many
+  // transactions). Pause collapses that to one flush. Exhausted push must
+  // reload even when remote version === local version (the production
+  // _reloadRemoteState used to no-op on equality, leaving combat UI ahead).
+  const doc = new MockDoc(composition(2, 0, 6));
+  const sean = new Client('sean', 'user_0', doc, { isHost: true, manualPush: true });
+  const baseVersion = doc.stateVersion;
+  const baseUnits = structuredClone(sean.gs.units);
+
+  let notifies = 0;
+  sean.gs.subscribe(() => { notifies++; });
+
+  sean.gs.pauseNotifications();
+  for (let i = 0; i < 8; i++) {
+    const t = Object.keys(sean.gs.units)[0];
+    sean.gs.units[t] = [{ type: 'infantry', quantity: 1 + i, owner: sean.gs.currentPlayer.id }];
+    sean.gs._notify(); // swallowed while paused
+  }
+  check('P6: per-round notifies swallowed during pause', notifies === 0);
+  sean.gs.resumeNotifications({ flush: true });
+  check('P6: resume flushes exactly one notify', notifies === 1);
+
+  doc.failNext = 99;
+  const exhausted = await sean.pushWithRetry(3);
+  check('P6: exhausted push reloads even when versions are equal',
+        exhausted.status === 'exhausted' && sean.localVersion === baseVersion &&
+        sean.reloadedOnExhaust === 1 &&
+        JSON.stringify(sean.gs.units) === JSON.stringify(baseUnits));
+  check('P6: doc never moved (equal-version failed write)',
+        doc.stateVersion === baseVersion);
+}
+
 console.log('=== B3: turn indicator single source of truth (Bug 3) ===');
 {
   // A committed handoff to user_1 is in the doc. A stale cached flag on user_0's
