@@ -3,6 +3,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
+import { possessivePhrase } from '../utils/possessive.js';
 
 // Compact phase hints
 const PHASE_HINTS = {
@@ -503,7 +504,7 @@ export class PlayerPanel {
         turnIndicator = `<span class="pp-turn-badge your-turn" style="color: ${textColor};">YOUR TURN</span>`;
       } else {
         // Show "Current Turn:" label to make it clear this isn't the local player
-        headerLabel = `${player.name}'s Turn`;
+        headerLabel = possessivePhrase(player.name, 'Turn');
         turnIndicator = `<span class="pp-turn-badge waiting">WAITING</span>`;
       }
     }

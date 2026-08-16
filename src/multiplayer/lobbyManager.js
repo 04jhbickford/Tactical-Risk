@@ -18,6 +18,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
+import { possessivePhrase } from '../utils/possessive.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -72,7 +73,7 @@ export class LobbyManager {
     const lobbyData = {
       code,
       hostId: user.id,
-      name: name || `${user.displayName}'s Game`,
+      name: name || possessivePhrase(user.displayName, 'Game'),
       password: settings.password || null,
       status: 'waiting', // 'waiting', 'starting', 'in_progress', 'finished'
       isPublished: false, // Lobby not visible in Open Games until host clicks "Create Game"

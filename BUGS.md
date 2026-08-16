@@ -2,6 +2,23 @@
 
 ---
 
+## 8.16.26 — V2.62 turn-badge possessive (V2.61 playtest)
+
+Live V2.61 HUD turn badge read **"Germans's Turn"** (double possessive). Cause: HUD / player-panel / action-log copy concatenated `name + "'s Turn"`.
+
+Fix (UI/copy only): shared `possessiveName` / `possessivePhrase` in `src/utils/possessive.js`.
+- Plural / sibilant names (Germans, Russians, Americans, James, Max): `Germans' Turn`
+- Adjectival demonyms (British, Japanese): `British Turn` (no `'s`)
+- Other names: `Alice's Turn`
+
+Same helper on the sidebar turn header, action-log "turn begins" line, and lobby default "… Game" name. Combat headers already used the bare faction name.
+
+SCHEMA_VERSION stays 11. Combat math / economy / victory / setup-rules / map / multiplayerGuard / touchInput.js / zoom math unchanged.
+
+Harness: `node tools/test-possessive.mjs`. Existing `test-tablet-chrome.mjs`, `test-recent-move-display.mjs`, `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
+
+---
+
 ## 8.16.26 — V2.61 tablet chrome (V2.59 narrow-window playtest, ~772×635)
 
 Playtest on a ~770px window (sidebar ~280px, map ~490px):

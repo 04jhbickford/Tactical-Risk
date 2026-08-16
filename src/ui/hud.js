@@ -1,6 +1,7 @@
 // Top bar HUD: game title, current turn info, player legend
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
+import { possessivePhrase } from '../utils/possessive.js';
 
 export class HUD {
   constructor() {
@@ -72,7 +73,7 @@ export class HUD {
           <div class="hud-current-turn">
             ${flagSrc ? `<img src="${flagSrc}" class="hud-flag-large" alt="${player.name}">` : ''}
             <div class="hud-turn-info">
-              <span class="hud-player-name" style="color: ${player.color}">${player.name}'s Turn</span>
+              <span class="hud-player-name" style="color: ${player.color}">${possessivePhrase(player.name, 'Turn')}</span>
               <span class="hud-phase-name">${this._getPhaseName(phase)}</span>
             </div>
           </div>`;

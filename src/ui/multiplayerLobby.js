@@ -4,6 +4,7 @@
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { GAME_VERSION } from './lobby.js';
+import { possessivePhrase } from '../utils/possessive.js';
 
 // Available factions (should match setup data)
 const FACTIONS = [
@@ -213,7 +214,7 @@ export class MultiplayerLobby {
       <form class="mp-form modern" data-form="create">
         <div class="mp-field">
           <label>Game Name</label>
-          <input type="text" id="create-name" placeholder="${user?.displayName}'s Game" maxlength="30" class="modern-input">
+          <input type="text" id="create-name" placeholder="${possessivePhrase(user?.displayName, 'Game')}" maxlength="30" class="modern-input">
         </div>
         <div class="mp-field-row">
           <div class="mp-field">

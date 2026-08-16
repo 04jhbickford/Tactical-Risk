@@ -1,6 +1,8 @@
 // Action Log - tracks and displays all player actions during the game
 // Now integrated into the sidebar/player panel
 
+import { possessivePhrase } from '../utils/possessive.js';
+
 export class ActionLog {
   constructor() {
     this.gameState = null;
@@ -157,7 +159,7 @@ export class ActionLog {
 
   logTurnStart(player, round) {
     this.log('turn', {
-      message: `Round ${round} - ${player.name}'s turn begins`,
+      message: `Round ${round} - ${possessivePhrase(player.name, 'turn')} begins`,
       round,
       color: player.color
     });
