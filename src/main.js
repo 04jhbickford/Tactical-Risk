@@ -47,7 +47,16 @@ import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
 import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
-import { shouldHidePhoneTooltipOn, shouldToggleOffPhoneTooltip } from './ui/territoryTooltip.js';
+import {
+  shouldHidePhoneTooltipOn,
+  shouldToggleOffPhoneTooltip,
+  shouldShowPhoneTooltipOnTap,
+  shouldShowPhoneTooltipOnHover,
+  shouldInspectPhoneHold,
+  shouldCommitPhoneSetupTap,
+  PHONE_INSPECT_HOLD_MS,
+  PHONE_INSPECT_MOVE_PX,
+} from './ui/territoryTooltip.js';
 
 initMobileShell();
 
@@ -163,6 +172,16 @@ async function init() {
   let hoverTooltipTimeout = null;
   let lastHoverPos = { x: 0, y: 0 };
   const TOOLTIP_DELAY = 400; // ms before showing tooltip
+  let phoneHoldTimer = null;
+  let phoneHoldStart = null;
+  let phoneInspected = false;
+
+  const clearPhoneHold = () => {
+    if (phoneHoldTimer) {
+      clearTimeout(phoneHoldTimer);
+      phoneHoldTimer = null;
+    }
+  };
 
   // Drag-and-drop state for unit movement
   let isDraggingUnits = false;
@@ -1493,6 +1512,28 @@ async function init() {
       tooltip.hide();
     }
     unitTooltip.hide();
+    clearPhoneHold();
+    phoneInspected = false;
+    phoneHoldStart = { x: e.clientX, y: e.clientY };
+    if (isMobileShell() && gameState && !shouldShowPhoneTooltipOnTap({
+      mobile: true, phase: gameState.phase,
+    })) {
+      phoneHoldTimer = setTimeout(() => {
+        phoneHoldTimer = null;
+        if (!isMobileShell() || !gameState) return;
+        const world = camera.screenToWorld(phoneHoldStart.x, phoneHoldStart.y);
+        const hit = territoryMap.hitTest(wrapX(world.x), world.y);
+        if (!hit) return;
+        if (!shouldInspectPhoneHold({
+          mobile: true,
+          phase: gameState.phase,
+          heldMs: PHONE_INSPECT_HOLD_MS,
+          movedPx: 0,
+        })) return;
+        phoneInspected = true;
+        tooltip.show(hit, phoneHoldStart.x, phoneHoldStart.y, { inspect: true });
+      }, PHONE_INSPECT_HOLD_MS);
+    }
 
     // Check if we should start a unit drag (during movement phases)
     if (gameState && e.button === 0) {
@@ -1583,6 +1624,15 @@ async function init() {
       return;
     }
 
+    if (phoneHoldStart) {
+      const dx = e.clientX - phoneHoldStart.x;
+      const dy = e.clientY - phoneHoldStart.y;
+      if (Math.hypot(dx, dy) >= PHONE_INSPECT_MOVE_PX) {
+        clearPhoneHold();
+        phoneHoldStart = null;
+      }
+    }
+
     // Handle camera panning (only when mouse button is held down and dragging)
     const moved = camera.onMouseMove(e);
     if (moved) {
@@ -1595,6 +1645,8 @@ async function init() {
       hoverTerritory = null;
       tooltip.hide();
       unitTooltip.hide();
+      clearPhoneHold();
+      phoneHoldStart = null;
       if (hoverTooltipTimeout) {
         clearTimeout(hoverTooltipTimeout);
         hoverTooltipTimeout = null;
@@ -1652,7 +1704,7 @@ async function init() {
         tooltip.hide();
 
         // Start new tooltip timer if hovering over a territory
-        if (hit && gameState) {
+        if (hit && gameState && shouldShowPhoneTooltipOnHover({ mobile: isMobileShell() })) {
           lastHoverPos = { x: e.clientX, y: e.clientY };
           hoverTooltipTimeout = setTimeout(() => {
             // Only show if still hovering over the same territory
@@ -1678,6 +1730,8 @@ async function init() {
     const wasDrag = camera.onMouseUp();
     canvas.classList.remove('panning');
     canvas.classList.remove('dragging-units');
+    clearPhoneHold();
+    phoneHoldStart = null;
 
     // Handle drag-and-drop unit movement completion
     if (isDraggingUnits && dragSourceTerritory) {
@@ -1852,12 +1906,24 @@ async function init() {
 
       if (hit) {
         console.log('[Click] Territory selected:', hit.name, 'Phase:', gameState?.phase);
+        if (isMobileShell() && gameState && !shouldCommitPhoneSetupTap({
+          mobile: true,
+          phase: gameState.phase,
+          inspected: phoneInspected,
+        })) {
+          phoneInspected = false;
+          camera.dirty = true;
+          return;
+        }
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
-        // Phone: tap-to-toggle + auto-dismiss (DevTools device mode included).
+        // Phone setup: tap places / selects — do not open the inspect sheet.
+        // Playing still tap-to-toggles. Long-press inspect is a small edge card.
         // Tablet (fromTouch, not mobile-shell) keeps the V2.64 peek.
         // Desktop mouse hover is unchanged — no fromTouch, not mobile-shell.
-        if (isMobileShell() && gameState) {
+        if (isMobileShell() && gameState && shouldShowPhoneTooltipOnTap({
+          mobile: true, phase: gameState.phase,
+        })) {
           if (shouldToggleOffPhoneTooltip({
             mobile: true,
             visibleName: tooltip.currentTerritory?.name,
@@ -1867,7 +1933,7 @@ async function init() {
           } else {
             tooltip.show(hit, e.clientX, e.clientY);
           }
-        } else if (e.fromTouch && gameState) {
+        } else if (!isMobileShell() && e.fromTouch && gameState) {
           tooltip.show(hit, e.clientX, e.clientY);
         }
       } else {

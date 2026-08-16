@@ -2,6 +2,24 @@
 
 ---
 
+## 8.16.26 — V2.69 phone setup tap places; inspect is a long-press edge card
+
+James on live V2.68 (390, Place Capital / Initial Deployment): tap land opened the half-screen territory card. Then he had to tap a unit in the tray and tap the same land again to place. The inspect sheet covered the tile (inspect-blocking-commit).
+
+Verified in-repo: `setSelectedTerritory` already places when a peek chip is selected. `mouseup` then always called `tooltip.show()` on phone, and the 400ms hover timer could also pop the full card.
+
+Fix (phone setup only — same `place-unit` / Place Capital handlers):
+- Tap owned land during Initial Deployment places if a unit chip is selected. No second tap. No tooltip.
+- No unit selected: tap does not open the card. Peek hint is “Tap a unit, then the map.”
+- Place Capital: tap owned land selects it; one Confirm CTA. No tooltip on that tap.
+- Long-press (≥500ms, <12px move) opens a small edge chip (name / owner / IPC) under the HUD. Inspect does not place. V2.66 dismiss rules stay when a card is shown.
+
+V2.67 peek tray and V2.68 ink-edge gold stay. Desktop ≥901 and tablet 481–900 frozen. SCHEMA_VERSION stays 11.
+
+Harness: `node tools/test-tablet-chrome.mjs` (tap vs inspect predicates, edge clamp, deploy hint, existing peek + gold + tooltip dismiss).
+
+---
+
 ## 8.16.26 — V2.68 phone Fit fills the frame; gold is an owned edge
 
 James on live V2.66 (390): (1) teal/blue bands above and below the map wasted the frame; (2) the gold owned-land wash shouted.

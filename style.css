@@ -17776,6 +17776,20 @@ html, body {
   html.mobile-shell .territory-tooltip .tt-ipc {
     color: #fde68a;
   }
+
+  /* Setup inspect: small edge chip under the HUD, not a half-screen sheet */
+  html.mobile-shell .territory-tooltip.territory-tooltip--edge {
+    max-width: min(200px, calc(100vw - 24px));
+    max-height: 88px;
+    overflow: hidden;
+    padding: 8px 10px;
+  }
+
+  html.mobile-shell .territory-tooltip.territory-tooltip--edge .tt-units-section,
+  html.mobile-shell .territory-tooltip.territory-tooltip--edge .tt-indicators,
+  html.mobile-shell .territory-tooltip.territory-tooltip--edge .tt-adjacent {
+    display: none;
+  }
 }
 
 /* Handoff hides live chrome (not painted underneath). Class-gated so

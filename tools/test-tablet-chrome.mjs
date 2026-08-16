@@ -15,7 +15,13 @@ const {
   resolveMapRightEdge,
   shouldHidePhoneTooltipOn,
   shouldToggleOffPhoneTooltip,
+  shouldShowPhoneTooltipOnTap,
+  shouldShowPhoneTooltipOnHover,
+  shouldInspectPhoneHold,
+  shouldCommitPhoneSetupTap,
+  clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
+  PHONE_INSPECT_HOLD_MS,
 } = await import(pathToFileURL(join(root, 'src/ui/territoryTooltip.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
@@ -69,7 +75,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.68', GAME_VERSION === 'V2.68');
+check('GAME_VERSION is V2.69', GAME_VERSION === 'V2.69');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -498,6 +504,51 @@ check('phone peek still uses PHASE_HINTS when they exist',
     && !/\.phone-tray-body \{/.test(beforePhone));
   check('tablet 481–900 rail is still 280px after V2.67',
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
+}
+
+console.log('=== V2.69 phone setup tap places; inspect is long-press edge card ===');
+check('phone setup tap does not open the tooltip',
+  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false
+  && shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+check('phone playing tap still can show the tooltip',
+  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.PLAYING }) === true);
+check('desktop tap predicate is off (hover path unchanged)',
+  shouldShowPhoneTooltipOnTap({ mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+check('phone hover does not open the tooltip',
+  shouldShowPhoneTooltipOnHover({ mobile: true }) === false
+  && shouldShowPhoneTooltipOnHover({ mobile: false }) === true);
+check('long-press on setup is inspect, not a tap',
+  shouldInspectPhoneHold({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, heldMs: PHONE_INSPECT_HOLD_MS, movedPx: 0,
+  }) === true
+  && shouldInspectPhoneHold({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, heldMs: 100, movedPx: 0,
+  }) === false
+  && shouldInspectPhoneHold({
+    mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, heldMs: PHONE_INSPECT_HOLD_MS, movedPx: 0,
+  }) === false);
+check('inspect hold does not commit a setup tap',
+  shouldCommitPhoneSetupTap({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: true,
+  }) === false
+  && shouldCommitPhoneSetupTap({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
+  }) === true);
+check('phone deploy hint is Tap a unit, then the map',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit, then the map');
+check('desktop deploy PHASE_HINTS stay Click to place units',
+  resolvePhaseHint(GAME_PHASES.UNIT_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT]);
+{
+  const edge = clampTooltipToPhoneEdge({ width: 180, viewportWidth: 390, padTop: 56 });
+  check('inspect chip parks under the HUD, not on the tap',
+    edge.top >= 56 && edge.left >= 0 && edge.left + 180 <= 390 + 1);
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';
+  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  check('phone inspect edge card is in the 480 block only',
+    /territory-tooltip--edge/.test(phoneBlock)
+    && /max-height:\s*88px/.test(phoneBlock)
+    && !/territory-tooltip--edge/.test(beforePhone));
 }
 
 if (failures) {

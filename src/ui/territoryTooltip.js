@@ -2,6 +2,7 @@
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { isMobileShell, readableFactionTextColor } from './mobileShell.js';
+import { GAME_PHASES } from '../state/gameState.js';
 
 // Phone tooltip sits under #hud (70) so the full-screen menu sheet covers it.
 // Desktop / tablet keep the unscoped z-index: 100.
@@ -26,6 +27,51 @@ export function shouldHidePhoneTooltipOn({ mobile, reason } = {}) {
 // DevTools device mode sends real mouse events (no fromTouch) — still toggle.
 export function shouldToggleOffPhoneTooltip({ mobile, visibleName, tappedName } = {}) {
   return !!mobile && !!visibleName && visibleName === tappedName;
+}
+
+export function isPhoneSetupPlacementPhase(phase) {
+  return phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
+// Place Capital / Initial Deployment: a tap commits (select / place).
+// It must not open the half-screen inspect card. Playing keeps tap-to-toggle.
+export function shouldShowPhoneTooltipOnTap({ mobile, phase } = {}) {
+  if (!mobile) return false;
+  return !isPhoneSetupPlacementPhase(phase);
+}
+
+// Phone has no hover inspect — the 400ms hover timer would pop the sheet
+// during a press and block the land under the finger.
+export function shouldShowPhoneTooltipOnHover({ mobile } = {}) {
+  return !mobile;
+}
+
+export const PHONE_INSPECT_HOLD_MS = 500;
+export const PHONE_INSPECT_MOVE_PX = 12;
+
+// Long-press on setup land = inspect, not place.
+export function shouldInspectPhoneHold({ mobile, phase, heldMs, movedPx } = {}) {
+  if (!mobile || !isPhoneSetupPlacementPhase(phase)) return false;
+  return Number(heldMs) >= PHONE_INSPECT_HOLD_MS
+    && Number(movedPx) < PHONE_INSPECT_MOVE_PX;
+}
+
+export function shouldCommitPhoneSetupTap({ mobile, phase, inspected } = {}) {
+  if (!mobile || !isPhoneSetupPlacementPhase(phase)) return true;
+  return !inspected;
+}
+
+// Park the inspect chip under the HUD, not on the tapped land.
+export function clampTooltipToPhoneEdge({
+  width,
+  viewportWidth,
+  padTop = 56,
+  padding = 8,
+} = {}) {
+  const maxW = Math.max(1, viewportWidth - padding * 2);
+  const w = Math.min(width || 180, maxW);
+  const left = Math.max(padding, (viewportWidth - w) / 2);
+  return { left, top: padTop + padding };
 }
 
 /**
@@ -150,7 +196,7 @@ export class TerritoryTooltip {
     this.unitDefs = unitDefs;
   }
 
-  show(territory, screenX, screenY) {
+  show(territory, screenX, screenY, { inspect = false } = {}) {
     if (!territory) {
       this.hide();
       return;
@@ -160,6 +206,27 @@ export class TerritoryTooltip {
     const t = territory;
     const isLand = !t.isWater;
     const continent = isLand ? this.continentByTerritory[t.name] : null;
+    const edgeInspect = !!(inspect && isMobileShell());
+    this.el.classList.toggle('territory-tooltip--edge', edgeInspect);
+
+    if (edgeInspect) {
+      let html = `<div class="tt-header">${t.name}</div>`;
+      if (this.gameState && isLand) {
+        const owner = this.gameState.getOwner(t.name);
+        const player = owner ? this.gameState.getPlayer(owner) : null;
+        const ownerColor = readableFactionTextColor(player?.color || '#888');
+        const ipc = this.gameState.getEffectiveIpc?.(t.name) ?? (t.production || 0);
+        html += `<div class="tt-owner"><span style="color:${ownerColor}">${player?.name || owner || ''}</span></div>`;
+        html += `<div class="tt-stats"><span class="tt-ipc">💰 ${ipc} IPC</span></div>`;
+      } else {
+        html += `<div class="tt-type">🌊 Sea Zone</div>`;
+      }
+      this.el.innerHTML = html;
+      this.el.classList.remove('hidden');
+      this._position(screenX, screenY);
+      this._armPhoneAutoDismiss();
+      return;
+    }
 
     let html = `<div class="tt-header">${t.name}</div>`;
 
@@ -476,8 +543,9 @@ export class TerritoryTooltip {
     };
     // Phone: never re-hide after show(). A leftover sidebar rail rect must
     // not eat the card. Desktop / tablet keep clamp-to-sidebar (may dismiss).
+    const edge = this.el.classList.contains('territory-tooltip--edge');
     const pos = mobile
-      ? clampTooltipToViewport(args)
+      ? (edge ? clampTooltipToPhoneEdge(args) : clampTooltipToViewport(args))
       : clampTooltipToMapArea(args);
 
     if (!pos) {
@@ -492,6 +560,7 @@ export class TerritoryTooltip {
   hide() {
     this._clearPhoneDismiss();
     this.el.classList.add('hidden');
+    this.el.classList.remove('territory-tooltip--edge');
     this.currentTerritory = null;
   }
 

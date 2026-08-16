@@ -89,9 +89,9 @@ export function resolvePhaseHint(phase, turnPhase) {
 // Phone peek only. Desktop still reads PHASE_HINTS via resolvePhaseHint
 // (purchase / mobilize / tech stay empty there).
 export function resolvePhonePeekHint(phase, turnPhase) {
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Tap a unit, then the map';
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Tap a unit, then the map';
   if (phase === GAME_PHASES.PLAYING) {
     if (turnPhase === TURN_PHASES.PURCHASE) return 'Tap a unit to buy';
     if (turnPhase === TURN_PHASES.MOBILIZE) return 'Tap a factory, then a unit';
