@@ -307,7 +307,7 @@ async function init() {
   // Rules button is now in the HUD (top bar)
 
   // Action handler for player panel buttons
-  playerPanel.setActionCallback((action, data) => {
+  playerPanel.setActionCallback(async (action, data) => {
     if (!gameState) return;
 
     switch (action) {
@@ -319,8 +319,7 @@ async function init() {
           camera.dirty = true;
           selectedTerritory = null;
           playerPanel.setSelectedTerritory(null);
-
-          // Don't auto-pan during initial deployment - let player explore the map
+          if (syncManager) await syncManager.pushStateNow();
         }
         break;
 
@@ -490,12 +489,26 @@ async function init() {
         }
         break;
 
-      case 'finish-placement':
-        gameState.finishPlacementRound(unitDefs);
-        syncManager?.pushStateNow(); // immediate push — no debounce
+      case 'finish-placement': {
+        // Lock the UI before the local pass so a double-tap cannot skip the
+        // next seat, and so kill-after-tap cannot look like "still my turn".
+        if (gameState.isMultiplayer) {
+          playerPanel.setWaitingForSync(true);
+        }
+        const pass = gameState.finishPlacementRound(unitDefs);
+        if (!pass?.ok) {
+          playerPanel.setWaitingForSync(false);
+          break;
+        }
+        if (syncManager) {
+          const pushed = await syncManager.pushStateNow();
+          if (!pushed) playerPanel.setWaitingForSync(false);
+        } else {
+          playerPanel.setWaitingForSync(false);
+        }
         camera.dirty = true;
-        // Don't recenter camera during initial deployment - let player explore freely
         break;
+      }
 
       case 'execute-move':
         // Execute a move from inline movement UI
@@ -679,7 +692,10 @@ async function init() {
         }
 
         gameState.nextPhase();
-        syncManager?.pushStateNow(); // immediate push — no debounce
+        if (syncManager) {
+          const pushed = await syncManager.pushStateNow();
+          if (!pushed) playerPanel.setWaitingForSync(false);
+        }
         camera.dirty = true;
 
         // Log phase change or turn start
@@ -996,6 +1012,7 @@ async function init() {
         showNotification('Could not save — game re-synced to the last confirmed state. Please retry your move.');
         camera.dirty = true;
         combatUI.syncFromAuthoritativeState();
+        playerPanel.setWaitingForSync(false);
         playerPanel.revealActionsAfterResync();
       }
       // push_stale is handled automatically (state reloads); no user action needed
@@ -1110,8 +1127,11 @@ async function init() {
       aiController.setUnitDefs(unitDefs);
       aiController.setActionLog(actionLog);
       aiController.setGameState(gameState);
-      aiController.setOnAction((action, data) => {
+      aiController.setOnAction((action) => {
         camera.dirty = true;
+        if (action === 'finishPlacement' || action === 'placeCapital') {
+          syncManager?.pushStateNow();
+        }
       });
       aiController.setOnStatusUpdate((message) => {
         console.log('[AI Status]', message);
@@ -1139,11 +1159,11 @@ async function init() {
     hud.setGameState(gameState);
     // Pass-and-play handoff overlay (self-disables for multiplayer/AI-only)
     handoffScreen.setGameState(gameState);
-    hud.setNextPhaseCallback(() => {
+    hud.setNextPhaseCallback(async () => {
       const prevPlayer = gameState.currentPlayer;
       const prevRound = gameState.round;
       gameState.nextPhase();
-      syncManager?.pushStateNow(); // immediate push — no debounce
+      if (syncManager) await syncManager.pushStateNow();
       camera.dirty = true;
 
       // Log phase change or turn start

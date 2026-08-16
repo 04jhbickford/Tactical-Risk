@@ -12,6 +12,7 @@ import {
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
 import { GAME_VERSION, compareGameVersions } from '../version.js';
+import { createPushQueue } from './pushCoalesce.js';
 
 export class SyncManager {
   constructor(gameId, gameState) {
@@ -27,13 +28,20 @@ export class SyncManager {
     this.unsubscribe = null;
     this._listeners = [];
     this._pendingPush = null;
-    // Serialize + coalesce pushes (V2.56): only one _doPush transaction may be
-    // in flight at a time. If local state changes while a push is running, we set
-    // _pushDirty and re-push exactly once on completion, instead of firing racing
-    // transactions that contend and throw (the V2.55 push-failure storm).
-    this._pushInFlight = null;
-    this._pushDirty = false;
+    // Serialize + coalesce pushes. A Done/pass waiter must wait for the
+    // coalesced follow-up write, not the in-flight pre-Done place write
+    // (V2.71 kill-after-Done left the pass unpersisted).
+    this._pushQueue = createPushQueue(async () => {
+      this.isPushing = true;
+      try {
+        return await this._runPushWithRetry();
+      } finally {
+        this.isPushing = false;
+      }
+    });
     this._versionOutdatedNotified = false; // fire the refresh banner at most once
+    this._lifecycleBound = false;
+    this._onLifecycleHide = () => this._flushOnHide();
   }
 
   // Dimension C (version-upgrade robustness): every game doc records the
@@ -104,6 +112,7 @@ export class SyncManager {
       return false;
     }
 
+    this._bindLifecycleFlush();
     const gameRef = doc(this.db, 'games', this.gameId);
 
     // Get initial state
@@ -208,6 +217,7 @@ export class SyncManager {
       return false;
     }
 
+    this._bindLifecycleFlush();
     const gameRef = doc(this.db, 'games', this.gameId);
     const startTime = Date.now();
 
@@ -317,6 +327,40 @@ export class SyncManager {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+    this._unbindLifecycleFlush();
+  }
+
+  _bindLifecycleFlush() {
+    if (this._lifecycleBound || typeof window === 'undefined') return;
+    this._lifecycleBound = true;
+    window.addEventListener('pagehide', this._onLifecycleHide);
+    document.addEventListener('visibilitychange', this._onLifecycleHide);
+  }
+
+  _unbindLifecycleFlush() {
+    if (!this._lifecycleBound || typeof window === 'undefined') return;
+    window.removeEventListener('pagehide', this._onLifecycleHide);
+    document.removeEventListener('visibilitychange', this._onLifecycleHide);
+    this._lifecycleBound = false;
+  }
+
+  // Best-effort: if Done/place is only in the debounce timer, fire it before
+  // the tab dies. An already-queued pass write keeps running; we do not invent
+  // a second Firebase client.
+  _flushOnHide() {
+    if (typeof document !== 'undefined' && document.visibilityState && document.visibilityState !== 'hidden') {
+      return;
+    }
+    if (!this.canPushLocalChange()) return;
+    if (this._pendingPush) {
+      clearTimeout(this._pendingPush);
+      this._pendingPush = null;
+      this.pushStateNow();
+      return;
+    }
+    if (this._pushQueue?.hasPendingWork()) {
+      this.pushStateNow();
+    }
   }
 
   // Update active player status
@@ -371,41 +415,12 @@ export class SyncManager {
     return this._doPush();
   }
 
-  // Serialize + coalesce entry point. Guarantees a single in-flight push; a
-  // change that lands mid-push is captured by one coalesced follow-up rather
-  // than a second concurrent transaction. Callers still get a boolean.
+  // Serialize + coalesce entry point. A Done waiter shares the queue tail,
+  // which includes the follow-up write of the post-Done state — not just the
+  // in-flight pre-Done place write.
   async _doPush() {
     if (!this.db || !this.gameId) return false;
-
-    // A push is already running — mark dirty so it re-runs once when it settles,
-    // and share that push's outcome with this caller.
-    if (this._pushInFlight) {
-      this._pushDirty = true;
-      return this._pushInFlight;
-    }
-
-    this._pushInFlight = (async () => {
-      this.isPushing = true;
-      try {
-        return await this._runPushWithRetry();
-      } finally {
-        this.isPushing = false;
-      }
-    })();
-
-    let result;
-    try {
-      result = await this._pushInFlight;
-    } finally {
-      this._pushInFlight = null;
-    }
-
-    // State changed while we were pushing — flush it in a single follow-up push.
-    if (this._pushDirty) {
-      this._pushDirty = false;
-      return this._doPush();
-    }
-    return result;
+    return this._pushQueue.enqueue();
   }
 
   // Retry transient transaction failures with small backoff. On exhaustion we

@@ -5,10 +5,26 @@ import { pathToFileURL } from 'url';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
+if (typeof globalThis.localStorage === 'undefined') {
+  globalThis.localStorage = {
+    getItem() { return null; },
+    setItem() {},
+    removeItem() {},
+  };
+}
+
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const { GameState } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
+const { GameState, GAME_PHASES } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { computeIsLocalPlayerTurn, shouldShowBottomTurnActions } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
+const { GAME_VERSION, SCHEMA_VERSION } =
+  await import(pathToFileURL(join(root, 'src/version.js')));
+const {
+  canFinishPlacementRound,
+  pickAuthoritativePlacementSnapshot,
+} = await import(pathToFileURL(join(root, 'src/state/placementPass.js')));
+const { createPushQueue } = await import(pathToFileURL(join(root, 'src/multiplayer/pushCoalesce.js')));
+const { mayRunAI } = await import(pathToFileURL(join(root, 'src/multiplayer/aiPolicy.js')));
 
 let failures = 0;
 const check = (label, cond) => {
@@ -87,6 +103,222 @@ console.log('=== Bug B: notify pause + equal-version reload rule ===');
   check('stale path: equal versions do NOT apply (no-op)', shouldApply(4, 4, false) === false);
   check('exhaust path: equal versions MUST apply (force)', shouldApply(4, 4, true) === true);
   check('exhaust path: older remote still applies when forced', shouldApply(3, 4, true) === true);
+}
+
+const unitDefs = {
+  infantry: { isLand: true },
+  tacticalBomber: { isAir: true },
+  factory: { isBuilding: true },
+};
+
+function makePlacementTable({
+  players = [
+    { id: 'p1', name: 'James', oderId: 'james', isAI: false },
+    { id: 'p2', name: 'Sean', oderId: 'sean', isAI: false },
+  ],
+  currentPlayerIndex = 0,
+  placementRound = 2,
+  unitsPlacedThisRound = 6,
+  unitsToPlace = null,
+} = {}) {
+  const territories = [
+    { name: 'Home', isWater: false, connections: ['Sea'] },
+    { name: 'Away', isWater: false, connections: ['Sea'] },
+    { name: 'Sea', isWater: true, connections: ['Home', 'Away'] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = players;
+  gs.currentPlayerIndex = currentPlayerIndex;
+  gs.phase = GAME_PHASES.UNIT_PLACEMENT;
+  gs.turnPhase = 'develop_tech';
+  gs.placementRound = placementRound;
+  gs.unitsPlacedThisRound = unitsPlacedThisRound;
+  gs.territoryState = {
+    Home: { owner: players[0].id },
+    Away: { owner: players[1].id },
+  };
+  gs.playerState = {
+    [players[0].id]: { capitalTerritory: 'Home' },
+    [players[1].id]: { capitalTerritory: players[1] ? 'Away' : 'Home' },
+  };
+  gs.unitsToPlace = unitsToPlace || {
+    [players[0].id]: [
+      { type: 'infantry', quantity: 3 },
+      { type: 'tacticalBomber', quantity: 1 },
+    ],
+    [players[1].id]: [{ type: 'infantry', quantity: 4 }],
+  };
+  return gs;
+}
+
+console.log('=== V2.72 version + leftover-unit pass predicate ===');
+{
+  check('GAME_VERSION is V2.72', GAME_VERSION === 'V2.72');
+  check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
+  check('round cap allows Done with leftovers still in the pool',
+    canFinishPlacementRound({
+      placedThisRound: 6, limit: 6, remainingKnown: 4, hasPlaceable: true,
+    }) === true);
+  check('unplaceable leftover allows Done (ghost / landlock)',
+    canFinishPlacementRound({
+      placedThisRound: 2, limit: 6, remainingKnown: 1, hasPlaceable: false,
+    }) === true);
+  check('placeable remainder below cap blocks Done',
+    canFinishPlacementRound({
+      placedThisRound: 2, limit: 6, remainingKnown: 4, hasPlaceable: true,
+    }) === false);
+}
+
+console.log('=== third-wave Done persists the next seat (async kill-after-Done) ===');
+{
+  const gs = makePlacementTable({ placementRound: 2, unitsPlacedThisRound: 6 });
+  gs._lastCapital = { playerId: 'p1', territory: 'Home' };
+  const before = gs.toJSON();
+  const pass = gs.finishPlacementRound(unitDefs);
+  check('Done on wave 3 commits', pass.ok === true);
+  check('next human already owns the seat', gs.currentPlayer?.id === 'p2');
+  check('phase stays unit placement while the next seat can place',
+    gs.phase === GAME_PHASES.UNIT_PLACEMENT);
+  check('leftover in-memory capital does not block Done', pass.ok === true);
+
+  const remote = gs.toJSON();
+  check('unitsPlacedThisRound is serialized (mid-wave rejoin cap)',
+    Object.prototype.hasOwnProperty.call(remote, 'unitsPlacedThisRound'));
+  check('pass snapshot stores the next seat', remote.currentPlayerIndex === 1);
+
+  const leaver = makePlacementTable({ placementRound: 2, unitsPlacedThisRound: 6 });
+  leaver.loadFromJSON(remote);
+  check('rejoin after committed Done is NOT stuck as the passer',
+    leaver.currentPlayer?.id === 'p2');
+  check('leaver cannot finish again — not their seat',
+    leaver.canFinishPlacementRound('p1', unitDefs) === false
+    || leaver.currentPlayer?.id !== 'p1');
+
+  const uncommitted = new GameState({ risk: { factions: [] } }, [], []);
+  uncommitted.loadFromJSON(before);
+  check('Done that never wrote: rejoin restores the same passer mid-wave',
+    uncommitted.currentPlayer?.id === 'p1');
+  check('uncommitted rejoin can Done again (6/6 still finishable)',
+    uncommitted.canFinishPlacementRound('p1', unitDefs) === true);
+  const retry = uncommitted.finishPlacementRound(unitDefs);
+  check('second client/session Done advances after a lost write',
+    retry.ok === true && uncommitted.currentPlayer?.id === 'p2');
+}
+
+console.log('=== rejoin mid-place restores the 6-cap, then pass ===');
+{
+  const live = makePlacementTable({ unitsPlacedThisRound: 3 });
+  live.unitsToPlace.p1 = [{ type: 'infantry', quantity: 3 }];
+  const snap = live.toJSON();
+  const rejoin = new GameState({ risk: { factions: [] } }, [
+    { name: 'Home', isWater: false, connections: [] },
+  ], []);
+  rejoin.loadFromJSON(snap);
+  check('mid-place rejoin restores unitsPlacedThisRound',
+    rejoin.unitsPlacedThisRound === 3);
+  check('mid-place rejoin still owns the seat', rejoin.currentPlayer?.id === 'p1');
+  const one = rejoin.placeInitialUnit('Home', 'infantry', unitDefs);
+  check('can finish remaining placements after rejoin', one.success === true);
+  rejoin.placeInitialUnit('Home', 'infantry', unitDefs);
+  rejoin.placeInitialUnit('Home', 'infantry', unitDefs);
+  const over = rejoin.placeInitialUnit('Home', 'infantry', unitDefs);
+  check('6-cap still enforced after rejoin (no extra place)',
+    over.success === false);
+  const pass = rejoin.finishPlacementRound(unitDefs);
+  check('after finishing remaining places, Done passes',
+    pass.ok === true && rejoin.currentPlayer?.id === 'p2');
+}
+
+console.log('=== double-tap Done does not skip the next human ===');
+{
+  const gs = makePlacementTable({ unitsPlacedThisRound: 6 });
+  const first = gs.finishPlacementRound(unitDefs);
+  const second = gs.finishPlacementRound(unitDefs);
+  check('first Done advances to p2', first.ok === true && gs.currentPlayer?.id === 'p2');
+  check('second Done is not-ready while p2 still has placeable units',
+    second.ok === false && second.reason === 'not-ready');
+  check('double-tap did not skip p2', gs.currentPlayer?.id === 'p2');
+}
+
+console.log('=== human vs AI + last-human leave (state, not presence) ===');
+{
+  const gs = makePlacementTable({
+    players: [
+      { id: 'p1', name: 'James', oderId: 'james', isAI: false },
+      { id: 'ai', name: 'Germany', isAI: true },
+    ],
+    unitsToPlace: {
+      p1: [{ type: 'infantry', quantity: 1 }],
+      ai: [{ type: 'infantry', quantity: 4 }],
+    },
+    unitsPlacedThisRound: 6,
+  });
+  const pass = gs.finishPlacementRound(unitDefs);
+  check('human Done hands the seat to the AI',
+    pass.ok === true && gs.currentPlayer?.id === 'ai');
+  const remote = gs.toJSON();
+  const rejoin = new GameState({ risk: { factions: [] } }, [], []);
+  rejoin.loadFromJSON(remote);
+  check('rejoin after Done+exit sees the AI seat, not a half-pass',
+    rejoin.currentPlayer?.id === 'ai');
+  check('default policy: last human gone → AI does not run unattended',
+    mayRunAI({ aiHasAuthority: true, runsWhenUnattended: false, humanPresent: false }) === false);
+  check('host/failover may run AI when a human is present',
+    mayRunAI({ aiHasAuthority: true, runsWhenUnattended: false, humanPresent: true }) === true);
+  check('non-host without authority cannot run AI after host leave',
+    mayRunAI({ aiHasAuthority: false, runsWhenUnattended: false, humanPresent: true }) === false);
+}
+
+console.log('=== two clients: remote/Firebase snapshot wins ===');
+{
+  const localPass = { currentPlayerIndex: 1, phase: 'unit_placement' };
+  const remoteStillPasser = { currentPlayerIndex: 0, phase: 'unit_placement' };
+  check('equal version: remote wins (no local-only pass)',
+    pickAuthoritativePlacementSnapshot({
+      remote: remoteStillPasser,
+      local: localPass,
+      remoteVersion: 4,
+      localVersion: 4,
+    }) === remoteStillPasser);
+  const remoteCommitted = { currentPlayerIndex: 1, phase: 'unit_placement' };
+  check('newer remote committed pass wins',
+    pickAuthoritativePlacementSnapshot({
+      remote: remoteCommitted,
+      local: remoteStillPasser,
+      remoteVersion: 5,
+      localVersion: 4,
+    }) === remoteCommitted);
+}
+
+console.log('=== push queue: Done waiter waits for the post-Done write ===');
+{
+  const writes = [];
+  let live = 'place';
+  let releasePlace;
+  const holdPlace = new Promise((r) => { releasePlace = r; });
+  let sawPlaceStart;
+  const placeStarted = new Promise((r) => { sawPlaceStart = r; });
+  const q = createPushQueue(async () => {
+    const snap = live;
+    if (snap === 'place') {
+      sawPlaceStart();
+      await holdPlace;
+    }
+    writes.push(snap);
+    return snap === 'done';
+  });
+  const placeWait = q.enqueue();
+  await placeStarted;
+  live = 'done';
+  const doneWait = q.enqueue();
+  releasePlace();
+  const [placeResult, doneResult] = await Promise.all([placeWait, doneWait]);
+  check('in-flight place write still happens', writes[0] === 'place');
+  check('coalesced follow-up writes the Done snapshot', writes[1] === 'done');
+  check('Done waiter result is the Done write, not the place write',
+    doneResult === true);
+  check('place waiter also settles after the coalesced Done write',
+    placeResult === true);
 }
 
 console.log(failures === 0 ? '\nALL MP TURN-SYNC CHECKS PASS' : `\n${failures} FAILURES`);

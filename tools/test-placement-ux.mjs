@@ -6,11 +6,15 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+import { readFileSync } from 'fs';
+
 const { GameState } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
-const { computeInitialPlacementUX } =
+const { computeInitialPlacementUX, resolvePhoneStickyUnitType } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
+const { canFinishPlacementRound, knownUnitsToPlace } =
+  await import(pathToFileURL(join(root, 'src/state/placementPass.js')));
 
 let failures = 0;
 const check = (label, cond) => {
@@ -27,7 +31,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.71', GAME_VERSION === 'V2.71');
+check('GAME_VERSION is V2.72', GAME_VERSION === 'V2.72');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== computeInitialPlacementUX: land selected, only naval remain, valid sea exists ===');
@@ -196,6 +200,65 @@ console.log('=== hasPlaceableUnits: landlocked vs coastal vs enemy-occupied sea 
   gs.unitsToPlace.coastal = [{ type: 'infantry', quantity: 1 }];
   check('land units remain placeable even with no legal sea',
     gs.hasPlaceableUnits('coastal', unitDefs) === true);
+}
+
+console.log('=== leftover / ghost unit must not block Done or sticky-select ===');
+{
+  const liveUnits = JSON.parse(readFileSync(join(root, 'data/units.json'), 'utf8'));
+  check('tacticalBomber is a real air unit in units.json',
+    liveUnits.tacticalBomber?.isAir === true);
+
+  const ghostPool = [
+    { type: 'tacticalBomber', quantity: 1 },
+    { type: 'unknownGhost', quantity: 1 },
+  ];
+  const known = knownUnitsToPlace(ghostPool, unitDefs);
+  check('unknown types are stripped from the known tray', known.length === 0);
+  check('sticky skips an unknown leftover (no ghost default)',
+    resolvePhoneStickyUnitType(null, ghostPool, unitDefs) === null);
+  check('sticky still defaults to the first known remaining type',
+    resolvePhoneStickyUnitType(null, [
+      { type: 'tacticalBomber', quantity: 1 },
+      { type: 'infantry', quantity: 2 },
+    ], unitDefs) === 'infantry');
+
+  check('ghost-only leftover is finishable (nothing known/placeable)',
+    canFinishPlacementRound({
+      placedThisRound: 0,
+      limit: 6,
+      remainingKnown: 0,
+      hasPlaceable: false,
+    }) === true);
+
+  const gs = new GameState({ risk: { factions: [] } }, [
+    { name: 'Home', isWater: false, connections: [] },
+  ], []);
+  gs.players = [{ id: 'p1', name: 'James' }];
+  gs.currentPlayerIndex = 0;
+  gs.phase = 'unit_placement';
+  gs.territoryState = { Home: { owner: 'p1' } };
+  gs.unitsToPlace = {
+    p1: [
+      { type: 'tacticalBomber', quantity: 1 },
+      { type: 'unknownGhost', quantity: 1 },
+    ],
+  };
+  check('GameState ignores unknown leftovers in remaining count',
+    gs.getTotalUnitsToPlace('p1', unitDefs) === 0);
+  check('GameState can finish when only ghosts remain',
+    gs.canFinishPlacementRound('p1', unitDefs) === true);
+
+  const withBomber = {
+    ...unitDefs,
+    tacticalBomber: { isAir: true },
+  };
+  gs.unitsToPlace.p1 = [{ type: 'tacticalBomber', quantity: 1 }];
+  check('real tactical bomber is placeable on owned land',
+    gs.hasPlaceableUnits('p1', withBomber) === true);
+  check('real leftover bomber does not hide Done only because it is a bomber — it is placeable',
+    gs.canFinishPlacementRound('p1', withBomber) === false);
+  const placed = gs.placeInitialUnit('Home', 'tacticalBomber', withBomber);
+  check('tactical bomber places on owned land', placed.success === true);
 }
 
 console.log(failures === 0 ? '\nALL PLACEMENT UX CHECKS PASS' : `\n${failures} FAILURES`);

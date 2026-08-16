@@ -13,6 +13,7 @@ import {
   shouldShowPhonePeekUnitRow,
   shouldUsePhonePlacementTray,
 } from './mobileShell.js';
+import { knownUnitsToPlace } from '../state/placementPass.js';
 
 // Compact phase hints — phone tray peek reads these next to End ${phase}.
 export const PHASE_HINTS = {
@@ -111,9 +112,8 @@ export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
 
 // After a place, keep the type. If it is exhausted (or never set), peek
 // the first remaining unit so the next land tap places with no tray trip.
-export function resolvePhoneStickyUnitType(selectedUnitType, unitsToPlace) {
-  const remaining = (Array.isArray(unitsToPlace) ? unitsToPlace : [])
-    .filter(u => u && u.quantity > 0);
+export function resolvePhoneStickyUnitType(selectedUnitType, unitsToPlace, unitDefs = null) {
+  const remaining = knownUnitsToPlace(unitsToPlace, unitDefs);
   if (selectedUnitType && remaining.some(u => u.type === selectedUnitType)) {
     return selectedUnitType;
   }
@@ -434,6 +434,7 @@ export class PlayerPanel {
       this.selectedUnitType = resolvePhoneStickyUnitType(
         this.selectedUnitType,
         this.gameState.getUnitsToPlace?.(player.id) || [],
+        this.unitDefs,
       );
     }
 
@@ -1729,9 +1730,10 @@ export class PlayerPanel {
   // Shared inputs for the initial-deploy Done button and naval-remainder hint.
   _getInitialPlacementUX(player) {
     const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
-    const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id);
+    const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id, this.unitDefs);
     const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
-    const unitsToPlace = this.gameState.getUnitsToPlace?.(player.id) || [];
+    const unitsToPlace = this.gameState.getKnownUnitsToPlace?.(player.id, this.unitDefs)
+      || knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs);
     const hasPlaceable = this.gameState.hasPlaceableUnits?.(player.id, this.unitDefs) ?? (totalRemaining > 0);
     const totalQueued = Object.values(this.placementQueue || {}).reduce((sum, q) => sum + q, 0);
 
@@ -1794,7 +1796,7 @@ export class PlayerPanel {
     let chips = '';
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      const units = (this.gameState.getUnitsToPlace?.(player.id) || []).filter(u => u.quantity > 0);
+      const units = knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs);
       for (const unit of units) {
         const imageSrc = getUnitIconPath(unit.type, player.id);
         const selected = this.selectedUnitType === unit.type ? ' selected' : '';
@@ -1847,8 +1849,8 @@ export class PlayerPanel {
 
   _renderPhonePlacementTray(player) {
     const { unitsToPlace, ux, placedThisRound, limit } = this._getInitialPlacementUX(player);
-    const remaining = (unitsToPlace || []).filter(u => u.quantity > 0);
-    this.selectedUnitType = resolvePhoneStickyUnitType(this.selectedUnitType, remaining);
+    const remaining = knownUnitsToPlace(unitsToPlace, this.unitDefs);
+    this.selectedUnitType = resolvePhoneStickyUnitType(this.selectedUnitType, remaining, this.unitDefs);
 
     const selectedName = this.selectedUnitType
       ? this.selectedUnitType.charAt(0).toUpperCase() + this.selectedUnitType.slice(1)

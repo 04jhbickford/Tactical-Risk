@@ -2,6 +2,23 @@
 
 ---
 
+## 8.16.26 — V2.72 multiplayer Done/pass must persist; leftover bomber cannot lock Done
+
+James on live V2.71: third deployment wave, placed, tapped Done / next player, exited the app. The game did not advance. Rejoin could not finish or pass — stuck between turns. An extra tactical bomber sat in the place tray and could not be placed.
+
+Verified in-repo (not a chrome/CSS bug):
+- `RISK_STARTING_UNITS` included `tacticalBomber`, but `data/units.json` had no def. `placeInitialUnit` / `hasPlaceableUnits` skip unknown types; the tray still listed quantity > 0. V2.71 sticky default-selected that leftover, so land taps failed while other real units remained and Done stayed hidden.
+- `finish-placement` mutated local state then fired `pushStateNow()` without awaiting. If a place write was in flight, the Done waiter received the pre-Done result; the follow-up write died with the tab. `unitsPlacedThisRound` was not in `toJSON`, so rejoin reset the 6-cap and hid Done.
+
+Fix (shared turn/pass state — desktop/tablet CSS frozen):
+- `tacticalBomber` is a real air unit (owned land). Unknown leftovers are stripped from tray/sticky/counts and cannot block Done.
+- `unitsPlacedThisRound` serializes (SCHEMA 11, additive). Mid-place rejoin restores the cap; uncommitted Done can be tapped again; committed Done already belongs to the next seat.
+- Push queue: a Done waiter waits for the coalesced post-Done write, not the in-flight place write. `pagehide` / hidden flushes a pending debounce. Double-tap Done is `not-ready`.
+
+Harness: `node tools/test-mp-turn-sync.mjs` (pass/rejoin/async/AI/double-tap/remote-wins/coalesce) and `node tools/test-placement-ux.mjs` (ghost leftover + real bomber).
+
+---
+
 ## 8.16.26 — V2.71 phone tap-tap-tap place; one-tap capital; undo
 
 James on live V2.70 (390): placement still felt like tray → map → tray → map. The commute is the bug (peek tray at the bottom, land in the middle). Confirm on Place Capital was an extra tap. Drag-from-chip was rejected (more travel; tiny DnD already failed).

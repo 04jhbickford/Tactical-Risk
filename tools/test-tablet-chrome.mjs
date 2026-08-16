@@ -89,7 +89,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.71', GAME_VERSION === 'V2.71');
+check('GAME_VERSION is V2.72', GAME_VERSION === 'V2.72');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -715,6 +715,11 @@ check('exhausted type defaults to the first remaining',
   ]) === 'artillery');
 check('no remaining units → null',
   resolvePhoneStickyUnitType('infantry', []) === null);
+check('unknown leftover is not sticky-selected when defs are passed',
+  resolvePhoneStickyUnitType(null, [
+    { type: 'tacticalBomber', quantity: 1 },
+    { type: 'infantry', quantity: 2 },
+  ], { infantry: { isLand: true } }) === 'infantry');
 check('phone capital tap on owned land auto-commits (desktop does not)',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,

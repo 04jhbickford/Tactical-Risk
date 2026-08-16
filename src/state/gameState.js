@@ -1,5 +1,11 @@
 // Central game state for all game modes
 
+import {
+  knownUnitsToPlace,
+  countKnownUnitsToPlace,
+  canFinishPlacementRound as canFinishPlacementRoundPred,
+} from './placementPass.js';
+
 export const GAME_PHASES = {
   LOBBY: 'lobby',
   CAPITAL_PLACEMENT: 'capital_placement',
@@ -87,7 +93,7 @@ export const RISK_STARTING_UNITS = {
   land: [
     { type: 'bomber', quantity: 1 },
     { type: 'fighter', quantity: 2 }, // Both fighters are in land, placed independently
-    { type: 'tacticalBomber', quantity: 1 },
+    { type: 'tacticalBomber', quantity: 1 }, // Must exist in data/units.json or it ghosts the tray
     { type: 'armour', quantity: 3 },
     { type: 'artillery', quantity: 3 },
     { type: 'infantry', quantity: 9 },
@@ -1125,16 +1131,33 @@ export class GameState {
     return this.unitsToPlace[playerId] || [];
   }
 
-  // Check if player has units left to place
-  hasUnitsToPlace(playerId) {
+  // Check if player has units left to place.
+  // When unitDefs is passed, unknown types (no def) do not count — they
+  // cannot be placed and must not keep the pass locked.
+  hasUnitsToPlace(playerId, unitDefs) {
+    if (unitDefs) return countKnownUnitsToPlace(this.unitsToPlace[playerId], unitDefs) > 0;
     const units = this.unitsToPlace[playerId] || [];
     return units.some(u => u.quantity > 0);
   }
 
+  getKnownUnitsToPlace(playerId, unitDefs) {
+    return knownUnitsToPlace(this.unitsToPlace[playerId], unitDefs);
+  }
+
   // Get total unit count left to place
-  getTotalUnitsToPlace(playerId) {
+  getTotalUnitsToPlace(playerId, unitDefs) {
+    if (unitDefs) return countKnownUnitsToPlace(this.unitsToPlace[playerId], unitDefs);
     const units = this.unitsToPlace[playerId] || [];
     return units.reduce((sum, u) => sum + u.quantity, 0);
+  }
+
+  canFinishPlacementRound(playerId, unitDefs) {
+    return canFinishPlacementRoundPred({
+      placedThisRound: this.unitsPlacedThisRound || 0,
+      limit: this.getUnitsPerRoundLimit(),
+      remainingKnown: this.getTotalUnitsToPlace(playerId, unitDefs),
+      hasPlaceable: this.hasPlaceableUnits(playerId, unitDefs),
+    });
   }
 
   // Check if player has any units that can actually be placed (have valid locations)
@@ -1441,8 +1464,14 @@ export class GameState {
   // Finish current player's placement round (6 units max, or all remaining)
   // unitDefs is optional but needed for accurate placeable check
   finishPlacementRound(unitDefs = null) {
+    if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) {
+      return { ok: false, reason: 'wrong-phase' };
+    }
     const player = this.currentPlayer;
-    if (!player) return;
+    if (!player) return { ok: false, reason: 'no-player' };
+    if (!this.canFinishPlacementRound(player.id, unitDefs)) {
+      return { ok: false, reason: 'not-ready' };
+    }
 
     this.unitsPlacedThisRound = 0;
     this.placementHistory = []; // Clear undo history for this round
@@ -1450,7 +1479,7 @@ export class GameState {
     // Check if all players have finished placing - either no units left OR no placeable units
     const anyPlayerCanPlace = this.players.some(p => {
       if (p.surrendered) return false;
-      const hasUnits = this.hasUnitsToPlace(p.id);
+      const hasUnits = this.hasUnitsToPlace(p.id, unitDefs);
       if (!hasUnits) return false;
       if (unitDefs) {
         return this.hasPlaceableUnits(p.id, unitDefs);
@@ -1488,7 +1517,7 @@ export class GameState {
         iterations++;
         const p = this.players[this.currentPlayerIndex];
         if (p.surrendered) continue;
-        const hasUnits = this.hasUnitsToPlace(p.id);
+        const hasUnits = this.hasUnitsToPlace(p.id, unitDefs);
         const canPlace = hasUnits && (!unitDefs || this.hasPlaceableUnits(p.id, unitDefs));
         if (canPlace) break;
         // Safety guard: anyPlayerCanPlace confirmed someone can place, so this loop
@@ -1498,6 +1527,11 @@ export class GameState {
 
     this._notify();
     this.autoSave(); // Persist deployment progress for hotseat resume
+    return {
+      ok: true,
+      currentPlayerIndex: this.currentPlayerIndex,
+      phase: this.phase,
+    };
   }
 
   // Add unit to pending purchases (PURCHASE phase) - units placed during MOBILIZE
@@ -4901,6 +4935,8 @@ export class GameState {
       cardTradeCount: this.cardTradeCount,
       unitsToPlace: this.unitsToPlace,
       placementRound: this.placementRound,
+      // Additive (no schema bump): mid-wave rejoin must restore the 6-unit cap.
+      unitsPlacedThisRound: this.unitsPlacedThisRound || 0,
       // v8: Save air unit origin tracking for proper landing calculation after load
       airUnitOrigins: this.airUnitOrigins,
       friendlyTerritoriesAtTurnStart: Array.from(this.friendlyTerritoriesAtTurnStart || []),
@@ -4950,6 +4986,7 @@ export class GameState {
     this.cardTradeCount = data.cardTradeCount || {};
     this.unitsToPlace = data.unitsToPlace || {};
     this.placementRound = data.placementRound || 0;
+    this.unitsPlacedThisRound = data.unitsPlacedThisRound || 0;
 
     // v8: Restore air unit tracking for proper landing calculation
     this.airUnitOrigins = data.airUnitOrigins || {};

@@ -39,6 +39,14 @@
     "isAir": true,
     "image": "Bomber.png"
   },
+  "tacticalBomber": {
+    "cost": 11,
+    "attack": 3,
+    "defense": 3,
+    "movement": 4,
+    "isAir": true,
+    "image": "Bomber.png"
+  },
   "transport": {
     "cost": 7,
     "attack": 0,
