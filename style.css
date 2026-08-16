@@ -17097,9 +17097,18 @@ html, body {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  /* Beat .pp-phase.compact { display: flex } so PLACE CAPITAL / CLICK
+     YOUR TERRITORY is not a second copy of the peek hint. */
   .pp-header,
-  .pp-phase {
+  .pp-header.compact,
+  .pp-phase,
+  .pp-phase.compact {
     display: none;
+  }
+
+  .player-panel.player-panel--peek {
+    max-height: none;
+    height: auto;
   }
 
   .pp-tabs {
@@ -17109,6 +17118,10 @@ html, body {
 
   .pp-tab {
     min-height: 44px;
+    height: 44px;
+    box-sizing: border-box;
+    padding: 6px 4px;
+    justify-content: center;
   }
 
   /* Tray peek: PHASE_HINTS one-liner next to the End ${phase} CTA */

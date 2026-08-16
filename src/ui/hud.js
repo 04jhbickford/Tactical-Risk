@@ -2,7 +2,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta } from './mobileShell.js';
+import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor } from './mobileShell.js';
 
 export class HUD {
   constructor() {
@@ -166,7 +166,7 @@ export class HUD {
           ${flagSrc
             ? `<img src="${flagSrc}" class="hud-mobile-flag" alt="">`
             : `<span class="hud-mobile-swatch" style="background:${player.color}"></span>`}
-          <span class="hud-mobile-faction" style="color:${player.color}">${player.name}</span>
+          <span class="hud-mobile-faction" style="color:${readableFactionTextColor(player.color)}">${player.name}</span>
           <span class="hud-mobile-sep" aria-hidden="true">·</span>
           <span class="hud-mobile-phase">${phaseName}</span>
         </div>`;

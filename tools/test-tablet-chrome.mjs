@@ -24,6 +24,8 @@ const {
   shouldHideTurnActionChrome,
   formatMobilePhaseLabel,
   formatMobilePlayerMeta,
+  shouldCollapseMobileTray,
+  readableFactionTextColor,
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { resolvePhaseHint, PHASE_HINTS } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
@@ -37,7 +39,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.63', GAME_VERSION === 'V2.63');
+check('GAME_VERSION is V2.64', GAME_VERSION === 'V2.64');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -200,7 +202,33 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
   check('phone setup pins START GAME above the fold',
     /\.setup-footer \{[\s\S]*?position:\s*sticky[\s\S]*?bottom:\s*0/.test(phoneBlock)
     && /\.start-game-btn \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
+  check('phone tabs are ≥44px tall',
+    /\.pp-tab \{[\s\S]*?min-height:\s*44px[\s\S]*?height:\s*44px/.test(phoneBlock));
+  check('phone hides compact phase header (one hint)',
+    /\.pp-phase\.compact \{[\s\S]*?display:\s*none/.test(phoneBlock));
 }
+
+console.log('=== V2.64 one Place Capital hint + readable faction color ===');
+check('desktop Place Capital does not collapse the sheet',
+  shouldCollapseMobileTray({ mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false);
+check('phone Place Capital collapses to peek (one hint)',
+  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === true);
+check('phone unit-placement keeps the actions sheet',
+  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+check('phone playing phase keeps the actions sheet',
+  shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.PLAYING }) === false);
+check('peek hint is the single PHASE_HINTS line',
+  resolvePhaseHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Click your territory');
+check('dark grey faction text is lifted for contrast',
+  readableFactionTextColor('#4A4A4A') !== '#4a4a4a'
+  && readableFactionTextColor('#4A4A4A').startsWith('#'));
+check('already-bright faction color is kept',
+  readableFactionTextColor('#1E90FF') === '#1e90ff');
+check('End Turn and Done still never coexist',
+  pickMobilePrimaryButtons([
+    { action: 'finish-placement', label: 'Done', primary: true },
+    { action: 'next-phase', label: 'End Turn', primary: true },
+  ]).length === 1);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

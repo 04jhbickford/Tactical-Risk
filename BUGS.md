@@ -2,6 +2,22 @@
 
 ---
 
+## 8.16.26 — V2.64 phone Place Capital polish (V2.63 390px playtest)
+
+Live V2.63 at 390×844 passed the big items (rail gone, map majority, opaque handoff, desktop HUD intact). Place Capital still repeated “Click your territory” three times (sheet header PLACE CAPITAL / CLICK YOUR TERRITORY, body copy, tray peek) and the sheet ate ~28–33% of the screen for pure text. Faction name “Germans” was low-contrast grey next to PLACE CAPITAL. Tab hit targets were short of 44px.
+
+Fix (phone-only — `html.mobile-shell` / `@media (max-width: 480px)`):
+- Collapse Place Capital to a thin peek: one PHASE_HINTS line + one CTA. Hide header / phase row / tabs / body hint (`.pp-phase.compact` was beating the V2.63 `display: none`)
+- Faction name uses `readableFactionTextColor` so the swatch stays raw and the text stays readable on the dark HUD
+- ACTIONS | PLAYERS | TERRITORY | LOG tabs are 44px tall
+- One primary CTA; End Turn and Done still never coexist
+
+Desktop ≥901 and the 481–900 tablet band are unchanged. SCHEMA_VERSION stays 11. Rules / map / combat / Firebase / turn email / territory labels / CSS-zoom / desktop HUD unchanged.
+
+Harness: `node tools/test-tablet-chrome.mjs` (one-hint collapse + contrast + 44px tabs). Existing `test-possessive.mjs`, `test-recent-move-display.mjs`, `test-placement-ux.mjs`, `test-mp-turn-sync.mjs`, `robustness-harness.mjs` still pass.
+
+---
+
 ## 8.16.26 — V2.63 desktop-safe iPhone chrome (James V2.62 playtest)
 
 Live V2.62 on iPhone (~390×844) was the desktop HUD stuffed into a phone: map was a ~110px postage stamp beside a 280px sidebar; title + five player chips overlapped; End Turn and Done could stack; Max sat next to zoom +/−; touch targets were 18px; “Pass the device” painted over live chrome; nothing used the Dynamic Island or home-indicator safe areas.

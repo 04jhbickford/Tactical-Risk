@@ -1,4 +1,4 @@
-// Phone chrome (V2.63). Visual split only.
+// Phone chrome (V2.63/V2.64). Visual split only.
 // iPhone shell is max-width: 480px so the V2.61 tablet band (481–900)
 // and desktop ≥901px stay on their existing trees. matchMedia sets
 // html.mobile-shell once; phone CSS lives in @media (max-width: 480px)
@@ -86,6 +86,31 @@ export function formatMobilePlayerMeta({ ipcs, surrendered } = {}) {
   if (Number.isFinite(Number(ipcs))) parts.push(`${Number(ipcs)}$`);
   if (surrendered) parts.push('OUT');
   return parts.join(' · ');
+}
+
+// Place Capital has no real Actions-tab chrome (no unit rows / buy list).
+// Collapse the sheet to a thin peek: one hint + one CTA. Do not also
+// render the phase header, body copy, and tab strip.
+export function shouldCollapseMobileTray({ mobile, phase } = {}) {
+  return !!mobile && phase === GAME_PHASES.CAPITAL_PLACEMENT;
+}
+
+// Faction swatch keeps the raw color. Text on the dark HUD must stay readable.
+export function readableFactionTextColor(hex) {
+  const raw = String(hex ?? '').trim();
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (!m) return raw || '#e0e0e0';
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (lum >= 0.45) return `#${h.toLowerCase()}`;
+  const lift = Math.min(1, (0.55 - lum) / 0.55 + 0.35);
+  const mix = (c) => Math.round(c + (255 - c) * lift);
+  const to = (n) => mix(n).toString(16).padStart(2, '0');
+  return `#${to(r)}${to(g)}${to(b)}`;
 }
 
 export function initMobileShell() {

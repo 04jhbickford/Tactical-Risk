@@ -4,7 +4,7 @@
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, pickMobilePrimaryButtons } from './mobileShell.js';
+import { isMobileShell, pickMobilePrimaryButtons, shouldCollapseMobileTray } from './mobileShell.js';
 
 // Compact phase hints — phone tray peek reads these next to End ${phase}.
 export const PHASE_HINTS = {
@@ -305,12 +305,14 @@ export class PlayerPanel {
 
   _render() {
     if (!this.gameState) {
+      this.el.classList.remove('player-panel--peek');
       this.contentEl.innerHTML = '';
       return;
     }
 
     const player = this.gameState.currentPlayer;
     if (!player) {
+      this.el.classList.remove('player-panel--peek');
       this.contentEl.innerHTML = '';
       return;
     }
@@ -336,22 +338,32 @@ export class PlayerPanel {
 
     let html = '';
 
-    // Player header (compact, always visible)
-    html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
+    // Phone Place Capital: thin peek only (one hint + one CTA). The desktop
+    // header / phase row / tabs / body hint repeat the same line three times.
+    const collapsePeek = shouldCollapseMobileTray({
+      mobile: isMobileShell(),
+      phase,
+    });
+    this.el.classList.toggle('player-panel--peek', collapsePeek);
 
-    // Phase indicator
-    html += this._renderPhaseIndicator(phase, turnPhase);
+    if (!collapsePeek) {
+      // Player header (compact, always visible)
+      html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
 
-    // Note: Waiting state is now shown inline in Actions tab, not as overlay
-    // This allows Players, Territory, Log tabs to remain fully functional while waiting
+      // Phase indicator
+      html += this._renderPhaseIndicator(phase, turnPhase);
 
-    // Tab navigation
-    html += this._renderTabs();
+      // Note: Waiting state is now shown inline in Actions tab, not as overlay
+      // This allows Players, Territory, Log tabs to remain fully functional while waiting
 
-    // Tab content
-    html += `<div class="pp-tab-content">`;
-    html += this._renderTabContent(phase, turnPhase, player);
-    html += `</div>`;
+      // Tab navigation
+      html += this._renderTabs();
+
+      // Tab content
+      html += `<div class="pp-tab-content">`;
+      html += this._renderTabContent(phase, turnPhase, player);
+      html += `</div>`;
+    }
 
     // Fixed bottom actions bar — hidden for spectators / waiting clients
     const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn);
@@ -677,9 +689,10 @@ export class PlayerPanel {
   _renderPhaseActions(phase, turnPhase, player) {
     let html = '';
 
-    // Capital placement - hint only, button is in bottom actions bar
+    // Capital placement - hint only, button is in bottom actions bar.
+    // Phone peek already owns this line — do not repeat it in the body.
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      if (!this.selectedTerritory || this.selectedTerritory.isWater) {
+      if (!isMobileShell() && (!this.selectedTerritory || this.selectedTerritory.isWater)) {
         html += `<div class="pp-hint">Click one of your territories to place your capital</div>`;
       }
     }
