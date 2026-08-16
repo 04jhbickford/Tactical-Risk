@@ -86,6 +86,8 @@ html, body {
   letter-spacing: 1px;
   color: #f0f0f0;
   text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .hud-turn {
@@ -665,7 +667,8 @@ html, body {
    With the art's min-width:50% + the 420px card, narrow viewports overflow
    (50% of 820 + 420 = 830px) and the card gets clipped at the right edge. */
 @media (max-width: 900px) {
-  .lobby-overlay::before {
+  .lobby-overlay::before,
+  .lobby-overlay.modern::before {
     display: none;
   }
 
@@ -1904,12 +1907,17 @@ html, body {
 }
 
 .player-name-input.modern:disabled {
-  opacity: 0.4;
+  opacity: 1;
+  color: #cbd5e1;
   cursor: not-allowed;
 }
 
 .player-name-input.modern::placeholder {
-  color: #475569;
+  color: #94a3b8;
+}
+
+.player-name-input.modern:disabled::placeholder {
+  color: #cbd5e1;
 }
 
 .player-options {
@@ -3697,7 +3705,8 @@ html, body {
   border-radius: 8px;
   padding: 10px 14px;
   min-width: 160px;
-  max-width: 280px;
+  /* Stay inside the map gutter so a 280px card cannot cover the Actions panel */
+  max-width: min(280px, calc(100vw - 320px - 30px));
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -16632,8 +16641,13 @@ html, body {
 
 /* Portrait tablets / narrow windows: slimmer sidebar leaves room for the map */
 @media (max-width: 900px) {
-  #sidebar {
+  #sidebar,
+  .player-panel {
     width: 280px;
+  }
+
+  .territory-tooltip {
+    max-width: min(280px, calc(100vw - 280px - 30px));
   }
 
   .player-grid.modern {
@@ -16642,6 +16656,91 @@ html, body {
 
   .mp-menu-grid.four-col {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Title + turn badge + flag strip must stay on one 48px row at ~770px */
+  #hud {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .hud-title {
+    font-size: 13px;
+    letter-spacing: 0.4px;
+  }
+
+  .hud-current-turn {
+    flex-shrink: 0;
+    gap: 6px;
+    padding: 4px 8px;
+  }
+
+  .hud-flag-large {
+    width: 24px;
+    height: 18px;
+  }
+
+  .hud-player-name {
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .hud-phase-name {
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .hud-turn-order {
+    flex-shrink: 0;
+    margin-left: 0;
+  }
+
+  .hud-phase-progress {
+    display: none;
+  }
+
+  /* Duplicate of the turn-order flags; names here are what overflowed the strip */
+  .hud-legend {
+    display: none;
+  }
+
+  /* After .lobby-container.modern { max-width: 600px } so this actually wins.
+     Setup was a 600px column with ~180px empty gutter at ~770px. */
+  .lobby-overlay.modern::before {
+    display: none;
+  }
+
+  .lobby-container.modern {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .lobby-content-wrapper {
+    max-width: none;
+  }
+
+  .lobby-setup,
+  .lobby-my-games {
+    max-width: none;
+  }
+}
+
+/* Narrow or short viewports: shrink the minimap so the map stays playable.
+   ~772×635 with a 280px sidebar leaves ~490px of map; 233×133 (and the
+   coarse-pointer 300×171) ate the lower-left. Keep it, just smaller. */
+@media (max-width: 900px), (max-height: 700px) {
+  #minimap {
+    width: 140px;
+    height: 80px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 900px),
+       (pointer: coarse) and (max-height: 700px) {
+  #minimap {
+    width: 156px;
+    height: 89px;
   }
 }
 

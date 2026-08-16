@@ -2,6 +2,54 @@
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 
+/**
+ * Map-right edge used to keep the tooltip out of the Actions panel.
+ * Hidden / zero-width / off-screen sidebars leave the full viewport.
+ */
+export function resolveMapRightEdge(sidebarRect, viewportWidth) {
+  if (!sidebarRect || !(sidebarRect.width > 0)) return viewportWidth;
+  if (sidebarRect.left >= viewportWidth || sidebarRect.left <= 0) return viewportWidth;
+  return sidebarRect.left;
+}
+
+/**
+ * Clamp a tooltip box to the map rectangle (left of the sidebar).
+ * Returns {left, top}, or null when the box cannot fit without covering the panel.
+ */
+export function clampTooltipToMapArea({
+  cursorX,
+  cursorY,
+  width,
+  height,
+  viewportWidth,
+  viewportHeight,
+  mapRight,
+  padding = 15,
+}) {
+  const maxRight = mapRight - padding;
+  const maxBottom = viewportHeight - padding;
+  const availW = maxRight - padding;
+  const availH = maxBottom - padding;
+
+  if (width > availW || height > availH) return null;
+
+  let left = cursorX + padding;
+  let top = cursorY + padding;
+
+  if (left + width > maxRight) {
+    left = cursorX - width - padding;
+  }
+  if (top + height > maxBottom) {
+    top = cursorY - height - padding;
+  }
+
+  left = Math.max(padding, Math.min(left, maxRight - width));
+  top = Math.max(padding, Math.min(top, maxBottom - height));
+
+  if (left + width > maxRight) return null;
+  return { left, top };
+}
+
 export class TerritoryTooltip {
   constructor(continents) {
     this.continents = continents;
@@ -318,27 +366,29 @@ export class TerritoryTooltip {
   _position(x, y) {
     const padding = 15;
     const rect = this.el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const sidebar = document.getElementById('sidebar');
+    const sidebarRect = sidebar && !sidebar.classList.contains('hidden')
+      ? sidebar.getBoundingClientRect()
+      : null;
+    const mapRight = resolveMapRightEdge(sidebarRect, window.innerWidth);
+    const pos = clampTooltipToMapArea({
+      cursorX: x,
+      cursorY: y,
+      width: rect.width,
+      height: rect.height,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      mapRight,
+      padding,
+    });
 
-    // Default: show to right and below cursor
-    let left = x + padding;
-    let top = y + padding;
-
-    // Flip if would go off-screen
-    if (left + rect.width > vw - padding) {
-      left = x - rect.width - padding;
+    if (!pos) {
+      this.el.classList.add('hidden');
+      return;
     }
-    if (top + rect.height > vh - padding) {
-      top = y - rect.height - padding;
-    }
 
-    // Ensure minimum position
-    left = Math.max(padding, left);
-    top = Math.max(padding, top);
-
-    this.el.style.left = `${left}px`;
-    this.el.style.top = `${top}px`;
+    this.el.style.left = `${pos.left}px`;
+    this.el.style.top = `${pos.top}px`;
   }
 
   hide() {
