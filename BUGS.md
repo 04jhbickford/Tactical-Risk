@@ -2,6 +2,23 @@
 
 ---
 
+## 8.16.26 — V2.73 waiting overlay stuck on the active player's own seat
+
+Live V2.72 playtest. James (iPhone, host) created a 4-seat game: Robert007 (desktop Chrome, not host), Easy Bot, James, Hard Bot. Capitals placed (Robert → James; host ran the AI seats). Robert's client then showed HIS unit_placement turn — tab title "Your turn", "Robert007's Turn", INITIAL DEPLOYMENT / CLICK TO PLACE UNITS — but a yellow WAITING badge and the spectator overlay "Robert007 is playing" / "You can view the map while waiting." He could not place.
+
+Debug dump (2026-08-16T22:33:53Z): isActivePlayer true, not host, phase unit_placement, current = Robert007. Every `state_updated` line had `isActivePlayer=undefined`. State had actually advanced (v24 current=Robert after the AI seats).
+
+Cause: V2.72 set `isWaitingForSync` on finish-placement (and next-phase handoff). `computeIsLocalPlayerTurn` treats that lock as "not your turn," which paints the spectator overlay even when the loaded seat is you. `state_updated` omitted `isActivePlayer`, so `if (data.isActivePlayer) setWaitingForSync(false)` never ran when a later remote snapshot made this client current.
+
+Fix (shared turn/waiting state — desktop/tablet CSS frozen):
+- Remote snapshot that makes you current clears waiting-for-sync (live `checkIsActivePlayer()`, and `state_updated` now carries the flag).
+- Spectator overlay / WAITING badge are seat-based: never "You are playing" / "view the map while waiting" on your own seat. Own seat shows place-units UI.
+- Done/End still uses the waiting lock so a double-tap cannot skip the next seat.
+
+Harness: `node tools/test-mp-turn-sync.mjs` (active human + overlay illegal; isActivePlayer ⇒ place UI; host vs non-host after AI seats).
+
+---
+
 ## 8.16.26 — V2.72 multiplayer Done/pass must persist; leftover bomber cannot lock Done
 
 James on live V2.71: third deployment wave, placed, tapped Done / next player, exited the app. The game did not advance. Rejoin could not finish or pass — stuck between turns. An extra tactical bomber sat in the place tray and could not be placed.

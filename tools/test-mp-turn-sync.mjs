@@ -15,8 +15,14 @@ if (typeof globalThis.localStorage === 'undefined') {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const { GameState, GAME_PHASES } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
-const { computeIsLocalPlayerTurn, shouldShowBottomTurnActions } =
-  await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
+const {
+  computeIsLocalPlayerTurn,
+  shouldShowBottomTurnActions,
+  isCurrentPlayerLocal,
+  shouldShowSpectatorWaiting,
+  resolveWaitingForSyncAfterRemoteSnapshot,
+  shouldShowPlaceUnitsUI,
+} = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
 const {
@@ -153,7 +159,7 @@ function makePlacementTable({
 
 console.log('=== V2.72 version + leftover-unit pass predicate ===');
 {
-  check('GAME_VERSION is V2.72', GAME_VERSION === 'V2.72');
+  check('GAME_VERSION is V2.73', GAME_VERSION === 'V2.73');
   check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
   check('round cap allows Done with leftovers still in the pool',
     canFinishPlacementRound({
@@ -319,6 +325,150 @@ console.log('=== push queue: Done waiter waits for the post-Done write ===');
     doneResult === true);
   check('place waiter also settles after the coalesced Done write',
     placeResult === true);
+}
+
+console.log('=== V2.73: never spectator-wait on your own seat ===');
+{
+  const robert = 'sypRcamUvNXDlD7BRyJrYImZg5H2';
+  const james = 'james-host-uid';
+
+  check('own seat is local',
+    isCurrentPlayerLocal({ localUserId: robert, currentPlayerOderId: robert }) === true);
+  check('other seat is not local',
+    isCurrentPlayerLocal({ localUserId: robert, currentPlayerOderId: james }) === false);
+
+  check('active human + spectator overlay is illegal',
+    !(isCurrentPlayerLocal({ localUserId: robert, currentPlayerOderId: robert })
+      && shouldShowSpectatorWaiting({
+        isMultiplayer: true,
+        localUserId: robert,
+        currentPlayerOderId: robert,
+      })));
+
+  check('own seat never shows spectator overlay (even if waiting is stuck)',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: true,
+      localUserId: robert,
+      currentPlayerOderId: robert,
+    }) === false);
+
+  check('other seat shows spectator overlay',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: true,
+      localUserId: robert,
+      currentPlayerOderId: james,
+    }) === true);
+
+  check('hotseat never shows spectator overlay',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: false,
+      localUserId: robert,
+      currentPlayerOderId: robert,
+    }) === false);
+
+  check('remote snapshot that makes you current MUST clear waiting',
+    resolveWaitingForSyncAfterRemoteSnapshot({
+      isWaitingForSync: true,
+      isActivePlayer: true,
+    }) === false);
+
+  check('remote snapshot while it is someone else keeps the waiting lock',
+    resolveWaitingForSyncAfterRemoteSnapshot({
+      isWaitingForSync: true,
+      isActivePlayer: false,
+    }) === true);
+
+  check('isActivePlayer true ⇒ place UI (stuck waiting is dropped)',
+    shouldShowPlaceUnitsUI({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: robert,
+      currentPlayerOderId: robert,
+      isActivePlayer: true,
+    }) === true);
+
+  check('isActivePlayer false ⇒ no place UI',
+    shouldShowPlaceUnitsUI({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: robert,
+      currentPlayerOderId: james,
+      isActivePlayer: false,
+    }) === false);
+}
+
+console.log('=== V2.73: host vs non-host after mixed capital + AI seats ===');
+{
+  // Live seat order: Robert007 (browser, not host), Easy Bot, James (host), Hard Bot.
+  // After capitals, unit_placement belongs to Robert. Both clients may still
+  // have isWaitingForSync from the V2.72 handoff lock.
+  const robert = 'sypRcamUvNXDlD7BRyJrYImZg5H2';
+  const james = 'james-host-uid';
+  const currentAfterAIs = robert;
+
+  const robertWaiting = resolveWaitingForSyncAfterRemoteSnapshot({
+    isWaitingForSync: true,
+    isActivePlayer: currentAfterAIs === robert,
+  });
+  check('non-host Robert after AI seats: waiting cleared',
+    robertWaiting === false);
+  check('non-host Robert after AI seats: place UI',
+    shouldShowPlaceUnitsUI({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: robert,
+      currentPlayerOderId: currentAfterAIs,
+      isActivePlayer: true,
+    }) === true);
+  check('non-host Robert after AI seats: no spectator overlay',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: true,
+      localUserId: robert,
+      currentPlayerOderId: currentAfterAIs,
+    }) === false);
+  check('non-host Robert after AI seats: bottom bar shown',
+    shouldShowBottomTurnActions({
+      isMultiplayer: true,
+      isLocalPlayerTurn: computeIsLocalPlayerTurn({
+        isMultiplayer: true,
+        isWaitingForSync: robertWaiting,
+        localUserId: robert,
+        currentPlayerOderId: currentAfterAIs,
+      }),
+      isAI: false,
+    }) === true);
+
+  const jamesWaiting = resolveWaitingForSyncAfterRemoteSnapshot({
+    isWaitingForSync: true,
+    isActivePlayer: currentAfterAIs === james,
+  });
+  check('host James after AI seats: still waiting (not his seat)',
+    jamesWaiting === true);
+  check('host James after AI seats: no place UI',
+    shouldShowPlaceUnitsUI({
+      isMultiplayer: true,
+      isWaitingForSync: true,
+      localUserId: james,
+      currentPlayerOderId: currentAfterAIs,
+      isActivePlayer: false,
+    }) === false);
+  check('host James after AI seats: spectator overlay for Robert',
+    shouldShowSpectatorWaiting({
+      isMultiplayer: true,
+      localUserId: james,
+      currentPlayerOderId: currentAfterAIs,
+    }) === true);
+  check('host James after AI seats: bottom bar hidden',
+    shouldShowBottomTurnActions({
+      isMultiplayer: true,
+      isLocalPlayerTurn: computeIsLocalPlayerTurn({
+        isMultiplayer: true,
+        isWaitingForSync: jamesWaiting,
+        localUserId: james,
+        currentPlayerOderId: currentAfterAIs,
+      }),
+      isAI: false,
+    }) === false);
 }
 
 console.log(failures === 0 ? '\nALL MP TURN-SYNC CHECKS PASS' : `\n${failures} FAILURES`);

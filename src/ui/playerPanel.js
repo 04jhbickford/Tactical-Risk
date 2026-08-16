@@ -44,6 +44,46 @@ export function computeIsLocalPlayerTurn({ isMultiplayer, isWaitingForSync, loca
     (!isWaitingForSync && !!localUserId && currentPlayerOderId === localUserId);
 }
 
+// Loaded-state seat check — ignores the optimistic waiting lock.
+// WAITING / "X is playing" / "view the map while waiting" are spectator copy
+// and must never paint on the local human's own seat (V2.72 Robert playtest).
+export function isCurrentPlayerLocal({ localUserId, currentPlayerOderId }) {
+  return !!localUserId && currentPlayerOderId === localUserId;
+}
+
+// Spectator overlay is only for someone else's seat. Active human + waiting
+// overlay is illegal even if isWaitingForSync is still stuck true.
+export function shouldShowSpectatorWaiting({ isMultiplayer, localUserId, currentPlayerOderId }) {
+  if (!isMultiplayer) return false;
+  if (!localUserId) return true;
+  return !isCurrentPlayerLocal({ localUserId, currentPlayerOderId });
+}
+
+// A remote snapshot that makes THIS client the current human must drop the
+// optimistic waiting lock. state_updated used to omit isActivePlayer, so
+// `if (data.isActivePlayer)` never cleared and the overlay stuck on own seat.
+export function resolveWaitingForSyncAfterRemoteSnapshot({ isWaitingForSync, isActivePlayer }) {
+  if (isActivePlayer) return false;
+  return !!isWaitingForSync;
+}
+
+// After applying a remote snapshot: isActivePlayer true ⇒ place-units UI.
+export function shouldShowPlaceUnitsUI({
+  isMultiplayer,
+  isWaitingForSync,
+  localUserId,
+  currentPlayerOderId,
+  isActivePlayer,
+}) {
+  const waiting = resolveWaitingForSyncAfterRemoteSnapshot({ isWaitingForSync, isActivePlayer });
+  return computeIsLocalPlayerTurn({
+    isMultiplayer,
+    isWaitingForSync: waiting,
+    localUserId,
+    currentPlayerOderId,
+  });
+}
+
 // Primary End-phase / confirm bar is only for the local human whose turn it is.
 export function shouldShowBottomTurnActions({ isMultiplayer, isLocalPlayerTurn, isAI }) {
   if (isAI) return false;
@@ -440,7 +480,7 @@ export class PlayerPanel {
 
     // Check if it's the local player's turn in multiplayer
     const isMultiplayer = this.gameState.isMultiplayer;
-    const localUserId = this.syncManager?.userId;
+    const localUserId = this.localUserId || this.syncManager?.userId;
     const currentPlayerOderId = player?.oderId;
 
     // It's our turn only if the LOADED STATE says the current player is us —
@@ -452,6 +492,10 @@ export class PlayerPanel {
       isWaitingForSync: this.isWaitingForSync,
       localUserId,
       currentPlayerOderId
+    });
+    const isOwnSeat = !isMultiplayer || isCurrentPlayerLocal({
+      localUserId,
+      currentPlayerOderId,
     });
 
     let html = '';
@@ -499,7 +543,7 @@ export class PlayerPanel {
       html += `</div>`;
     } else {
       // Player header (compact, always visible)
-      html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn);
+      html += this._renderHeader(player, isMultiplayer, isLocalPlayerTurn, isOwnSeat);
 
       // Phase indicator
       html += this._renderPhaseIndicator(phase, turnPhase);
@@ -693,15 +737,16 @@ export class PlayerPanel {
     return html;
   }
 
-  _renderHeader(player, isMultiplayer = false, isLocalPlayerTurn = true) {
+  _renderHeader(player, isMultiplayer = false, isLocalPlayerTurn = true, isOwnSeat = isLocalPlayerTurn) {
     const ipcs = this.gameState.getIPCs(player.id);
     const territories = this.gameState.getPlayerTerritories(player.id).length;
     const aiLabel = player.isAI ? `<span class="pp-ai-badge">${player.aiDifficulty?.toUpperCase() || 'AI'}</span>` : '';
     const textColor = this._getContrastColor(player.color);
 
-    // In multiplayer, show separate identity bar when it's not your turn
+    // Identity bar + WAITING badge follow the loaded seat, not the optimistic
+    // waiting lock. Own-seat + WAITING / "You: …" is the V2.72 stuck state.
     let identityBar = '';
-    if (isMultiplayer && !isLocalPlayerTurn && this.localUserId) {
+    if (isMultiplayer && !isOwnSeat && this.localUserId) {
       // Find local player info
       const localPlayer = this.gameState.players?.find(p => p.oderId === this.localUserId);
       if (localPlayer) {
@@ -718,7 +763,7 @@ export class PlayerPanel {
     let turnIndicator = '';
     let headerLabel = player.name;
     if (isMultiplayer) {
-      if (isLocalPlayerTurn) {
+      if (isOwnSeat) {
         turnIndicator = `<span class="pp-turn-badge your-turn" style="color: ${textColor};">YOUR TURN</span>`;
       } else {
         // Show "Current Turn:" label to make it clear this isn't the local player
@@ -729,7 +774,7 @@ export class PlayerPanel {
 
     return `
       ${identityBar}
-      <div class="pp-header compact ${!isLocalPlayerTurn ? 'not-your-turn' : ''}" style="background: ${player.color};">
+      <div class="pp-header compact ${!isOwnSeat ? 'not-your-turn' : ''}" style="background: ${player.color};">
         ${player.flag ? `<img src="assets/flags/${player.flag}" class="pp-flag" alt="${player.name}">` : ''}
         <span class="pp-player-name" style="color: ${textColor};">${headerLabel}</span>
         ${aiLabel}
@@ -800,19 +845,15 @@ export class PlayerPanel {
   _renderActionsTab(phase, turnPhase, player) {
     let html = '<div class="pp-actions-tab">';
 
-    // In multiplayer, it's our turn only if the loaded state's current player
-    // is us — mirrors the guard's live check so the view can never allow (or
-    // hide) actions the guard would decide differently on
+    // Spectator overlay is seat-based, not waiting-lock-based. A stuck
+    // isWaitingForSync on your own seat used to paint "You are playing" /
+    // "view the map while waiting" and block place-units (V2.72 playtest).
     const isMultiplayer = this.gameState.isMultiplayer && this.localUserId;
-    const isLocalPlayerTurn = computeIsLocalPlayerTurn({
+    if (isMultiplayer && shouldShowSpectatorWaiting({
       isMultiplayer,
-      isWaitingForSync: this.isWaitingForSync,
       localUserId: this.localUserId,
-      currentPlayerOderId: player?.oderId
-    });
-
-    // If multiplayer and not our turn (or waiting for sync), show waiting message
-    if (isMultiplayer && !isLocalPlayerTurn) {
+      currentPlayerOderId: player?.oderId,
+    })) {
       const flagSrc = player?.flag ? `assets/flags/${player.flag}` : null;
       html += `
         <div class="pp-waiting-turn">

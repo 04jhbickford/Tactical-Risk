@@ -22,7 +22,7 @@ import { MapRenderer } from './map/mapRenderer.js';
 import { TerritoryRenderer } from './map/territoryRenderer.js';
 import { TerritoryMap } from './map/territoryMap.js';
 import { UnitRenderer } from './map/unitRenderer.js';
-import { PlayerPanel } from './ui/playerPanel.js';
+import { PlayerPanel, resolveWaitingForSyncAfterRemoteSnapshot } from './ui/playerPanel.js';
 import { TerritoryTooltip } from './ui/territoryTooltip.js';
 import { PurchasePopup } from './ui/purchasePopup.js';
 import { MovementUI } from './ui/movementUI.js';
@@ -975,11 +975,15 @@ async function init() {
           ? '● Your turn — Tactical Risk'
           : 'Tactical Risk';
 
-        // Clear optimistic waiting state when we receive any sync update
-        // This handles both turn returns and state updates
-        if (data.isActivePlayer) {
-          playerPanel.setWaitingForSync(false);
-        }
+        // A remote snapshot that makes THIS client current must drop the
+        // optimistic waiting lock. state_updated used to omit isActivePlayer,
+        // so `if (data.isActivePlayer)` never cleared — V2.72 playtest stuck
+        // Robert on his own unit_placement seat with WAITING + "you are playing".
+        const isActivePlayer = !!(data?.isActivePlayer || syncManager.checkIsActivePlayer());
+        playerPanel.setWaitingForSync(resolveWaitingForSyncAfterRemoteSnapshot({
+          isWaitingForSync: playerPanel.isWaitingForSync,
+          isActivePlayer,
+        }));
 
         // Update player panel to reflect turn change
         playerPanel._render();

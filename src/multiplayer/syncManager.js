@@ -170,10 +170,7 @@ export class SyncManager {
         // Update active player status
         this._updateActivePlayer(newData.currentPlayerId);
 
-        this._notifyListeners('state_updated', {
-          version: this.localVersion,
-          currentPlayerId: newData.currentPlayerId
-        });
+        this._notifyListeners('state_updated', this._turnSnapshotPayload(newData.currentPlayerId));
       } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
         // Doc-level current player differs from ours at the same version —
         // our local state has DIVERGED from the doc (seen in the V2.53
@@ -188,10 +185,7 @@ export class SyncManager {
         }
         console.log(`[Sync] Turn changed without version bump (init): ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
         this._updateActivePlayer(newData.currentPlayerId);
-        this._notifyListeners('turn_changed', {
-          currentPlayerId: newData.currentPlayerId,
-          isActivePlayer: this.isActivePlayer
-        });
+        this._notifyListeners('turn_changed', this._turnSnapshotPayload(newData.currentPlayerId));
       }
     }, async (error) => {
       console.error('SyncManager: Subscription error', error);
@@ -283,18 +277,12 @@ export class SyncManager {
             // Update active player status
             this._updateActivePlayer(newData.currentPlayerId);
 
-            this._notifyListeners('state_updated', {
-              version: this.localVersion,
-              currentPlayerId: newData.currentPlayerId
-            });
+            this._notifyListeners('state_updated', this._turnSnapshotPayload(newData.currentPlayerId));
           } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
             // Turn changed without version bump (shouldn't happen, but handle it)
             console.log(`[Sync] Turn changed without version bump: ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
             this._updateActivePlayer(newData.currentPlayerId);
-            this._notifyListeners('turn_changed', {
-              currentPlayerId: newData.currentPlayerId,
-              isActivePlayer: this.isActivePlayer
-            });
+            this._notifyListeners('turn_changed', this._turnSnapshotPayload(newData.currentPlayerId));
           }
         }, async (error) => {
           console.error('SyncManager: Subscription error', error);
@@ -361,6 +349,18 @@ export class SyncManager {
     if (this._pushQueue?.hasPendingWork()) {
       this.pushStateNow();
     }
+  }
+
+  // Payload for state_updated / turn_changed. Always include the live
+  // isActivePlayer flag so UI can drop the optimistic waiting lock when a
+  // remote snapshot makes THIS client current (V2.72 omitted it on
+  // state_updated — debug dump: isActivePlayer=undefined on every line).
+  _turnSnapshotPayload(currentPlayerId) {
+    return {
+      version: this.localVersion,
+      currentPlayerId,
+      isActivePlayer: this.checkIsActivePlayer(),
+    };
   }
 
   // Update active player status
@@ -551,10 +551,7 @@ export class SyncManager {
         }
         this._updateActivePlayer(data.currentPlayerId);
         if (!force) {
-          this._notifyListeners('state_updated', {
-            version: this.localVersion,
-            currentPlayerId: data.currentPlayerId
-          });
+          this._notifyListeners('state_updated', this._turnSnapshotPayload(data.currentPlayerId));
         }
       }
     } catch (error) {
