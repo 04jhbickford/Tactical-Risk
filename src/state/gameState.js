@@ -1432,6 +1432,32 @@ export class GameState {
     return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
   }
 
+  // Deploy N must place N. Pause notifies so a mid-batch re-render cannot
+  // put Undo under the Deploy tap (B13/B18) or retarget the remaining drops.
+  placeInitialUnitsBatch(territoryName, unitTypes, unitDefs) {
+    const types = Array.isArray(unitTypes) ? unitTypes : [];
+    const placed = [];
+    const failed = [];
+    this.pauseNotifications();
+    try {
+      for (const unitType of types) {
+        const result = this.placeInitialUnit(territoryName, unitType, unitDefs);
+        if (result?.success) placed.push(unitType);
+        else failed.push({ unitType, error: result?.error || 'failed' });
+      }
+    } finally {
+      this.resumeNotifications({ flush: true });
+    }
+    return {
+      placed: placed.length,
+      placedTypes: placed,
+      requested: types.length,
+      failed,
+      territory: territoryName,
+      unitsPlacedThisRound: this.unitsPlacedThisRound,
+    };
+  }
+
   // Undo last unit placement
   undoPlacement() {
     if (this.placementHistory.length === 0) return false;
@@ -1495,8 +1521,10 @@ export class GameState {
       } else {
         unitsToPlace.push({ type: lastPlacement.unitType, quantity: 1 });
       }
-      this.unitsPlacedThisRound = Math.max(0, this.unitsPlacedThisRound - 1);
     }
+    // DEPLOYED is unitsPlacedThisRound. Undo must always drop it or the
+    // next + looks like it vanished the restored unit (B15).
+    this.unitsPlacedThisRound = Math.max(0, this.unitsPlacedThisRound - 1);
 
     this._notify();
     return true;

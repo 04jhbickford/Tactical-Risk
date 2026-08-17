@@ -17,6 +17,8 @@ import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
   applyPlaceQueueDelta,
   applyPlaceQueueMax,
+  canAddToPlaceQueue,
+  expandPlaceQueue,
   queuedCount,
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
@@ -317,6 +319,8 @@ export class PlayerPanel {
 
     this._renderRaf = 0;
     this._lastRenderedPlayerId = null;
+    this._ignoreUndoUntil = 0;
+    this._unitListScrollTop = 0;
     this.contentEl.addEventListener('click', (e) => this._onPanelClick(e));
     this.contentEl.addEventListener('change', (e) => this._onPanelChange(e));
   }
@@ -325,7 +329,7 @@ export class PlayerPanel {
     if (this._renderRaf) return;
     this._renderRaf = requestAnimationFrame(() => {
       this._renderRaf = 0;
-            this._scheduleRender();
+      this._render();
     });
   }
 
@@ -437,15 +441,16 @@ export class PlayerPanel {
   }
 
   setSelectedTerritory(territory) {
-    // Reset movement state when territory changes
+    // Reset movement state when territory changes. Do NOT clear the
+    // placement queue — a spurious retarget (B16) was wiping staged units
+    // so the next + looked like it vanished them (B15).
     if (this.selectedTerritory?.name !== territory?.name) {
       this.moveSelectedUnits = {};
       this.movePendingDest = null;
-      this.moveUnitTab = 'land'; // Reset to default tab
-      this.placementQueue = {}; // Reset placement queue
+      this.moveUnitTab = 'land';
     }
     this.selectedTerritory = territory;
-            this._scheduleRender();
+    this._scheduleRender();
   }
 
   _phoneUnitFitsTerritory(unitType, territory) {
@@ -654,8 +659,14 @@ export class PlayerPanel {
       html += bottomActions;
     }
 
+    const list = this.contentEl.querySelector('.pp-unit-list');
+    if (list) this._unitListScrollTop = list.scrollTop;
+
     this.contentEl.innerHTML = html;
     this._bindEvents();
+
+    const restored = this.contentEl.querySelector('.pp-unit-list');
+    if (restored) restored.scrollTop = this._unitListScrollTop || 0;
   }
 
   _renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn = true) {
@@ -801,15 +812,19 @@ export class PlayerPanel {
     if (mobile) {
       const canUndoPlacement = !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
       const canUndoCapital = !!this.gameState.canUndoLastCapital?.();
-      if (shouldShowPhoneSetupUndo({
+      const showUndo = shouldShowPhoneSetupUndo({
         mobile: true, phase, canUndoPlacement, canUndoCapital,
-      })) {
+      }) && Date.now() >= (this._ignoreUndoUntil || 0);
+      html += `<div class="pp-peek-undo-slot">`;
+      if (showUndo) {
         const undoAction = canUndoPlacement ? 'undo-placement' : 'undo-capital';
         html += `
         <button class="pp-confirm-btn undoable" data-action="${undoAction}">
           Undo
         </button>`;
       }
+      html += `</div>`;
+      html += `<div class="pp-peek-primary-slot">`;
     }
 
     for (const btn of buttons) {
@@ -825,6 +840,7 @@ export class PlayerPanel {
         </button>`;
     }
 
+    if (mobile) html += `</div>`;
     html += `</div>`;
     if (mobile) html += `</div>`;
     html += `</div>`;
@@ -2097,7 +2113,12 @@ export class PlayerPanel {
       const imageSrc = getUnitIconPath(unit.type, player.id);
       const queued = this.placementQueue[unit.type] || 0;
       const available = unit.quantity;
-      const canAdd = available > 0 && slotsRemaining > queued && isValidPlacement;
+      const canAdd = isValidPlacement && canAddToPlaceQueue({
+        queue: this.placementQueue,
+        unitType: unit.type,
+        available,
+        slotsRemaining,
+      });
       const canRemove = queued > 0;
 
       // Build tooltip
@@ -3235,6 +3256,10 @@ export class PlayerPanel {
         const action = btn.dataset.action;
         const territory = btn.dataset.territory;
         const setIndex = btn.dataset.set;
+        if ((action === 'undo-placement' || action === 'undo-capital')
+          && Date.now() < (this._ignoreUndoUntil || 0)) {
+          return;
+        }
 
         if (action === 'toggle-cards') {
           this.cardsCollapsed = !this.cardsCollapsed;
@@ -3360,20 +3385,19 @@ export class PlayerPanel {
         }
 
         // Deploy commits the queue onto the selected territory. Do not
-        // clear selection or pass the turn.
+        // clear selection or pass the turn. Batch so Deploy N places N
+        // (a mid-loop re-render used to put Undo under the same tap).
         if (action === 'confirm-placement') {
           if (this.onAction && this.selectedTerritory && this.placementQueue) {
             const keepTerritory = this.selectedTerritory;
-            const territory = keepTerritory.name;
             const queue = { ...this.placementQueue };
+            const unitTypes = expandPlaceQueue(queue);
             this.placementQueue = {};
-            for (const [unitType, qty] of Object.entries(queue)) {
-              if (qty > 0) {
-                for (let i = 0; i < qty; i++) {
-                  this.onAction('place-unit', { unitType, territory });
-                }
-              }
-            }
+            this._ignoreUndoUntil = Date.now() + 400;
+            this.onAction('place-units-batch', {
+              territory: keepTerritory.name,
+              unitTypes,
+            });
             this.selectedTerritory = keepTerritory;
             this._scheduleRender();
           }

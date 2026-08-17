@@ -17306,6 +17306,20 @@ html, body {
     gap: 8px;
   }
 
+  /* Undo and Deploy keep separate slots so a post-deploy re-render
+     cannot put Undo where Deploy was (B18). */
+  .pp-peek-undo-slot {
+    flex: 0 0 auto;
+    min-width: 72px;
+    min-height: 44px;
+  }
+
+  .pp-peek-primary-slot {
+    flex: 1 1 auto;
+    min-width: 88px;
+    min-height: 44px;
+  }
+
   .pp-peek-cta-row .pp-confirm-btn {
     width: auto;
     min-width: 44px;

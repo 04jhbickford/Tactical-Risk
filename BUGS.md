@@ -17,6 +17,13 @@ Fix (SCHEMA 11, no map/rules/combat math change):
 - Persist `turnPhase=setup` during capital/unit placement (never leftover `purchase`). Deep-clone `unitsToPlace`. Guest applies remote state when the version is newer **or** the seat changes. `nextTurn` / Done reset `unitsPlacedThisRound` to 0.
 - One delegated panel click + rAF render. `+`/`−`/`Max` are pure one-row queue math; Deploy commits; panel count is units actually placed. Undo never passes. Own land/capital tap selects (Confirm / Deploy are the verbs). Leave is a separate control, not the row. Deploy N sits on the phone peek CTA. `tacticalrisk:your-turn` + `window.__tacticalRiskTurn` for WhatsApp. Tab title uses the same “is it my turn?” predicate as the banner.
 
+Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
+- B13 Deploy N placed N−1 (remaining −5 on Deploy 6): each `placeInitialUnit` `_notify()` re-rendered mid-batch and put Undo under the Deploy tap.
+- B14 `+` at the 6-cap stole from another staged type: `canAdd` used this-row queued only, so + stayed live at cap; a mid-render retarget hit another row’s −.
+- B15 Undo vs DEPLOYED desync / + vanished the restored unit: undo did not always decrement `unitsPlacedThisRound`; `setSelectedTerritory` wiped the queue.
+- B16/B17 selection jump + fighter auto-commit: `_scheduleRender` called itself and never painted (shipped V2.77). Stale panel vs live selection. `+` is queue-only; Deploy is the commit.
+- B18/B8/B10: Undo and Deploy now have separate peek slots; unit-list scroll is restored; Deploy batch notifies once (no 0-flash, B12).
+
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
 
 ---

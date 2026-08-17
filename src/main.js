@@ -481,7 +481,8 @@ async function init() {
         break;
 
       case 'place-unit':
-        // Inline placement - place a unit on the selected territory
+        // Queue + is staging only. A single place-unit is leftover UI —
+        // still one unit, never a pass.
         if (data.unitType && data.territory) {
           const result = gameState.placeInitialUnit(data.territory, data.unitType, unitDefs);
           if (result.success) {
@@ -490,6 +491,21 @@ async function init() {
           }
         }
         break;
+
+      case 'place-units-batch': {
+        const types = Array.isArray(data.unitTypes) ? data.unitTypes : [];
+        if (data.territory && types.length > 0) {
+          const keep = selectedTerritory;
+          const result = gameState.placeInitialUnitsBatch(data.territory, types, unitDefs);
+          for (const unitType of result.placedTypes || []) {
+            actionLog.logInitialPlacement(gameState.currentPlayer, unitType, data.territory);
+          }
+          selectedTerritory = keep;
+          playerPanel.setSelectedTerritory(keep || playerPanel.selectedTerritory);
+          camera.dirty = true;
+        }
+        break;
+      }
 
       case 'undo-placement':
         if (gameState.undoPlacement()) {

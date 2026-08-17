@@ -12,7 +12,8 @@ export function applyPlaceQueueDelta({
   available = 0,
   slotsRemaining = 0,
 } = {}) {
-  if (!unitType) return { ...queue };
+  const nextQueue = { ...queue };
+  if (!unitType) return nextQueue;
   const current = Number(queue[unitType]) || 0;
   const others = queuedCount(queue) - current;
   const maxForRow = Math.min(
@@ -20,7 +21,31 @@ export function applyPlaceQueueDelta({
     Math.max(0, (Number(slotsRemaining) || 0) - others),
   );
   const next = Math.max(0, Math.min(maxForRow, current + Number(delta)));
-  return { ...queue, [unitType]: next };
+  nextQueue[unitType] = next;
+  return nextQueue;
+}
+
+// + at the round cap must no-op. It must not decrement another staged type.
+export function canAddToPlaceQueue({
+  queue = {},
+  unitType,
+  available = 0,
+  slotsRemaining = 0,
+} = {}) {
+  const current = Number(queue[unitType]) || 0;
+  const next = applyPlaceQueueDelta({
+    queue, unitType, delta: 1, available, slotsRemaining,
+  });
+  return (Number(next[unitType]) || 0) > current;
+}
+
+export function expandPlaceQueue(queue = {}) {
+  const out = [];
+  for (const [type, qty] of Object.entries(queue || {})) {
+    const n = Number(qty) || 0;
+    for (let i = 0; i < n; i++) out.push(type);
+  }
+  return out;
 }
 
 // Max fills THIS row only, up to remaining slots this round (not other types).

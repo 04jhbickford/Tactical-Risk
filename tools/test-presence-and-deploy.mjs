@@ -4,6 +4,7 @@
 import { pathToFileURL } from 'url';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 
 if (typeof globalThis.localStorage === 'undefined') {
   globalThis.localStorage = {
@@ -31,6 +32,8 @@ const {
 const {
   applyPlaceQueueDelta,
   applyPlaceQueueMax,
+  canAddToPlaceQueue,
+  expandPlaceQueue,
   queuedCount,
   shouldResetDeployedThisRound,
 } = await import(pathToFileURL(join(root, 'src/state/placeQueue.js')));
@@ -275,6 +278,79 @@ check('game-row click is not Leave',
   shouldOpenLeaveConfirm({ clickOnLeaveControl: false }) === false);
 check('Leave control still opens confirm',
   shouldOpenLeaveConfirm({ clickOnLeaveControl: true }) === true);
+
+console.log('=== B13–B17 deploy batch / cap / undo / paint ===');
+{
+  const q = { infantry: 4, armour: 2 };
+  const atCap = applyPlaceQueueDelta({
+    queue: q, unitType: 'fighter', delta: 1, available: 3, slotsRemaining: 6,
+  });
+  check('B14: + at cap does not steal from staged types',
+    atCap.infantry === 4 && atCap.armour === 2 && (atCap.fighter || 0) === 0);
+  check('B14: + at cap is rejected',
+    canAddToPlaceQueue({
+      queue: q, unitType: 'fighter', available: 3, slotsRemaining: 6,
+    }) === false);
+  const plusInf = applyPlaceQueueDelta({
+    queue: q, unitType: 'infantry', delta: 1, available: 10, slotsRemaining: 6,
+  });
+  check('B14: + on a full row is a no-op, other row untouched',
+    plusInf.infantry === 4 && plusInf.armour === 2);
+
+  const territories = [
+    { name: 'East United States', isWater: false, connections: ['Eastern Canada'] },
+    { name: 'Eastern Canada', isWater: false, connections: ['East United States'] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = [{ id: 'p1', name: 'James', oderId: 'james', isAI: false }];
+  gs.currentPlayerIndex = 0;
+  gs.phase = GAME_PHASES.UNIT_PLACEMENT;
+  gs.unitsToPlace = { p1: [
+    { type: 'infantry', quantity: 20 },
+    { type: 'fighter', quantity: 2 },
+  ] };
+  gs.territoryState = {
+    'East United States': { owner: 'p1' },
+    'Eastern Canada': { owner: 'p1' },
+  };
+  gs.units = { 'East United States': [], 'Eastern Canada': [] };
+  gs.unitsPlacedThisRound = 0;
+  let notifies = 0;
+  gs.subscribe(() => { notifies++; });
+
+  const types = expandPlaceQueue({ infantry: 5, fighter: 1 });
+  check('queue of 6 expands to 6 commits', types.length === 6);
+  const batch = gs.placeInitialUnitsBatch('East United States', types, {
+    infantry: { isLand: true },
+    fighter: { isAir: true },
+  });
+  check('B13: Deploy 6 places 6, not 5',
+    batch.placed === 6 && batch.requested === 6 && batch.failed.length === 0);
+  check('B13: remaining drops by 6, not 5',
+    remainingDeployByPlayer(gs.unitsToPlace, ['p1'], {
+      infantry: { isLand: true }, fighter: { isAir: true },
+    }).p1 === 16);
+  check('B13: all 6 landed on the selected territory',
+    (gs.units['East United States'] || []).reduce((s, u) => s + (u.quantity || 0), 0) === 6
+    && (gs.units['Eastern Canada'] || []).length === 0);
+  check('B13: batch notifies once (no mid-loop Undo retarget / 0-flash)',
+    notifies === 1);
+  check('DEPLOYED is 6 after commit', gs.unitsPlacedThisRound === 6);
+
+  const beforePool = gs.unitsToPlace.p1.find(u => u.type === 'fighter').quantity;
+  check('B15: undo last (fighter) restores pool and drops DEPLOYED',
+    gs.undoPlacement() === true
+    && gs.unitsPlacedThisRound === 5
+    && gs.unitsToPlace.p1.find(u => u.type === 'fighter').quantity === beforePool + 1);
+
+  const src = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B16/B17: _scheduleRender paints via _render, not itself',
+    src.includes('this._renderRaf = 0;\n      this._render();')
+    && !src.includes('this._renderRaf = 0;\n      this._scheduleRender();'));
+  check('B17: + is place-queue, never place-unit',
+    /action === 'place-queue'/.test(src)
+    && /place-units-batch/.test(src));
+}
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);
