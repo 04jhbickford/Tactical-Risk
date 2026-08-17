@@ -32,6 +32,7 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B24: Max bumped DEPLOYED before deploy; Deploy 1 placed 0 twice, then a bomber. DEPLOYED is placed-this-round only. Failed Deploy restores the queue.
 - Undo lock: place / deploy / purchase / move are undoable by default. Undo is hidden after combat resolve and after Done / next-player pass. Combat math and retreat history are unchanged.
 - Turn notice hook: when currentPlayer changes, POST `{ gameCode, currentPlayerName, phase }` to `TACTICAL_RISK_TURN_NOTICE_URL` (window / env / localStorage). Unused if unset. No WhatsApp from the client. No phone numbers.
+- E1 presence resume: `visibilitychange` (visible) and `pageshow` (including bfcache) heartbeat now and re-attach Firestore snapshots only if the listener died. Idle/background does not start the 90s host failover. `deleteDoc` stays on explicit leave / real close (`stop()`), not on background. No RTDB `onDisconnect`.
 
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`, `node tools/test-undo-and-turn-notice.mjs`.
 

@@ -17,6 +17,8 @@ import {
   resolvePresenceState,
   shouldDeletePresenceDoc,
   shouldHeartbeatNow,
+  shouldReplaceSnapshotListener,
+  shouldResumeSnapshots,
 } from './presencePolicy.js';
 
 // Presence states
@@ -37,6 +39,7 @@ export class PresenceManager {
     this.gameId = null;
     this.presenceRef = null;
     this.unsubscribe = null;
+    this._snapshotLive = false;
     this.heartbeatInterval = null;
     this.lastActivity = Date.now();
     this.playerPresence = {}; // { oderId: { state, lastSeen, displayName } }
@@ -91,8 +94,8 @@ export class PresenceManager {
     window.addEventListener('pageshow', this._boundPageShowHandler);
     window.addEventListener('pagehide', this._boundPageHideHandler);
 
-    // Subscribe to all presence documents
-    this._subscribeToPresence();
+    // Subscribe to all presence documents (one listener)
+    this._ensurePresenceSnapshot();
 
     // Do NOT delete the presence doc on beforeunload — mobile browsers
     // fire that when backgrounding. Explicit Exit is the only delete.
@@ -157,18 +160,24 @@ export class PresenceManager {
 
   _onVisibility() {
     const visible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-    if (visible && shouldHeartbeatNow({ event: 'visibility-visible' })) {
+    if (visible && shouldResumeSnapshots({ event: 'visibility-visible' })) {
       this.lastActivity = Date.now();
-      this._updatePresence(PRESENCE_STATES.ONLINE);
+      if (shouldHeartbeatNow({ event: 'visibility-visible' })) {
+        this._updatePresence(PRESENCE_STATES.ONLINE);
+      }
+      this._ensurePresenceSnapshot();
       return;
     }
     this._updatePresence(presenceStateForVisibility('hidden'));
   }
 
-  _onPageShow() {
-    if (!shouldHeartbeatNow({ event: 'pageshow' })) return;
+  _onPageShow(event) {
+    if (!shouldResumeSnapshots({ event: 'pageshow' })) return;
     this.lastActivity = Date.now();
-    this._updatePresence(PRESENCE_STATES.ONLINE);
+    if (shouldHeartbeatNow({ event: 'pageshow' })) {
+      this._updatePresence(PRESENCE_STATES.ONLINE);
+    }
+    this._ensurePresenceSnapshot({ persistedPageShow: !!(event && event.persisted) });
   }
 
   _onPageHide() {
@@ -212,12 +221,30 @@ export class PresenceManager {
     }
   }
 
+  _ensurePresenceSnapshot({ persistedPageShow = false } = {}) {
+    if (!shouldReplaceSnapshotListener({
+      hasUnsubscribe: typeof this.unsubscribe === 'function',
+      listenerErrored: !this._snapshotLive && !this.unsubscribe,
+      persistedPageShow,
+    })) {
+      return;
+    }
+    this._subscribeToPresence();
+  }
+
   _subscribeToPresence() {
     if (!this.gameId || !this.db) return;
+
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+    this._snapshotLive = false;
 
     const presenceCollection = collection(this.db, 'games', this.gameId, 'presence');
 
     this.unsubscribe = onSnapshot(presenceCollection, (snapshot) => {
+      this._snapshotLive = true;
       const presence = {};
 
       snapshot.forEach(doc => {
@@ -236,6 +263,10 @@ export class PresenceManager {
 
       this.playerPresence = presence;
       this._notifyListeners();
+    }, (error) => {
+      console.error('[Presence] Snapshot error — will re-attach on resume', error);
+      this._snapshotLive = false;
+      this.unsubscribe = null;
     });
   }
 

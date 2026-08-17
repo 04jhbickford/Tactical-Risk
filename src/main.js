@@ -76,7 +76,11 @@ import { createSyncManager } from './multiplayer/syncManager.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
-import { shouldEjectFromMatch } from './multiplayer/presencePolicy.js';
+import {
+  shouldEjectFromMatch,
+  shouldAccumulateHostOfflineMs,
+  shouldStartHostFailover,
+} from './multiplayer/presencePolicy.js';
 import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
@@ -900,9 +904,15 @@ async function init() {
     syncManager.setAuthorityCheck(() => {
       if (!gameState || !presenceManager || !hostOderId) return false;
       let isAuthority = false;
-      if (presenceManager.getPlayerPresence(hostOderId) === 'offline') {
+      const hostPresence = presenceManager.getPlayerPresence(hostOderId);
+      // Idle / backgrounded host must not start the 90s failover clock.
+      if (shouldAccumulateHostOfflineMs({ hostPresence })) {
         if (hostOfflineSince === null) hostOfflineSince = Date.now();
-        if (Date.now() - hostOfflineSince >= FAILOVER_GRACE_MS) {
+        if (shouldStartHostFailover({
+          hostPresence,
+          offlineForMs: Date.now() - hostOfflineSince,
+          graceMs: FAILOVER_GRACE_MS,
+        })) {
           const me = authManager.getUser();
           const fallback = gameState.players?.find(p =>
             !p.isAI && !p.surrendered &&

@@ -49,6 +49,10 @@ const {
   resolvePresenceState,
   shouldOpenLeaveConfirm,
   isLeaveControlTarget,
+  shouldReplaceSnapshotListener,
+  shouldResumeSnapshots,
+  shouldAccumulateHostOfflineMs,
+  shouldStartHostFailover,
   PRESENCE_GONE_MS,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/presencePolicy.js')));
 const {
@@ -94,6 +98,28 @@ check('heartbeat on visible + pageshow + interval',
   && shouldHeartbeatNow({ event: 'pageshow' })
   && shouldHeartbeatNow({ event: 'interval' })
   && shouldHeartbeatNow({ event: 'beforeunload' }) === false);
+check('E1: resume on visible and pageshow (incl. bfcache)',
+  shouldResumeSnapshots({ event: 'visibility-visible' })
+  && shouldResumeSnapshots({ event: 'pageshow' })
+  && shouldResumeSnapshots({ event: 'interval' }) === false);
+check('E1: live snapshot is not replaced (no double-subscribe)',
+  shouldReplaceSnapshotListener({ hasUnsubscribe: true, listenerErrored: false }) === false);
+check('E1: dead / missing / bfcache snapshot is replaced',
+  shouldReplaceSnapshotListener({ hasUnsubscribe: false }) === true
+  && shouldReplaceSnapshotListener({ hasUnsubscribe: true, persistedPageShow: true }) === true
+  && shouldReplaceSnapshotListener({ hasUnsubscribe: false, listenerErrored: true }) === true);
+check('E1: idle/background host does not start 90s failover',
+  shouldAccumulateHostOfflineMs({ hostPresence: 'idle' }) === false
+  && shouldStartHostFailover({
+    hostPresence: 'idle', offlineForMs: 3 * 60 * 1000, graceMs: 90000,
+  }) === false);
+check('E1: missing host still failovers after grace',
+  shouldStartHostFailover({
+    hostPresence: 'offline', offlineForMs: 90000, graceMs: 90000,
+  }) === true
+  && shouldStartHostFailover({
+    hostPresence: 'offline', offlineForMs: 1000, graceMs: 90000,
+  }) === false);
 {
   const now = 1_000_000;
   check('missing doc is offline',
@@ -435,6 +461,19 @@ console.log('=== B20–B24 pointer lock / Max / failed Deploy / Leave ===');
     /pp-placement-actions[\s\S]*finish-placement/.test(src));
   check('B20–B22: panel uses pointerdown lock',
     src.includes('_onPanelPointerDown') && src.includes('resolveLockedPanelClick'));
+}
+
+{
+  const syncSrc = readFileSync(join(root, 'src/multiplayer/syncManager.js'), 'utf8');
+  const presenceSrc = readFileSync(join(root, 'src/multiplayer/presenceManager.js'), 'utf8');
+  check('E1: sync re-attaches via ensure, not a second startSync',
+    syncSrc.includes('_ensureGameSnapshot')
+    && (syncSrc.match(/onSnapshot\(/g) || []).length === 1);
+  check('E1: presence re-attaches via ensure, one collection listener',
+    presenceSrc.includes('_ensurePresenceSnapshot')
+    && (presenceSrc.match(/onSnapshot\(/g) || []).length === 1);
+  check('E1: no RTDB onDisconnect',
+    !syncSrc.includes('onDisconnect') && !presenceSrc.includes('onDisconnect'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

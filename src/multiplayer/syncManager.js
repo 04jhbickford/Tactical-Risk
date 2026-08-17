@@ -14,6 +14,10 @@ import { getAuthManager } from './auth.js';
 import { GAME_VERSION, compareGameVersions } from '../version.js';
 import { createPushQueue } from './pushCoalesce.js';
 import { shouldApplyRemoteGameState } from '../state/placementPass.js';
+import {
+  shouldReplaceSnapshotListener,
+  shouldResumeSnapshots,
+} from './presencePolicy.js';
 
 export class SyncManager {
   constructor(gameId, gameState) {
@@ -42,7 +46,9 @@ export class SyncManager {
     });
     this._versionOutdatedNotified = false; // fire the refresh banner at most once
     this._lifecycleBound = false;
+    this._snapshotLive = false;
     this._onLifecycleHide = () => this._flushOnHide();
+    this._onLifecycleResume = (event) => this._resumeSnapshots(event);
   }
 
   // Dimension C (version-upgrade robustness): every game doc records the
@@ -134,74 +140,7 @@ export class SyncManager {
     // Determine if we're the active player
     this._updateActivePlayer(data.currentPlayerId);
 
-    // Subscribe to real-time updates
-    this.unsubscribe = onSnapshot(gameRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        this._notifyListeners('game_deleted', null);
-        return;
-      }
-
-      const newData = snapshot.data();
-
-      console.log(`[Sync] onSnapshot (init): version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
-
-      this._checkRemoteVersion(newData);
-
-      // Skip if this is our own update (but still check turn changes)
-      if (this.isPushing) {
-        // Even when pushing, update active player if it changed
-        if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-          this._updateActivePlayer(newData.currentPlayerId);
-        }
-        return;
-      }
-
-      // Only update if version is newer
-      if (newData.stateVersion > this.localVersion) {
-        console.log(`[Sync] Loading newer state (init): ${this.localVersion} -> ${newData.stateVersion}`);
-        this.localVersion = newData.stateVersion;
-
-        // Load new state - set flag to prevent subscription from pushing back
-        if (newData.state) {
-          this.isLoadingRemoteState = true;
-          this.gameState.loadFromJSON(newData.state);
-          this.isLoadingRemoteState = false;
-        }
-
-        // Update active player status
-        this._updateActivePlayer(newData.currentPlayerId);
-
-        this._notifyListeners('state_updated', this._turnSnapshotPayload(newData.currentPlayerId));
-      } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-        // Doc-level current player differs from ours at the same version —
-        // our local state has DIVERGED from the doc (seen in the V2.53
-        // playtest when two AI runners raced). The doc is authoritative:
-        // load its state instead of just flipping the cached flag, or the
-        // sidebar and the actual game state disagree about whose turn it is.
-        if (newData.state) {
-          this.isLoadingRemoteState = true;
-          this.gameState.loadFromJSON(newData.state);
-          this.isLoadingRemoteState = false;
-          this.localVersion = newData.stateVersion || this.localVersion;
-        }
-        console.log(`[Sync] Turn changed without version bump (init): ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
-        this._updateActivePlayer(newData.currentPlayerId);
-        this._notifyListeners('turn_changed', this._turnSnapshotPayload(newData.currentPlayerId));
-      }
-    }, async (error) => {
-      console.error('SyncManager: Subscription error', error);
-
-      // Check if this is an auth error that needs re-login
-      const authResult = await this.authManager.handleFirebaseError(error);
-      if (authResult.needsReauth) {
-        console.warn('[Sync] Auth error - user needs to re-login');
-        this._notifyListeners('auth_error', { needsReauth: true });
-        return;
-      }
-
-      this._notifyListeners('error', error);
-    });
-
+    this._ensureGameSnapshot();
     return true;
   }
 
@@ -241,62 +180,7 @@ export class SyncManager {
 
         console.log(`[Sync] After load - currentPlayer: ${this.gameState.currentPlayer?.name} (oderId: ${this.gameState.currentPlayer?.oderId})`);
 
-        // Now subscribe to real-time updates
-        this.unsubscribe = onSnapshot(gameRef, (snapshot) => {
-          if (!snapshot.exists()) {
-            this._notifyListeners('game_deleted', null);
-            return;
-          }
-
-          const newData = snapshot.data();
-
-          console.log(`[Sync] onSnapshot: version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
-
-          this._checkRemoteVersion(newData);
-
-          // Skip if this is our own update (but still check turn changes)
-          if (this.isPushing) {
-            // Even when pushing, update active player if it changed
-            if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-              this._updateActivePlayer(newData.currentPlayerId);
-            }
-            return;
-          }
-
-          // Newer version, or the seat changed at the same version — guest
-          // must load unitsToPlace / unitsPlacedThisRound or they inherit
-          // the previous actor's 6/6 and leftover pool.
-          if (this._shouldApplyRemote(newData)) {
-            console.log(`[Sync] Loading remote state: ${this.localVersion} -> ${newData.stateVersion}, seat ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
-            this.localVersion = Math.max(this.localVersion, newData.stateVersion || 0);
-
-            if (newData.state) {
-              this.isLoadingRemoteState = true;
-              this.gameState.loadFromJSON(newData.state);
-              this.isLoadingRemoteState = false;
-            }
-
-            this._updateActivePlayer(newData.currentPlayerId);
-            this._notifyListeners('state_updated', this._turnSnapshotPayload(newData.currentPlayerId));
-          } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-            console.log(`[Sync] Turn changed without version bump: ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
-            this._updateActivePlayer(newData.currentPlayerId);
-            this._notifyListeners('turn_changed', this._turnSnapshotPayload(newData.currentPlayerId));
-          }
-        }, async (error) => {
-          console.error('SyncManager: Subscription error', error);
-
-          // Check if this is an auth error that needs re-login
-          const authResult = await this.authManager.handleFirebaseError(error);
-          if (authResult.needsReauth) {
-            console.warn('[Sync] Auth error - user needs to re-login');
-            this._notifyListeners('auth_error', { needsReauth: true });
-            return;
-          }
-
-          this._notifyListeners('error', error);
-        });
-
+        this._ensureGameSnapshot();
         return true;
       }
 
@@ -314,7 +198,87 @@ export class SyncManager {
       this.unsubscribe();
       this.unsubscribe = null;
     }
+    this._snapshotLive = false;
     this._unbindLifecycleFlush();
+  }
+
+  _ensureGameSnapshot({ persistedPageShow = false } = {}) {
+    if (!this.db || !this.gameId) return;
+    if (!shouldReplaceSnapshotListener({
+      hasUnsubscribe: typeof this.unsubscribe === 'function',
+      listenerErrored: !this._snapshotLive && !this.unsubscribe,
+      persistedPageShow,
+    })) {
+      return;
+    }
+    this._attachGameSnapshot();
+  }
+
+  _attachGameSnapshot() {
+    const gameRef = doc(this.db, 'games', this.gameId);
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+    this._snapshotLive = false;
+    this.unsubscribe = onSnapshot(gameRef, (snapshot) => {
+      this._snapshotLive = true;
+      if (!snapshot.exists()) {
+        this._notifyListeners('game_deleted', null);
+        return;
+      }
+
+      const newData = snapshot.data();
+      console.log(`[Sync] onSnapshot: version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
+      this._checkRemoteVersion(newData);
+
+      if (this.isPushing) {
+        if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
+          this._updateActivePlayer(newData.currentPlayerId);
+        }
+        return;
+      }
+
+      if (this._shouldApplyRemote(newData)) {
+        console.log(`[Sync] Loading remote state: ${this.localVersion} -> ${newData.stateVersion}, seat ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
+        this.localVersion = Math.max(this.localVersion, newData.stateVersion || 0);
+        if (newData.state) {
+          this.isLoadingRemoteState = true;
+          this.gameState.loadFromJSON(newData.state);
+          this.isLoadingRemoteState = false;
+        }
+        this._updateActivePlayer(newData.currentPlayerId);
+        this._notifyListeners('state_updated', this._turnSnapshotPayload(newData.currentPlayerId));
+      } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
+        console.log(`[Sync] Turn changed without version bump: ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
+        this._updateActivePlayer(newData.currentPlayerId);
+        this._notifyListeners('turn_changed', this._turnSnapshotPayload(newData.currentPlayerId));
+      }
+    }, async (error) => {
+      console.error('SyncManager: Subscription error — will re-attach on resume', error);
+      this._snapshotLive = false;
+      this.unsubscribe = null;
+      const authResult = await this.authManager.handleFirebaseError(error);
+      if (authResult.needsReauth) {
+        this._notifyListeners('auth_error', { needsReauth: true });
+        return;
+      }
+      this._notifyListeners('error', error);
+    });
+  }
+
+  _resumeSnapshots(event) {
+    const persisted = !!(event && event.persisted);
+    const visible = typeof document === 'undefined'
+      || document.visibilityState === 'visible'
+      || event?.type === 'pageshow';
+    if (!visible) return;
+    if (!shouldResumeSnapshots({
+      event: event?.type === 'pageshow' ? 'pageshow' : 'visibility-visible',
+    })) {
+      return;
+    }
+    this._ensureGameSnapshot({ persistedPageShow: persisted });
   }
 
   _bindLifecycleFlush() {
@@ -322,12 +286,16 @@ export class SyncManager {
     this._lifecycleBound = true;
     window.addEventListener('pagehide', this._onLifecycleHide);
     document.addEventListener('visibilitychange', this._onLifecycleHide);
+    window.addEventListener('pageshow', this._onLifecycleResume);
+    document.addEventListener('visibilitychange', this._onLifecycleResume);
   }
 
   _unbindLifecycleFlush() {
     if (!this._lifecycleBound || typeof window === 'undefined') return;
     window.removeEventListener('pagehide', this._onLifecycleHide);
     document.removeEventListener('visibilitychange', this._onLifecycleHide);
+    window.removeEventListener('pageshow', this._onLifecycleResume);
+    document.removeEventListener('visibilitychange', this._onLifecycleResume);
     this._lifecycleBound = false;
   }
 

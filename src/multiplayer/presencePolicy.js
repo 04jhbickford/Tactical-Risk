@@ -38,6 +38,39 @@ export function shouldHeartbeatNow({ event } = {}) {
     || event === 'interval';
 }
 
+// Resume (visible / pageshow, including bfcache) must heartbeat now.
+export function shouldResumeSnapshots({ event } = {}) {
+  return event === 'visibility-visible' || event === 'pageshow';
+}
+
+// Re-attach only when the listener is dead. A live unsubscribe must not
+// get a second onSnapshot (dual writer / duplicate apply).
+export function shouldReplaceSnapshotListener({
+  hasUnsubscribe = false,
+  listenerErrored = false,
+  persistedPageShow = false,
+} = {}) {
+  if (persistedPageShow) return true;
+  if (listenerErrored) return true;
+  if (!hasUnsubscribe) return true;
+  return false;
+}
+
+// A backgrounded host is idle, not gone. Idle must not start the 90s
+// host-failover clock by itself.
+export function shouldAccumulateHostOfflineMs({ hostPresence } = {}) {
+  return hostPresence === 'offline';
+}
+
+export function shouldStartHostFailover({
+  hostPresence = 'offline',
+  offlineForMs = 0,
+  graceMs = 90000,
+} = {}) {
+  if (!shouldAccumulateHostOfflineMs({ hostPresence })) return false;
+  return Number(offlineForMs) >= Number(graceMs);
+}
+
 // A single permission-denied / network blip is not a sign-out.
 // Eject only when the session is actually gone.
 export function shouldEjectFromMatch({
