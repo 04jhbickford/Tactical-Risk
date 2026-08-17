@@ -5,6 +5,7 @@ import {
   countKnownUnitsToPlace,
   canFinishPlacementRound as canFinishPlacementRoundPred,
   cloneUnitsToPlace,
+  onlyNavalRemaining,
 } from './placementPass.js';
 
 export const GAME_PHASES = {
@@ -1192,12 +1193,14 @@ export class GameState {
     return units.reduce((sum, u) => sum + u.quantity, 0);
   }
 
-  canFinishPlacementRound(playerId, unitDefs) {
+  canFinishPlacementRound(playerId, unitDefs, { allowNavalSkip = false } = {}) {
     return canFinishPlacementRoundPred({
       placedThisRound: this.unitsPlacedThisRound || 0,
       limit: this.getUnitsPerRoundLimit(),
       remainingKnown: this.getTotalUnitsToPlace(playerId, unitDefs),
       hasPlaceable: this.hasPlaceableUnits(playerId, unitDefs),
+      onlyNavalRemaining: onlyNavalRemaining(this.unitsToPlace[playerId], unitDefs),
+      allowNavalSkip,
     });
   }
 
@@ -1205,6 +1208,12 @@ export class GameState {
   hasPlaceableUnits(playerId, unitDefs) {
     const units = this.unitsToPlace[playerId] || [];
     if (!units.some(u => u.quantity > 0)) return false;
+
+    // B19: Done/skip leftover ships must not hand the seat straight back.
+    if (this.playerState[playerId]?.skipLeftoverNaval
+      && onlyNavalRemaining(units, unitDefs)) {
+      return false;
+    }
 
     // Get player's owned territories and valid sea zones
     const ownedTerritories = this.getPlayerTerritories(playerId);
@@ -1532,14 +1541,18 @@ export class GameState {
 
   // Finish current player's placement round (6 units max, or all remaining)
   // unitDefs is optional but needed for accurate placeable check
-  finishPlacementRound(unitDefs = null) {
+  finishPlacementRound(unitDefs = null, { allowNavalSkip = false } = {}) {
     if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) {
       return { ok: false, reason: 'wrong-phase' };
     }
     const player = this.currentPlayer;
     if (!player) return { ok: false, reason: 'no-player' };
-    if (!this.canFinishPlacementRound(player.id, unitDefs)) {
+    if (!this.canFinishPlacementRound(player.id, unitDefs, { allowNavalSkip })) {
       return { ok: false, reason: 'not-ready' };
+    }
+    if (allowNavalSkip && onlyNavalRemaining(this.unitsToPlace[player.id], unitDefs)) {
+      if (!this.playerState[player.id]) this.playerState[player.id] = {};
+      this.playerState[player.id].skipLeftoverNaval = true;
     }
 
     this.unitsPlacedThisRound = 0;

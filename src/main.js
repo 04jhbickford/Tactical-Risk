@@ -534,7 +534,9 @@ async function init() {
         if (gameState.isMultiplayer) {
           playerPanel.setWaitingForSync(true);
         }
-        const pass = gameState.finishPlacementRound(unitDefs);
+        const pass = gameState.finishPlacementRound(unitDefs, {
+          allowNavalSkip: !!data?.allowNavalSkip,
+        });
         if (!pass?.ok) {
           playerPanel.setWaitingForSync(false);
           break;

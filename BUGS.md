@@ -23,6 +23,7 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B15 Undo vs DEPLOYED desync / + vanished the restored unit: undo did not always decrement `unitsPlacedThisRound`; `setSelectedTerritory` wiped the queue.
 - B16/B17 selection jump + fighter auto-commit: `_scheduleRender` called itself and never painted (shipped V2.77). Stale panel vs live selection. `+` is queue-only; Deploy is the commit.
 - B18/B8/B10: Undo and Deploy now have separate peek slots; unit-list scroll is restored; Deploy batch notifies once (no 0-flash, B12).
+- B19: ships-only remainder on inland land showed a sea hint, no unit rows, and hid Done until 6/6. Place leftover ships in a legal sea, or Done/skip (does not bounce the seat back).
 
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
 

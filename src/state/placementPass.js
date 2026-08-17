@@ -14,17 +14,27 @@ export function countKnownUnitsToPlace(unitsToPlace, unitDefs) {
     .reduce((sum, u) => sum + (Number(u.quantity) || 0), 0);
 }
 
-// Done is legal when the round cap is hit, nothing known remains, or
-// nothing remaining can legally be placed (ghost / landlocked leftover).
+export function onlyNavalRemaining(unitsToPlace, unitDefs) {
+  const known = knownUnitsToPlace(unitsToPlace, unitDefs);
+  if (known.length === 0) return false;
+  return known.every(u => !!unitDefs?.[u.type]?.isSea);
+}
+
+// Done is legal when the round cap is hit, nothing known remains,
+// nothing remaining can legally be placed (ghost / landlocked leftover),
+// or leftover ships are skipped from an inland/non-sea selection (B19).
 export function canFinishPlacementRound({
   placedThisRound = 0,
   limit = 6,
   remainingKnown = 0,
   hasPlaceable = false,
+  onlyNavalRemaining: onlyNaval = false,
+  allowNavalSkip = false,
 } = {}) {
   return Number(placedThisRound) >= Number(limit)
     || Number(remainingKnown) <= 0
-    || !hasPlaceable;
+    || !hasPlaceable
+    || (!!allowNavalSkip && !!onlyNaval);
 }
 
 // After a committed Done, the next actor is the next non-skipped player

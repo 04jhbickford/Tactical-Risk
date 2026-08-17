@@ -156,19 +156,30 @@ export function computeInitialPlacementUX({
   selectedKind = 'other',
 } = {}) {
   const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
-  const showDone = canFinish && totalQueued === 0;
   const onlyNavalRemain = landAirRemaining === 0 && navalRemaining > 0;
-  const needSeaHint = onlyNavalRemain && hasPlaceable && !showDone && selectedKind !== 'valid-sea';
+  // Inland / non-sea + leftover ships: Done/skip must be available.
+  // Gating Done on 6/6 here is the B19 deadlock (hint only, no rows).
+  const canSkipNaval = onlyNavalRemain
+    && selectedKind !== 'valid-sea'
+    && totalQueued === 0
+    && placedThisRound < limit;
+  const showDone = (canFinish || canSkipNaval) && totalQueued === 0;
+  const needSeaHint = onlyNavalRemain
+    && hasPlaceable
+    && selectedKind !== 'valid-sea'
+    && placedThisRound < limit;
   const stuckWithNaval = onlyNavalRemain && !hasPlaceable;
 
   let hint = null;
-  if (needSeaHint) {
+  if (needSeaHint && canSkipNaval) {
+    hint = 'Click a sea zone adjacent to a coastal territory you own to place leftover ships, or Done to skip them.';
+  } else if (needSeaHint) {
     hint = 'Click a sea zone adjacent to a coastal territory you own to place ships.';
   } else if (stuckWithNaval && showDone) {
     hint = 'No legal sea zone to place remaining ships. Continue to the next player.';
   }
 
-  return { showDone, needSeaHint, stuckWithNaval, onlyNavalRemain, hint };
+  return { showDone, needSeaHint, stuckWithNaval, onlyNavalRemain, canSkipNaval, hint };
 }
 
 // One-line "what now" for the phone tray peek (and the desktop phase row).
@@ -741,10 +752,13 @@ export class PlayerPanel {
       } else if (ux.showDone) {
         buttons.push({
           action: 'finish-placement',
-          label: 'Done - Next Player →',
+          label: ux.canSkipNaval ? 'Done — skip leftover ships →' : 'Done - Next Player →',
           disabled: false,
           primary: true
         });
+        if (ux.needSeaHint && ux.hint) {
+          warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
+        }
       } else if (ux.needSeaHint && ux.hint) {
         warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
       }
@@ -3258,6 +3272,14 @@ export class PlayerPanel {
         const setIndex = btn.dataset.set;
         if ((action === 'undo-placement' || action === 'undo-capital')
           && Date.now() < (this._ignoreUndoUntil || 0)) {
+          return;
+        }
+
+        if (action === 'finish-placement') {
+          const { ux } = this._getInitialPlacementUX(this.gameState.currentPlayer);
+          if (this.onAction) {
+            this.onAction('finish-placement', { allowNavalSkip: !!ux.canSkipNaval });
+          }
           return;
         }
 
