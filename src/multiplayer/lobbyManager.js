@@ -27,8 +27,12 @@ import {
 import {
   lastMatchForJoinCode,
   readLastMatch,
+  rememberLastMatch,
+  forgetLastMatch,
   recoverMyGamesOnLoad,
   resolveJoinNotFoundError,
+  shouldClearLobbyOnSnapshotError,
+  shouldKeepLastKnownLobby,
 } from './lastMatch.js';
 import { resolveStartGameTarget } from './lobbyStart.js';
 
@@ -48,6 +52,7 @@ export class LobbyManager {
     this.authManager = null;
     this.currentLobby = null;
     this.lobbyUnsubscribe = null;
+    this._listenerErrored = false;
     this._listeners = [];
   }
 
@@ -109,6 +114,10 @@ export class LobbyManager {
 
     try {
       await setDoc(doc(this.db, 'lobbies', lobbyId), lobbyData);
+      rememberLastMatch({
+        lobbyCode: code,
+        hostName: user.displayName,
+      });
       this._subscribeToLobby(lobbyId);
       return { success: true, lobbyId, code };
     } catch (error) {
@@ -318,6 +327,10 @@ export class LobbyManager {
 
     // Check if already in lobby
     if (lobby.players.some(p => p.oderId === user.id)) {
+      rememberLastMatch({
+        lobbyCode: lobby.code || code,
+        hostName: lobby.players?.find((p) => p.isHost)?.displayName || null,
+      });
       this._subscribeToLobby(lobby.id);
       return { success: true, lobbyId: lobby.id };
     }
@@ -349,6 +362,10 @@ export class LobbyManager {
         players: arrayUnion(newPlayer),
         updatedAt: serverTimestamp()
       });
+      rememberLastMatch({
+        lobbyCode: lobby.code || code,
+        hostName: lobby.players?.find((p) => p.isHost)?.displayName || null,
+      });
       this._subscribeToLobby(lobby.id);
       console.log('[LobbyManager] Player successfully joined lobby');
       return { success: true, lobbyId: lobby.id };
@@ -374,6 +391,7 @@ export class LobbyManager {
       this.lobbyUnsubscribe = null;
     }
     this.currentLobby = null;
+    forgetLastMatch();
 
     // If host, delete lobby or transfer host
     if (lobby.hostId === user.id) {
@@ -730,14 +748,30 @@ export class LobbyManager {
       (snapshot) => {
         if (snapshot.exists()) {
           this.currentLobby = { id: snapshot.id, ...snapshot.data() };
-        } else {
+          this._listenerErrored = false;
+          rememberLastMatch({
+            gameId: this.currentLobby.gameId || readLastMatch()?.gameId || null,
+            lobbyCode: this.currentLobby.code,
+            hostName: this.currentLobby.players?.find((p) => p.isHost)?.displayName || null,
+          });
+        } else if (shouldKeepLastKnownLobby({
+          snapshotExists: false,
+          explicitLeave: false,
+        }) && this.currentLobby) {
+          // B41: missing-doc flicker is not Leave. Keep the last known room.
+          this._listenerErrored = true;
+        } else if (shouldClearLobbyOnSnapshotError()) {
           this.currentLobby = null;
         }
         this._notifyListeners();
       },
       (error) => {
         console.error('Lobby subscription error:', error);
-        this.currentLobby = null;
+        this._listenerErrored = true;
+        // B41: permission / token flicker must not eject the host.
+        if (shouldClearLobbyOnSnapshotError()) {
+          this.currentLobby = null;
+        }
         this._notifyListeners();
       }
     );

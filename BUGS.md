@@ -2,6 +2,16 @@
 
 ---
 
+## 8.17.26 — V2.79 B41 host lobby dumped home (6V9ZXK)
+
+Same family as B38. Production V2.78, lobby **6V9ZXK** (Bastion's Game), host Bastion / abramlockheed. Host created a 2-player no-AI lobby, stayed at 1/2 (Start not clicked). View dumped to Local Play / Play Online with no Leave, no Start, no Delete Lobby, no surrender. Still signed in. Guest (James) was still joining. Do not treat as surrendered. Rejoin **6V9ZXK** only — no new game.
+
+Cause: a waiting lobby never wrote `lastMatch` (only `startMultiplayerGame` did). Snapshot error / missing-doc flicker nulled `currentLobby` and the UI left the room. `onBack` / resume-miss then called `lobby.show()` (home). A discarded tab restart with no remembered code shows the landing page while Firebase still has the host signed in.
+
+Fix: remember `{ lobbyCode }` on create/join. Snapshot error keeps the last known lobby and does not navigate home. Lost lobby view restores from the live lobby/game doc (or Rejoin 6V9ZXK), never Local Play. Start stays gated until both seated. SCHEMA 11. GAME_VERSION V2.79. No map/rule change.
+
+---
+
 ## 8.17.26 — V2.78 ship (CEVX6F B38–B40)
 
 CoS-approved squash to main. SCHEMA 11. No map/rule change. No Vercel billing from this ship.

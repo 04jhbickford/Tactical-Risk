@@ -12,6 +12,9 @@ import {
   shouldOpenMyGames,
   shouldPrefillJoinCodeFromLastMatch,
   joinFormFieldAttrString,
+  shouldLeaveLobbyView,
+  shouldNavigateToHome,
+  resolveLobbyViewAfterLoss,
 } from '../multiplayer/lastMatch.js';
 import { resolveHostLobbyPrimaryCta } from '../multiplayer/lobbyStart.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
@@ -112,13 +115,14 @@ export class MultiplayerLobby {
   show() {
     console.log('[MultiplayerLobby] show() called, mode:', this.mode);
     console.trace('[MultiplayerLobby] show() stack trace');
+    if (typeof this.onCoverHome === 'function') this.onCoverHome();
     this.el.classList.remove('hidden');
     this.el.style.display = 'flex'; // Ensure visible
     this._subscribeToLobby();
     this._render();
   }
 
-  hide() {
+  hide({ resetMode = true } = {}) {
     console.log('[MultiplayerLobby] hide() called');
     this.el.classList.add('hidden');
     this.el.style.display = 'none'; // Force hide with display none
@@ -126,8 +130,7 @@ export class MultiplayerLobby {
       this.unsubscribe();
       this.unsubscribe = null;
     }
-    // Reset mode to menu for next time
-    this.mode = 'menu';
+    if (resetMode) this.mode = 'menu';
   }
 
   destroy() {
@@ -156,6 +159,23 @@ export class MultiplayerLobby {
       // Update UI
       if (lobby) {
         this.mode = 'lobby';
+        this._render();
+        return;
+      }
+
+      // B41: a null snapshot is not Leave. Stay in / restore the room.
+      if (!shouldLeaveLobbyView({ snapshotMissing: true, presenceFlicker: true })) {
+        const view = resolveLobbyViewAfterLoss({
+          currentLobby: null,
+          lastMatch: readLastMatch(),
+        });
+        if (view === 'lobby' || view === 'game' || view === 'reconnect') {
+          this.mode = view === 'reconnect' ? 'reconnect' : 'lobby';
+          if ((view === 'lobby' || view === 'game') && !this._restoringLobby) {
+            void this._restoreLiveLobby();
+            return;
+          }
+        }
       }
       this._render();
     });
@@ -259,6 +279,19 @@ export class MultiplayerLobby {
         <button class="mp-secondary-btn" data-action="back">← Back</button>
         <button class="mp-secondary-btn danger" data-action="signout">Sign Out</button>
       </div>
+    `;
+  }
+
+  _renderLobbyRestoring(user, last) {
+    const code = last?.lobbyCode || 'the lobby';
+    return `
+      <div class="mp-identity-box">
+        <p class="mp-welcome">Still in ${code}</p>
+        <p class="mp-identity-details">
+          Connection flickered. You did not leave. Restoring the live lobby…
+        </p>
+      </div>
+      ${this._renderLastMatchBanner()}
     `;
   }
 
@@ -531,9 +564,52 @@ export class MultiplayerLobby {
     });
   }
 
+  async _restoreLiveLobby() {
+    if (this._restoringLobby) return false;
+    this._restoringLobby = true;
+    try {
+      const last = readLastMatch();
+      const view = resolveLobbyViewAfterLoss({
+        currentLobby: this.lobbyManager.getLobby(),
+        lastMatch: last,
+      });
+      if (view === 'game' && last?.gameId && this.onStart) {
+        this.hide();
+        this.onStart(last.gameId, { id: last.gameId, lobbyCode: last.lobbyCode });
+        return true;
+      }
+      if ((view === 'lobby' || view === 'game') && last?.lobbyCode) {
+        const result = await this.lobbyManager.joinLobby(last.lobbyCode, null);
+        if (result.success && result.isGame && this.onStart) {
+          this.hide();
+          this.onStart(result.gameId, result.game);
+          return true;
+        }
+        if (result.success) {
+          this.mode = 'lobby';
+          this._render();
+          return true;
+        }
+      }
+      if (view === 'reconnect') {
+        this.showReconnectOnly();
+        return true;
+      }
+      this._render();
+      return false;
+    } finally {
+      this._restoringLobby = false;
+    }
+  }
+
   _renderLobby(user) {
     const lobby = this.lobbyManager.getLobby();
     if (!lobby) {
+      const last = readLastMatch();
+      if (!shouldLeaveLobbyView({ snapshotMissing: true })
+        && (last?.lobbyCode || last?.gameId)) {
+        return this._renderLobbyRestoring(user, last);
+      }
       this.mode = 'menu';
       return this._renderMenu(user);
     }
@@ -731,6 +807,15 @@ export class MultiplayerLobby {
     });
 
     this.el.querySelector('[data-action="back"]')?.addEventListener('click', () => {
+      const last = readLastMatch();
+      if (!shouldNavigateToHome({
+        explicitExit: true,
+        lastMatch: last,
+        liveLobby: !!this.lobbyManager.getLobby(),
+      })) {
+        void this._restoreLiveLobby();
+        return;
+      }
       this.hide();
       if (this.onBack) {
         this.onBack();
@@ -741,7 +826,7 @@ export class MultiplayerLobby {
       await this.authManager.signOut();
       this.hide();
       if (this.onBack) {
-        this.onBack();
+        this.onBack('signout');
       }
     });
 
@@ -788,6 +873,7 @@ export class MultiplayerLobby {
     });
 
     this.el.querySelector('[data-action="leave"]')?.addEventListener('click', async () => {
+      if (!shouldLeaveLobbyView({ explicitLeave: true })) return;
       await this.lobbyManager.leaveLobby();
       this.mode = 'menu';
       this._render();

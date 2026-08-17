@@ -91,6 +91,8 @@ import {
   shouldLeaveGameView,
   shouldAutoResumeLastMatch,
   resolveResumeFailureView,
+  shouldNavigateToHome,
+  resolveLobbyViewAfterLoss,
 } from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
@@ -1635,7 +1637,7 @@ async function init() {
       (gameId, lobbyData) => {
         startMultiplayerGame(gameId, lobbyData);
       },
-      (action) => {
+      async (action) => {
         if (action === 'rejoin') {
           if (!gameListUI) {
             gameListUI = new GameList(
@@ -1652,12 +1654,54 @@ async function init() {
           }
           multiplayerLobby.hide();
           gameListUI.show();
-        } else {
+        } else if (action === 'signout' || shouldNavigateToHome({
+          explicitExit: true,
+          confirmedSignOut: action === 'signout',
+          lastMatch: readLastMatch(),
+        })) {
           lobby.show();
+        } else {
+          await restoreLiveLobbyOrGame();
         }
       }
     );
+    multiplayerLobby.onCoverHome = () => lobby.hide();
     return multiplayerLobby;
+  };
+
+  const restoreLiveLobbyOrGame = async () => {
+    const last = readLastMatch();
+    const view = resolveLobbyViewAfterLoss({ lastMatch: last });
+    ensureMultiplayerLobby();
+    lobby.hide();
+    if (view === 'game' && last?.gameId) {
+      await startMultiplayerGame(last.gameId, {
+        id: last.gameId,
+        lobbyCode: last.lobbyCode,
+      });
+      if (gameState?.players?.length) return true;
+    }
+    if ((view === 'lobby' || view === 'game') && last?.lobbyCode) {
+      try {
+        const result = await lobbyManager.joinLobby(last.lobbyCode, null);
+        if (result.success && result.isGame) {
+          await startMultiplayerGame(result.gameId, result.game);
+          return !!(gameState?.players?.length);
+        }
+        if (result.success) {
+          multiplayerLobby.mode = 'lobby';
+          multiplayerLobby.show();
+          return true;
+        }
+      } catch (err) {
+        console.warn('[Main] Restore live lobby failed — staying off home', err);
+      }
+    }
+    if (last?.gameId || last?.lobbyCode) {
+      multiplayerLobby.showReconnectOnly();
+      return true;
+    }
+    return false;
   };
 
   // Handle Play Online button click
@@ -1680,9 +1724,16 @@ async function init() {
         });
         if (gameState?.players?.length) return;
       }
+      if (shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last }) && last?.lobbyCode) {
+        const restored = await restoreLiveLobbyOrGame();
+        if (restored) return;
+      }
       ensureMultiplayerLobby();
-      if (resolveResumeFailureView({ resumed: false, lastMatch: last }) === 'reconnect') {
+      const resumeView = resolveResumeFailureView({ resumed: false, lastMatch: last });
+      if (resumeView === 'reconnect') {
         multiplayerLobby.showReconnectOnly();
+      } else if (resumeView === 'lobby') {
+        await restoreLiveLobbyOrGame();
       } else {
         multiplayerLobby.show();
       }
@@ -1697,12 +1748,20 @@ async function init() {
       if (!authScreen) {
         authScreen = new AuthScreen((user) => {
           if (user) handlePlayOnline();
-          else lobby.show();
+          else if (shouldNavigateToHome({ explicitExit: true, lastMatch: readLastMatch() })) {
+            lobby.show();
+          } else {
+            restoreLiveLobbyOrGame();
+          }
         });
       } else {
         authScreen.onComplete = (user) => {
           if (user) handlePlayOnline();
-          else lobby.show();
+          else if (shouldNavigateToHome({ explicitExit: true, lastMatch: readLastMatch() })) {
+            lobby.show();
+          } else {
+            restoreLiveLobbyOrGame();
+          }
         };
       }
       authScreen.show();
@@ -1776,7 +1835,7 @@ async function init() {
         }
       }
     } catch (err) {
-      console.warn('[Main] Auto-resume last match failed — staying on home', err);
+      console.warn('[Main] Auto-resume last match failed — not dumping to home', err);
     }
     if (!resumedLastMatch) {
       const view = resolveResumeFailureView({
@@ -1786,8 +1845,13 @@ async function init() {
       if (view === 'reconnect') {
         ensureMultiplayerLobby();
         multiplayerLobby.showReconnectOnly();
-      } else {
+      } else if (view === 'lobby') {
+        await restoreLiveLobbyOrGame();
+      } else if (shouldNavigateToHome({ lastMatch: lastAtBoot })) {
         lobby.show();
+      } else {
+        ensureMultiplayerLobby();
+        multiplayerLobby.showReconnectOnly();
       }
     }
   }
