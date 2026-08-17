@@ -2,10 +2,11 @@
 // iPhone shell is max-width: 480px so the V2.61 tablet band (481–900)
 // and desktop ≥901px stay on their existing trees. Phone CSS lives in
 // @media (max-width: 480px) and html.mobile-shell.
-// Landscape phones are typically 667–932 wide × ~390 tall — width-only
-// 480px would drop them into the tablet tree. Height ≤480 and width <901
-// keeps that viewport on the phone shell. Desktop ≥901 and tablet 481–900
-// (when height is omitted or >480) stay frozen. No rules / combat / schema changes.
+// Landscape phones are 667–956 wide × ~375–440 tall — width-only 480px
+// would drop them into the tablet/desktop tree. Use the short side for
+// phone (min ≤480) and keep iPad/desktop out (max <1024). Width-only
+// 481–900 stays tablet; 1280×400 / 1280×800 stay desktop. No rules /
+// combat / schema changes.
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { MAP_WIDTH, MAP_HEIGHT } from '../map/camera.js';
@@ -14,6 +15,8 @@ export const MOBILE_SHELL_MAX_WIDTH = 480;
 export const MOBILE_SHELL_QUERY = `(max-width: ${MOBILE_SHELL_MAX_WIDTH}px)`;
 export const TABLET_CHROME_MAX_WIDTH = 900;
 export const DESKTOP_MIN_WIDTH = 901;
+// Below iPad's 1024 long side so Plus / Pro Max landscape (~926–956) stay phone.
+export const PHONE_MAX_LONG_SIDE = 1024;
 
 const listeners = [];
 
@@ -24,7 +27,9 @@ export function shouldUseMobileShell(viewportWidth, viewportHeight) {
   if (viewportHeight == null || viewportHeight === '') return false;
   const height = Number(viewportHeight);
   if (!Number.isFinite(height)) return false;
-  return height <= MOBILE_SHELL_MAX_WIDTH && width < DESKTOP_MIN_WIDTH;
+  const shortSide = Math.min(width, height);
+  const longSide = Math.max(width, height);
+  return shortSide <= MOBILE_SHELL_MAX_WIDTH && longSide < PHONE_MAX_LONG_SIDE;
 }
 
 export function isMobileShell() {

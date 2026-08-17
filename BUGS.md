@@ -15,7 +15,7 @@ Cause:
 
 Fix (UI / chrome / queue skip — SCHEMA 11, no rule/map/odds change):
 - After AA rolls, stay on `aaResults`: who shot (defending AA), dice, hits, which aircraft died (cheapest first, no attacker choice). Continue proceeds. Auto-battle paints then pauses 600ms. One-line action-log entry.
-- Phone if width ≤480, or (height provided AND height ≤480 AND width <901). `initMobileShell` uses innerWidth + innerHeight and re-applies on resize / orientationchange. Desktop ≥901 and tablet 481–900 (no height / tall) stay frozen.
+- Phone if width ≤480 (height omitted), or min(width,height) ≤480 AND max <1024 (below iPad). Plus / Pro Max landscape (926–956 × 428–440) stay phone. `initMobileShell` uses innerWidth + innerHeight and re-applies on resize / orientationchange. Desktop windows (1280×400 / 1280×800) and iPad 768×1024 / 1024×768 stay frozen; 481/772/900 with no height stay tablet.
 - Never show a combat against zero enemy combat units (factory excluded; AA-only still a fight). Empty queue heads dequeue as already resolved. If both sides remain, reopen the real fight. `_reloadRemoteState({force:true})` still restores pre-combat armies when the commit did not land.
 
 Harness: `node tools/test-combat-ui.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
