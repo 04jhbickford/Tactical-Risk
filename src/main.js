@@ -503,8 +503,9 @@ async function init() {
           selectedTerritory = keep;
           playerPanel.setSelectedTerritory(keep || playerPanel.selectedTerritory);
           camera.dirty = true;
+          return result;
         }
-        break;
+        return { placed: 0, placedTypes: [], requested: types.length, failed: types.map((unitType) => ({ unitType, error: 'no-territory' })) };
       }
 
       case 'undo-placement':
@@ -1881,6 +1882,12 @@ async function init() {
     console.log('[MouseUp] wasDrag:', wasDrag, 'Phase:', gameState?.phase);
 
     if (!wasDrag) {
+      // A panel + / Deploy tap that shrinks the tray must not select the
+      // territory now under the finger (B22 East US → East Canada).
+      if (playerPanel.shouldBlockMapSelect()) {
+        camera.dirty = true;
+        return;
+      }
       const world = camera.screenToWorld(e.clientX, e.clientY);
       const wrappedWorldX = wrapX(world.x);
       const hit = territoryMap.hitTest(wrappedWorldX, world.y);

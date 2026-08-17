@@ -24,6 +24,12 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B16/B17 selection jump + fighter auto-commit: `_scheduleRender` called itself and never painted (shipped V2.77). Stale panel vs live selection. `+` is queue-only; Deploy is the commit.
 - B18/B8/B10: Undo and Deploy now have separate peek slots; unit-list scroll is restored; Deploy batch notifies once (no 0-flash, B12).
 - B19: ships-only remainder on inland land showed a sea hint, no unit rows, and hid Done until 6/6. Place leftover ships in a legal sea, or Done/skip (does not bounce the seat back).
+- B19-James (ZUJMNP V2.76): 1/6, remaining 6 naval-only, only Undo. Same leftover-ship deadlock on a legal sea — Done was sea-gated and lived only on the clipped bottom bar. Done/skip is now on any tile (including valid sea) and in the inline placement actions next to Undo.
+- B20: Deploy 1 placed 3 armour (remaining 13→10, round 1→3). Mid-gesture re-render retargeted Deploy onto other + rows. Pointerdown locks the action; Deploy commits that lock only.
+- B21: Artillery + auto-committed and ended the turn at 3/6 (no Done click). Same retarget onto Done after leftover-ship Done appeared. + lock cannot become finish-placement; a ghost Done within 400ms of + is ignored.
+- B22: Artillery + switched the panel to Log and jumped East US → East Canada. + lock cannot become a tab; a panel gesture blocks the map hit now under the finger.
+- B23 P0: Game tab self-navigated to the lobby (auth eject — already on main). Clicking the game *row title* opened surrender. Leave is a compact sibling; title/join never opens the confirm. Do not enlarge Leave.
+- B24: Max bumped DEPLOYED before deploy; Deploy 1 placed 0 twice, then a bomber. DEPLOYED is placed-this-round only. Failed Deploy restores the queue.
 
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
 

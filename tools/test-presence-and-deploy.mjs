@@ -36,6 +36,8 @@ const {
   expandPlaceQueue,
   queuedCount,
   shouldResetDeployedThisRound,
+  deployedThisRoundDisplay,
+  queueAfterDeployAttempt,
 } = await import(pathToFileURL(join(root, 'src/state/placeQueue.js')));
 const {
   shouldDeletePresenceDoc,
@@ -46,8 +48,14 @@ const {
   shouldDeleteLobbyOnHostLeave,
   resolvePresenceState,
   shouldOpenLeaveConfirm,
+  isLeaveControlTarget,
   PRESENCE_GONE_MS,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/presencePolicy.js')));
+const {
+  capturePanelPointerLock,
+  resolveLockedPanelClick,
+  shouldBlockMapSelectAfterPanel,
+} = await import(pathToFileURL(join(root, 'src/ui/panelClickLock.js')));
 const {
   computeIsLocalPlayerTurn,
   resolveTabTitle,
@@ -278,6 +286,16 @@ check('game-row click is not Leave',
   shouldOpenLeaveConfirm({ clickOnLeaveControl: false }) === false);
 check('Leave control still opens confirm',
   shouldOpenLeaveConfirm({ clickOnLeaveControl: true }) === true);
+{
+  const title = { closest: (sel) => sel === '.mp-game-name' ? title : null };
+  const leaveBtn = { closest: (sel) => sel === '[data-leave-game]' ? leaveBtn : null };
+  check('B23: row title is not a leave control',
+    isLeaveControlTarget(title) === false
+    && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: title }) === false);
+  check('B23: only the Leave button opens surrender',
+    isLeaveControlTarget(leaveBtn) === true
+    && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: leaveBtn }) === true);
+}
 
 console.log('=== B13–B17 deploy batch / cap / undo / paint ===');
 {
@@ -350,6 +368,73 @@ console.log('=== B13–B17 deploy batch / cap / undo / paint ===');
   check('B17: + is place-queue, never place-unit',
     /action === 'place-queue'/.test(src)
     && /place-units-batch/.test(src));
+}
+
+console.log('=== B20–B24 pointer lock / Max / failed Deploy / Leave ===');
+{
+  const plusLock = capturePanelPointerLock({
+    action: 'place-queue',
+    dataset: { action: 'place-queue', unit: 'artillery', delta: '1' },
+  });
+  const plusThenDone = resolveLockedPanelClick({
+    lock: plusLock,
+    clickAction: 'finish-placement',
+    now: 100,
+    lastQueueGestureAt: 0,
+  });
+  check('B21: + lock does not become Done / end the turn',
+    plusThenDone?.action === 'place-queue');
+  const plusThenLog = resolveLockedPanelClick({
+    lock: plusLock,
+    clickTabId: 'log',
+    clickAction: 'phone-detent-tab',
+    now: 100,
+    lastQueueGestureAt: 0,
+  });
+  check('B22: + lock does not switch to Log',
+    plusThenLog?.kind === 'action' && plusThenLog.action === 'place-queue');
+  const deployLock = capturePanelPointerLock({
+    action: 'confirm-placement',
+    dataset: { action: 'confirm-placement' },
+  });
+  const deployThenPlus = resolveLockedPanelClick({
+    lock: deployLock,
+    clickAction: 'place-queue',
+    clickDataset: { unit: 'armour', delta: '1' },
+    now: 100,
+  });
+  check('B20: Deploy lock does not retarget onto another +',
+    deployThenPlus?.action === 'confirm-placement');
+  const ghostDone = resolveLockedPanelClick({
+    lock: null,
+    clickAction: 'finish-placement',
+    now: 250,
+    lastQueueGestureAt: 100,
+  });
+  check('B21: ghost Done after + is ignored', ghostDone === null);
+  check('B22: panel gesture blocks the map select under the finger',
+    shouldBlockMapSelectAfterPanel({ panelPointerAt: 100, now: 200 }) === true
+    && shouldBlockMapSelectAfterPanel({ panelPointerAt: 100, now: 700 }) === false);
+
+  const q = { armour: 1 };
+  const maxed = applyPlaceQueueMax({
+    queue: q, unitType: 'armour', available: 3, slotsRemaining: 5,
+  });
+  check('B24: Max fills the queue only',
+    maxed.armour === 3 && queuedCount(maxed) === 3);
+  check('B24: Max does not bump DEPLOYED',
+    deployedThisRoundDisplay(1) === 1
+    && deployedThisRoundDisplay(1) !== queuedCount(maxed));
+  check('B24: Deploy 0 restores the staged queue',
+    queueAfterDeployAttempt({ queueBefore: { bomber: 1 }, placed: 0 }).bomber === 1);
+  check('B24: Deploy 1 clears the queue',
+    Object.keys(queueAfterDeployAttempt({ queueBefore: { bomber: 1 }, placed: 1 })).length === 0);
+
+  const src = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B19-James: inline placement actions include Done',
+    /pp-placement-actions[\s\S]*finish-placement/.test(src));
+  check('B20–B22: panel uses pointerdown lock',
+    src.includes('_onPanelPointerDown') && src.includes('resolveLockedPanelClick'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

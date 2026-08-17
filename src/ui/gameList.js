@@ -276,7 +276,7 @@ export class GameList {
 
     return `
       <div class="mp-game-row">
-        <button type="button" class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
+        <button type="button" class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}" data-role="join-game">
           <div class="mp-game-info">
             <span class="mp-game-name">${playerNames}</span>
             <span class="mp-game-details">
@@ -288,7 +288,7 @@ export class GameList {
           </div>
         </button>
         <div class="mp-game-row-actions">
-          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" title="Leave this game (surrender)">Leave</button>
+          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" data-role="leave-game" title="Leave this game (surrender)">Leave</button>
         </div>
         ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}
       </div>
@@ -344,7 +344,7 @@ export class GameList {
     this.el.querySelectorAll('.mp-game-item[data-game-id]').forEach(item => {
       item.addEventListener('click', async (e) => {
         if (e.target.closest('[data-leave-game]')) return;
-        if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false })) return;
+        if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false, eventTarget: e.target })) return;
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
         console.log('[GameList] Game clicked:', { gameId, game });
@@ -365,7 +365,7 @@ export class GameList {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true })) return;
+        if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: e.target })) return;
         const gameId = btn.dataset.leaveGame;
         const game = this.games.find(g => g.id === gameId);
         const isStarted = game?.stateVersion > 0;

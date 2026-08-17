@@ -69,8 +69,18 @@ export function shouldDeleteLobbyOnHostLeave({ lobbyStatus, remainingHumans = 0 
   return remainingHumans <= 0;
 }
 
-// Surrender is an explicit Leave control. A game-row / join tap must
-// never open the leave confirm.
-export function shouldOpenLeaveConfirm({ clickOnLeaveControl } = {}) {
-  return !!clickOnLeaveControl;
+// Surrender is an explicit Leave control. A game-row / join tap / title
+// tap must never open the leave confirm (B23).
+export function isLeaveControlTarget(eventTarget) {
+  if (!eventTarget || typeof eventTarget.closest !== 'function') return false;
+  return !!eventTarget.closest('[data-leave-game]');
+}
+
+export function shouldOpenLeaveConfirm({
+  clickOnLeaveControl = false,
+  eventTarget = null,
+} = {}) {
+  if (!clickOnLeaveControl) return false;
+  if (eventTarget) return isLeaveControlTarget(eventTarget);
+  return true;
 }

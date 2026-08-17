@@ -73,3 +73,15 @@ export function shouldResetDeployedThisRound({
   if (remotePlacedThisRound === 0) return true;
   return false;
 }
+
+// DEPLOYED is units on the map this round. Max / + only change the queue.
+export function deployedThisRoundDisplay(placedThisRound) {
+  return Math.max(0, Number(placedThisRound) || 0);
+}
+
+// Keep the staged queue when Deploy places 0 (invalid tile / empty batch)
+// so the next tap is not a no-op (B24).
+export function queueAfterDeployAttempt({ queueBefore = {}, placed = 0 } = {}) {
+  if (Number(placed) > 0) return {};
+  return { ...(queueBefore || {}) };
+}

@@ -20,8 +20,17 @@ import {
   canAddToPlaceQueue,
   expandPlaceQueue,
   queuedCount,
+  deployedThisRoundDisplay,
+  queueAfterDeployAttempt,
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
+import {
+  capturePanelPointerLock,
+  resolveLockedPanelClick,
+  shouldBlockMapSelectAfterPanel,
+  isQueueGestureAction,
+  PANEL_QUEUE_GUARD_MS,
+} from './panelClickLock.js';
 
 // Compact phase hints — phone tray peek reads these next to End ${phase}.
 export const PHASE_HINTS = {
@@ -157,10 +166,10 @@ export function computeInitialPlacementUX({
 } = {}) {
   const canFinish = placedThisRound >= limit || totalRemaining === 0 || !hasPlaceable;
   const onlyNavalRemain = landAirRemaining === 0 && navalRemaining > 0;
-  // Inland / non-sea + leftover ships: Done/skip must be available.
-  // Gating Done on 6/6 here is the B19 deadlock (hint only, no rows).
+  // Leftover ships: Done/skip from ANY tile, including a legal sea (James
+  // B19-class: 1/6, 6 naval-only, Undo-only because Done was sea-gated).
+  // Gating Done on 6/6 or on valid-sea is the inland/sea deadlock.
   const canSkipNaval = onlyNavalRemain
-    && selectedKind !== 'valid-sea'
     && totalQueued === 0
     && placedThisRound < limit;
   const showDone = (canFinish || canSkipNaval) && totalQueued === 0;
@@ -175,6 +184,8 @@ export function computeInitialPlacementUX({
     hint = 'Click a sea zone adjacent to a coastal territory you own to place leftover ships, or Done to skip them.';
   } else if (needSeaHint) {
     hint = 'Click a sea zone adjacent to a coastal territory you own to place ships.';
+  } else if (canSkipNaval && selectedKind === 'valid-sea') {
+    hint = 'Place leftover ships here, or Done to skip them.';
   } else if (stuckWithNaval && showDone) {
     hint = 'No legal sea zone to place remaining ships. Continue to the next player.';
   }
@@ -332,8 +343,43 @@ export class PlayerPanel {
     this._lastRenderedPlayerId = null;
     this._ignoreUndoUntil = 0;
     this._unitListScrollTop = 0;
+    this._pointerLock = null;
+    this._panelPointerAt = 0;
+    this._lastQueueGestureAt = 0;
+    this.contentEl.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { passive: true });
+    this.contentEl.addEventListener('pointercancel', () => {
+      this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
+    });
     this.contentEl.addEventListener('click', (e) => this._onPanelClick(e));
     this.contentEl.addEventListener('change', (e) => this._onPanelChange(e));
+  }
+
+  _readPointerLock(target) {
+    const tab = target?.closest?.('.pp-tab');
+    if (tab && this.contentEl.contains(tab)) {
+      return capturePanelPointerLock({ tabId: tab.dataset.tab });
+    }
+    const btn = target?.closest?.('[data-action]');
+    if (btn && this.contentEl.contains(btn)) {
+      return capturePanelPointerLock({
+        action: btn.dataset.action,
+        disabled: !!btn.disabled,
+        dataset: { ...btn.dataset },
+      });
+    }
+    return capturePanelPointerLock({});
+  }
+
+  _onPanelPointerDown(e) {
+    this._panelPointerAt = Date.now();
+    this._pointerLock = this._readPointerLock(e.target);
+  }
+
+  shouldBlockMapSelect(now = Date.now()) {
+    return shouldBlockMapSelectAfterPanel({
+      panelPointerAt: this._panelPointerAt || 0,
+      now,
+    });
   }
 
   _scheduleRender() {
@@ -345,19 +391,33 @@ export class PlayerPanel {
   }
 
   _onPanelClick(e) {
-    const tab = e.target.closest('.pp-tab');
-    if (tab && this.contentEl.contains(tab)) {
-      e.preventDefault();
-      e.stopPropagation();
-      this.activeTab = tab.dataset.tab;
+    e.preventDefault();
+    e.stopPropagation();
+    const clickTab = e.target.closest?.('.pp-tab');
+    const clickBtn = e.target.closest?.('[data-action]');
+    const resolved = resolveLockedPanelClick({
+      lock: this._pointerLock,
+      clickTabId: clickTab && this.contentEl.contains(clickTab) ? clickTab.dataset.tab : null,
+      clickAction: clickBtn && this.contentEl.contains(clickBtn) && !clickBtn.disabled
+        ? clickBtn.dataset.action
+        : null,
+      clickDataset: clickBtn ? { ...clickBtn.dataset } : {},
+      now: Date.now(),
+      lastQueueGestureAt: this._lastQueueGestureAt || 0,
+    });
+    this._pointerLock = null;
+    if (!resolved) return;
+    if (resolved.kind === 'tab') {
+      this.activeTab = resolved.tab;
       this._scheduleRender();
       return;
     }
-    const btn = e.target.closest('[data-action]');
-    if (!btn || !this.contentEl.contains(btn) || btn.disabled) return;
-    e.preventDefault();
-    e.stopPropagation();
-    this._dispatchAction(btn);
+    if (resolved.kind === 'action') {
+      if (isQueueGestureAction(resolved.action)) {
+        this._lastQueueGestureAt = Date.now();
+      }
+      this._dispatchAction({ dataset: resolved.dataset || { action: resolved.action } });
+    }
   }
 
   _onPanelChange(e) {
@@ -2086,8 +2146,8 @@ export class PlayerPanel {
     if (!this.placementQueue) this.placementQueue = {};
 
     // Panel count is units actually on the map this round. Queue is not
-    // committed until Deploy — including it here looked like 6/6 before place.
-    const deployedThisRound = placedThisRound;
+    // committed until Deploy — Max / + must not bump this (B24).
+    const deployedThisRound = deployedThisRoundDisplay(placedThisRound);
 
     let html = `
       <div class="pp-inline-placement">
@@ -2102,21 +2162,21 @@ export class PlayerPanel {
           <span class="pp-remaining-value">${actualRemaining} units</span>
         </div>`;
 
-    // Show selected territory (only if still placing)
-    if (!showDoneButton) {
-      if (isValidPlacement) {
-        html += `
+    // Selected tile + skip hint stay visible when Done/skip is offered
+    // (James B19-class: 1/6 naval-only still needs a Done next to Undo).
+    if (isValidPlacement) {
+      html += `
           <div class="pp-placement-selected">
             <span class="pp-selected-icon">${isWater ? '🌊' : '🏔'}</span>
             <span class="pp-selected-name">${this.selectedTerritory.name}</span>
           </div>`;
-      } else if (ux.needSeaHint && ux.hint) {
+      if (ux.hint) {
         html += `<div class="pp-hint">${ux.hint}</div>`;
-      } else {
-        html += `<div class="pp-hint">Click a territory you own to place units</div>`;
       }
-    } else if (ux.stuckWithNaval && ux.hint) {
+    } else if (ux.hint) {
       html += `<div class="pp-hint">${ux.hint}</div>`;
+    } else if (!showDoneButton) {
+      html += `<div class="pp-hint">Click a territory you own to place units</div>`;
     }
 
     // Unit list with +/- controls (like buy phase)
@@ -2259,6 +2319,9 @@ export class PlayerPanel {
     html += `<div class="pp-placement-actions">`;
     if (canUndo) {
       html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
+    }
+    if (showDoneButton) {
+      html += `<button class="pp-action-btn primary" data-action="finish-placement">${ux.canSkipNaval ? 'Done — skip leftover ships →' : 'Done - Next Player →'}</button>`;
     }
     if (totalQueued > 0 && isValidPlacement && !isMobileShell()) {
       html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
@@ -3276,6 +3339,9 @@ export class PlayerPanel {
         }
 
         if (action === 'finish-placement') {
+          if (Date.now() < (this._lastQueueGestureAt || 0) + PANEL_QUEUE_GUARD_MS) {
+            return;
+          }
           const { ux } = this._getInitialPlacementUX(this.gameState.currentPlayer);
           if (this.onAction) {
             this.onAction('finish-placement', { allowNavalSkip: !!ux.canSkipNaval });
@@ -3346,6 +3412,9 @@ export class PlayerPanel {
         }
 
         if (action === 'phone-detent-tab') {
+          if (Date.now() < (this._lastQueueGestureAt || 0) + PANEL_QUEUE_GUARD_MS) {
+            return;
+          }
           const tab = btn.dataset.tab || 'actions';
           this.phoneDetentTab = tab;
           this.trayExpanded = true;
@@ -3414,14 +3483,22 @@ export class PlayerPanel {
             const keepTerritory = this.selectedTerritory;
             const queue = { ...this.placementQueue };
             const unitTypes = expandPlaceQueue(queue);
-            this.placementQueue = {};
+            if (unitTypes.length === 0) return;
             this._ignoreUndoUntil = Date.now() + 400;
-            this.onAction('place-units-batch', {
+            const placedBefore = this.gameState?.unitsPlacedThisRound || 0;
+            const finish = (result) => {
+              const placed = result?.placed
+                ?? Math.max(0, (this.gameState?.unitsPlacedThisRound || 0) - placedBefore);
+              this.placementQueue = queueAfterDeployAttempt({ queueBefore: queue, placed });
+              this.selectedTerritory = keepTerritory;
+              this._scheduleRender();
+            };
+            const ret = this.onAction('place-units-batch', {
               territory: keepTerritory.name,
               unitTypes,
             });
-            this.selectedTerritory = keepTerritory;
-            this._scheduleRender();
+            if (ret && typeof ret.then === 'function') ret.then(finish);
+            else finish(ret);
           }
           return;
         }
