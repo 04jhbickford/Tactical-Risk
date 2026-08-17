@@ -2405,7 +2405,27 @@ html, body {
   gap: 12px;
 }
 
-@media (min-width: 600px) {
+/* B26: Join by Code is its own full-width target on phone — never under My Games. */
+.mp-menu-card[data-action="join-by-code"] {
+  min-height: 72px;
+}
+
+@media (max-width: 640px) {
+  .mp-menu-grid.four-col {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .mp-menu-card[data-action="join-by-code"] {
+    order: -2;
+    width: 100%;
+    min-height: 76px;
+  }
+  .mp-menu-card[data-action="my-games"] {
+    order: -1;
+  }
+}
+
+@media (min-width: 641px) {
   .mp-menu-grid.four-col {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -16776,6 +16796,12 @@ html, body {
 
   .mp-menu-grid.four-col {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 640px) {
+    .mp-menu-grid.four-col {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* Title + turn badge + flag strip must stay on one 48px row at ~770px */

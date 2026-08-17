@@ -7,6 +7,7 @@ import {
   cloneUnitsToPlace,
   onlyNavalRemaining,
 } from './placementPass.js';
+import { resolveDeployedThisRoundAfterLoad } from './placeQueue.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -5081,6 +5082,9 @@ export class GameState {
 
   loadFromJSON(data) {
     if (data.version < 3) throw new Error('Incompatible save version');
+    const prevPlayerId = this.currentPlayer?.id;
+    const prevPlacedThisRound = this.unitsPlacedThisRound || 0;
+    const prevPlacementRound = this.placementRound || 0;
     this.gameMode = data.gameMode;
     this.alliancesEnabled = data.alliancesEnabled ?? (data.gameMode === 'classic');
     this.teamsEnabled = data.teamsEnabled ?? false;
@@ -5112,7 +5116,15 @@ export class GameState {
     this.cardTradeCount = data.cardTradeCount || {};
     this.unitsToPlace = data.unitsToPlace || {};
     this.placementRound = data.placementRound || 0;
-    this.unitsPlacedThisRound = data.unitsPlacedThisRound || 0;
+    // Same seat + stale remote 0/missing must not wipe a local 1/6 (B28).
+    this.unitsPlacedThisRound = resolveDeployedThisRoundAfterLoad({
+      prevPlayerId,
+      nextPlayerId: this.players?.[this.currentPlayerIndex]?.id,
+      remotePlacedThisRound: data.unitsPlacedThisRound,
+      localPlacedThisRound: prevPlacedThisRound,
+      prevPlacementRound,
+      nextPlacementRound: this.placementRound,
+    });
 
     // v8: Restore air unit tracking for proper landing calculation
     this.airUnitOrigins = data.airUnitOrigins || {};

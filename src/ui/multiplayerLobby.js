@@ -5,7 +5,12 @@ import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { GAME_VERSION } from './lobby.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { readLastMatch } from '../multiplayer/lastMatch.js';
+import {
+  readLastMatch,
+  resolveMenuCardAction,
+  shouldOpenJoinByCode,
+  shouldOpenMyGames,
+} from '../multiplayer/lastMatch.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
 
 // Available factions (should match setup data)
@@ -51,7 +56,54 @@ export class MultiplayerLobby {
     this.el = document.createElement('div');
     this.el.id = 'multiplayer-lobby';
     this.el.className = 'lobby-overlay modern hidden';
+    this.el.addEventListener('click', (e) => this._onOverlayClick(e));
     document.body.appendChild(this.el);
+  }
+
+  // Exclusive cards: Join by Code never opens My Games (B26).
+  _onOverlayClick(e) {
+    const card = e.target.closest?.('.mp-menu-card[data-action]');
+    if (!card || !this.el.contains(card)) return;
+    const action = resolveMenuCardAction(card.dataset.action);
+    if (shouldOpenJoinByCode(action) || action === 'join-by-code') {
+      e.preventDefault();
+      e.stopPropagation();
+      this._openJoinByCode();
+      return;
+    }
+    if (shouldOpenMyGames(action) || action === 'my-games') {
+      e.preventDefault();
+      e.stopPropagation();
+      this._openMyGames();
+      return;
+    }
+    if (action === 'create') {
+      if (this.mode === 'reconnect') return;
+      this.mode = 'create';
+      this._render();
+      return;
+    }
+    if (action === 'browse') {
+      this.mode = 'browse';
+      this._render();
+      this._loadBrowseGames();
+    }
+  }
+
+  _openJoinByCode() {
+    if (this.mode === 'reconnect') this._fromReconnect = true;
+    this.mode = 'join';
+    this._render();
+  }
+
+  _openMyGames() {
+    if (this.onBack) this.onBack('rejoin');
+  }
+
+  showReconnectOnly() {
+    this.mode = 'reconnect';
+    this._fromReconnect = true;
+    this.show();
   }
 
   show() {
@@ -113,6 +165,8 @@ export class MultiplayerLobby {
 
     if (this.mode === 'menu') {
       content = this._renderMenu(user);
+    } else if (this.mode === 'reconnect') {
+      content = this._renderReconnect(user);
     } else if (this.mode === 'create') {
       content = this._renderCreate(user);
     } else if (this.mode === 'join') {
@@ -160,34 +214,16 @@ export class MultiplayerLobby {
       ${this._renderLastMatchBanner()}
 
       <div class="mp-menu-grid four-col">
-        <button class="mp-menu-card" data-action="create">
-          <div class="mp-card-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-          </div>
-          <div class="mp-card-content">
-            <h3>Create Game</h3>
-            <p>Host a new game</p>
-          </div>
-        </button>
-        <button class="mp-menu-card" data-action="join">
+        <button type="button" class="mp-menu-card mp-menu-card-join" data-action="join-by-code">
           <div class="mp-card-icon">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
           </div>
           <div class="mp-card-content">
             <h3>Join by Code</h3>
-            <p>Enter game code</p>
+            <p>Enter 6-character code</p>
           </div>
         </button>
-        <button class="mp-menu-card" data-action="browse">
-          <div class="mp-card-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-          </div>
-          <div class="mp-card-content">
-            <h3>Open Games</h3>
-            <p>Join a lobby</p>
-          </div>
-        </button>
-        <button class="mp-menu-card" data-action="rejoin">
+        <button type="button" class="mp-menu-card" data-action="my-games">
           <div class="mp-card-icon">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
           </div>
@@ -196,12 +232,43 @@ export class MultiplayerLobby {
             <p>Resume playing</p>
           </div>
         </button>
+        <button type="button" class="mp-menu-card" data-action="browse">
+          <div class="mp-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+          </div>
+          <div class="mp-card-content">
+            <h3>Open Games</h3>
+            <p>Join a lobby</p>
+          </div>
+        </button>
+        <button type="button" class="mp-menu-card" data-action="create">
+          <div class="mp-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          </div>
+          <div class="mp-card-content">
+            <h3>Create Game</h3>
+            <p>Host a new game</p>
+          </div>
+        </button>
       </div>
 
       <div class="mp-footer-actions">
         <button class="mp-secondary-btn" data-action="back">← Back</button>
         <button class="mp-secondary-btn danger" data-action="signout">Sign Out</button>
       </div>
+    `;
+  }
+
+  _renderReconnect(user) {
+    return `
+      <div class="mp-identity-box">
+        <p class="mp-welcome">Still in the match</p>
+        <p class="mp-identity-details">
+          Sign-in dropped. Rejoin the live game — do not start a new one.
+        </p>
+      </div>
+      ${this._renderLastMatchBanner()}
+      ${this._renderJoin(user)}
     `;
   }
 
@@ -632,30 +699,6 @@ export class MultiplayerLobby {
   }
 
   _bindEvents() {
-    // Menu buttons
-    this.el.querySelector('[data-action="create"]')?.addEventListener('click', () => {
-      this.mode = 'create';
-      this._render();
-    });
-
-    this.el.querySelector('[data-action="join"]')?.addEventListener('click', () => {
-      this.mode = 'join';
-      this._render();
-    });
-
-    this.el.querySelector('[data-action="browse"]')?.addEventListener('click', () => {
-      this.mode = 'browse';
-      this._render();
-      this._loadBrowseGames();
-    });
-
-    this.el.querySelector('[data-action="rejoin"]')?.addEventListener('click', () => {
-      // Show game list for rejoining
-      if (this.onBack) {
-        this.onBack('rejoin');
-      }
-    });
-
     this.el.querySelector('[data-action="rejoin-last"]')?.addEventListener('click', async () => {
       const last = readLastMatch();
       if (last?.lobbyCode) {
@@ -699,7 +742,7 @@ export class MultiplayerLobby {
     });
 
     this.el.querySelector('[data-action="cancel"]')?.addEventListener('click', () => {
-      this.mode = 'menu';
+      this.mode = this._fromReconnect ? 'reconnect' : 'menu';
       this._render();
     });
 

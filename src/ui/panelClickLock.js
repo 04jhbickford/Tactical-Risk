@@ -75,3 +75,23 @@ export function shouldBlockMapSelectAfterPanel({
 export function isQueueGestureAction(action) {
   return QUEUE_ACTIONS.has(action);
 }
+
+// One gesture changes one unitType. A mid-render retarget onto Transport
+// after Destroyer + must be ignored (B30 / B14 family).
+export function shouldIgnoreQueueRetarget({
+  lockedType = null,
+  incomingType = null,
+  elapsedMs = 0,
+  windowMs = PANEL_QUEUE_GUARD_MS,
+} = {}) {
+  if (!lockedType || !incomingType) return false;
+  if (lockedType === incomingType) return false;
+  return Number(elapsedMs) >= 0 && Number(elapsedMs) < Number(windowMs);
+}
+
+export function resolveQueueUnitType({
+  lockedType = null,
+  incomingType = null,
+} = {}) {
+  return lockedType || incomingType || null;
+}

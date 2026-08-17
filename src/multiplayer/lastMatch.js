@@ -89,3 +89,32 @@ export function resolveHostReconnectCopy({
 export function shouldShowHostReconnect({ hostPresence } = {}) {
   return hostPresence === 'idle' || hostPresence === 'offline';
 }
+
+// Session-lost must not dump the game view to home / Create Game (B27).
+// Only Exit or confirmed Leave leave the table.
+export function shouldLeaveGameView({
+  explicitExit = false,
+  confirmedLeave = false,
+  sessionLost = false,
+} = {}) {
+  if (explicitExit || confirmedLeave) return true;
+  if (sessionLost) return false;
+  return false;
+}
+
+// Exclusive MP menu cards. Join by Code must never open My Games (B26).
+export function resolveMenuCardAction(action) {
+  if (action === 'join-by-code' || action === 'join') return 'join-by-code';
+  if (action === 'my-games' || action === 'rejoin') return 'my-games';
+  if (action === 'create') return 'create';
+  if (action === 'browse') return 'browse';
+  return null;
+}
+
+export function shouldOpenJoinByCode(action) {
+  return resolveMenuCardAction(action) === 'join-by-code';
+}
+
+export function shouldOpenMyGames(action) {
+  return resolveMenuCardAction(action) === 'my-games';
+}

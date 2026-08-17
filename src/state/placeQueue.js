@@ -39,6 +39,22 @@ export function canAddToPlaceQueue({
   return (Number(next[unitType]) || 0) > current;
 }
 
+// Staging (+ / Max) does not need a legal tile. Deploy still does (B29).
+export function canStagePlaceQueue(args = {}) {
+  return canAddToPlaceQueue(args);
+}
+
+// Pool lookup must survive TacticalBomber vs tacticalBomber (B29).
+export function quantityAvailableForType(unitsToPlace = [], unitType) {
+  if (!unitType || !Array.isArray(unitsToPlace)) return 0;
+  const want = String(unitType);
+  const exact = unitsToPlace.find((u) => u?.type === want);
+  if (exact) return Number(exact.quantity) || 0;
+  const lower = want.toLowerCase();
+  const fuzzy = unitsToPlace.find((u) => String(u?.type || '').toLowerCase() === lower);
+  return Number(fuzzy?.quantity) || 0;
+}
+
 export function expandPlaceQueue(queue = {}) {
   const out = [];
   for (const [type, qty] of Object.entries(queue || {})) {
@@ -64,14 +80,50 @@ export function applyPlaceQueueMax({
   });
 }
 
+// DEPLOYED resets only when the seat (or placement wave) changes.
+// Same seat + remote 0/missing is a stale snapshot — keep the local 1/6 (B28).
 export function shouldResetDeployedThisRound({
   prevPlayerId,
   nextPlayerId,
   remotePlacedThisRound,
+  localPlacedThisRound,
+  prevPlacementRound,
+  nextPlacementRound,
 } = {}) {
   if (prevPlayerId && nextPlayerId && prevPlayerId !== nextPlayerId) return true;
-  if (remotePlacedThisRound === 0) return true;
+  if (
+    prevPlacementRound != null
+    && nextPlacementRound != null
+    && Number(nextPlacementRound) > Number(prevPlacementRound)
+  ) {
+    return true;
+  }
   return false;
+}
+
+export function resolveDeployedThisRoundAfterLoad({
+  prevPlayerId,
+  nextPlayerId,
+  remotePlacedThisRound,
+  localPlacedThisRound = 0,
+  prevPlacementRound,
+  nextPlacementRound,
+} = {}) {
+  const remoteNum = remotePlacedThisRound == null
+    ? 0
+    : Math.max(0, Number(remotePlacedThisRound) || 0);
+  const localNum = Math.max(0, Number(localPlacedThisRound) || 0);
+  if (shouldResetDeployedThisRound({
+    prevPlayerId,
+    nextPlayerId,
+    remotePlacedThisRound,
+    localPlacedThisRound,
+    prevPlacementRound,
+    nextPlacementRound,
+  })) {
+    return remoteNum;
+  }
+  return Math.max(localNum, remoteNum);
 }
 
 // DEPLOYED is units on the map this round. Max / + only change the queue.

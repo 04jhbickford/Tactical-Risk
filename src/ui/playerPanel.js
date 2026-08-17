@@ -17,7 +17,8 @@ import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
   applyPlaceQueueDelta,
   applyPlaceQueueMax,
-  canAddToPlaceQueue,
+  canStagePlaceQueue,
+  quantityAvailableForType,
   expandPlaceQueue,
   queuedCount,
   deployedThisRoundDisplay,
@@ -32,6 +33,8 @@ import {
   resolveLockedPanelClick,
   shouldBlockMapSelectAfterPanel,
   isQueueGestureAction,
+  shouldIgnoreQueueRetarget,
+  resolveQueueUnitType,
   PANEL_QUEUE_GUARD_MS,
 } from './panelClickLock.js';
 
@@ -385,6 +388,8 @@ export class PlayerPanel {
     this._pointerLock = null;
     this._panelPointerAt = 0;
     this._lastQueueGestureAt = 0;
+    this._lastQueueUnitType = null;
+    this._queueLockType = null;
     this.contentEl.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -412,6 +417,12 @@ export class PlayerPanel {
   _onPanelPointerDown(e) {
     this._panelPointerAt = Date.now();
     this._pointerLock = this._readPointerLock(e.target);
+    const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
+      || this._pointerLock?.dataset?.unit
+      || null;
+    if (isQueueGestureAction(this._pointerLock?.action) && unit) {
+      this._queueLockType = unit;
+    }
   }
 
   shouldBlockMapSelect(now = Date.now()) {
@@ -555,12 +566,18 @@ export class PlayerPanel {
     // Reset movement state when territory changes. Do NOT clear the
     // placement queue — a spurious retarget (B16) was wiping staged units
     // so the next + looked like it vanished them (B15).
+    // Do NOT zero DEPLOYED — selecting another tile after Deploy 1/6
+    // must stay 1/6 (B28).
+    const keepPlaced = this.gameState?.unitsPlacedThisRound;
     if (this.selectedTerritory?.name !== territory?.name) {
       this.moveSelectedUnits = {};
       this.movePendingDest = null;
       this.moveUnitTab = 'land';
     }
     this.selectedTerritory = territory;
+    if (this.gameState && keepPlaced != null) {
+      this.gameState.unitsPlacedThisRound = keepPlaced;
+    }
     this._scheduleRender();
   }
 
@@ -2299,8 +2316,9 @@ export class PlayerPanel {
       const def = this.unitDefs?.[unit.type];
       const imageSrc = getUnitIconPath(unit.type, player.id);
       const queued = this.placementQueue[unit.type] || 0;
-      const available = unit.quantity;
-      const canAdd = isValidPlacement && canAddToPlaceQueue({
+      const available = quantityAvailableForType(unitsToPlace, unit.type) || unit.quantity;
+      // + / Max stage without a legal tile. Deploy still needs one (B29).
+      const canAdd = canStagePlaceQueue({
         queue: this.placementQueue,
         unitType: unit.type,
         available,
@@ -2316,7 +2334,7 @@ export class PlayerPanel {
       }
 
       return `
-        <div class="pp-buy-row ${queued > 0 ? 'has-qty' : ''}" title="${tooltip}">
+        <div class="pp-buy-row ${queued > 0 ? 'has-qty' : ''}" data-unit="${unit.type}" title="${tooltip}">
           <div class="pp-buy-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
             <span class="pp-buy-name">${unit.type}</span>
@@ -2372,57 +2390,48 @@ export class PlayerPanel {
           return aircraft.length < capacity;
         });
 
-        // Show air units (fighters/tactical bombers) if carrier has space
-        if (hasCarrierWithSpace && airUnits.length > 0) {
-          // Filter to only show aircraft that carriers can carry
+        // Air can stage here even without a carrier. Deploy still needs
+        // land or a carrier with space (B29 TacticalBomber Max).
+        if (airUnits.length > 0) {
           const carrierDef = this.unitDefs?.carrier;
           const carriableAir = airUnits.filter(u => carrierDef?.canCarry?.includes(u.type));
-          if (carriableAir.length > 0) {
-            html += `<div class="pp-unit-category-label">Air (on Carrier)</div>`;
-            html += carriableAir.map(renderPlacementRow).join('');
-            hasUnitsToShow = true;
+          const airToShow = hasCarrierWithSpace && carriableAir.length > 0
+            ? carriableAir
+            : airUnits;
+          html += `<div class="pp-unit-category-label">${
+            hasCarrierWithSpace ? 'Air (on Carrier)' : 'Air (stage — deploy on land or a carrier)'
+          }</div>`;
+          html += airToShow.map(renderPlacementRow).join('');
+          hasUnitsToShow = true;
+          if (!hasCarrierWithSpace) {
+            html += `<div class="pp-placement-hint">💡 Place a carrier here first to deploy aircraft at sea</div>`;
           }
         }
 
         if (!hasUnitsToShow) {
-          // Check if there are air units that could be placed IF there was a carrier
-          const hasAirUnits = airUnits.length > 0;
-          const carrierDef = this.unitDefs?.carrier;
-          const carriableAir = hasAirUnits ? airUnits.filter(u => carrierDef?.canCarry?.includes(u.type)) : [];
-
-          if (carriableAir.length > 0 && !hasCarrierWithSpace) {
-            html += `<div class="pp-placement-done-msg">No naval units to place</div>`;
-            html += `<div class="pp-placement-hint">💡 Place a carrier here first to deploy fighters</div>`;
-          } else {
-            html += `<div class="pp-placement-done-msg">No units to place here</div>`;
-          }
+          html += `<div class="pp-placement-done-msg">No units to place here</div>`;
         }
       }
     } else {
-      // Show summary of all remaining units when no valid placement tile is selected
+      // Stage from any remaining row. Deploy still needs a legal tile (B29).
       if (ux.needSeaHint && ux.hint) {
         html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
       } else if (ux.stuckWithNaval && ux.hint) {
         html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+      } else {
+        html += `<div class="pp-hint">Stage units, then click a territory you own to Deploy</div>`;
       }
-      html += `<div class="pp-unit-category-label">Land (${landUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
-      for (const unit of landUnits) {
-        const imageSrc = getUnitIconPath(unit.type, player.id);
-        html += `<div class="pp-buy-row disabled"><div class="pp-buy-info">${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon">` : ''}<span class="pp-buy-name">${unit.type}</span><span class="pp-buy-cost">×${unit.quantity}</span></div></div>`;
+      if (landUnits.length > 0) {
+        html += `<div class="pp-unit-category-label">Land</div>`;
+        html += landUnits.map(renderPlacementRow).join('');
       }
       if (airUnits.length > 0) {
-        html += `<div class="pp-unit-category-label">Air (${airUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
-        for (const unit of airUnits) {
-          const imageSrc = getUnitIconPath(unit.type, player.id);
-          html += `<div class="pp-buy-row disabled"><div class="pp-buy-info">${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon">` : ''}<span class="pp-buy-name">${unit.type}</span><span class="pp-buy-cost">×${unit.quantity}</span></div></div>`;
-        }
+        html += `<div class="pp-unit-category-label">Air</div>`;
+        html += airUnits.map(renderPlacementRow).join('');
       }
       if (navalUnits.length > 0) {
-        html += `<div class="pp-unit-category-label">Naval (${navalUnits.reduce((s, u) => s + u.quantity, 0)})</div>`;
-        for (const unit of navalUnits) {
-          const imageSrc = getUnitIconPath(unit.type, player.id);
-          html += `<div class="pp-buy-row disabled"><div class="pp-buy-info">${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon">` : ''}<span class="pp-buy-name">${unit.type}</span><span class="pp-buy-cost">×${unit.quantity}</span></div></div>`;
-        }
+        html += `<div class="pp-unit-category-label">Naval</div>`;
+        html += navalUnits.map(renderPlacementRow).join('');
       }
     }
 
@@ -3554,10 +3563,21 @@ export class PlayerPanel {
         // Handle placement queue +/- delta — one row, ±1. Render after the
         // click so the same tap cannot retarget onto Done or another +.
         if (action === 'place-queue') {
-          const unitType = btn.dataset.unit;
+          const incoming = btn.dataset.unit;
+          const unitType = resolveQueueUnitType({
+            lockedType: this._queueLockType,
+            incomingType: incoming,
+          });
+          if (shouldIgnoreQueueRetarget({
+            lockedType: this._lastQueueUnitType,
+            incomingType: unitType,
+            elapsedMs: Date.now() - (this._lastQueueGestureAt || 0),
+          })) {
+            return;
+          }
           const delta = parseInt(btn.dataset.delta, 10);
           const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
-          const available = unitsToPlace.find(u => u.type === unitType)?.quantity || 0;
+          const available = quantityAvailableForType(unitsToPlace, unitType);
           const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
           const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
           this.placementQueue = applyPlaceQueueDelta({
@@ -3567,15 +3587,29 @@ export class PlayerPanel {
             available,
             slotsRemaining: limit - placedThisRound,
           });
+          this._lastQueueUnitType = unitType;
+          this._lastQueueGestureAt = Date.now();
+          this._queueLockType = null;
           this._scheduleRender();
           return;
         }
 
         // Max fills THIS row only, up to remaining slots this round.
         if (action === 'place-queue-max') {
-          const unitType = btn.dataset.unit;
+          const incoming = btn.dataset.unit;
+          const unitType = resolveQueueUnitType({
+            lockedType: this._queueLockType,
+            incomingType: incoming,
+          });
+          if (shouldIgnoreQueueRetarget({
+            lockedType: this._lastQueueUnitType,
+            incomingType: unitType,
+            elapsedMs: Date.now() - (this._lastQueueGestureAt || 0),
+          })) {
+            return;
+          }
           const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
-          const available = unitsToPlace.find(u => u.type === unitType)?.quantity || 0;
+          const available = quantityAvailableForType(unitsToPlace, unitType);
           const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
           const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
           this.placementQueue = applyPlaceQueueMax({
@@ -3584,6 +3618,9 @@ export class PlayerPanel {
             available,
             slotsRemaining: limit - placedThisRound,
           });
+          this._lastQueueUnitType = unitType;
+          this._lastQueueGestureAt = Date.now();
+          this._queueLockType = null;
           this._scheduleRender();
           return;
         }

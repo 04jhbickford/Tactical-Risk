@@ -33,9 +33,12 @@ const {
   applyPlaceQueueDelta,
   applyPlaceQueueMax,
   canAddToPlaceQueue,
+  canStagePlaceQueue,
+  quantityAvailableForType,
   expandPlaceQueue,
   queuedCount,
   shouldResetDeployedThisRound,
+  resolveDeployedThisRoundAfterLoad,
   deployedThisRoundDisplay,
   placementBudgetCopy,
   queueAfterDeployAttempt,
@@ -71,11 +74,17 @@ const {
   resolveLobbyCodeFromGameDoc,
   resolveHostReconnectCopy,
   shouldShowHostReconnect,
+  shouldLeaveGameView,
+  resolveMenuCardAction,
+  shouldOpenJoinByCode,
+  shouldOpenMyGames,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
 const {
   capturePanelPointerLock,
   resolveLockedPanelClick,
   shouldBlockMapSelectAfterPanel,
+  shouldIgnoreQueueRetarget,
+  resolveQueueUnitType,
 } = await import(pathToFileURL(join(root, 'src/ui/panelClickLock.js')));
 const {
   computeIsLocalPlayerTurn,
@@ -256,9 +265,24 @@ check('seat change resets deployed this round',
   shouldResetDeployedThisRound({
     prevPlayerId: 'host', nextPlayerId: 'guest', remotePlacedThisRound: 6,
   }) === true);
-check('remote 0/N also resets',
+check('B28: same seat + remote 0 does not wipe local 1/6',
   shouldResetDeployedThisRound({
     prevPlayerId: 'guest', nextPlayerId: 'guest', remotePlacedThisRound: 0,
+  }) === false);
+check('B28: same seat keeps max(local, remote)',
+  resolveDeployedThisRoundAfterLoad({
+    prevPlayerId: 'usa', nextPlayerId: 'usa',
+    remotePlacedThisRound: 0, localPlacedThisRound: 1,
+  }) === 1);
+check('B28: missing remote field does not reset',
+  resolveDeployedThisRoundAfterLoad({
+    prevPlayerId: 'usa', nextPlayerId: 'usa',
+    remotePlacedThisRound: undefined, localPlacedThisRound: 1,
+  }) === 1);
+check('new placement wave resets',
+  shouldResetDeployedThisRound({
+    prevPlayerId: 'usa', nextPlayerId: 'usa',
+    prevPlacementRound: 0, nextPlacementRound: 1,
   }) === true);
 check('guest must load when the seat changes at the same version',
   shouldApplyRemoteGameState({
@@ -689,6 +713,124 @@ console.log('=== B20–B24 pointer lock / Max / failed Deploy / Leave ===');
     && (presenceSrc.match(/onSnapshot\(/g) || []).length === 1);
   check('E1: no RTDB onDisconnect',
     !syncSrc.includes('onDisconnect') && !presenceSrc.includes('onDisconnect'));
+}
+
+console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, + steal ===');
+{
+  check('B26: join-by-code is not my-games',
+    shouldOpenJoinByCode('join-by-code') === true
+    && shouldOpenMyGames('join-by-code') === false
+    && resolveMenuCardAction('join-by-code') === 'join-by-code');
+  check('B26: my-games is not join-by-code',
+    shouldOpenMyGames('my-games') === true
+    && shouldOpenJoinByCode('my-games') === false);
+  const lobbySrc = readFileSync(join(root, 'src/ui/multiplayerLobby.js'), 'utf8');
+  check('B26: Join card is join-by-code, My Games is my-games',
+    /data-action="join-by-code"/.test(lobbySrc)
+    && /data-action="my-games"/.test(lobbySrc)
+    && !/data-action="join"[\s>]/.test(lobbySrc)
+    && !/data-action="rejoin"[\s>]/.test(lobbySrc));
+  check('B26: join-by-code never calls onBack rejoin',
+    /_openJoinByCode\(\) \{[^}]*this\.mode = 'join'/.test(lobbySrc)
+    && !/_openJoinByCode\(\) \{[^}]*onBack\('rejoin'\)/.test(lobbySrc));
+
+  check('B27: session-lost does not leave the game view',
+    shouldLeaveGameView({ sessionLost: true }) === false);
+  check('B27: Exit / Leave still leave',
+    shouldLeaveGameView({ explicitExit: true }) === true
+    && shouldLeaveGameView({ confirmedLeave: true }) === true);
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const authBlock = mainSrc.slice(
+    mainSrc.indexOf("event === 'auth_error'"),
+    mainSrc.indexOf('// Set up gameState observer'),
+  );
+  check('B27: auth_error does not dump to handlePlayOnline / home',
+    authBlock.includes('shouldLeaveGameView')
+    && authBlock.includes('showReconnectOnly')
+    && !authBlock.includes('handlePlayOnline()')
+    && !authBlock.includes('lobby.show()'));
+  check('B27: reconnect-only exists and is not Create Game',
+    lobbySrc.includes('showReconnectOnly')
+    && /_renderReconnect\(user\) \{[\s\S]*?_renderJoin/.test(lobbySrc)
+    && !/_renderReconnect\(user\) \{[\s\S]*?data-action="create"/.test(lobbySrc));
+
+  const territories = [
+    { name: 'East US', isWater: false, connections: [] },
+    { name: 'West US', isWater: false, connections: [] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = [
+    { id: 'usa', name: 'James', oderId: 'james', isAI: false },
+    { id: 'ussr', name: 'Bastion', oderId: 'host', isAI: false },
+  ];
+  gs.currentPlayerIndex = 0;
+  gs.phase = GAME_PHASES.UNIT_PLACEMENT;
+  gs.turnPhase = SETUP_TURN_PHASE;
+  gs.unitsToPlace = { usa: [{ type: 'tacticalBomber', quantity: 1 }, { type: 'destroyer', quantity: 2 }, { type: 'transport', quantity: 6 }] };
+  gs.territoryState = { 'East US': { owner: 'usa' }, 'West US': { owner: 'usa' } };
+  gs.units = { 'East US': [], 'West US': [] };
+  gs.unitsPlacedThisRound = 1;
+  const stale = gs.toJSON();
+  stale.unitsPlacedThisRound = 0;
+  gs.loadFromJSON(stale);
+  check('B28: loadFromJSON same seat keeps 1/6 against stale 0',
+    gs.unitsPlacedThisRound === 1);
+  const missing = gs.toJSON();
+  delete missing.unitsPlacedThisRound;
+  gs.unitsPlacedThisRound = 1;
+  gs.loadFromJSON(missing);
+  check('B28: missing unitsPlacedThisRound does not reset',
+    gs.unitsPlacedThisRound === 1);
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B28: select keeps unitsPlacedThisRound',
+    panelSrc.includes('keepPlaced')
+    && panelSrc.includes('this.gameState.unitsPlacedThisRound = keepPlaced'));
+
+  check('B29: TacticalBomber pool lookup is case-robust',
+    quantityAvailableForType(
+      [{ type: 'tacticalBomber', quantity: 1 }],
+      'TacticalBomber',
+    ) === 1);
+  check('B29: Max stages bomber without a tile',
+    canStagePlaceQueue({
+      queue: {},
+      unitType: 'tacticalBomber',
+      available: 1,
+      slotsRemaining: 6,
+    }) === true
+    && applyPlaceQueueMax({
+      queue: {},
+      unitType: 'tacticalBomber',
+      available: 1,
+      slotsRemaining: 6,
+    }).tacticalBomber === 1);
+  check('B29: + / Max do not require isValidPlacement',
+    panelSrc.includes('canStagePlaceQueue')
+    && /Stage units, then click a territory/.test(panelSrc));
+
+  check('B30: lock prefers Destroyer over Transport steal',
+    resolveQueueUnitType({
+      lockedType: 'destroyer',
+      incomingType: 'transport',
+    }) === 'destroyer');
+  check('B30: retarget onto Transport within 400ms is ignored',
+    shouldIgnoreQueueRetarget({
+      lockedType: 'destroyer',
+      incomingType: 'transport',
+      elapsedMs: 50,
+    }) === true);
+  check('B30: same-row + is not ignored',
+    shouldIgnoreQueueRetarget({
+      lockedType: 'destroyer',
+      incomingType: 'destroyer',
+      elapsedMs: 50,
+    }) === false);
+  let q = { transport: 4 };
+  q = applyPlaceQueueDelta({
+    queue: q, unitType: 'destroyer', delta: 1, available: 2, slotsRemaining: 6,
+  });
+  check('B30: Destroyer + does not increment Transport',
+    q.destroyer === 1 && q.transport === 4);
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

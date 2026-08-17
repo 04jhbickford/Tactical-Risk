@@ -86,6 +86,7 @@ import {
   forgetLastMatch,
   rememberLastMatch,
   resolveLobbyCodeFromGameDoc,
+  shouldLeaveGameView,
 } from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
@@ -1135,7 +1136,7 @@ async function init() {
         showVersionBanner(data?.remoteVersion);
       }
 
-      // Handle auth errors - redirect to login
+      // Handle auth errors. Session-lost must not dump to home / Create Game (B27).
       if (event === 'auth_error' && data?.needsReauth) {
         const tokenValid = await authManager.validateToken();
         const eject = shouldEjectFromMatch({
@@ -1148,15 +1149,18 @@ async function init() {
           showNotification('Connection hiccup — still in the match.');
           return;
         }
-        console.warn('[Main] Auth error detected - returning to lobby');
-        document.title = 'Tactical Risk';
+        const resumeGameId = syncManager?.gameId || null;
+        const resumeCode = currentGameCode;
         rememberLastMatch({
-          gameId: syncManager?.gameId || null,
-          lobbyCode: currentGameCode,
+          gameId: resumeGameId,
+          lobbyCode: resumeCode,
         });
-        showNotification(currentGameCode
-          ? `Session expired. Sign in and rejoin ${currentGameCode} — the game is still there.`
-          : 'Session expired. Sign in and open My Games — the match is still there.');
+        showNotification(resumeCode
+          ? `Session expired. Sign in and rejoin ${resumeCode} — you are still in the match.`
+          : 'Session expired. Sign in and rejoin — the match is still there.');
+
+        const leaveView = shouldLeaveGameView({ sessionLost: true });
+        const keepGameView = !leaveView && !!gameState;
 
         if (syncManager) {
           syncManager.stopSync();
@@ -1165,9 +1169,41 @@ async function init() {
         if (presenceManager) {
           presenceManager.stop({ reason: presenceStopReason({ explicitLeave: false }) });
         }
-        gameState = null;
 
-        handlePlayOnline();
+        if (keepGameView) {
+          const reconnectAfterAuth = (user) => {
+            if (!user) return;
+            if (resumeGameId) {
+              startMultiplayerGame(resumeGameId, { id: resumeGameId, lobbyCode: resumeCode });
+            }
+          };
+          if (!authManager.isLoggedIn()) {
+            if (!authScreen) authScreen = new AuthScreen(reconnectAfterAuth);
+            else authScreen.onComplete = reconnectAfterAuth;
+            authScreen.show();
+          }
+          return;
+        }
+
+        gameState = null;
+        const showReconnect = () => {
+          ensureMultiplayerLobby();
+          multiplayerLobby.showReconnectOnly();
+        };
+        if (!authManager.isLoggedIn()) {
+          if (!authScreen) {
+            authScreen = new AuthScreen((user) => {
+              if (user) showReconnect();
+            });
+          } else {
+            authScreen.onComplete = (user) => {
+              if (user) showReconnect();
+            };
+          }
+          authScreen.show();
+        } else {
+          showReconnect();
+        }
       }
     });
 
@@ -1574,6 +1610,38 @@ async function init() {
     playerPanel.show();
   };
 
+  const ensureMultiplayerLobby = () => {
+    if (multiplayerLobby) return multiplayerLobby;
+    multiplayerLobby = new MultiplayerLobby(
+      setup,
+      (gameId, lobbyData) => {
+        startMultiplayerGame(gameId, lobbyData);
+      },
+      (action) => {
+        if (action === 'rejoin') {
+          if (!gameListUI) {
+            gameListUI = new GameList(
+              (gameId, game) => {
+                console.log('[Main] onSelectGame called, hiding overlays');
+                multiplayerLobby.hide();
+                gameListUI.hide();
+                startMultiplayerGame(gameId, game);
+              },
+              () => {
+                multiplayerLobby.show();
+              }
+            );
+          }
+          multiplayerLobby.hide();
+          gameListUI.show();
+        } else {
+          lobby.show();
+        }
+      }
+    );
+    return multiplayerLobby;
+  };
+
   // Handle Play Online button click
   const handlePlayOnline = () => {
     if (!isFirebaseConfigured()) {
@@ -1582,56 +1650,15 @@ async function init() {
       return;
     }
 
-    // Check if user is logged in
     if (authManager.isLoggedIn()) {
-      // Show multiplayer lobby
-      if (!multiplayerLobby) {
-        multiplayerLobby = new MultiplayerLobby(
-          setup,
-          // onStart - when game starts
-          (gameId, lobbyData) => {
-            startMultiplayerGame(gameId, lobbyData);
-          },
-          // onBack
-          (action) => {
-            if (action === 'rejoin') {
-              // Show game list
-              if (!gameListUI) {
-                gameListUI = new GameList(
-                  // onSelectGame
-                  (gameId, game) => {
-                    console.log('[Main] onSelectGame called, hiding overlays');
-                    // Hide ALL multiplayer overlays before starting game
-                    multiplayerLobby.hide();
-                    gameListUI.hide();
-                    startMultiplayerGame(gameId, game);
-                  },
-                  // onBack
-                  () => {
-                    multiplayerLobby.show();
-                  }
-                );
-              }
-              // Hide multiplayer lobby while showing game list
-              multiplayerLobby.hide();
-              gameListUI.show();
-            } else {
-              // Back to main lobby
-              lobby.show();
-            }
-          }
-        );
-      }
+      ensureMultiplayerLobby();
       multiplayerLobby.show();
     } else {
-      // Show auth screen
       if (!authScreen) {
         authScreen = new AuthScreen((user) => {
           if (user) {
-            // User logged in, show multiplayer lobby
             handlePlayOnline();
           } else {
-            // User cancelled, back to main lobby
             lobby.show();
           }
         });
