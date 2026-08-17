@@ -64,6 +64,43 @@ html, body {
   cursor: move;
 }
 
+/* James lock: whose turn / last action / click landed. Sibling of #hud
+   so the 48px bar height stays frozen. */
+#hud-clarity {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  z-index: 9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 4px 16px 6px;
+  background: rgba(20, 20, 40, 0.88);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #e2e8f0;
+  pointer-events: none;
+}
+
+#hud-clarity[hidden] {
+  display: none;
+}
+
+#hud-clarity.waiting .hud-clarity-turn {
+  color: #ffcc80;
+}
+
+#hud-clarity.your-turn .hud-clarity-turn {
+  color: #c8e6c9;
+}
+
+.hud-clarity-match {
+  color: #ffe0b2;
+}
+
 /* --- HUD --- */
 #hud {
   position: absolute;
@@ -248,7 +285,9 @@ html, body {
   bottom: 0;
   background: rgba(20, 20, 40, 0.95);
   border-left: 1px solid rgba(255,255,255,0.1);
-  z-index: 20;
+  /* Same node as .player-panel. Id beat .player-panel { z-index: 55 },
+     so the sheet sat under #zoom-controls (50) and looked blank. */
+  z-index: 60;
   overflow-y: auto;
   transition: transform 0.2s ease;
 }
@@ -2368,7 +2407,27 @@ html, body {
   gap: 12px;
 }
 
-@media (min-width: 600px) {
+/* B26: Join by Code is its own full-width target on phone — never under My Games. */
+.mp-menu-card[data-action="join-by-code"] {
+  min-height: 72px;
+}
+
+@media (max-width: 640px) {
+  .mp-menu-grid.four-col {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .mp-menu-card[data-action="join-by-code"] {
+    order: -2;
+    width: 100%;
+    min-height: 76px;
+  }
+  .mp-menu-card[data-action="my-games"] {
+    order: -1;
+  }
+}
+
+@media (min-width: 641px) {
   .mp-menu-grid.four-col {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -2532,12 +2591,14 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
+  pointer-events: none;
 }
 
 .mp-game-row-actions {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  pointer-events: auto;
 }
 
 .mp-game-row.own-lobby {
@@ -2561,6 +2622,11 @@ html, body {
 
 .mp-game-row .mp-game-item {
   flex: 1;
+  pointer-events: auto;
+}
+
+.mp-game-row .mp-admin-delete {
+  pointer-events: auto;
 }
 
 .mp-admin-delete {
@@ -4641,10 +4707,27 @@ html, body {
 
 .pp-qty-btn.max-btn {
   width: auto;
-  padding: 0 6px;
+  min-width: 36px;
+  min-height: 28px;
+  padding: 0 8px;
   font-size: 9px;
   font-weight: bold;
   color: #4caf50;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.pp-tabs,
+.phone-detent-tabs {
+  position: relative;
+  z-index: 1;
+}
+
+.player-panel,
+.player-panel .pp-content,
+.player-panel .pp-qty-btn {
+  pointer-events: auto;
 }
 
 .pp-unit-list {
@@ -16063,8 +16146,49 @@ html, body {
   color: #FF9800;
 }
 
+/* Phone / peek: same seat words as the desktop badge and the tab title. */
+.pp-seat-chip {
+  margin: 6px 12px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.pp-seat-chip.your-turn {
+  background: rgba(76, 175, 80, 0.35);
+  border: 1px solid #4CAF50;
+  color: #c8e6c9;
+}
+
+.pp-seat-chip.waiting {
+  background: rgba(255, 152, 0, 0.28);
+  border: 1px solid #FF9800;
+  color: #ffcc80;
+}
+
 .pp-header.not-your-turn {
   opacity: 0.85;
+}
+
+.pp-host-reconnect,
+.mp-last-match {
+  margin: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 152, 0, 0.18);
+  border: 1px solid #FF9800;
+  color: #ffe0b2;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mp-last-match .mp-primary-btn {
+  margin-top: 8px;
+  width: 100%;
 }
 
 /* Identity Bar - shows "You: [Name]" when it's another player's turn */
@@ -16628,12 +16752,22 @@ html, body {
 
   .mp-game-row {
     flex-wrap: wrap;
+    row-gap: 10px;
   }
 
+  /* Leave stays a compact sibling under the title — not a full-width
+     44px bar that steals the row-title tap (B23). */
   .mp-game-row-actions {
-    width: 100%;
+    width: auto;
+    margin-left: auto;
     justify-content: flex-end;
-    padding-top: 4px;
+    padding-top: 8px;
+  }
+
+  .mp-leave-game {
+    min-width: 0;
+    min-height: 0;
+    padding: 6px 10px;
   }
 
   /* Multiplayer join flow (the tablet-as-client path): auth tabs, menu
@@ -16681,6 +16815,12 @@ html, body {
 
   .mp-menu-grid.four-col {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 640px) {
+    .mp-menu-grid.four-col {
+      grid-template-columns: 1fr;
+    }
   }
 
   /* Title + turn badge + flag strip must stay on one 48px row at ~770px */
@@ -16817,6 +16957,13 @@ html, body {
     justify-content: space-between;
     height: var(--mobile-top-bar);
     z-index: 70;
+  }
+
+  html.mobile-shell #hud-clarity {
+    top: var(--mobile-top-bar, calc(48px + env(safe-area-inset-top, 0px)));
+    font-size: 11px;
+    padding: 4px 10px 6px;
+    z-index: 69;
   }
 
   /* Kill the 3-row desktop HUD pieces if JS has not swapped the tree yet */
@@ -17306,6 +17453,20 @@ html, body {
     gap: 8px;
   }
 
+  /* Undo and Deploy keep separate slots so a post-deploy re-render
+     cannot put Undo where Deploy was (B18). */
+  .pp-peek-undo-slot {
+    flex: 0 0 auto;
+    min-width: 72px;
+    min-height: 44px;
+  }
+
+  .pp-peek-primary-slot {
+    flex: 1 1 auto;
+    min-width: 88px;
+    min-height: 44px;
+  }
+
   .pp-peek-cta-row .pp-confirm-btn {
     width: auto;
     min-width: 44px;
@@ -17697,6 +17858,21 @@ html, body {
     font-size: 12px;
     font-weight: 700;
     color: #94a3b8;
+  }
+
+  .phone-place-pool {
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
+  }
+
+  .phone-place-done {
+    min-height: 44px;
+    border-radius: 10px;
+    border: 1px solid #4CAF50;
+    background: rgba(76, 175, 80, 0.25);
+    color: #e8f5e9;
+    font-weight: 700;
   }
 
   .phone-place-hint {

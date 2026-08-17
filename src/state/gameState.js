@@ -5,7 +5,11 @@ import {
   countKnownUnitsToPlace,
   canFinishPlacementRound as canFinishPlacementRoundPred,
   cloneUnitsToPlace,
+  onlyNavalRemaining,
+  resolvePlayerDeployPool,
+  shouldRestoreStartingDeployPool,
 } from './placementPass.js';
+import { resolveDeployedThisRoundAfterLoad } from './placeQueue.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -181,6 +185,9 @@ export class GameState {
 
     // Movement history for current turn: [{ from, to, units }]
     this.moveHistory = [];
+    // Moves at or below this index are locked after combat resolve / leaving
+    // combat movement. Retreat still reads the full history (no combat math change).
+    this.undoLockMoveCount = 0;
 
     // Air unit origins: { territory: { unitType: { origin: territoryName, distance: n } } }
     // Tracks where air units came from and how far they traveled for post-combat landing
@@ -234,6 +241,7 @@ export class GameState {
     // Initial setup state for Risk mode
     this.unitsToPlace = {}; // { playerId: [{ type, quantity }] }
     this.unitsPlacedThisRound = 0;
+    this.unitsPlacedThisRoundOwnerId = null;
     this.placementRound = 0;
 
     // Multiplayer state
@@ -1116,6 +1124,8 @@ export class GameState {
         this.phase = GAME_PHASES.UNIT_PLACEMENT;
         this.turnPhase = SETUP_TURN_PHASE;
         this.unitsPlacedThisRound = 0;
+        this.unitsPlacedThisRoundOwnerId = null;
+        this.ensureInitialDeployPools();
       }
       capGuard++;
     } while (this.players[this.currentPlayerIndex]?.surrendered && capGuard < this.players.length);
@@ -1167,44 +1177,91 @@ export class GameState {
     return true;
   }
 
+  _buildStartingDeployPool({ factoryAlreadyPlaced = false } = {}) {
+    const land = RISK_STARTING_UNITS.land.map((u) => ({ ...u }));
+    if (factoryAlreadyPlaced) {
+      const factory = land.find((u) => u.type === 'factory');
+      if (factory) factory.quantity = 0;
+    }
+    return [
+      ...land.filter((u) => u.quantity > 0),
+      ...RISK_STARTING_UNITS.naval.map((u) => ({ ...u })),
+    ];
+  }
+
+  // First UNIT_PLACEMENT wave with no land/air in the seat pool is a
+  // deserialize / key miss — not "this faction has no land IPC."
+  ensureInitialDeployPools() {
+    if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) return false;
+    let restored = false;
+    for (const p of this.players || []) {
+      const rows = resolvePlayerDeployPool(this.unitsToPlace, p.id, [p.name]);
+      this.unitsToPlace[p.id] = rows;
+      if (shouldRestoreStartingDeployPool({
+        phase: this.phase,
+        placementRound: this.placementRound || 1,
+        placedThisRound: this.unitsPlacedThisRound || 0,
+        pool: rows,
+      })) {
+        this.unitsToPlace[p.id] = this._buildStartingDeployPool({
+          factoryAlreadyPlaced: !!this.playerState?.[p.id]?.hasPlacedCapital,
+        });
+        restored = true;
+      }
+    }
+    if (restored) this._deployPoolRestored = true;
+    return restored;
+  }
+
   // Get units that current player still needs to place (Risk mode)
   getUnitsToPlace(playerId) {
-    return this.unitsToPlace[playerId] || [];
+    const player = this.players?.find((p) => p.id === playerId);
+    return resolvePlayerDeployPool(this.unitsToPlace, playerId, [
+      player?.name,
+    ]);
   }
 
   // Check if player has units left to place.
   // When unitDefs is passed, unknown types (no def) do not count — they
   // cannot be placed and must not keep the pass locked.
   hasUnitsToPlace(playerId, unitDefs) {
-    if (unitDefs) return countKnownUnitsToPlace(this.unitsToPlace[playerId], unitDefs) > 0;
-    const units = this.unitsToPlace[playerId] || [];
+    if (unitDefs) return countKnownUnitsToPlace(this.getUnitsToPlace(playerId), unitDefs) > 0;
+    const units = this.getUnitsToPlace(playerId);
     return units.some(u => u.quantity > 0);
   }
 
   getKnownUnitsToPlace(playerId, unitDefs) {
-    return knownUnitsToPlace(this.unitsToPlace[playerId], unitDefs);
+    return knownUnitsToPlace(this.getUnitsToPlace(playerId), unitDefs);
   }
 
   // Get total unit count left to place
   getTotalUnitsToPlace(playerId, unitDefs) {
-    if (unitDefs) return countKnownUnitsToPlace(this.unitsToPlace[playerId], unitDefs);
-    const units = this.unitsToPlace[playerId] || [];
+    if (unitDefs) return countKnownUnitsToPlace(this.getUnitsToPlace(playerId), unitDefs);
+    const units = this.getUnitsToPlace(playerId);
     return units.reduce((sum, u) => sum + u.quantity, 0);
   }
 
-  canFinishPlacementRound(playerId, unitDefs) {
+  canFinishPlacementRound(playerId, unitDefs, { allowNavalSkip = false } = {}) {
     return canFinishPlacementRoundPred({
       placedThisRound: this.unitsPlacedThisRound || 0,
       limit: this.getUnitsPerRoundLimit(),
       remainingKnown: this.getTotalUnitsToPlace(playerId, unitDefs),
       hasPlaceable: this.hasPlaceableUnits(playerId, unitDefs),
+      onlyNavalRemaining: onlyNavalRemaining(this.getUnitsToPlace(playerId), unitDefs),
+      allowNavalSkip,
     });
   }
 
   // Check if player has any units that can actually be placed (have valid locations)
   hasPlaceableUnits(playerId, unitDefs) {
-    const units = this.unitsToPlace[playerId] || [];
+    const units = this.getUnitsToPlace(playerId);
     if (!units.some(u => u.quantity > 0)) return false;
+
+    // B19: Done/skip leftover ships must not hand the seat straight back.
+    if (this.playerState[playerId]?.skipLeftoverNaval
+      && onlyNavalRemaining(units, unitDefs)) {
+      return false;
+    }
 
     // Get player's owned territories and valid sea zones
     const ownedTerritories = this.getPlayerTerritories(playerId);
@@ -1276,7 +1333,8 @@ export class GameState {
     }
 
     // Check if player has this unit to place
-    const unitsToPlace = this.unitsToPlace[player.id] || [];
+    const unitsToPlace = this.getUnitsToPlace(player.id);
+    this.unitsToPlace[player.id] = unitsToPlace;
     const unitEntry = unitsToPlace.find(u => u.type === unitType && u.quantity > 0);
     if (!unitEntry) {
       return { success: false, error: `No ${unitType} available to place` };
@@ -1363,6 +1421,7 @@ export class GameState {
             onCarrier: true,
           });
           this.unitsPlacedThisRound++;
+          this.unitsPlacedThisRoundOwnerId = player.id;
           this._lastCapital = null;
           this._notify();
           return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
@@ -1396,6 +1455,7 @@ export class GameState {
             onTransport: true,
           });
           this.unitsPlacedThisRound++;
+          this.unitsPlacedThisRoundOwnerId = player.id;
           this._lastCapital = null;
           this._notify();
           return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
@@ -1426,10 +1486,37 @@ export class GameState {
     });
 
     this.unitsPlacedThisRound++;
+    this.unitsPlacedThisRoundOwnerId = player.id;
     this._lastCapital = null;
 
     this._notify();
     return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
+  }
+
+  // Deploy N must place N. Pause notifies so a mid-batch re-render cannot
+  // put Undo under the Deploy tap (B13/B18) or retarget the remaining drops.
+  placeInitialUnitsBatch(territoryName, unitTypes, unitDefs) {
+    const types = Array.isArray(unitTypes) ? unitTypes : [];
+    const placed = [];
+    const failed = [];
+    this.pauseNotifications();
+    try {
+      for (const unitType of types) {
+        const result = this.placeInitialUnit(territoryName, unitType, unitDefs);
+        if (result?.success) placed.push(unitType);
+        else failed.push({ unitType, error: result?.error || 'failed' });
+      }
+    } finally {
+      this.resumeNotifications({ flush: true });
+    }
+    return {
+      placed: placed.length,
+      placedTypes: placed,
+      requested: types.length,
+      failed,
+      territory: territoryName,
+      unitsPlacedThisRound: this.unitsPlacedThisRound,
+    };
   }
 
   // Undo last unit placement
@@ -1488,15 +1575,18 @@ export class GameState {
       this.playerState[player.id].ipcs += lastPlacement.cost;
     } else {
       // If it was from starting units, restore to pool
-      const unitsToPlace = this.unitsToPlace[player.id] || [];
+      const unitsToPlace = this.getUnitsToPlace(player.id);
+      this.unitsToPlace[player.id] = unitsToPlace;
       const poolEntry = unitsToPlace.find(u => u.type === lastPlacement.unitType);
       if (poolEntry) {
         poolEntry.quantity++;
       } else {
         unitsToPlace.push({ type: lastPlacement.unitType, quantity: 1 });
       }
-      this.unitsPlacedThisRound = Math.max(0, this.unitsPlacedThisRound - 1);
     }
+    // DEPLOYED is unitsPlacedThisRound. Undo must always drop it or the
+    // next + looks like it vanished the restored unit (B15).
+    this.unitsPlacedThisRound = Math.max(0, this.unitsPlacedThisRound - 1);
 
     this._notify();
     return true;
@@ -1504,17 +1594,22 @@ export class GameState {
 
   // Finish current player's placement round (6 units max, or all remaining)
   // unitDefs is optional but needed for accurate placeable check
-  finishPlacementRound(unitDefs = null) {
+  finishPlacementRound(unitDefs = null, { allowNavalSkip = false } = {}) {
     if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) {
       return { ok: false, reason: 'wrong-phase' };
     }
     const player = this.currentPlayer;
     if (!player) return { ok: false, reason: 'no-player' };
-    if (!this.canFinishPlacementRound(player.id, unitDefs)) {
+    if (!this.canFinishPlacementRound(player.id, unitDefs, { allowNavalSkip })) {
       return { ok: false, reason: 'not-ready' };
+    }
+    if (allowNavalSkip && onlyNavalRemaining(this.getUnitsToPlace(player.id), unitDefs)) {
+      if (!this.playerState[player.id]) this.playerState[player.id] = {};
+      this.playerState[player.id].skipLeftoverNaval = true;
     }
 
     this.unitsPlacedThisRound = 0;
+    this.unitsPlacedThisRoundOwnerId = null;
     this.turnPhase = this.phase === GAME_PHASES.PLAYING
       ? this.turnPhase
       : SETUP_TURN_PHASE;
@@ -1649,6 +1744,19 @@ export class GameState {
 
     this._notify();
     return { success: true };
+  }
+
+  // Undo the last pending purchase (one unit). Purchase + is undoable;
+  // leaving the phase / passing the seat is not.
+  undoLastPurchase(unitDefs) {
+    if (!shouldShowPurchase(this.phase, this.turnPhase)) {
+      return { success: false, error: 'Can only undo during purchase' };
+    }
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+    const mine = (this.pendingPurchases || []).filter(p => p.owner === player.id && p.quantity > 0);
+    if (mine.length === 0) return { success: false, error: 'No purchases to undo' };
+    return this.removeFromPendingPurchases(mine[mine.length - 1].type, unitDefs);
   }
 
   // Get pending purchases for current player
@@ -2026,9 +2134,11 @@ export class GameState {
     // Reset turn state - start with tech development phase
     this.turnPhase = TURN_PHASES.DEVELOP_TECH;
     this.unitsPlacedThisRound = 0;
+    this.unitsPlacedThisRoundOwnerId = null;
     this.pendingPurchases = [];
     this.combatQueue = [];
     this.moveHistory = [];
+    this.undoLockMoveCount = 0;
     this.placementHistory = [];
     this.mobilizationHistory = []; // Reset mobilization undo history for new turn
     this.airUnitOrigins = {}; // Reset air unit tracking for new turn
@@ -2145,6 +2255,12 @@ export class GameState {
         // Auto-advance to next player
         this.nextTurn();
         return;
+      }
+
+      // Leaving combat movement commits those moves. Undo stays available
+      // for later NCM moves. Combat phase itself is never undoable.
+      if (this.turnPhase === TURN_PHASES.COMBAT_MOVE) {
+        this.undoLockMoveCount = this.moveHistory.length;
       }
 
       // Set the phase and break
@@ -2782,8 +2898,15 @@ export class GameState {
 
   // Undo the last movement (during combat or non-combat move phase)
   undoLastMove() {
+    if (this.turnPhase === TURN_PHASES.COMBAT) {
+      return { success: false, error: 'Cannot undo after combat resolve' };
+    }
     if (this.turnPhase !== TURN_PHASES.COMBAT_MOVE && this.turnPhase !== TURN_PHASES.NON_COMBAT_MOVE) {
       return { success: false, error: 'Can only undo during movement phases' };
+    }
+
+    if (this.moveHistory.length <= (this.undoLockMoveCount || 0)) {
+      return { success: false, error: 'Cannot undo a committed combat move' };
     }
 
     if (this.moveHistory.length === 0) {
@@ -5010,6 +5133,9 @@ export class GameState {
 
   loadFromJSON(data) {
     if (data.version < 3) throw new Error('Incompatible save version');
+    const prevPlayerId = this.currentPlayer?.id;
+    const prevPlacedThisRound = this.unitsPlacedThisRound || 0;
+    const prevPlacementRound = this.placementRound || 0;
     this.gameMode = data.gameMode;
     this.alliancesEnabled = data.alliancesEnabled ?? (data.gameMode === 'classic');
     this.teamsEnabled = data.teamsEnabled ?? false;
@@ -5039,9 +5165,25 @@ export class GameState {
     this.playerTechs = data.playerTechs || {};
     this.riskCards = data.riskCards || {};
     this.cardTradeCount = data.cardTradeCount || {};
-    this.unitsToPlace = data.unitsToPlace || {};
+    this.unitsToPlace = cloneUnitsToPlace(data.unitsToPlace || {});
     this.placementRound = data.placementRound || 0;
-    this.unitsPlacedThisRound = data.unitsPlacedThisRound || 0;
+    // Same seat + stale remote 0/missing must not wipe a local 1/6 (B28).
+    const nextPlayerId = this.players?.[this.currentPlayerIndex]?.id;
+    this.unitsPlacedThisRound = resolveDeployedThisRoundAfterLoad({
+      prevPlayerId,
+      nextPlayerId,
+      remotePlacedThisRound: data.unitsPlacedThisRound,
+      localPlacedThisRound: prevPlacedThisRound,
+      prevPlacementRound,
+      nextPlacementRound: this.placementRound,
+      localPlacedOwnerId: this.unitsPlacedThisRoundOwnerId,
+    });
+    this.unitsPlacedThisRoundOwnerId = this.unitsPlacedThisRound > 0
+      ? (this.unitsPlacedThisRoundOwnerId && this.unitsPlacedThisRoundOwnerId === nextPlayerId
+        ? this.unitsPlacedThisRoundOwnerId
+        : nextPlayerId || null)
+      : null;
+    this.ensureInitialDeployPools();
 
     // v8: Restore air unit tracking for proper landing calculation
     this.airUnitOrigins = data.airUnitOrigins || {};

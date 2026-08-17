@@ -25,8 +25,7 @@ import { UnitRenderer } from './map/unitRenderer.js';
 import {
   PlayerPanel,
   resolveWaitingForSyncAfterRemoteSnapshot,
-  computeIsLocalPlayerTurn,
-  resolveTabTitle,
+  resolveTurnChrome,
   emitYourTurnEvent,
 } from './ui/playerPanel.js';
 import { TerritoryTooltip } from './ui/territoryTooltip.js';
@@ -76,7 +75,23 @@ import { createSyncManager } from './multiplayer/syncManager.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
-import { shouldEjectFromMatch } from './multiplayer/presencePolicy.js';
+import {
+  shouldEjectFromMatch,
+  shouldAccumulateHostOfflineMs,
+  shouldStartHostFailover,
+  presenceStopReason,
+  shouldShowSignInForm,
+} from './multiplayer/presencePolicy.js';
+import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
+import {
+  forgetLastMatch,
+  rememberLastMatch,
+  readLastMatch,
+  resolveLobbyCodeFromGameDoc,
+  shouldLeaveGameView,
+  shouldAutoResumeLastMatch,
+  resolveResumeFailureView,
+} from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -327,6 +342,7 @@ async function init() {
           camera.dirty = true;
           selectedTerritory = null;
           playerPanel.setSelectedTerritory(null);
+          notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
         }
         break;
@@ -393,8 +409,10 @@ async function init() {
 
       case 'undo-purchase':
         if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) break;
-        if (data.unitType) {
-          const undoPurchaseResult = gameState.removeFromPendingPurchases(data.unitType, unitDefs);
+        {
+          const undoPurchaseResult = data.unitType
+            ? gameState.removeFromPendingPurchases(data.unitType, unitDefs)
+            : gameState.undoLastPurchase(unitDefs);
           if (undoPurchaseResult.success) {
             camera.dirty = true;
           }
@@ -481,7 +499,8 @@ async function init() {
         break;
 
       case 'place-unit':
-        // Inline placement - place a unit on the selected territory
+        // Queue + is staging only. A single place-unit is leftover UI —
+        // still one unit, never a pass.
         if (data.unitType && data.territory) {
           const result = gameState.placeInitialUnit(data.territory, data.unitType, unitDefs);
           if (result.success) {
@@ -490,6 +509,22 @@ async function init() {
           }
         }
         break;
+
+      case 'place-units-batch': {
+        const types = Array.isArray(data.unitTypes) ? data.unitTypes : [];
+        if (data.territory && types.length > 0) {
+          const keep = selectedTerritory;
+          const result = gameState.placeInitialUnitsBatch(data.territory, types, unitDefs);
+          for (const unitType of result.placedTypes || []) {
+            actionLog.logInitialPlacement(gameState.currentPlayer, unitType, data.territory);
+          }
+          selectedTerritory = keep;
+          playerPanel.setSelectedTerritory(keep || playerPanel.selectedTerritory);
+          camera.dirty = true;
+          return result;
+        }
+        return { placed: 0, placedTypes: [], requested: types.length, failed: types.map((unitType) => ({ unitType, error: 'no-territory' })) };
+      }
 
       case 'undo-placement':
         if (gameState.undoPlacement()) {
@@ -518,11 +553,15 @@ async function init() {
         if (gameState.isMultiplayer) {
           playerPanel.setWaitingForSync(true);
         }
-        const pass = gameState.finishPlacementRound(unitDefs);
+        const prevSeat = gameState.currentPlayer;
+        const pass = gameState.finishPlacementRound(unitDefs, {
+          allowNavalSkip: !!data?.allowNavalSkip,
+        });
         if (!pass?.ok) {
           playerPanel.setWaitingForSync(false);
           break;
         }
+        notifyTurnSwap(prevSeat, gameState.currentPlayer);
         if (syncManager) {
           const pushed = await syncManager.pushStateNow();
           if (!pushed) playerPanel.setWaitingForSync(false);
@@ -715,6 +754,7 @@ async function init() {
         }
 
         gameState.nextPhase();
+        notifyTurnSwap(prevPlayer, gameState.currentPlayer);
         if (syncManager) {
           const pushed = await syncManager.pushStateNow();
           if (!pushed) playerPanel.setWaitingForSync(false);
@@ -770,6 +810,21 @@ async function init() {
   let authScreen = null;
   let multiplayerLobby = null;
   let gameListUI = null;
+  let currentGameCode = null;
+  let lastTurnNoticeSeatId = null;
+
+  const notifyTurnSwap = (prevPlayer, nextPlayer) => {
+    const nextId = nextPlayer?.oderId || nextPlayer?.id || null;
+    const prevId = prevPlayer?.oderId || prevPlayer?.id || lastTurnNoticeSeatId;
+    maybePostTurnNotice({
+      prevPlayerId: prevId,
+      nextPlayerId: nextId,
+      nextPlayerName: nextPlayer?.name || null,
+      gameCode: currentGameCode,
+      phase: gameState?.phase || null,
+    });
+    if (nextId) lastTurnNoticeSeatId = nextId;
+  };
 
   // Pass-and-play handoff overlay (hotseat games only)
   const handoffScreen = new HandoffScreen();
@@ -794,6 +849,23 @@ async function init() {
   const startMultiplayerGame = async (gameId, lobbyData) => {
     try {
       console.log('[MP] startMultiplayerGame called with:', { gameId, lobbyData });
+      currentGameCode = resolveLobbyCodeFromGameDoc(lobbyData) || resolveLobbyCodeFromGameDoc({
+        lobbyCode: lobbyData?.lobbyCode,
+        code: lobbyData?.code,
+      });
+      rememberLastMatch({
+        gameId,
+        lobbyCode: currentGameCode,
+        hostName: (lobbyData?.lobbyData?.players || lobbyData?.players || [])
+          .find((p) => p.isHost)?.displayName || null,
+      });
+      hud.setClarityContext({
+        localUserId: authManager.getUser()?.id || null,
+        gameCode: currentGameCode,
+        justResumed: true,
+        hostName: (lobbyData?.lobbyData?.players || lobbyData?.players || [])
+          .find((p) => p.isHost)?.displayName || null,
+      });
 
       // CRITICAL: Hide all multiplayer overlays immediately
       if (multiplayerLobby) {
@@ -841,6 +913,7 @@ async function init() {
 
     // Set host flag on syncManager (for AI control - original host controls AI)
     syncManager.setIsHost(isHost);
+    hud.setClarityContext({ isHost, localUserId: user?.id || null });
 
     // Host-failover authority: if the host goes offline, the first online
     // non-surrendered human (in turn order) takes over running AI turns so the
@@ -858,9 +931,15 @@ async function init() {
     syncManager.setAuthorityCheck(() => {
       if (!gameState || !presenceManager || !hostOderId) return false;
       let isAuthority = false;
-      if (presenceManager.getPlayerPresence(hostOderId) === 'offline') {
+      const hostPresence = presenceManager.getPlayerPresence(hostOderId);
+      // Idle / backgrounded host must not start the 90s failover clock.
+      if (shouldAccumulateHostOfflineMs({ hostPresence })) {
         if (hostOfflineSince === null) hostOfflineSince = Date.now();
-        if (Date.now() - hostOfflineSince >= FAILOVER_GRACE_MS) {
+        if (shouldStartHostFailover({
+          hostPresence,
+          offlineForMs: Date.now() - hostOfflineSince,
+          graceMs: FAILOVER_GRACE_MS,
+        })) {
           const me = authManager.getUser();
           const fallback = gameState.players?.find(p =>
             !p.isAI && !p.surrendered &&
@@ -873,7 +952,7 @@ async function init() {
       }
       if (isAuthority && !wasFailoverAuthority) {
         console.warn('[MP] Host offline for 90s+ — this client is taking over AI turns');
-        showNotification('Host has been offline a while — you are now running the AI players.');
+        showNotification('Host is still reconnecting — you are running AI so the game can continue. Stay in the match.');
       } else if (!isAuthority && wasFailoverAuthority) {
         console.warn('[MP] Host is back — returning AI control');
         showNotification('Host is back — they are running the AI players again.');
@@ -994,15 +1073,15 @@ async function init() {
 
         // Async-play awareness: flag the browser tab while it's your turn so a
         // backgrounded player can see it at a glance
-        const isLocalPlayerTurn = computeIsLocalPlayerTurn({
+        const turnChrome = resolveTurnChrome({
           isMultiplayer: true,
-          isWaitingForSync: playerPanel.isWaitingForSync,
           localUserId: playerPanel.localUserId || syncManager.userId,
           currentPlayerOderId: gameState.currentPlayer?.oderId,
+          currentPlayerName: gameState.currentPlayer?.name,
         });
-        document.title = resolveTabTitle({ isLocalPlayerTurn });
+        document.title = turnChrome.tabTitle;
         emitYourTurnEvent({
-          yourTurn: isLocalPlayerTurn,
+          yourTurn: turnChrome.ownSeat,
           playerName: gameState.currentPlayer?.name,
           gameId,
         });
@@ -1061,33 +1140,77 @@ async function init() {
         showVersionBanner(data?.remoteVersion);
       }
 
-      // Handle auth errors - redirect to login
+      // Handle auth errors. Session-lost must not dump to home / Create Game (B27).
       if (event === 'auth_error' && data?.needsReauth) {
         const tokenValid = await authManager.validateToken();
         const eject = shouldEjectFromMatch({
           authUserPresent: !!authManager.getUser(),
           tokenValid,
-          confirmedSignOut: !authManager.getUser() && !authManager.isLoggedIn(),
+          // A null user after background is not Sign Out. Only the Sign Out
+          // button sets confirmedSignOut. Treating !getUser() as confirmed
+          // is what dumped the host to Sign In and killed ZUJMNP.
+          confirmedSignOut: false,
         });
         if (!eject) {
           console.warn('[Main] Auth hiccup — staying in the match');
           showNotification('Connection hiccup — still in the match.');
           return;
         }
-        console.warn('[Main] Auth error detected - returning to lobby');
-        document.title = 'Tactical Risk';
-        showNotification('Session expired. Please sign in again.');
+        const resumeGameId = syncManager?.gameId || null;
+        const resumeCode = currentGameCode;
+        rememberLastMatch({
+          gameId: resumeGameId,
+          lobbyCode: resumeCode,
+        });
+        showNotification(resumeCode
+          ? `Session expired. Sign in and rejoin ${resumeCode} — you are still in the match.`
+          : 'Session expired. Sign in and rejoin — the match is still there.');
+
+        const leaveView = shouldLeaveGameView({ sessionLost: true });
+        const keepGameView = !leaveView && !!gameState;
 
         if (syncManager) {
           syncManager.stopSync();
           syncManager = null;
         }
         if (presenceManager) {
-          presenceManager.stop();
+          presenceManager.stop({ reason: presenceStopReason({ explicitLeave: false }) });
         }
-        gameState = null;
 
-        lobby.show();
+        if (keepGameView) {
+          const reconnectAfterAuth = (user) => {
+            if (!user) return;
+            if (resumeGameId) {
+              startMultiplayerGame(resumeGameId, { id: resumeGameId, lobbyCode: resumeCode });
+            }
+          };
+          if (!authManager.isLoggedIn()) {
+            if (!authScreen) authScreen = new AuthScreen(reconnectAfterAuth);
+            else authScreen.onComplete = reconnectAfterAuth;
+            authScreen.show();
+          }
+          return;
+        }
+
+        gameState = null;
+        const showReconnect = () => {
+          ensureMultiplayerLobby();
+          multiplayerLobby.showReconnectOnly();
+        };
+        if (!authManager.isLoggedIn()) {
+          if (!authScreen) {
+            authScreen = new AuthScreen((user) => {
+              if (user) showReconnect();
+            });
+          } else {
+            authScreen.onComplete = (user) => {
+              if (user) showReconnect();
+            };
+          }
+          authScreen.show();
+        } else {
+          showReconnect();
+        }
       }
     });
 
@@ -1119,6 +1242,14 @@ async function init() {
     let lastPresenceStates = null;
     presenceManager.subscribe((presence) => {
       playerPanel.setPresenceData(presence);
+      const hostPlayer = gameState?.players?.find(p => p.isHost)
+        || gameState?.players?.find(p => p.oderId && !p.isAI);
+      if (hostPlayer) {
+        hud.setClarityContext({
+          hostPresence: presenceManager.getPlayerPresence(hostPlayer.oderId),
+          hostName: hostPlayer.name,
+        });
+      }
 
       const myId = authManager.getUser()?.id;
       if (lastPresenceStates) {
@@ -1128,9 +1259,12 @@ async function init() {
           const wasOffline = !prev || prev === 'offline';
           const isOffline = info.state === 'offline';
           if (wasOffline && !isOffline) {
-            showNotification(`${info.displayName || 'A player'} is back online`);
+            showNotification(`${info.displayName || 'A player'} is back — still in ${currentGameCode || 'the match'}`);
           } else if (!wasOffline && isOffline) {
-            showNotification(`${info.displayName || 'A player'} went offline`);
+            const hostGone = hostPlayer && oderId === hostPlayer.oderId;
+            showNotification(hostGone
+              ? `${info.displayName || 'Host'} is reconnecting — you are still in ${currentGameCode || 'the match'}. Do not leave.`
+              : `${info.displayName || 'A player'} went offline`);
           }
         }
       }
@@ -1143,6 +1277,17 @@ async function init() {
 
     // Wire up all the UI components (same as local game)
     wireUpGameComponents();
+
+    // CEVX6F hold: a healed first-wave pool must reach the other client.
+    // Do not open a new game — push the same doc.
+    if (gameState._deployPoolRestored && syncManager && !syncManager.isLoading?.()) {
+      if (typeof syncManager.pushStateNow === 'function') {
+        await syncManager.pushStateNow();
+      } else if (typeof syncManager.forcePush === 'function') {
+        await syncManager.forcePush();
+      }
+      gameState._deployPoolRestored = false;
+    }
 
     // Start with map overview
     camera.dirty = true;
@@ -1160,6 +1305,7 @@ async function init() {
 
   // Function to wire up all game components (shared between local and multiplayer)
   const wireUpGameComponents = () => {
+    lastTurnNoticeSeatId = gameState.currentPlayer?.oderId || gameState.currentPlayer?.id || null;
     // Check if there are AI players
     const hasAIPlayers = gameState.players?.some(p => p.isAI);
 
@@ -1176,7 +1322,8 @@ async function init() {
       aiController.setGameState(gameState);
       aiController.setOnAction((action) => {
         camera.dirty = true;
-        if (action === 'finishPlacement' || action === 'placeCapital') {
+        if (action === 'finishPlacement' || action === 'placeCapital' || action === 'nextPhase') {
+          notifyTurnSwap(null, gameState.currentPlayer);
           syncManager?.pushStateNow();
         }
       });
@@ -1205,12 +1352,14 @@ async function init() {
 
     // Wire up components
     hud.setGameState(gameState);
+    hud.setActionLog(actionLog);
     // Pass-and-play handoff overlay (self-disables for multiplayer/AI-only)
     handoffScreen.setGameState(gameState);
     hud.setNextPhaseCallback(async () => {
       const prevPlayer = gameState.currentPlayer;
       const prevRound = gameState.round;
       gameState.nextPhase();
+      notifyTurnSwap(prevPlayer, gameState.currentPlayer);
       if (syncManager) await syncManager.pushStateNow();
       camera.dirty = true;
 
@@ -1238,6 +1387,7 @@ async function init() {
 
     hud.setOnExitToLobby(() => {
       document.title = 'Tactical Risk';
+      forgetLastMatch();
       // Stop presence tracking
       if (presenceManager) {
         presenceManager.stop();
@@ -1293,7 +1443,7 @@ async function init() {
         isActive: syncManager.checkIsActivePlayer()
       });
 
-      playerPanel.setMultiplayerState(syncManager, localUserId);
+      playerPanel.setMultiplayerState(syncManager, localUserId, currentGameCode);
     }
 
     tooltip.setGameState(gameState);
@@ -1478,70 +1628,90 @@ async function init() {
     playerPanel.show();
   };
 
+  const ensureMultiplayerLobby = () => {
+    if (multiplayerLobby) return multiplayerLobby;
+    multiplayerLobby = new MultiplayerLobby(
+      setup,
+      (gameId, lobbyData) => {
+        startMultiplayerGame(gameId, lobbyData);
+      },
+      (action) => {
+        if (action === 'rejoin') {
+          if (!gameListUI) {
+            gameListUI = new GameList(
+              (gameId, game) => {
+                console.log('[Main] onSelectGame called, hiding overlays');
+                multiplayerLobby.hide();
+                gameListUI.hide();
+                startMultiplayerGame(gameId, game);
+              },
+              () => {
+                multiplayerLobby.show();
+              }
+            );
+          }
+          multiplayerLobby.hide();
+          gameListUI.show();
+        } else {
+          lobby.show();
+        }
+      }
+    );
+    return multiplayerLobby;
+  };
+
   // Handle Play Online button click
-  const handlePlayOnline = () => {
+  const handlePlayOnline = async () => {
     if (!isFirebaseConfigured()) {
       alert('Multiplayer is not configured. Please set up Firebase in src/multiplayer/firebase.js');
       lobby.show();
       return;
     }
 
-    // Check if user is logged in
+    // Reload / version refresh: a restored Firebase user is still signed in
+    // even before authReady. Only show Sign In after restore finishes empty.
     if (authManager.isLoggedIn()) {
-      // Show multiplayer lobby
-      if (!multiplayerLobby) {
-        multiplayerLobby = new MultiplayerLobby(
-          setup,
-          // onStart - when game starts
-          (gameId, lobbyData) => {
-            startMultiplayerGame(gameId, lobbyData);
-          },
-          // onBack
-          (action) => {
-            if (action === 'rejoin') {
-              // Show game list
-              if (!gameListUI) {
-                gameListUI = new GameList(
-                  // onSelectGame
-                  (gameId, game) => {
-                    console.log('[Main] onSelectGame called, hiding overlays');
-                    // Hide ALL multiplayer overlays before starting game
-                    multiplayerLobby.hide();
-                    gameListUI.hide();
-                    startMultiplayerGame(gameId, game);
-                  },
-                  // onBack
-                  () => {
-                    multiplayerLobby.show();
-                  }
-                );
-              }
-              // Hide multiplayer lobby while showing game list
-              multiplayerLobby.hide();
-              gameListUI.show();
-            } else {
-              // Back to main lobby
-              lobby.show();
-            }
-          }
-        );
+      if (authScreen) authScreen.hide();
+      const last = readLastMatch();
+      if (shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last }) && last?.gameId) {
+        await startMultiplayerGame(last.gameId, {
+          id: last.gameId,
+          lobbyCode: last.lobbyCode,
+        });
+        if (gameState?.players?.length) return;
       }
-      multiplayerLobby.show();
-    } else {
-      // Show auth screen
+      ensureMultiplayerLobby();
+      if (resolveResumeFailureView({ resumed: false, lastMatch: last }) === 'reconnect') {
+        multiplayerLobby.showReconnectOnly();
+      } else {
+        multiplayerLobby.show();
+      }
+      return;
+    }
+
+    if (!authManager.isAuthReady()
+      || shouldShowSignInForm({
+        authReady: authManager.isAuthReady(),
+        userPresent: authManager.isLoggedIn(),
+      })) {
       if (!authScreen) {
         authScreen = new AuthScreen((user) => {
-          if (user) {
-            // User logged in, show multiplayer lobby
-            handlePlayOnline();
-          } else {
-            // User cancelled, back to main lobby
-            lobby.show();
-          }
+          if (user) handlePlayOnline();
+          else lobby.show();
         });
+      } else {
+        authScreen.onComplete = (user) => {
+          if (user) handlePlayOnline();
+          else lobby.show();
+        };
       }
       authScreen.show();
+      return;
     }
+
+    if (authScreen) authScreen.hide();
+    ensureMultiplayerLobby();
+    multiplayerLobby.show();
   };
 
   // Lobby (local games)
@@ -1572,8 +1742,55 @@ async function init() {
     if (lobby && !lobby.el?.classList.contains('hidden')) lobby._render();
   });
 
+  // B38: a signed-in reload must reopen the live match, not the home screen.
+  const lastAtBoot = readLastMatch();
+  if (lastAtBoot?.gameId || lastAtBoot?.lobbyCode) {
+    lobby.hide();
+  }
+
   // Load map tiles
   await mapRenderer.load();
+
+  let resumedLastMatch = false;
+  if (isFirebaseConfigured() && (lastAtBoot?.gameId || lastAtBoot?.lobbyCode)) {
+    try {
+      const user = await authManager.whenReady();
+      if (shouldAutoResumeLastMatch({ signedIn: !!user, lastMatch: lastAtBoot })) {
+        if (lastAtBoot.gameId) {
+          await startMultiplayerGame(lastAtBoot.gameId, {
+            id: lastAtBoot.gameId,
+            lobbyCode: lastAtBoot.lobbyCode,
+          });
+          resumedLastMatch = !!(gameState && gameState.players?.length);
+        } else if (lastAtBoot.lobbyCode) {
+          const result = await lobbyManager.joinLobby(lastAtBoot.lobbyCode, null);
+          if (result.success && result.isGame) {
+            await startMultiplayerGame(result.gameId, result.game);
+            resumedLastMatch = !!(gameState && gameState.players?.length);
+          } else if (result.success) {
+            ensureMultiplayerLobby();
+            multiplayerLobby.mode = 'lobby';
+            multiplayerLobby.show();
+            resumedLastMatch = true;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Main] Auto-resume last match failed — staying on home', err);
+    }
+    if (!resumedLastMatch) {
+      const view = resolveResumeFailureView({
+        resumed: false,
+        lastMatch: lastAtBoot,
+      });
+      if (view === 'reconnect') {
+        ensureMultiplayerLobby();
+        multiplayerLobby.showReconnectOnly();
+      } else {
+        lobby.show();
+      }
+    }
+  }
 
   // Canvas sizing
   resizeCanvas();
@@ -1581,6 +1798,13 @@ async function init() {
 
   // Mouse events
   canvas.addEventListener('mousedown', (e) => {
+    // B31: Max hover can sit over the map / LOG. A click whose coordinates
+    // are inside the deploy panel must never select a territory.
+    if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+      e.preventDefault();
+      playerPanel._onPanelPointerDown(e);
+      return;
+    }
     e.preventDefault();
     // Phone tap-to-toggle: keep the card up through mousedown so mouseup
     // can close the same territory instead of immediately re-showing it.
@@ -1863,6 +2087,13 @@ async function init() {
     console.log('[MouseUp] wasDrag:', wasDrag, 'Phase:', gameState?.phase);
 
     if (!wasDrag) {
+      // A panel + / Max / Deploy tap must not select the territory under
+      // the finger (B22 / B31 East US) even when the canvas is the target.
+      if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+        playerPanel.commitLockedPanelGesture(e);
+        camera.dirty = true;
+        return;
+      }
       const world = camera.screenToWorld(e.clientX, e.clientY);
       const wrappedWorldX = wrapX(world.x);
       const hit = territoryMap.hitTest(wrappedWorldX, world.y);
@@ -2010,6 +2241,7 @@ async function init() {
         }
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
+        hud.setLastClick({ landed: true, label: hit.name });
         // Phone setup: tap places / selects — do not open the inspect sheet.
         // Playing still tap-to-toggles. Long-press inspect is a small edge card.
         // Tablet (fromTouch, not mobile-shell) keeps the V2.64 peek.
@@ -2044,6 +2276,7 @@ async function init() {
         }
         selectedTerritory = null;
         playerPanel.setSelectedTerritory(null);
+        hud.setLastClick({ landed: false, label: 'map' });
         movementUI.cancel();
       }
       camera.dirty = true;

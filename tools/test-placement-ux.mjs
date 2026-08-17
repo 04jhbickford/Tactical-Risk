@@ -8,12 +8,20 @@ import { fileURLToPath } from 'url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 import { readFileSync } from 'fs';
 
+if (typeof globalThis.localStorage === 'undefined') {
+  globalThis.localStorage = {
+    getItem() { return null; },
+    setItem() {},
+    removeItem() {},
+  };
+}
+
 const { GameState } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { computeInitialPlacementUX, resolvePhoneStickyUnitType } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
-const { canFinishPlacementRound, knownUnitsToPlace } =
+const { canFinishPlacementRound, knownUnitsToPlace, onlyNavalRemaining } =
   await import(pathToFileURL(join(root, 'src/state/placementPass.js')));
 
 let failures = 0;
@@ -31,7 +39,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.77', GAME_VERSION === 'V2.77');
+check('GAME_VERSION is V2.78', GAME_VERSION === 'V2.78');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== computeInitialPlacementUX: land selected, only naval remain, valid sea exists ===');
@@ -46,11 +54,13 @@ console.log('=== computeInitialPlacementUX: land selected, only naval remain, va
     totalQueued: 0,
     selectedKind: 'owned-land',
   });
-  check('Done hidden (ships still placeable at sea)', ux.showDone === false);
-  check('sea-zone hint shown', ux.needSeaHint === true);
-  check('not stuck', ux.stuckWithNaval === false);
-  check('hint tells player to click a coastal sea zone',
-    /sea zone/i.test(ux.hint) && /coastal/i.test(ux.hint));
+  check('B19: Done/skip shown on inland land (not gated on 6/6)', ux.showDone === true);
+  check('James lock: leftover ships always have a Done', ux.showDone === true);
+  check('B19: sea-zone hint still shown so ships can be placed', ux.needSeaHint === true);
+  check('not stuck (legal sea exists)', ux.stuckWithNaval === false);
+  check('B19: can skip leftover ships from a non-sea tile', ux.canSkipNaval === true);
+  check('hint offers place at sea OR Done',
+    /sea zone/i.test(ux.hint) && /Done/i.test(ux.hint));
 }
 
 console.log('=== computeInitialPlacementUX: invalid/random sea, only naval, valid drop exists ===');
@@ -65,14 +75,14 @@ console.log('=== computeInitialPlacementUX: invalid/random sea, only naval, vali
     totalQueued: 0,
     selectedKind: 'other',
   });
-  check('Done still hidden', ux.showDone === false);
+  check('B19: Done/skip also available from a non-sea tile', ux.showDone === true);
   check('same sea-zone hint', ux.needSeaHint === true);
 }
 
 console.log('=== computeInitialPlacementUX: valid sea selected, ships remain ===');
 {
   const ux = computeInitialPlacementUX({
-    placedThisRound: 0,
+    placedThisRound: 1,
     limit: 6,
     totalRemaining: 6,
     landAirRemaining: 0,
@@ -81,10 +91,12 @@ console.log('=== computeInitialPlacementUX: valid sea selected, ships remain ===
     totalQueued: 0,
     selectedKind: 'valid-sea',
   });
-  check('Done hidden — must place ships', ux.showDone === false);
+  check('B19-James: Done/skip on a legal sea at 1/6 naval-only', ux.showDone === true);
+  check('B19-James: can skip leftover ships from a sea tile', ux.canSkipNaval === true);
   check('no redirect hint on a legal sea', ux.needSeaHint === false);
   check('no stuck message', ux.stuckWithNaval === false);
-  check('no hint text', ux.hint === null);
+  check('hint offers place here OR Done',
+    /Place leftover ships/i.test(ux.hint) && /Done/i.test(ux.hint));
 }
 
 console.log('=== computeInitialPlacementUX: landlocked / no legal naval drop ===');
@@ -104,6 +116,21 @@ console.log('=== computeInitialPlacementUX: landlocked / no legal naval drop ===
   check('stuck flag set', ux.stuckWithNaval === true);
   check('hint explains there is no legal sea zone',
     /no legal sea zone/i.test(ux.hint));
+}
+
+console.log('=== James lock: 6/6 this round still offers Done ===');
+{
+  const ux = computeInitialPlacementUX({
+    placedThisRound: 6,
+    limit: 6,
+    totalRemaining: 1,
+    landAirRemaining: 1,
+    navalRemaining: 0,
+    hasPlaceable: true,
+    totalQueued: 0,
+    selectedKind: 'owned-land',
+  });
+  check('round cap offers Done so 6/6 is not a dead screen', ux.showDone === true);
 }
 
 console.log('=== computeInitialPlacementUX: mixed land+naval, land selected ===');
@@ -259,6 +286,102 @@ console.log('=== leftover / ghost unit must not block Done or sticky-select ==='
     gs.canFinishPlacementRound('p1', withBomber) === false);
   const placed = gs.placeInitialUnit('Home', 'tacticalBomber', withBomber);
   check('tactical bomber places on owned land', placed.success === true);
+}
+
+console.log('=== B19: ships-only inland does not deadlock ===');
+{
+  const seaDefs = {
+    infantry: { isLand: true },
+    transport: { isSea: true },
+    battleship: { isSea: true },
+  };
+  const territories = [
+    { name: 'Inland', isWater: false, connections: [] },
+    { name: 'Coast', isWater: false, connections: ['Caspian Sea Zone'] },
+    { name: 'Caspian Sea Zone', isWater: true, connections: ['Coast'] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = [
+    { id: 'p1', name: 'James', isAI: false },
+    { id: 'p2', name: 'Host', isAI: false },
+  ];
+  gs.currentPlayerIndex = 0;
+  gs.phase = 'unit_placement';
+  gs.territoryState = {
+    Inland: { owner: 'p1' },
+    Coast: { owner: 'p1' },
+    'Caspian Sea Zone': { owner: null },
+  };
+  gs.units = { Inland: [], Coast: [], 'Caspian Sea Zone': [] };
+  gs.unitsToPlace = {
+    p1: [{ type: 'transport', quantity: 2 }, { type: 'battleship', quantity: 1 }],
+    p2: [{ type: 'infantry', quantity: 6 }],
+  };
+  gs.unitsPlacedThisRound = 0;
+  check('only naval remain for James',
+    onlyNavalRemaining(gs.unitsToPlace.p1, seaDefs) === true);
+  check('ships are still placeable at Caspian',
+    gs.hasPlaceableUnits('p1', seaDefs) === true);
+  check('without skip, Done is gated (not 6/6)',
+    gs.canFinishPlacementRound('p1', seaDefs) === false);
+  check('with skip, Done is legal from inland',
+    gs.canFinishPlacementRound('p1', seaDefs, { allowNavalSkip: true }) === true);
+  const onSea = gs.placeInitialUnit('Caspian Sea Zone', 'transport', seaDefs);
+  check('leftover ships still place in a legal sea', onSea.success === true);
+  gs.undoPlacement();
+  const pass = gs.finishPlacementRound(seaDefs, { allowNavalSkip: true });
+  check('Done/skip from inland commits', pass.ok === true);
+  check('seat leaves James (does not bounce back onto leftover ships)',
+    gs.currentPlayer?.id === 'p2');
+  check('James leftover ships no longer block the pass',
+    gs.hasPlaceableUnits('p1', seaDefs) === false);
+}
+
+console.log('=== B19-James: 1/6 naval-only on a legal sea can Done/skip ===');
+{
+  const seaDefs = {
+    infantry: { isLand: true },
+    transport: { isSea: true },
+    battleship: { isSea: true },
+  };
+  const territories = [
+    { name: 'East United States', isWater: false, connections: ['US East Coast'] },
+    { name: 'US East Coast', isWater: true, connections: ['East United States'] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = [
+    { id: 'p1', name: 'James', isAI: false },
+    { id: 'p2', name: 'Host', isAI: false },
+  ];
+  gs.currentPlayerIndex = 0;
+  gs.phase = 'unit_placement';
+  gs.territoryState = {
+    'East United States': { owner: 'p1' },
+    'US East Coast': { owner: null },
+  };
+  gs.units = { 'East United States': [], 'US East Coast': [] };
+  gs.unitsToPlace = {
+    p1: [{ type: 'transport', quantity: 4 }, { type: 'battleship', quantity: 2 }],
+    p2: [{ type: 'infantry', quantity: 6 }],
+  };
+  gs.unitsPlacedThisRound = 1;
+  const ux = computeInitialPlacementUX({
+    placedThisRound: 1,
+    limit: 6,
+    totalRemaining: 6,
+    landAirRemaining: 0,
+    navalRemaining: 6,
+    hasPlaceable: true,
+    totalQueued: 0,
+    selectedKind: 'valid-sea',
+  });
+  check('1/6 + 6 naval-only shows Done (not Undo-only)',
+    ux.showDone === true && ux.canSkipNaval === true);
+  check('Done/skip from the sea tile commits',
+    gs.canFinishPlacementRound('p1', seaDefs, { allowNavalSkip: true }) === true);
+  const pass = gs.finishPlacementRound(seaDefs, { allowNavalSkip: true });
+  check('James seat advances after skip at 1/6',
+    pass.ok === true && gs.currentPlayer?.id === 'p2');
 }
 
 console.log(failures === 0 ? '\nALL PLACEMENT UX CHECKS PASS' : `\n${failures} FAILURES`);

@@ -6,6 +6,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   deleteDoc,
   doc
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
@@ -13,7 +14,18 @@ import { getFirebaseDb } from '../multiplayer/firebase.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { leaveGame } from '../multiplayer/surrender.js';
-import { shouldOpenLeaveConfirm } from '../multiplayer/presencePolicy.js';
+import {
+  mergeMyActiveGames,
+  shouldAbortMyGamesOnTokenHiccup,
+  shouldJoinGameFromRowClick,
+  shouldOpenLeaveConfirm,
+} from '../multiplayer/presencePolicy.js';
+import {
+  forgetLastMatch,
+  readLastMatch,
+  recoverMyGamesOnLoad,
+  shouldWipeMyGamesOnError,
+} from '../multiplayer/lastMatch.js';
 
 export { shouldOpenLeaveConfirm };
 
@@ -67,7 +79,8 @@ export class GameList {
     this.isLoading = true;
     this._render();
 
-    const userId = this.authManager.getUserId();
+    const user = this.authManager.getUser();
+    const userId = user?.id || this.authManager.getUserId();
     console.log('[GameList] Loading games for userId:', userId);
 
     if (!userId || !this.db) {
@@ -77,40 +90,55 @@ export class GameList {
       return;
     }
 
-    // Validate token before making Firestore queries
+    // Token hiccup after Sign In must still query (B25). A remembered
+    // last match is enough to keep My Games from going empty.
+    const remembered = readLastMatch();
     const isTokenValid = await this.authManager.validateToken();
-    if (!isTokenValid) {
+    if (shouldAbortMyGamesOnTokenHiccup({
+      authUserPresent: !!user,
+      tokenValid: isTokenValid,
+      hasLastMatch: !!(remembered?.gameId || remembered?.lobbyCode),
+    })) {
       console.warn('[GameList] Token validation failed - user needs to re-login');
-      this.games = [];
+      this.games = recoverMyGamesOnLoad({ games: [], lastMatch: remembered });
       this.isLoading = false;
       return;
     }
 
     try {
-      // Query games where user is a player
-      // Include both 'active' and 'starting' (in case host hasn't initialized yet)
-      console.log('[GameList] Querying games with:', {
-        userId,
-        statuses: ['active', 'starting']
+      // Equality / array-contains only — compound `in` needs a composite index
+      // (firestore.indexes.json is empty). Filter status client-side.
+      console.log('[GameList] Querying games with:', { userId });
+
+      const gamesRef = collection(this.db, 'games');
+      const [seatSnap, starterSnap] = await Promise.all([
+        getDocs(query(gamesRef, where('playerUserIds', 'array-contains', userId))),
+        getDocs(query(gamesRef, where('startedBy', '==', userId))),
+      ]);
+      const bySeat = seatSnap.docs.map(d => {
+        const data = d.data();
+        console.log(`[GameList] Game ${d.id}: status=${data.status}, playerUserIds=`, data.playerUserIds);
+        return { id: d.id, ...data };
       });
-
-      const q = query(
-        collection(this.db, 'games'),
-        where('playerUserIds', 'array-contains', userId),
-        where('status', 'in', ['active', 'starting'])
-      );
-
-      const snapshot = await getDocs(q);
-      console.log(`[GameList] Found ${snapshot.docs.length} games for userId ${userId}`);
-
-      this.games = snapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log(`[GameList] Game ${doc.id}: status=${data.status}, playerUserIds=`, data.playerUserIds);
-        return {
-          id: doc.id,
-          ...data
-        };
+      const byStarter = starterSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      this.games = mergeMyActiveGames({ bySeat, byStarter });
+      let lastGame = null;
+      if (remembered?.gameId && !this.games.some(g => g.id === remembered.gameId)) {
+        try {
+          const snap = await getDoc(doc(this.db, 'games', remembered.gameId));
+          if (snap.exists()) {
+            lastGame = { id: snap.id, ...snap.data() };
+          }
+        } catch (err) {
+          console.warn('[GameList] last-match getDoc failed', err);
+        }
+      }
+      this.games = recoverMyGamesOnLoad({
+        games: this.games,
+        lastMatchGame: lastGame,
+        lastMatch: remembered,
       });
+      console.log(`[GameList] Found ${this.games.length} active games for userId ${userId}`);
 
       // Sort by last updated
       this.games.sort((a, b) => {
@@ -133,11 +161,29 @@ export class GameList {
     } catch (error) {
       console.error('[GameList] Error loading games:', error);
 
+      const last = readLastMatch();
+      let lastGame = null;
+      if (last?.gameId) {
+        try {
+          const snap = await getDoc(doc(this.db, 'games', last.gameId));
+          if (snap.exists()) lastGame = { id: snap.id, ...snap.data() };
+        } catch (err) {
+          console.warn('[GameList] last-match getDoc failed after query error', err);
+        }
+      }
+      this.games = recoverMyGamesOnLoad({
+        games: [],
+        lastMatchGame: lastGame,
+        lastMatch: last,
+      });
+
       // Check if it's an auth error - if so, handle re-authentication
       const authResult = await this.authManager.handleFirebaseError(error);
       if (authResult.needsReauth) {
         console.warn('[GameList] Auth error detected - user needs to re-login');
-        this.games = [];
+        if (shouldWipeMyGamesOnError({ lastMatch: last })) {
+          this.games = [];
+        }
         this.isLoading = false;
         return;
       }
@@ -147,7 +193,6 @@ export class GameList {
         console.error('[GameList] INDEX ERROR - May need to create Firestore index!');
         console.error('[GameList] Error details:', error.message);
       }
-      this.games = [];
     }
 
     this.isLoading = false;
@@ -276,7 +321,7 @@ export class GameList {
 
     return `
       <div class="mp-game-row">
-        <button type="button" class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
+        <button type="button" class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}" data-role="join-game">
           <div class="mp-game-info">
             <span class="mp-game-name">${playerNames}</span>
             <span class="mp-game-details">
@@ -286,9 +331,10 @@ export class GameList {
           <div class="mp-game-status">
             ${statusHtml}
           </div>
+          <span class="mp-game-join">Resume</span>
         </button>
         <div class="mp-game-row-actions">
-          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" title="Leave this game (surrender)">Leave</button>
+          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" data-role="leave-game" title="Surrender and leave this game">Leave</button>
         </div>
         ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}
       </div>
@@ -344,7 +390,8 @@ export class GameList {
     this.el.querySelectorAll('.mp-game-item[data-game-id]').forEach(item => {
       item.addEventListener('click', async (e) => {
         if (e.target.closest('[data-leave-game]')) return;
-        if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false })) return;
+        if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false, eventTarget: e.target })) return;
+        if (!shouldJoinGameFromRowClick({ eventTarget: e.target })) return;
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
         console.log('[GameList] Game clicked:', { gameId, game });
@@ -365,7 +412,7 @@ export class GameList {
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true })) return;
+        if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: e.target })) return;
         const gameId = btn.dataset.leaveGame;
         const game = this.games.find(g => g.id === gameId);
         const isStarted = game?.stateVersion > 0;
@@ -379,6 +426,8 @@ export class GameList {
         const userId = this.authManager.getUserId();
         const result = await leaveGame(gameId, userId);
         if (result.success) {
+          const remembered = readLastMatch();
+          if (remembered?.gameId === gameId) forgetLastMatch();
           await this._loadGames();
           this._render();
         } else {

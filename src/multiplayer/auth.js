@@ -26,6 +26,8 @@ export class AuthManager {
     this.confirmationResult = null;
     this.recaptchaVerifier = null;
     this._listeners = [];
+    this._ready = false;
+    this._readyPromise = null;
   }
 
   initialize() {
@@ -34,25 +36,66 @@ export class AuthManager {
 
     if (!this.auth) {
       console.warn('Firebase Auth not available - multiplayer disabled');
+      this._ready = true;
       return;
     }
 
-    // Listen for auth state changes
-    onAuthStateChanged(this.auth, async (user) => {
+    this._readyPromise = this._waitForAuthReady();
+
+    // Apply the Firebase user immediately. A Firestore lastLogin write must
+    // never block or wipe the restored session (V2.77 reload → Sign In).
+    onAuthStateChanged(this.auth, (user) => {
       if (user) {
-        // Update last login time in Firestore
-        await this._updateUserDocument(user);
-        this.currentUser = {
-          id: user.uid,
-          email: user.email,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Player',
-          phoneNumber: user.phoneNumber
-        };
-      } else {
+        this._applyFirebaseUser(user);
+        this._updateUserDocument(user).catch((err) => {
+          console.warn('[Auth] user doc update failed — session kept', err);
+        });
+      } else if (this._ready) {
         this.currentUser = null;
       }
       this._notifyListeners();
     });
+  }
+
+  _applyFirebaseUser(user) {
+    if (!user) {
+      this.currentUser = null;
+      return null;
+    }
+    this.currentUser = {
+      id: user.uid,
+      email: user.email,
+      displayName: user.displayName || user.email?.split('@')[0] || 'Player',
+      phoneNumber: user.phoneNumber
+    };
+    return this.currentUser;
+  }
+
+  async _waitForAuthReady() {
+    try {
+      if (typeof this.auth.authStateReady === 'function') {
+        await this.auth.authStateReady();
+      }
+    } catch (err) {
+      console.warn('[Auth] authStateReady failed — using currentUser fallback', err);
+    }
+    if (this.auth.currentUser && !this.currentUser) {
+      this._applyFirebaseUser(this.auth.currentUser);
+    }
+    this._ready = true;
+    return this.getUser();
+  }
+
+  // Reload / version refresh must wait for IndexedDB restore before Sign In.
+  async whenReady() {
+    if (this._ready) return this.getUser();
+    if (this._readyPromise) await this._readyPromise;
+    this._ready = true;
+    return this.getUser();
+  }
+
+  isAuthReady() {
+    return this._ready === true;
   }
 
   // Subscribe to auth state changes
@@ -200,9 +243,11 @@ export class AuthManager {
     }
   }
 
-  // Sign Out
-  async signOut() {
+  // Sign Out — only the Sign Out button. Background / visibilitychange /
+  // pagehide / pageshow must never call this (E1 / B25).
+  async signOut({ confirmed = true } = {}) {
     if (!this.auth) return;
+    if (!confirmed) return { success: false, error: 'Sign-out not confirmed' };
 
     try {
       await signOut(this.auth);
@@ -272,19 +317,23 @@ export class AuthManager {
     return { needsReauth: false };
   }
 
-  // Check if user is logged in
+  // Check if user is logged in. Prefer the restored Firebase user so a
+  // reload does not look signed-out while onAuthStateChanged is in flight.
   isLoggedIn() {
-    return this.currentUser !== null;
+    return this.getUser() !== null;
   }
 
   // Get current user
   getUser() {
-    return this.currentUser;
+    if (this.currentUser) return this.currentUser;
+    const fb = this.auth?.currentUser;
+    if (fb) return this._applyFirebaseUser(fb);
+    return null;
   }
 
   // Get user ID
   getUserId() {
-    return this.currentUser?.id || null;
+    return this.getUser()?.id || null;
   }
 
   // Convert Firebase error codes to user-friendly messages

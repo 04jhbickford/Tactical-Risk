@@ -17,6 +17,8 @@ import {
   resolvePresenceState,
   shouldDeletePresenceDoc,
   shouldHeartbeatNow,
+  shouldReplaceSnapshotListener,
+  shouldResumeSnapshots,
 } from './presencePolicy.js';
 
 // Presence states
@@ -37,6 +39,7 @@ export class PresenceManager {
     this.gameId = null;
     this.presenceRef = null;
     this.unsubscribe = null;
+    this._snapshotLive = false;
     this.heartbeatInterval = null;
     this.lastActivity = Date.now();
     this.playerPresence = {}; // { oderId: { state, lastSeen, displayName } }
@@ -91,8 +94,8 @@ export class PresenceManager {
     window.addEventListener('pageshow', this._boundPageShowHandler);
     window.addEventListener('pagehide', this._boundPageHideHandler);
 
-    // Subscribe to all presence documents
-    this._subscribeToPresence();
+    // Subscribe to all presence documents (one listener)
+    this._ensurePresenceSnapshot();
 
     // Do NOT delete the presence doc on beforeunload — mobile browsers
     // fire that when backgrounding. Explicit Exit is the only delete.
@@ -101,8 +104,9 @@ export class PresenceManager {
     return true;
   }
 
-  // Stop tracking presence
-  stop() {
+  // Stop tracking presence. Exit / Leave deletes the doc. Session loss
+  // (Sign In after a backgrounded tab) must not — that is B25.
+  stop({ reason = 'explicit-leave' } = {}) {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
@@ -121,7 +125,7 @@ export class PresenceManager {
     window.removeEventListener('pageshow', this._boundPageShowHandler);
     window.removeEventListener('pagehide', this._boundPageHideHandler);
 
-    this._goOffline({ reason: 'explicit-leave' });
+    this._goOffline({ reason });
     this.gameId = null;
     this.playerPresence = {};
   }
@@ -157,18 +161,28 @@ export class PresenceManager {
 
   _onVisibility() {
     const visible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-    if (visible && shouldHeartbeatNow({ event: 'visibility-visible' })) {
-      this.lastActivity = Date.now();
-      this._updatePresence(PRESENCE_STATES.ONLINE);
-      return;
+    const event = visible ? 'visibility-visible' : 'visibility-hidden';
+    // Required: heartbeat on every visibilitychange (hidden → idle, visible → online).
+    if (shouldHeartbeatNow({ event })) {
+      if (visible) this.lastActivity = Date.now();
+      this._updatePresence(visible ? PRESENCE_STATES.ONLINE : PRESENCE_STATES.IDLE);
     }
-    this._updatePresence(presenceStateForVisibility('hidden'));
+    if (visible && shouldResumeSnapshots({ event: 'visibility-visible' })) {
+      this._ensurePresenceSnapshot();
+    }
   }
 
-  _onPageShow() {
-    if (!shouldHeartbeatNow({ event: 'pageshow' })) return;
+  _onPageShow(event) {
+    const persisted = !!(event && event.persisted);
+    if (!shouldResumeSnapshots({ event: 'pageshow' })) return;
     this.lastActivity = Date.now();
-    this._updatePresence(PRESENCE_STATES.ONLINE);
+    if (shouldHeartbeatNow({
+      event: persisted ? 'pageshow-persisted' : 'pageshow',
+      persisted,
+    })) {
+      this._updatePresence(PRESENCE_STATES.ONLINE);
+    }
+    this._ensurePresenceSnapshot({ persistedPageShow: persisted });
   }
 
   _onPageHide() {
@@ -212,12 +226,30 @@ export class PresenceManager {
     }
   }
 
+  _ensurePresenceSnapshot({ persistedPageShow = false } = {}) {
+    if (!shouldReplaceSnapshotListener({
+      hasUnsubscribe: typeof this.unsubscribe === 'function',
+      listenerErrored: !this._snapshotLive && !this.unsubscribe,
+      persistedPageShow,
+    })) {
+      return;
+    }
+    this._subscribeToPresence();
+  }
+
   _subscribeToPresence() {
     if (!this.gameId || !this.db) return;
+
+    if (this.unsubscribe) {
+      this.unsubscribe();
+      this.unsubscribe = null;
+    }
+    this._snapshotLive = false;
 
     const presenceCollection = collection(this.db, 'games', this.gameId, 'presence');
 
     this.unsubscribe = onSnapshot(presenceCollection, (snapshot) => {
+      this._snapshotLive = true;
       const presence = {};
 
       snapshot.forEach(doc => {
@@ -236,6 +268,10 @@ export class PresenceManager {
 
       this.playerPresence = presence;
       this._notifyListeners();
+    }, (error) => {
+      console.error('[Presence] Snapshot error — will re-attach on resume', error);
+      this._snapshotLive = false;
+      this.unsubscribe = null;
     });
   }
 

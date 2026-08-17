@@ -19,7 +19,18 @@ import {
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { resolveJoinByCode, shouldDeleteLobbyOnHostLeave } from './presencePolicy.js';
+import {
+  mergeMyActiveGames,
+  resolveJoinByCode,
+  shouldDeleteLobbyOnHostLeave,
+} from './presencePolicy.js';
+import {
+  lastMatchForJoinCode,
+  readLastMatch,
+  recoverMyGamesOnLoad,
+  resolveJoinNotFoundError,
+} from './lastMatch.js';
+import { resolveStartGameTarget } from './lobbyStart.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -124,17 +135,42 @@ export class LobbyManager {
 
   // Find game by lobby code (for rejoining started games)
   async findGameByCode(code) {
-    // Single-field query only — compound query (lobbyCode + status) needs a composite index
-    const q = query(
-      collection(this.db, 'games'),
-      where('lobbyCode', '==', code.toUpperCase())
-    );
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return null;
-    const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status))
-      || snapshot.docs[0];
-    if (!active) return null;
-    return { id: active.id, ...active.data() };
+    // Single-field queries only — compound (lobbyCode + status) needs an index.
+    const upper = code.toUpperCase();
+    const pick = (snapshot) => {
+      if (!snapshot || snapshot.empty) return null;
+      const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status))
+        || snapshot.docs[0];
+      return active ? { id: active.id, ...active.data() } : null;
+    };
+    try {
+      const byLobbyCode = await getDocs(query(
+        collection(this.db, 'games'),
+        where('lobbyCode', '==', upper)
+      ));
+      const found = pick(byLobbyCode);
+      if (found) return found;
+      const byCode = await getDocs(query(
+        collection(this.db, 'games'),
+        where('code', '==', upper)
+      ));
+      return pick(byCode);
+    } catch (error) {
+      console.error('Error finding game by code:', error);
+      return null;
+    }
+  }
+
+  async getGameById(gameId) {
+    if (!this.db || !gameId) return null;
+    try {
+      const snap = await getDoc(doc(this.db, 'games', gameId));
+      if (!snap.exists()) return null;
+      return { id: snap.id, ...snap.data() };
+    } catch (error) {
+      console.error('Error loading game by id:', error);
+      return null;
+    }
   }
 
   // Get all open public lobbies (no password, waiting status)
@@ -182,13 +218,26 @@ export class LobbyManager {
     if (!user) return [];
 
     try {
-      const q = query(
-        collection(this.db, 'games'),
-        where('playerUserIds', 'array-contains', user.id),
-        where('status', 'in', ['active', 'starting'])
-      );
-      const snapshot = await getDocs(q);
-      const games = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Equality / array-contains only — no compound `in` (empty indexes.json).
+      const gamesRef = collection(this.db, 'games');
+      const [seatSnap, starterSnap] = await Promise.all([
+        getDocs(query(gamesRef, where('playerUserIds', 'array-contains', user.id))),
+        getDocs(query(gamesRef, where('startedBy', '==', user.id))),
+      ]);
+      let games = mergeMyActiveGames({
+        bySeat: seatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        byStarter: starterSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      });
+      const remembered = readLastMatch();
+      let lastGame = null;
+      if (remembered?.gameId && !games.some(g => g.id === remembered.gameId)) {
+        lastGame = await this.getGameById(remembered.gameId);
+      }
+      games = recoverMyGamesOnLoad({
+        games,
+        lastMatchGame: lastGame,
+        lastMatch: remembered,
+      });
       games.sort((a, b) => {
         const aTime = a.updatedAt?.toMillis?.() || 0;
         const bTime = b.updatedAt?.toMillis?.() || 0;
@@ -197,7 +246,16 @@ export class LobbyManager {
       return games;
     } catch (error) {
       console.error('Error getting my active games:', error);
-      return [];
+      const remembered = readLastMatch();
+      let lastGame = null;
+      if (remembered?.gameId) {
+        lastGame = await this.getGameById(remembered.gameId);
+      }
+      return recoverMyGamesOnLoad({
+        games: [],
+        lastMatchGame: lastGame,
+        lastMatch: remembered,
+      });
     }
   }
 
@@ -209,25 +267,47 @@ export class LobbyManager {
     if (!user) return { success: false, error: 'Not logged in' };
 
     const lobbyDoc = await this._findLobbyByCode(code);
-    const game = await this.findGameByCode(code);
+    let game = await this.findGameByCode(code);
+    if (!game && lobbyDoc?.gameId) {
+      game = await this.getGameById(lobbyDoc.gameId);
+    }
+    const remembered = lastMatchForJoinCode({ lastMatch: readLastMatch(), code });
+    if (!game && remembered?.gameId) {
+      game = await this.getGameById(remembered.gameId);
+    }
     const waitingLobby = lobbyDoc?.status === 'waiting' ? lobbyDoc : null;
     const resolved = resolveJoinByCode({
       waitingLobby,
       anyLobby: lobbyDoc,
       startedGame: game,
       userId: user.id,
+      rememberedGameId: remembered?.gameId || null,
     });
     if (resolved.kind === 'game') {
       return { success: true, isGame: true, gameId: resolved.game.id, game: resolved.game };
     }
     if (resolved.kind === 'started-lobby') {
+      if (!game && resolved.lobby?.gameId) {
+        game = await this.getGameById(resolved.lobby.gameId);
+      }
       if (game) {
         return { success: true, isGame: true, gameId: game.id, game };
       }
       return { success: false, error: 'Game already started' };
     }
     if (resolved.kind === 'not-found') {
-      return { success: false, error: 'Lobby not found' };
+      if (remembered?.gameId) {
+        return {
+          success: true,
+          isGame: true,
+          gameId: remembered.gameId,
+          game: { id: remembered.gameId, lobbyCode: code.toUpperCase() },
+        };
+      }
+      return {
+        success: false,
+        error: resolveJoinNotFoundError({ lastMatch: remembered, code }),
+      };
     }
     const lobby = resolved.lobby;
 
@@ -577,6 +657,14 @@ export class LobbyManager {
       return { success: false, error: 'All players must select a faction' };
     }
 
+    const existing = resolveStartGameTarget({
+      existingGameId: this.currentLobby.gameId,
+      lobbyStatus: this.currentLobby.status,
+    });
+    if (existing.reuse) {
+      return { success: true, gameId: existing.gameId, reused: true };
+    }
+
     const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const playerUserIds = this.currentLobby.players.map(p => p.oderId);
 
@@ -588,11 +676,20 @@ export class LobbyManager {
     console.log('[LobbyManager] playerUserIds array:', playerUserIds);
 
     try {
+      if (!this.currentLobby.isPublished) {
+        await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+          isPublished: true,
+          updatedAt: serverTimestamp(),
+        });
+        this.currentLobby.isPublished = true;
+      }
+
       // Create game document
       // The person who clicks Start becomes the initializer (startedBy)
       await setDoc(doc(this.db, 'games', gameId), {
         lobbyId: this.currentLobby.id,
         lobbyCode: this.currentLobby.code, // Store code for rejoining
+        code: this.currentLobby.code,
         status: 'starting',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

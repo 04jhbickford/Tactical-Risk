@@ -3,6 +3,7 @@
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor } from './mobileShell.js';
+import { resolveHudClarity } from './hudClarity.js';
 
 export class HUD {
   constructor() {
@@ -15,6 +16,22 @@ export class HUD {
     this.menuTabProvider = null;
     this.onMenuOpen = null;
     this.el = document.getElementById('hud');
+    this.clarityEl = document.getElementById('hud-clarity');
+    if (!this.clarityEl && this.el?.parentNode) {
+      this.clarityEl = document.createElement('div');
+      this.clarityEl.id = 'hud-clarity';
+      this.el.after(this.clarityEl);
+    }
+    this.actionLog = null;
+    this.lastClick = null;
+    this.clarityCtx = {
+      localUserId: null,
+      gameCode: null,
+      hostPresence: null,
+      hostName: null,
+      isHost: false,
+      justResumed: false,
+    };
     this._render();
 
     // Close menu when clicking outside
@@ -51,6 +68,20 @@ export class HUD {
 
   setNextPhaseCallback(callback) {
     this.onNextPhase = callback;
+  }
+
+  setActionLog(actionLog) {
+    this.actionLog = actionLog;
+  }
+
+  setLastClick(lastClick) {
+    this.lastClick = lastClick || null;
+    this._renderClarity();
+  }
+
+  setClarityContext(partial = {}) {
+    this.clarityCtx = { ...this.clarityCtx, ...partial };
+    this._renderClarity();
   }
 
   _render() {
@@ -158,6 +189,7 @@ export class HUD {
 
     this.el.innerHTML = html;
     this._bindEvents();
+    this._renderClarity();
   }
 
   // Phone top bar: {color} {faction} · {3/7 PHASE}. Phase identity stays
@@ -253,6 +285,54 @@ export class HUD {
       </div>
     `;
     this._bindEvents();
+    this._renderClarity();
+  }
+
+  _clarityModel() {
+    const gs = this.gameState;
+    const player = gs?.currentPlayer;
+    const last = this.actionLog?.entries?.length
+      ? this.actionLog.entries[this.actionLog.entries.length - 1]
+      : null;
+    return resolveHudClarity({
+      isMultiplayer: !!gs?.isMultiplayer,
+      localUserId: this.clarityCtx.localUserId,
+      currentPlayerOderId: player?.oderId,
+      currentPlayerName: player?.name,
+      phase: gs?.phase,
+      turnPhase: gs?.turnPhase,
+      lastActionEntry: last,
+      lastClick: this.lastClick,
+      deployedThisRound: gs?.unitsPlacedThisRound || 0,
+      limit: gs?.getUnitsPerRoundLimit?.() || 6,
+      poolRemaining: player ? (gs.getTotalUnitsToPlace?.(player.id) || 0) : 0,
+      gameCode: this.clarityCtx.gameCode,
+      justResumed: this.clarityCtx.justResumed,
+      hostPresence: this.clarityCtx.hostPresence,
+      hostName: this.clarityCtx.hostName,
+      isHost: this.clarityCtx.isHost,
+    });
+  }
+
+  _renderClarity() {
+    if (!this.clarityEl) return;
+    const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY;
+    if (!inGame) {
+      this.clarityEl.hidden = true;
+      this.clarityEl.innerHTML = '';
+      return;
+    }
+    const c = this._clarityModel();
+    this.clarityEl.hidden = false;
+    this.clarityEl.className = `hud-clarity${c.ownSeat ? ' your-turn' : ' waiting'}`;
+    this.clarityEl.innerHTML = `
+      <span class="hud-clarity-turn" data-clarity="turn">${c.whoseTurn}</span>
+      <span class="hud-clarity-phase" data-clarity="phase">${c.phase}</span>
+      ${c.budget ? `<span class="hud-clarity-budget" data-clarity="budget">${c.budget}</span>` : ''}
+      <span class="hud-clarity-last" data-clarity="last">${c.lastAction}</span>
+      <span class="hud-clarity-click" data-clarity="click">${c.click}</span>
+      ${c.match ? `<span class="hud-clarity-match" data-clarity="match">${c.match}</span>` : ''}
+    `;
   }
 
   _updateMenuState() {
