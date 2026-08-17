@@ -6,6 +6,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   deleteDoc,
   doc
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
@@ -19,6 +20,11 @@ import {
   shouldJoinGameFromRowClick,
   shouldOpenLeaveConfirm,
 } from '../multiplayer/presencePolicy.js';
+import {
+  forgetLastMatch,
+  mergeLastMatchIntoMyGames,
+  readLastMatch,
+} from '../multiplayer/lastMatch.js';
 
 export { shouldOpenLeaveConfirm };
 
@@ -112,6 +118,20 @@ export class GameList {
       });
       const byStarter = starterSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       this.games = mergeMyActiveGames({ bySeat, byStarter });
+      const remembered = readLastMatch();
+      if (remembered?.gameId && !this.games.some(g => g.id === remembered.gameId)) {
+        try {
+          const snap = await getDoc(doc(this.db, 'games', remembered.gameId));
+          if (snap.exists()) {
+            this.games = mergeLastMatchIntoMyGames({
+              games: this.games,
+              lastMatchGame: { id: snap.id, ...snap.data() },
+            });
+          }
+        } catch (err) {
+          console.warn('[GameList] last-match getDoc failed', err);
+        }
+      }
       console.log(`[GameList] Found ${this.games.length} active games for userId ${userId}`);
 
       // Sort by last updated
@@ -383,6 +403,8 @@ export class GameList {
         const userId = this.authManager.getUserId();
         const result = await leaveGame(gameId, userId);
         if (result.success) {
+          const remembered = readLastMatch();
+          if (remembered?.gameId === gameId) forgetLastMatch();
           await this._loadGames();
           this._render();
         } else {

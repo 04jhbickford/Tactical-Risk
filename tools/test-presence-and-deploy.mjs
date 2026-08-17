@@ -63,6 +63,16 @@ const {
   PRESENCE_GONE_MS,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/presencePolicy.js')));
 const {
+  rememberLastMatch,
+  readLastMatch,
+  forgetLastMatch,
+  lastMatchForJoinCode,
+  mergeLastMatchIntoMyGames,
+  resolveLobbyCodeFromGameDoc,
+  resolveHostReconnectCopy,
+  shouldShowHostReconnect,
+} = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
+const {
   capturePanelPointerLock,
   resolveLockedPanelClick,
   shouldBlockMapSelectAfterPanel,
@@ -194,6 +204,11 @@ console.log('=== B25: session-lost host can still find ZUJMNP ===');
     && resolveJoinByCode({ startedGame: missingIds, userId: 'host' }).kind === 'game');
   check('join-by-code does not say not-found when the game exists',
     resolveJoinByCode({ startedGame: emptyIds, userId: 'host' }).kind !== 'not-found');
+  check('B25 confirmed: started ZUJMNP is never lobby-not-found',
+    resolveJoinByCode({
+      startedGame: { id: 'g-zuj', lobbyCode: 'ZUJMNP', status: 'active', playerUserIds: ['guest'] },
+      userId: 'host',
+    }).kind === 'game');
   check('token hiccup with a signed-in user still loads My Games',
     shouldAbortMyGamesOnTokenHiccup({ authUserPresent: true, tokenValid: false }) === false
     && shouldAbortMyGamesOnTokenHiccup({ authUserPresent: false, tokenValid: false }) === true);
@@ -401,6 +416,47 @@ console.log('=== James lock: if it can look broken, it is broken ===');
   check('only Leave opens surrender',
     shouldJoinGameFromRowClick({ eventTarget: leaveEl }) === false
     && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: leaveEl }) === true);
+}
+
+console.log('=== B25 confirmed: last match + host reconnect copy ===');
+{
+  const mem = {
+    data: {},
+    getItem(k) { return this.data[k] ?? null; },
+    setItem(k, v) { this.data[k] = String(v); },
+    removeItem(k) { delete this.data[k]; },
+  };
+  check('game doc lobbyCode is the 6-char join code, not gameId',
+    resolveLobbyCodeFromGameDoc({ lobbyCode: 'ZUJMNP', id: 'game_123' }) === 'ZUJMNP'
+    && resolveLobbyCodeFromGameDoc({ code: 'game_123' }) === null);
+  const saved = rememberLastMatch({
+    gameId: 'game_zuj', lobbyCode: 'ZUJMNP', hostName: 'Bastion',
+  }, mem);
+  check('remember last match writes gameId + code',
+    saved.gameId === 'game_zuj' && readLastMatch(mem).lobbyCode === 'ZUJMNP');
+  check('join ZUJMNP uses the remembered gameId',
+    lastMatchForJoinCode({ lastMatch: readLastMatch(mem), code: 'zujmnp' })?.gameId === 'game_zuj');
+  check('My Games lists the remembered live game even if seat query missed it',
+    mergeLastMatchIntoMyGames({
+      games: [],
+      lastMatchGame: { id: 'game_zuj', status: 'active', lobbyCode: 'ZUJMNP' },
+    }).map((g) => g.id).join(',') === 'game_zuj');
+  forgetLastMatch(mem);
+  check('explicit leave forgets the last match', readLastMatch(mem) === null);
+  check('idle host is away, not game-over',
+    /away|rejoin|still here/i.test(resolveHostReconnectCopy({
+      hostPresence: 'idle', hostName: 'Bastion', gameCode: 'ZUJMNP',
+    }))
+    && shouldShowHostReconnect({ hostPresence: 'idle' }) === true);
+  check('missing host is reconnecting — guest must stay',
+    /reconnect/i.test(resolveHostReconnectCopy({
+      hostPresence: 'offline', hostName: 'Bastion', gameCode: 'ZUJMNP',
+    }))
+    && /Do not leave/i.test(resolveHostReconnectCopy({
+      hostPresence: 'offline', hostName: 'Bastion', gameCode: 'ZUJMNP',
+    })));
+  check('online host has no reconnect banner',
+    resolveHostReconnectCopy({ hostPresence: 'online' }) === null);
 }
 
 console.log('=== Undo / capital / leave row ===');

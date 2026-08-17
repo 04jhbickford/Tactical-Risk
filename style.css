@@ -16097,6 +16097,24 @@ html, body {
   opacity: 0.85;
 }
 
+.pp-host-reconnect,
+.mp-last-match {
+  margin: 8px 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 152, 0, 0.18);
+  border: 1px solid #FF9800;
+  color: #ffe0b2;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mp-last-match .mp-primary-btn {
+  margin-top: 8px;
+  width: 100%;
+}
+
 /* Identity Bar - shows "You: [Name]" when it's another player's turn */
 .pp-identity-bar {
   display: flex;

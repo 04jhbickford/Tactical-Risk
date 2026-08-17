@@ -82,6 +82,11 @@ import {
   presenceStopReason,
 } from './multiplayer/presencePolicy.js';
 import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
+import {
+  forgetLastMatch,
+  rememberLastMatch,
+  resolveLobbyCodeFromGameDoc,
+} from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -839,7 +844,16 @@ async function init() {
   const startMultiplayerGame = async (gameId, lobbyData) => {
     try {
       console.log('[MP] startMultiplayerGame called with:', { gameId, lobbyData });
-      currentGameCode = lobbyData?.lobbyData?.code || lobbyData?.code || gameId || null;
+      currentGameCode = resolveLobbyCodeFromGameDoc(lobbyData) || resolveLobbyCodeFromGameDoc({
+        lobbyCode: lobbyData?.lobbyCode,
+        code: lobbyData?.code,
+      });
+      rememberLastMatch({
+        gameId,
+        lobbyCode: currentGameCode,
+        hostName: (lobbyData?.lobbyData?.players || lobbyData?.players || [])
+          .find((p) => p.isHost)?.displayName || null,
+      });
 
       // CRITICAL: Hide all multiplayer overlays immediately
       if (multiplayerLobby) {
@@ -925,7 +939,7 @@ async function init() {
       }
       if (isAuthority && !wasFailoverAuthority) {
         console.warn('[MP] Host offline for 90s+ — this client is taking over AI turns');
-        showNotification('Host has been offline a while — you are now running the AI players.');
+        showNotification('Host is still reconnecting — you are running AI so the game can continue. Stay in the match.');
       } else if (!isAuthority && wasFailoverAuthority) {
         console.warn('[MP] Host is back — returning AI control');
         showNotification('Host is back — they are running the AI players again.');
@@ -1128,7 +1142,13 @@ async function init() {
         }
         console.warn('[Main] Auth error detected - returning to lobby');
         document.title = 'Tactical Risk';
-        showNotification('Session expired. Please sign in again.');
+        rememberLastMatch({
+          gameId: syncManager?.gameId || null,
+          lobbyCode: currentGameCode,
+        });
+        showNotification(currentGameCode
+          ? `Session expired. Sign in and rejoin ${currentGameCode} — the game is still there.`
+          : 'Session expired. Sign in and open My Games — the match is still there.');
 
         if (syncManager) {
           syncManager.stopSync();
@@ -1139,7 +1159,7 @@ async function init() {
         }
         gameState = null;
 
-        lobby.show();
+        handlePlayOnline();
       }
     });
 
@@ -1293,6 +1313,7 @@ async function init() {
 
     hud.setOnExitToLobby(() => {
       document.title = 'Tactical Risk';
+      forgetLastMatch();
       // Stop presence tracking
       if (presenceManager) {
         presenceManager.stop();
@@ -1348,7 +1369,7 @@ async function init() {
         isActive: syncManager.checkIsActivePlayer()
       });
 
-      playerPanel.setMultiplayerState(syncManager, localUserId);
+      playerPanel.setMultiplayerState(syncManager, localUserId, currentGameCode);
     }
 
     tooltip.setGameState(gameState);

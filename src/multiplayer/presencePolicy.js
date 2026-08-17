@@ -136,13 +136,27 @@ export function isSeatedInStartedGame({ game, lobby, userId } = {}) {
 
 // Join-by-code: a started match is still the same code. Waiting lobby
 // first; otherwise any lobby/game with that code.
-export function resolveJoinByCode({ waitingLobby, anyLobby, startedGame, userId } = {}) {
+export function resolveJoinByCode({
+  waitingLobby,
+  anyLobby,
+  startedGame,
+  userId,
+  rememberedGameId = null,
+} = {}) {
   if (waitingLobby) return { kind: 'lobby', lobby: waitingLobby };
-  if (startedGame && isSeatedInStartedGame({
-    game: startedGame,
-    lobby: anyLobby,
-    userId,
-  })) {
+  if (startedGame && (
+    isSeatedInStartedGame({
+      game: startedGame,
+      lobby: anyLobby,
+      userId,
+    })
+    || (rememberedGameId && rememberedGameId === startedGame.id)
+  )) {
+    return { kind: 'game', game: startedGame };
+  }
+  // B25 confirmed: guest is still in the live game. A started doc with
+  // this code must never be "Lobby not found" — the host is reconnecting.
+  if (startedGame) {
     return { kind: 'game', game: startedGame };
   }
   if (anyLobby && anyLobby.status && anyLobby.status !== 'waiting') {

@@ -25,6 +25,7 @@ import {
   queueAfterDeployAttempt,
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
+import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
 import { resolveUndoAction, canUndoLastMove } from '../state/undoPolicy.js';
 import {
   capturePanelPointerLock,
@@ -519,9 +520,10 @@ export class PlayerPanel {
   }
 
   // Multiplayer state
-  setMultiplayerState(syncManager, localUserId) {
+  setMultiplayerState(syncManager, localUserId, gameCode = null) {
     this.syncManager = syncManager;
     this.localUserId = localUserId;
+    if (gameCode) this.gameCode = gameCode;
   }
 
   // Set optimistic waiting state (called before nextPhase to lock UI immediately)
@@ -734,6 +736,7 @@ export class PlayerPanel {
 
     if (mobile) {
       html += this._renderSeatChip(chrome);
+      html += this._renderHostReconnectHint();
       html += this._renderPhoneDetentTabs();
       html += `<div class="phone-tray-body">`;
       if (this.phoneDetentTab === 'stats') {
@@ -1033,6 +1036,19 @@ export class PlayerPanel {
       </div>`;
   }
 
+  _renderHostReconnectHint() {
+    const hostPlayer = this.gameState?.players?.find(p => p.isHost)
+      || this.gameState?.players?.find(p => p.oderId && !p.isAI);
+    if (!hostPlayer || hostPlayer.oderId === this.localUserId) return '';
+    const copy = resolveHostReconnectCopy({
+      hostPresence: this._getPlayerPresence(hostPlayer.oderId),
+      hostName: hostPlayer.name,
+      gameCode: this.gameCode,
+    });
+    if (!copy) return '';
+    return `<div class="pp-host-reconnect" data-host-reconnect="1">${copy}</div>`;
+  }
+
   _renderWaitingIndicator(player) {
     // Get local player name for clarity
     const localPlayer = this.gameState.players?.find(p => p.oderId === this.localUserId);
@@ -1044,6 +1060,7 @@ export class PlayerPanel {
           <div class="pp-waiting-spinner"></div>
           <p>Waiting for <strong>${player.name}</strong> to finish their turn...</p>
           <p class="pp-waiting-hint">You are playing as <strong>${localName}</strong>. You can view the map while waiting.</p>
+          ${this._renderHostReconnectHint()}
         </div>
       </div>`;
   }
@@ -1114,6 +1131,7 @@ export class PlayerPanel {
           </div>
           <div class="pp-waiting-phase">${this._getPhaseDisplayName(phase, turnPhase)}</div>
           <div class="pp-waiting-hint">You can view the map while waiting</div>
+          ${this._renderHostReconnectHint()}
         </div>`;
       html += '</div>';
       return html;

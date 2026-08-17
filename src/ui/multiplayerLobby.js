@@ -5,6 +5,7 @@ import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { GAME_VERSION } from './lobby.js';
 import { possessivePhrase } from '../utils/possessive.js';
+import { readLastMatch } from '../multiplayer/lastMatch.js';
 
 // Available factions (should match setup data)
 const FACTIONS = [
@@ -155,6 +156,7 @@ export class MultiplayerLobby {
           <span class="mp-user-id">(ID: ...${userIdShort})</span>
         </p>
       </div>
+      ${this._renderLastMatchBanner()}
 
       <div class="mp-menu-grid four-col">
         <button class="mp-menu-card" data-action="create">
@@ -198,6 +200,18 @@ export class MultiplayerLobby {
       <div class="mp-footer-actions">
         <button class="mp-secondary-btn" data-action="back">← Back</button>
         <button class="mp-secondary-btn danger" data-action="signout">Sign Out</button>
+      </div>
+    `;
+  }
+
+  _renderLastMatchBanner() {
+    const last = readLastMatch();
+    if (!last?.lobbyCode && !last?.gameId) return '';
+    const code = last.lobbyCode || 'your last match';
+    return `
+      <div class="mp-last-match" data-last-match="1">
+        <p>You were in <strong>${code}</strong>. The guest is still there — rejoin. Do not start a new game.</p>
+        <button type="button" class="mp-primary-btn" data-action="rejoin-last">Rejoin ${code}</button>
       </div>
     `;
   }
@@ -266,7 +280,7 @@ export class MultiplayerLobby {
       <form class="mp-form modern" data-form="join">
         <div class="mp-field">
           <label>Game Code</label>
-          <input type="text" id="join-code" placeholder="ABC123" maxlength="6" class="modern-input code-input">
+          <input type="text" id="join-code" placeholder="ABC123" maxlength="6" class="modern-input code-input" value="${readLastMatch()?.lobbyCode || ''}">
         </div>
         <div class="mp-field">
           <label>Password (if required)</label>
@@ -639,6 +653,29 @@ export class MultiplayerLobby {
       if (this.onBack) {
         this.onBack('rejoin');
       }
+    });
+
+    this.el.querySelector('[data-action="rejoin-last"]')?.addEventListener('click', async () => {
+      const last = readLastMatch();
+      if (last?.lobbyCode) {
+        const result = await this.lobbyManager.joinLobby(last.lobbyCode, null);
+        if (result.success && result.isGame) {
+          this.hide();
+          if (this.onStart) this.onStart(result.gameId, result.game);
+          return;
+        }
+        if (result.success) {
+          this.mode = 'lobby';
+          this._render();
+          return;
+        }
+      }
+      if (last?.gameId && this.onStart) {
+        this.hide();
+        this.onStart(last.gameId, { id: last.gameId, lobbyCode: last.lobbyCode });
+        return;
+      }
+      if (this.onBack) this.onBack('rejoin');
     });
 
     this.el.querySelector('[data-action="refresh-browse"]')?.addEventListener('click', () => {

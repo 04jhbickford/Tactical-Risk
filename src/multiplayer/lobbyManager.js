@@ -24,6 +24,11 @@ import {
   resolveJoinByCode,
   shouldDeleteLobbyOnHostLeave,
 } from './presencePolicy.js';
+import {
+  lastMatchForJoinCode,
+  mergeLastMatchIntoMyGames,
+  readLastMatch,
+} from './lastMatch.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -128,18 +133,26 @@ export class LobbyManager {
 
   // Find game by lobby code (for rejoining started games)
   async findGameByCode(code) {
-    // Single-field query only — compound query (lobbyCode + status) needs a composite index
-    try {
-      const q = query(
-        collection(this.db, 'games'),
-        where('lobbyCode', '==', code.toUpperCase())
-      );
-      const snapshot = await getDocs(q);
-      if (snapshot.empty) return null;
+    // Single-field queries only — compound (lobbyCode + status) needs an index.
+    const upper = code.toUpperCase();
+    const pick = (snapshot) => {
+      if (!snapshot || snapshot.empty) return null;
       const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status))
         || snapshot.docs[0];
-      if (!active) return null;
-      return { id: active.id, ...active.data() };
+      return active ? { id: active.id, ...active.data() } : null;
+    };
+    try {
+      const byLobbyCode = await getDocs(query(
+        collection(this.db, 'games'),
+        where('lobbyCode', '==', upper)
+      ));
+      const found = pick(byLobbyCode);
+      if (found) return found;
+      const byCode = await getDocs(query(
+        collection(this.db, 'games'),
+        where('code', '==', upper)
+      ));
+      return pick(byCode);
     } catch (error) {
       console.error('Error finding game by code:', error);
       return null;
@@ -209,10 +222,15 @@ export class LobbyManager {
         getDocs(query(gamesRef, where('playerUserIds', 'array-contains', user.id))),
         getDocs(query(gamesRef, where('startedBy', '==', user.id))),
       ]);
-      const games = mergeMyActiveGames({
+      let games = mergeMyActiveGames({
         bySeat: seatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
         byStarter: starterSnap.docs.map(d => ({ id: d.id, ...d.data() })),
       });
+      const remembered = readLastMatch();
+      if (remembered?.gameId && !games.some(g => g.id === remembered.gameId)) {
+        const lastGame = await this.getGameById(remembered.gameId);
+        games = mergeLastMatchIntoMyGames({ games, lastMatchGame: lastGame });
+      }
       games.sort((a, b) => {
         const aTime = a.updatedAt?.toMillis?.() || 0;
         const bTime = b.updatedAt?.toMillis?.() || 0;
@@ -237,12 +255,17 @@ export class LobbyManager {
     if (!game && lobbyDoc?.gameId) {
       game = await this.getGameById(lobbyDoc.gameId);
     }
+    const remembered = lastMatchForJoinCode({ lastMatch: readLastMatch(), code });
+    if (!game && remembered?.gameId) {
+      game = await this.getGameById(remembered.gameId);
+    }
     const waitingLobby = lobbyDoc?.status === 'waiting' ? lobbyDoc : null;
     const resolved = resolveJoinByCode({
       waitingLobby,
       anyLobby: lobbyDoc,
       startedGame: game,
       userId: user.id,
+      rememberedGameId: remembered?.gameId || null,
     });
     if (resolved.kind === 'game') {
       return { success: true, isGame: true, gameId: resolved.game.id, game: resolved.game };
@@ -626,6 +649,7 @@ export class LobbyManager {
       await setDoc(doc(this.db, 'games', gameId), {
         lobbyId: this.currentLobby.id,
         lobbyCode: this.currentLobby.code, // Store code for rejoining
+        code: this.currentLobby.code,
         status: 'starting',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
