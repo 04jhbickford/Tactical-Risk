@@ -178,3 +178,9 @@ export function resolveQueueUnitType({
 } = {}) {
   return lockedType || incomingType || null;
 }
+
+// One pointerdown = one ±1. Canvas mouseup (B31) plus the real click
+// must not apply + twice (B32 Armour 1→3).
+export function shouldApplyQueueGesture({ alreadyApplied = false } = {}) {
+  return alreadyApplied !== true;
+}

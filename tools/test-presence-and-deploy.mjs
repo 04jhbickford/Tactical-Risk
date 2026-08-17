@@ -84,6 +84,7 @@ const {
   resolveLockedPanelClick,
   shouldBlockMapSelectAfterPanel,
   shouldIgnoreQueueRetarget,
+  shouldApplyQueueGesture,
   resolveQueueUnitType,
   pickPanelHitFromStack,
   isPointInPanelRect,
@@ -896,6 +897,29 @@ console.log('=== B31 Max/panel hit-test: not the map, not LOG ===');
   check('B31: panel hit-test prefers the stack over tab-first',
     panelSrc.includes('pickPanelHitFromStack')
     && panelSrc.includes('elementsFromPoint'));
+}
+
+console.log('=== B32 + is exactly +1 per gesture (not +2) ===');
+{
+  check('B32: first apply in a gesture is allowed',
+    shouldApplyQueueGesture({ alreadyApplied: false }) === true);
+  check('B32: second apply in the same gesture is rejected',
+    shouldApplyQueueGesture({ alreadyApplied: true }) === false);
+  let q = { armour: 1 };
+  q = applyPlaceQueueDelta({
+    queue: q, unitType: 'armour', delta: 1, available: 10, slotsRemaining: 6,
+  });
+  check('B32: one + is 1→2, not 1→3', q.armour === 2);
+  const doubleFire = applyPlaceQueueDelta({
+    queue: q, unitType: 'armour', delta: 1, available: 10, slotsRemaining: 6,
+  });
+  check('B32: a second dispatch without the guard would be +2 (the live bug)',
+    doubleFire.armour === 3);
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B32: panel click and canvas commit share one-shot apply',
+    panelSrc.includes('shouldApplyQueueGesture')
+    && panelSrc.includes('_queueGestureApplied')
+    && /commitLockedPanelGesture[\s\S]*alreadyApplied/.test(panelSrc));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

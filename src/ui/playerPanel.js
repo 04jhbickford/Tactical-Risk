@@ -34,6 +34,7 @@ import {
   shouldBlockMapSelectAfterPanel,
   isQueueGestureAction,
   shouldIgnoreQueueRetarget,
+  shouldApplyQueueGesture,
   resolveQueueUnitType,
   pickPanelHitFromStack,
   isPointInPanelRect,
@@ -392,8 +393,8 @@ export class PlayerPanel {
     this._lastQueueGestureAt = 0;
     this._lastQueueUnitType = null;
     this._queueLockType = null;
+    this._queueGestureApplied = false;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
-    this.contentEl.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
     });
@@ -433,6 +434,7 @@ export class PlayerPanel {
   }
 
   _onPanelPointerDown(e) {
+    this._queueGestureApplied = false;
     this._panelPointerAt = Date.now();
     this._pointerLock = this._readPointerLock(e);
     const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
@@ -459,7 +461,9 @@ export class PlayerPanel {
 
   // Canvas received the mouseup but the point is the panel (B31).
   // Apply the locked Max / + so the gesture is not a no-op.
+  // Do not apply again on the real click (B32 +2).
   commitLockedPanelGesture(e) {
+    if (!shouldApplyQueueGesture({ alreadyApplied: this._queueGestureApplied })) return;
     if (!this._pointerLock || this._pointerLock.kind === 'none') {
       this._onPanelPointerDown(e || {});
     }
@@ -502,6 +506,8 @@ export class PlayerPanel {
     }
     if (resolved.kind === 'action') {
       if (isQueueGestureAction(resolved.action)) {
+        if (!shouldApplyQueueGesture({ alreadyApplied: this._queueGestureApplied })) return;
+        this._queueGestureApplied = true;
         this._lastQueueGestureAt = Date.now();
       }
       this._dispatchAction({ dataset: resolved.dataset || { action: resolved.action } });
