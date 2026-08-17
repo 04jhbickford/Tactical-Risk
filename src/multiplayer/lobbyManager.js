@@ -667,6 +667,14 @@ export class LobbyManager {
     console.log('[LobbyManager] playerUserIds array:', playerUserIds);
 
     try {
+      if (!this.currentLobby.isPublished) {
+        await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+          isPublished: true,
+          updatedAt: serverTimestamp(),
+        });
+        this.currentLobby.isPublished = true;
+      }
+
       // Create game document
       // The person who clicks Start becomes the initializer (startedBy)
       await setDoc(doc(this.db, 'games', gameId), {

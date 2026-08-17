@@ -13,15 +13,16 @@ import {
   shouldPrefillJoinCodeFromLastMatch,
   joinFormFieldAttrString,
 } from '../multiplayer/lastMatch.js';
+import { resolveHostLobbyPrimaryCta } from '../multiplayer/lobbyStart.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
 
 // Available factions (should match setup data)
 const FACTIONS = [
-  { id: 'usa', name: 'USA', flag: 'usa.png', color: '#1E90FF' },
-  { id: 'germany', name: 'Germany', flag: 'germany.png', color: '#4A4A4A' },
-  { id: 'ussr', name: 'USSR', flag: 'ussr.png', color: '#B22222' },
-  { id: 'uk', name: 'UK', flag: 'uk.png', color: '#DAA520' },
-  { id: 'japan', name: 'Japan', flag: 'japan.png', color: '#FF8C00' },
+  { id: 'Russians', name: 'Russians', flag: 'Russians.png', color: '#B22222' },
+  { id: 'Germans', name: 'Germans', flag: 'Germans.png', color: '#4A4A4A' },
+  { id: 'British', name: 'British', flag: 'British.png', color: '#B8860B' },
+  { id: 'Japanese', name: 'Japanese', flag: 'Japanese.png', color: '#FF8C00' },
+  { id: 'Americans', name: 'Americans', flag: 'Americans.png', color: '#556B2F' },
 ];
 
 const FACTION_COLORS = [
@@ -659,24 +660,31 @@ export class MultiplayerLobby {
             const isFull = lobby.players.length >= lobby.settings.maxPlayers;
             const allHaveFactions = lobby.players.every(p => p.factionId);
             const canStart = lobby.players.length >= 2 && allHaveFactions && (isHost || isFull);
+            const hostCta = resolveHostLobbyPrimaryCta({
+              isHost,
+              playerCount: lobby.players.length,
+              allHaveFactions,
+              hostHasFaction: !!(currentPlayer?.factionId && currentPlayer?.color),
+            });
 
-            if (isHost && !lobby.isPublished) {
-              // Host hasn't published yet - show Create Game
-              const needsSetup = !currentPlayer?.factionId || !currentPlayer?.color;
+            if (hostCta) {
               return `
-                <button class="mp-action-btn primary" data-action="publish" ${needsSetup ? 'disabled' : ''}>
-                  Create Game
+                <button class="mp-action-btn start" data-action="start" ${hostCta.disabled ? 'disabled' : ''}>
+                  ${hostCta.label}
                 </button>
-                ${needsSetup ? '<p class="mp-action-hint">Select a faction and color above to continue</p>' : ''}
+                ${hostCta.hint ? `<p class="mp-action-hint">${hostCta.hint}</p>` : ''}
+                ${!lobby.isPublished ? `
+                  <button class="mp-action-btn secondary" data-action="publish">
+                    List in Open Games
+                  </button>
+                ` : ''}
               `;
             } else if (canStart) {
-              // Can start (host always, or anyone when full)
               return `<button class="mp-action-btn start" data-action="start"
                         ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
                   Start Game
                 </button>`;
-            } else if (!isHost) {
-              // Non-host waiting for more players
+            } else {
               return `
                 <button class="mp-action-btn ${currentPlayer?.isReady ? 'ready' : 'primary'}" data-action="ready"
                         ${!currentPlayer?.factionId || !currentPlayer?.color ? 'disabled' : ''}>
@@ -687,12 +695,6 @@ export class MultiplayerLobby {
                   <span>Waiting for more players...</span>
                 </div>
               `;
-            } else {
-              // Host with published lobby, not full
-              return `<button class="mp-action-btn start" data-action="start"
-                        ${!currentPlayer?.factionId || !currentPlayer?.color || lobby.players.length < 2 ? 'disabled' : ''}>
-                  Start Game
-                </button>`;
             }
           })()}
         </div>
@@ -824,12 +826,8 @@ export class MultiplayerLobby {
     this.el.querySelector('[data-action="publish"]')?.addEventListener('click', async () => {
       const result = await this.lobbyManager.publishLobby();
       if (result.success) {
-        // Disconnect from lobby updates (but stay in the lobby)
-        this.lobbyManager.disconnectFromLobby();
-        // Go to browse view to see the game in the list
-        this.mode = 'browse';
+        this.mode = 'lobby';
         this._render();
-        this._loadBrowseGames();
       } else {
         alert(result.error);
       }

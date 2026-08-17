@@ -6,6 +6,8 @@ import {
   canFinishPlacementRound as canFinishPlacementRoundPred,
   cloneUnitsToPlace,
   onlyNavalRemaining,
+  resolvePlayerDeployPool,
+  shouldRestoreStartingDeployPool,
 } from './placementPass.js';
 import { resolveDeployedThisRoundAfterLoad } from './placeQueue.js';
 
@@ -1123,6 +1125,7 @@ export class GameState {
         this.turnPhase = SETUP_TURN_PHASE;
         this.unitsPlacedThisRound = 0;
         this.unitsPlacedThisRoundOwnerId = null;
+        this.ensureInitialDeployPools();
       }
       capGuard++;
     } while (this.players[this.currentPlayerIndex]?.surrendered && capGuard < this.players.length);
@@ -1174,28 +1177,63 @@ export class GameState {
     return true;
   }
 
+  _buildStartingDeployPool({ factoryAlreadyPlaced = false } = {}) {
+    const land = RISK_STARTING_UNITS.land.map((u) => ({ ...u }));
+    if (factoryAlreadyPlaced) {
+      const factory = land.find((u) => u.type === 'factory');
+      if (factory) factory.quantity = 0;
+    }
+    return [
+      ...land.filter((u) => u.quantity > 0),
+      ...RISK_STARTING_UNITS.naval.map((u) => ({ ...u })),
+    ];
+  }
+
+  // First UNIT_PLACEMENT wave with no land/air in the seat pool is a
+  // deserialize / key miss — not "this faction has no land IPC."
+  ensureInitialDeployPools() {
+    if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) return;
+    for (const p of this.players || []) {
+      const rows = resolvePlayerDeployPool(this.unitsToPlace, p.id, [p.name]);
+      this.unitsToPlace[p.id] = rows;
+      if (shouldRestoreStartingDeployPool({
+        phase: this.phase,
+        placementRound: this.placementRound || 1,
+        placedThisRound: this.unitsPlacedThisRound || 0,
+        pool: rows,
+      })) {
+        this.unitsToPlace[p.id] = this._buildStartingDeployPool({
+          factoryAlreadyPlaced: !!this.playerState?.[p.id]?.hasPlacedCapital,
+        });
+      }
+    }
+  }
+
   // Get units that current player still needs to place (Risk mode)
   getUnitsToPlace(playerId) {
-    return this.unitsToPlace[playerId] || [];
+    const player = this.players?.find((p) => p.id === playerId);
+    return resolvePlayerDeployPool(this.unitsToPlace, playerId, [
+      player?.name,
+    ]);
   }
 
   // Check if player has units left to place.
   // When unitDefs is passed, unknown types (no def) do not count — they
   // cannot be placed and must not keep the pass locked.
   hasUnitsToPlace(playerId, unitDefs) {
-    if (unitDefs) return countKnownUnitsToPlace(this.unitsToPlace[playerId], unitDefs) > 0;
-    const units = this.unitsToPlace[playerId] || [];
+    if (unitDefs) return countKnownUnitsToPlace(this.getUnitsToPlace(playerId), unitDefs) > 0;
+    const units = this.getUnitsToPlace(playerId);
     return units.some(u => u.quantity > 0);
   }
 
   getKnownUnitsToPlace(playerId, unitDefs) {
-    return knownUnitsToPlace(this.unitsToPlace[playerId], unitDefs);
+    return knownUnitsToPlace(this.getUnitsToPlace(playerId), unitDefs);
   }
 
   // Get total unit count left to place
   getTotalUnitsToPlace(playerId, unitDefs) {
-    if (unitDefs) return countKnownUnitsToPlace(this.unitsToPlace[playerId], unitDefs);
-    const units = this.unitsToPlace[playerId] || [];
+    if (unitDefs) return countKnownUnitsToPlace(this.getUnitsToPlace(playerId), unitDefs);
+    const units = this.getUnitsToPlace(playerId);
     return units.reduce((sum, u) => sum + u.quantity, 0);
   }
 
@@ -1205,14 +1243,14 @@ export class GameState {
       limit: this.getUnitsPerRoundLimit(),
       remainingKnown: this.getTotalUnitsToPlace(playerId, unitDefs),
       hasPlaceable: this.hasPlaceableUnits(playerId, unitDefs),
-      onlyNavalRemaining: onlyNavalRemaining(this.unitsToPlace[playerId], unitDefs),
+      onlyNavalRemaining: onlyNavalRemaining(this.getUnitsToPlace(playerId), unitDefs),
       allowNavalSkip,
     });
   }
 
   // Check if player has any units that can actually be placed (have valid locations)
   hasPlaceableUnits(playerId, unitDefs) {
-    const units = this.unitsToPlace[playerId] || [];
+    const units = this.getUnitsToPlace(playerId);
     if (!units.some(u => u.quantity > 0)) return false;
 
     // B19: Done/skip leftover ships must not hand the seat straight back.
@@ -1291,7 +1329,8 @@ export class GameState {
     }
 
     // Check if player has this unit to place
-    const unitsToPlace = this.unitsToPlace[player.id] || [];
+    const unitsToPlace = this.getUnitsToPlace(player.id);
+    this.unitsToPlace[player.id] = unitsToPlace;
     const unitEntry = unitsToPlace.find(u => u.type === unitType && u.quantity > 0);
     if (!unitEntry) {
       return { success: false, error: `No ${unitType} available to place` };
@@ -1532,7 +1571,8 @@ export class GameState {
       this.playerState[player.id].ipcs += lastPlacement.cost;
     } else {
       // If it was from starting units, restore to pool
-      const unitsToPlace = this.unitsToPlace[player.id] || [];
+      const unitsToPlace = this.getUnitsToPlace(player.id);
+      this.unitsToPlace[player.id] = unitsToPlace;
       const poolEntry = unitsToPlace.find(u => u.type === lastPlacement.unitType);
       if (poolEntry) {
         poolEntry.quantity++;
@@ -1559,7 +1599,7 @@ export class GameState {
     if (!this.canFinishPlacementRound(player.id, unitDefs, { allowNavalSkip })) {
       return { ok: false, reason: 'not-ready' };
     }
-    if (allowNavalSkip && onlyNavalRemaining(this.unitsToPlace[player.id], unitDefs)) {
+    if (allowNavalSkip && onlyNavalRemaining(this.getUnitsToPlace(player.id), unitDefs)) {
       if (!this.playerState[player.id]) this.playerState[player.id] = {};
       this.playerState[player.id].skipLeftoverNaval = true;
     }
@@ -5121,7 +5161,7 @@ export class GameState {
     this.playerTechs = data.playerTechs || {};
     this.riskCards = data.riskCards || {};
     this.cardTradeCount = data.cardTradeCount || {};
-    this.unitsToPlace = data.unitsToPlace || {};
+    this.unitsToPlace = cloneUnitsToPlace(data.unitsToPlace || {});
     this.placementRound = data.placementRound || 0;
     // Same seat + stale remote 0/missing must not wipe a local 1/6 (B28).
     const nextPlayerId = this.players?.[this.currentPlayerIndex]?.id;
@@ -5139,6 +5179,7 @@ export class GameState {
         ? this.unitsPlacedThisRoundOwnerId
         : nextPlayerId || null)
       : null;
+    this.ensureInitialDeployPools();
 
     // v8: Restore air unit tracking for proper landing calculation
     this.airUnitOrigins = data.airUnitOrigins || {};

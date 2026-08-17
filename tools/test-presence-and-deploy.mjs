@@ -28,6 +28,10 @@ const {
   remainingDeployByPlayer,
   shouldApplyRemoteGameState,
   syncPushPhaseLabel,
+  coerceUnitsToPlaceRows,
+  resolvePlayerDeployPool,
+  shouldRestoreStartingDeployPool,
+  categorizeUnitsToPlace,
 } = await import(pathToFileURL(join(root, 'src/state/placementPass.js')));
 const {
   applyPlaceQueueDelta,
@@ -90,9 +94,14 @@ const {
   shouldOpenJoinByCode,
   shouldOpenMyGames,
   shouldPrefillJoinCodeFromLastMatch,
+  shouldAutoResumeLastMatch,
   joinFormFieldAttrs,
   joinFormFieldAttrString,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
+const { resolveHostLobbyPrimaryCta } =
+  await import(pathToFileURL(join(root, 'src/multiplayer/lobbyStart.js')));
+const { shouldPeekPhoneTray } =
+  await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const {
   capturePanelPointerLock,
   resolveLockedPanelClick,
@@ -1129,6 +1138,145 @@ console.log('=== B33–B36 undo/select must not pass; new seat is 0/6; + is +1 =
   check('B36: overlay commit is queue-only; gesture does not reset mid-click',
     panelSrc.includes('shouldCommitOverlayGesture')
     && panelSrc.includes('shouldBeginNewQueueGesture'));
+}
+
+console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, reload ===');
+{
+  const liveUnits = JSON.parse(readFileSync(join(root, 'data/units.json'), 'utf8'));
+  const territories = [
+    { name: 'Moscow', isWater: false, connections: ['Baltic'] },
+    { name: 'Berlin', isWater: false, connections: ['Baltic'] },
+    { name: 'Baltic', isWater: true, connections: ['Moscow', 'Berlin'] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.initGame('risk', [
+    { id: 'Russians', name: 'Bastion', color: '#B22222', oderId: 'host' },
+    { id: 'Americans', name: 'James', color: '#556B2F', oderId: 'guest' },
+  ], { startingIPCs: 80, isMultiplayer: true });
+
+  const russianLand = gs.landTerritories.find((t) => gs.getOwner(t.name) === 'Russians');
+  const americanLand = gs.landTerritories.find((t) => gs.getOwner(t.name) === 'Americans');
+  check('B39: risk init keys the pool as Russians, not ussr',
+    (gs.unitsToPlace.Russians || []).some((u) => u.type === 'infantry' && u.quantity > 0));
+  if (gs.currentPlayer.id === 'Russians') gs.placeCapital(russianLand.name);
+  else gs.placeCapital(americanLand.name);
+  if (gs.currentPlayer.id === 'Russians') gs.placeCapital(russianLand.name);
+  else gs.placeCapital(americanLand.name);
+
+  check('B39: after both capitals, phase is initial deployment',
+    gs.phase === GAME_PHASES.UNIT_PLACEMENT);
+  const first = gs.currentPlayer;
+  const pool = gs.getUnitsToPlace(first.id);
+  const cats = categorizeUnitsToPlace(pool, liveUnits);
+  check('B39: first seat still has infantry after capitals (not IPC-empty)',
+    cats.land.some((u) => u.type === 'infantry' && u.quantity > 0));
+  check('B39: land + air + naval rows exist so + / Max have targets',
+    cats.land.length > 0 && cats.naval.some((u) => u.type === 'transport'));
+  check('B39: remaining is the starting kit, not 1 transport',
+    gs.getTotalUnitsToPlace(first.id, liveUnits) > 6);
+
+  const owned = gs.getPlayerTerritories(first.id).find((n) => !gs.territoryByName[n].isWater);
+  let placed = 0;
+  for (let i = 0; i < 6; i++) {
+    const r = gs.placeInitialUnit(owned, 'infantry', liveUnits);
+    if (r.success) placed++;
+  }
+  check('B39: first turn can place 6 infantry', placed === 6 && gs.unitsPlacedThisRound === 6);
+  check('B39: Done is legal at 6/6',
+    gs.canFinishPlacementRound(first.id, liveUnits) === true);
+  const done = gs.finishPlacementRound(liveUnits);
+  check('B39: Done advances the seat', done.ok === true && gs.currentPlayer.id !== first.id);
+
+  const objectPool = { 0: { type: 'transport', quantity: 1 } };
+  check('B39: numeric-map pool coerces (Firestore shape)',
+    coerceUnitsToPlaceRows(objectPool).some((u) => u.type === 'transport'));
+  check('B39: type-map pool coerces',
+    coerceUnitsToPlaceRows({ transport: 1 }).some((u) => u.type === 'transport' && u.quantity === 1));
+  check('B39: wrong key still resolves Russians via alias',
+    resolvePlayerDeployPool({ russians: [{ type: 'infantry', quantity: 9 }] }, 'Russians')
+      .some((u) => u.type === 'infantry'));
+  check('B39: transport-only at wave 1 / 0 deployed must restore',
+    shouldRestoreStartingDeployPool({
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      placementRound: 1,
+      placedThisRound: 0,
+      pool: [{ type: 'transport', quantity: 1 }],
+      unitDefs: liveUnits,
+    }) === true);
+  check('B39: later-wave ships-only does not restore',
+    shouldRestoreStartingDeployPool({
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      placementRound: 2,
+      placedThisRound: 0,
+      pool: [{ type: 'transport', quantity: 1 }],
+      unitDefs: liveUnits,
+    }) === false);
+
+  const broken = new GameState({ risk: { factions: [] } }, territories, []);
+  broken.players = [
+    { id: 'Russians', name: 'Bastion', oderId: 'host' },
+    { id: 'Americans', name: 'James', oderId: 'guest' },
+  ];
+  broken.currentPlayerIndex = 0;
+  broken.phase = GAME_PHASES.UNIT_PLACEMENT;
+  broken.placementRound = 1;
+  broken.unitsPlacedThisRound = 0;
+  broken.playerState = { Russians: { hasPlacedCapital: true }, Americans: { hasPlacedCapital: true } };
+  broken.unitsToPlace = { Russians: { transport: 1 } };
+  broken.ensureInitialDeployPools();
+  check('B39: load of transport-only Russians restores infantry',
+    broken.getUnitsToPlace('Russians').some((u) => u.type === 'infantry' && u.quantity > 0));
+
+  const cta = resolveHostLobbyPrimaryCta({
+    isHost: true,
+    playerCount: 2,
+    allHaveFactions: true,
+    hostHasFaction: true,
+  });
+  check('B40: 2/2 host CTA is Start Game, not Create Game',
+    cta?.label === 'Start Game' && cta.action === 'start' && cta.disabled === false);
+  const lobbySrc = readFileSync(join(root, 'src/ui/multiplayerLobby.js'), 'utf8');
+  check('B40: waiting-room primary is never labeled Create Game',
+    !/data-action="publish"[\s\S]{0,80}Create Game/.test(lobbySrc)
+    && lobbySrc.includes('resolveHostLobbyPrimaryCta')
+    && lobbySrc.includes('Start Game'));
+  const lobbyMgrSrc = readFileSync(join(root, 'src/multiplayer/lobbyManager.js'), 'utf8');
+  check('B40: Start publishes an unpublished 2/2 lobby',
+    lobbyMgrSrc.includes('if (!this.currentLobby.isPublished)'));
+
+  check('B38: signed-in reload with last match auto-resumes',
+    shouldAutoResumeLastMatch({
+      signedIn: true,
+      lastMatch: { gameId: 'game_cevx', lobbyCode: 'CEVX6F' },
+    }) === true);
+  check('B38: signed-out reload does not auto-resume',
+    shouldAutoResumeLastMatch({
+      signedIn: false,
+      lastMatch: { gameId: 'game_cevx', lobbyCode: 'CEVX6F' },
+    }) === false);
+  check('B38: Exit does not auto-resume',
+    shouldAutoResumeLastMatch({
+      signedIn: true,
+      lastMatch: { gameId: 'game_cevx' },
+      explicitExit: true,
+    }) === false);
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  check('B38: boot path calls shouldAutoResumeLastMatch',
+    mainSrc.includes('shouldAutoResumeLastMatch')
+    && mainSrc.includes('startMultiplayerGame(lastAtBoot.gameId'));
+  check('B38: initial deploy does not peek-hide + / Max / Deploy',
+    shouldPeekPhoneTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+  check('B38: sidebar z-index beats zoom-controls',
+    /#sidebar \{[\s\S]*?z-index:\s*60/.test(readFileSync(join(root, 'style.css'), 'utf8')));
+  const panelSrcB38 = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B38: panel show() paints immediately; empty state is not blank',
+    panelSrcB38.includes("this.el.classList.remove('hidden')")
+    && panelSrcB38.includes('Loading match…')
+    && panelSrcB38.includes("className = 'player-panel hidden'"));
+  check('B39: placement actions always paint Undo and Deploy',
+    panelSrcB38.includes('↩ Undo')
+    && panelSrcB38.includes('data-action="confirm-placement"')
+    && panelSrcB38.includes('canDeploy'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

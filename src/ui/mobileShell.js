@@ -157,10 +157,14 @@ export function shouldPeekPhoneTray({
   expanded,
   airLanding,
   movePending,
+  phase,
 } = {}) {
   if (!mobile) return false;
   if (expanded) return false;
   if (airLanding || movePending) return false;
+  // B38/B39: peek hides .phone-tray-body (the + / Max / Undo / Deploy
+  // sheet). Initial deployment must stay open at default zoom.
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return false;
   return true;
 }
 
@@ -174,9 +178,8 @@ export function shouldCollapseMobileTray({
   movePending,
   expanded,
 } = {}) {
-  void phase;
   void turnPhase;
-  return shouldPeekPhoneTray({ mobile, expanded, airLanding, movePending });
+  return shouldPeekPhoneTray({ mobile, expanded, airLanding, movePending, phase });
 }
 
 // Expanded detent cap — one sheet, not a 280px column or 42/50dvh cover.

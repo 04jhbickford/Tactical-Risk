@@ -379,7 +379,7 @@ export class PlayerPanel {
     // Create panel element
     this.el = document.getElementById('sidebar');
     this.el.innerHTML = '';
-    this.el.className = 'player-panel';
+    this.el.className = 'player-panel hidden';
 
     // Create content wrapper
     this.contentEl = document.createElement('div');
@@ -717,7 +717,7 @@ export class PlayerPanel {
 
   show() {
     this.el.classList.remove('hidden');
-            this._scheduleRender();
+    this._render();
   }
 
   hide() {
@@ -725,16 +725,27 @@ export class PlayerPanel {
   }
 
   _render() {
+    try {
+      this._renderUnsafe();
+    } catch (err) {
+      console.error('[PlayerPanel] render failed', err);
+      if (this.contentEl) {
+        this.contentEl.innerHTML = '<div class="pp-loading">Loading match…</div>';
+      }
+    }
+  }
+
+  _renderUnsafe() {
     if (!this.gameState) {
       this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
-      this.contentEl.innerHTML = '';
+      this.contentEl.innerHTML = '<div class="pp-loading">Loading match…</div>';
       return;
     }
 
     const player = this.gameState.currentPlayer;
     if (!player) {
       this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
-      this.contentEl.innerHTML = '';
+      this.contentEl.innerHTML = '<div class="pp-loading">Loading match…</div>';
       return;
     }
     if (this._lastRenderedPlayerId && this._lastRenderedPlayerId !== player.id) {
@@ -787,7 +798,7 @@ export class PlayerPanel {
     // Desktop keeps the full sheet + tabs.
     const mobile = isMobileShell();
     if (mobile && (this._peekPhase !== phase || this._peekTurnPhase !== turnPhase)) {
-      this.trayExpanded = false;
+      this.trayExpanded = phase === GAME_PHASES.UNIT_PLACEMENT;
       this.phoneDetentTab = 'actions';
       this._peekPhase = phase;
       this._peekTurnPhase = turnPhase;
@@ -799,6 +810,7 @@ export class PlayerPanel {
       expanded: this.trayExpanded,
       airLanding,
       movePending,
+      phase,
     });
     const phoneTray = shouldUsePhonePlacementTray({ mobile, phase });
     this.el.classList.toggle('player-panel--peek', peek);
@@ -817,7 +829,7 @@ export class PlayerPanel {
       } else if (this.phoneDetentTab === 'log') {
         html += this._renderLogTab();
       } else if (phoneTray) {
-        html += this._renderPhonePlacementTray(player);
+        html += this._renderInlinePlacement(player);
       } else if (shouldShowPhonePanelBody({ mobile, phase, turnPhase, airLanding, movePending })) {
         html += `<div class="pp-tab-content">`;
         html += this._renderActionsTab(phase, turnPhase, player);
@@ -1871,10 +1883,13 @@ export class PlayerPanel {
   }
 
   _getContrastColor(hexColor) {
-    const hex = hexColor.replace('#', '');
+    const raw = String(hexColor || '#888888');
+    const hex = raw.replace('#', '');
+    if (hex.length < 6) return '#ffffff';
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
+    if ([r, g, b].some((n) => Number.isNaN(n))) return '#ffffff';
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return luminance > 0.5 ? '#000000' : '#ffffff';
   }
@@ -2491,17 +2506,15 @@ export class PlayerPanel {
 
     html += `</div>`;
 
-    // Action buttons - always at the bottom
+    // Action buttons — always painted. Missing Undo/Deploy looks like a
+    // dead first turn (B39) even when they are disabled.
     html += `<div class="pp-placement-actions">`;
-    if (canUndo) {
-      html += `<button class="pp-action-btn secondary small" data-action="undo-placement">↩ Undo</button>`;
-    }
+    html += `<button class="pp-action-btn secondary small" data-action="undo-placement"${canUndo ? '' : ' disabled'}>↩ Undo</button>`;
     if (showDoneButton) {
       html += `<button class="pp-action-btn primary" data-action="finish-placement">${ux.canSkipNaval ? 'Done — skip leftover ships →' : 'Done - Next Player →'}</button>`;
     }
-    if (totalQueued > 0 && isValidPlacement && !isMobileShell()) {
-      html += `<button class="pp-action-btn primary" data-action="confirm-placement">Deploy ${totalQueued} Unit${totalQueued > 1 ? 's' : ''}</button>`;
-    }
+    const canDeploy = totalQueued > 0 && isValidPlacement;
+    html += `<button class="pp-action-btn primary" data-action="confirm-placement"${canDeploy ? '' : ' disabled'}>Deploy${totalQueued > 0 ? ` ${totalQueued}` : ''}</button>`;
     html += `</div>`;
 
     html += `</div>`;

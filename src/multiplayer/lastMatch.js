@@ -163,6 +163,17 @@ export function shouldOpenMyGames(action) {
 
 // B37: browser autocomplete treated Game Code as a name (BICKFO) and
 // the lobby password as a saved login. Off + unique names; never prefill.
+// Reload of a signed-in tab must open the live match, not home (B38).
+export function shouldAutoResumeLastMatch({
+  signedIn = false,
+  lastMatch = null,
+  explicitExit = false,
+} = {}) {
+  if (explicitExit) return false;
+  if (!signedIn) return false;
+  return !!(lastMatch?.gameId || lastMatch?.lobbyCode);
+}
+
 export function shouldPrefillJoinCodeFromLastMatch() {
   return false;
 }

@@ -285,7 +285,9 @@ html, body {
   bottom: 0;
   background: rgba(20, 20, 40, 0.95);
   border-left: 1px solid rgba(255,255,255,0.1);
-  z-index: 20;
+  /* Same node as .player-panel. Id beat .player-panel { z-index: 55 },
+     so the sheet sat under #zoom-controls (50) and looked blank. */
+  z-index: 60;
   overflow-y: auto;
   transition: transform 0.2s ease;
 }

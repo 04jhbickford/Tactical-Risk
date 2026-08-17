@@ -86,8 +86,10 @@ import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
 import {
   forgetLastMatch,
   rememberLastMatch,
+  readLastMatch,
   resolveLobbyCodeFromGameDoc,
   shouldLeaveGameView,
+  shouldAutoResumeLastMatch,
 } from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
@@ -1716,8 +1718,44 @@ async function init() {
     if (lobby && !lobby.el?.classList.contains('hidden')) lobby._render();
   });
 
+  // B38: a signed-in reload must reopen the live match, not the home screen.
+  const lastAtBoot = readLastMatch();
+  if (lastAtBoot?.gameId || lastAtBoot?.lobbyCode) {
+    lobby.hide();
+  }
+
   // Load map tiles
   await mapRenderer.load();
+
+  let resumedLastMatch = false;
+  if (isFirebaseConfigured() && (lastAtBoot?.gameId || lastAtBoot?.lobbyCode)) {
+    try {
+      const user = await authManager.whenReady();
+      if (shouldAutoResumeLastMatch({ signedIn: !!user, lastMatch: lastAtBoot })) {
+        if (lastAtBoot.gameId) {
+          await startMultiplayerGame(lastAtBoot.gameId, {
+            id: lastAtBoot.gameId,
+            lobbyCode: lastAtBoot.lobbyCode,
+          });
+          resumedLastMatch = !!(gameState && gameState.players?.length);
+        } else if (lastAtBoot.lobbyCode) {
+          const result = await lobbyManager.joinLobby(lastAtBoot.lobbyCode, null);
+          if (result.success && result.isGame) {
+            await startMultiplayerGame(result.gameId, result.game);
+            resumedLastMatch = !!(gameState && gameState.players?.length);
+          } else if (result.success) {
+            ensureMultiplayerLobby();
+            multiplayerLobby.mode = 'lobby';
+            multiplayerLobby.show();
+            resumedLastMatch = true;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Main] Auto-resume last match failed — staying on home', err);
+    }
+    if (!resumedLastMatch) lobby.show();
+  }
 
   // Canvas sizing
   resizeCanvas();
