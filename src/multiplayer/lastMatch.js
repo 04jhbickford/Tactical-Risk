@@ -71,6 +71,48 @@ export function mergeLastMatchIntoMyGames({ games = [], lastMatchGame = null } =
   return [lastMatchGame, ...games];
 }
 
+// Query miss / token hiccup must still list the live match. A stub from
+// lastMatch is enough for Resume — startMultiplayerGame loads the doc.
+export function stubGameFromLastMatch(lastMatch = null) {
+  if (!lastMatch?.gameId) return null;
+  return {
+    id: lastMatch.gameId,
+    status: 'active',
+    lobbyCode: lastMatch.lobbyCode || null,
+    lobbyData: { code: lastMatch.lobbyCode || null, players: [] },
+  };
+}
+
+export function recoverMyGamesOnLoad({
+  games = [],
+  lastMatchGame = null,
+  lastMatch = null,
+} = {}) {
+  let next = mergeLastMatchIntoMyGames({ games, lastMatchGame });
+  if (next.some((g) => g.id === lastMatch?.gameId)) return next;
+  const stub = stubGameFromLastMatch(lastMatch);
+  if (stub) return mergeLastMatchIntoMyGames({ games: next, lastMatchGame: stub });
+  return next;
+}
+
+export function shouldWipeMyGamesOnError({ lastMatch = null } = {}) {
+  return !(lastMatch?.gameId || lastMatch?.lobbyCode);
+}
+
+export function shouldForgetLastMatchOnBackground() {
+  return false;
+}
+
+// Never the string "Lobby not found" — that is how ZUJMNP died after Sign In.
+export function resolveJoinNotFoundError({ lastMatch = null, code = null } = {}) {
+  const remembered = lastMatchForJoinCode({ lastMatch, code });
+  const upper = code ? String(code).toUpperCase() : null;
+  if (remembered || (lastMatch?.lobbyCode && lastMatch.lobbyCode === upper)) {
+    return `Still in ${upper} — the match is live. Open My Games or tap Rejoin.`;
+  }
+  return 'No waiting lobby with that code. If the match already started, open My Games — it stays listed there.';
+}
+
 // Guest-facing copy. Idle / missing host is "reconnecting", not "game over".
 export function resolveHostReconnectCopy({
   hostPresence = 'online',

@@ -200,9 +200,11 @@ export class AuthManager {
     }
   }
 
-  // Sign Out
-  async signOut() {
+  // Sign Out — only the Sign Out button. Background / visibilitychange /
+  // pagehide / pageshow must never call this (E1 / B25).
+  async signOut({ confirmed = true } = {}) {
     if (!this.auth) return;
+    if (!confirmed) return { success: false, error: 'Sign-out not confirmed' };
 
     try {
       await signOut(this.auth);

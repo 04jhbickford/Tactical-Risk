@@ -1142,7 +1142,10 @@ async function init() {
         const eject = shouldEjectFromMatch({
           authUserPresent: !!authManager.getUser(),
           tokenValid,
-          confirmedSignOut: !authManager.getUser() && !authManager.isLoggedIn(),
+          // A null user after background is not Sign Out. Only the Sign Out
+          // button sets confirmedSignOut. Treating !getUser() as confirmed
+          // is what dumped the host to Sign In and killed ZUJMNP.
+          confirmedSignOut: false,
         });
         if (!eject) {
           console.warn('[Main] Auth hiccup — staying in the match');

@@ -26,8 +26,9 @@ import {
 } from './presencePolicy.js';
 import {
   lastMatchForJoinCode,
-  mergeLastMatchIntoMyGames,
   readLastMatch,
+  recoverMyGamesOnLoad,
+  resolveJoinNotFoundError,
 } from './lastMatch.js';
 
 // Generate a random 6-character lobby code
@@ -227,10 +228,15 @@ export class LobbyManager {
         byStarter: starterSnap.docs.map(d => ({ id: d.id, ...d.data() })),
       });
       const remembered = readLastMatch();
+      let lastGame = null;
       if (remembered?.gameId && !games.some(g => g.id === remembered.gameId)) {
-        const lastGame = await this.getGameById(remembered.gameId);
-        games = mergeLastMatchIntoMyGames({ games, lastMatchGame: lastGame });
+        lastGame = await this.getGameById(remembered.gameId);
       }
+      games = recoverMyGamesOnLoad({
+        games,
+        lastMatchGame: lastGame,
+        lastMatch: remembered,
+      });
       games.sort((a, b) => {
         const aTime = a.updatedAt?.toMillis?.() || 0;
         const bTime = b.updatedAt?.toMillis?.() || 0;
@@ -239,7 +245,16 @@ export class LobbyManager {
       return games;
     } catch (error) {
       console.error('Error getting my active games:', error);
-      return [];
+      const remembered = readLastMatch();
+      let lastGame = null;
+      if (remembered?.gameId) {
+        lastGame = await this.getGameById(remembered.gameId);
+      }
+      return recoverMyGamesOnLoad({
+        games: [],
+        lastMatchGame: lastGame,
+        lastMatch: remembered,
+      });
     }
   }
 
@@ -280,9 +295,17 @@ export class LobbyManager {
       return { success: false, error: 'Game already started' };
     }
     if (resolved.kind === 'not-found') {
+      if (remembered?.gameId) {
+        return {
+          success: true,
+          isGame: true,
+          gameId: remembered.gameId,
+          game: { id: remembered.gameId, lobbyCode: code.toUpperCase() },
+        };
+      }
       return {
         success: false,
-        error: 'No waiting lobby with that code. If the match already started, open My Games — it stays listed there.',
+        error: resolveJoinNotFoundError({ lastMatch: remembered, code }),
       };
     }
     const lobby = resolved.lobby;

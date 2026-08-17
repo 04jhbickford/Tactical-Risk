@@ -48,6 +48,8 @@ const {
   presenceStateForVisibility,
   shouldHeartbeatNow,
   shouldEjectFromMatch,
+  shouldSignOutOnBackground,
+  isBackgroundLifecycleEvent,
   resolveJoinByCode,
   shouldDeleteLobbyOnHostLeave,
   presenceStopReason,
@@ -71,6 +73,11 @@ const {
   forgetLastMatch,
   lastMatchForJoinCode,
   mergeLastMatchIntoMyGames,
+  recoverMyGamesOnLoad,
+  stubGameFromLastMatch,
+  shouldWipeMyGamesOnError,
+  shouldForgetLastMatchOnBackground,
+  resolveJoinNotFoundError,
   resolveLobbyCodeFromGameDoc,
   resolveHostReconnectCopy,
   shouldShowHostReconnect,
@@ -140,6 +147,18 @@ check('heartbeat on visible + pageshow + interval',
   && shouldHeartbeatNow({ event: 'pageshow' })
   && shouldHeartbeatNow({ event: 'interval' })
   && shouldHeartbeatNow({ event: 'beforeunload' }) === false);
+check('E1/B25 P0: heartbeat on visibilitychange + pageshow persisted',
+  shouldHeartbeatNow({ event: 'visibilitychange' })
+  && shouldHeartbeatNow({ event: 'visibility-hidden' })
+  && shouldHeartbeatNow({ event: 'pageshow-persisted' })
+  && shouldHeartbeatNow({ event: 'pageshow', persisted: true }));
+check('E1/B25 P0: background never signs out',
+  shouldSignOutOnBackground({ event: 'visibilitychange' }) === false
+  && shouldSignOutOnBackground({ event: 'pagehide' }) === false
+  && shouldSignOutOnBackground({ event: 'pageshow' }) === false
+  && shouldSignOutOnBackground({ event: 'pageshow-persisted' }) === false
+  && isBackgroundLifecycleEvent('visibilitychange')
+  && isBackgroundLifecycleEvent('pageshow'));
 check('E1: resume on visible and pageshow (incl. bfcache)',
   shouldResumeSnapshots({ event: 'visibility-visible' })
   && shouldResumeSnapshots({ event: 'pageshow' })
@@ -178,6 +197,18 @@ check('E1: missing host still failovers after grace',
 check('auth hiccup with a live user does not eject',
   shouldEjectFromMatch({ authUserPresent: true, tokenValid: true }) === false
   && shouldEjectFromMatch({ authUserPresent: true, tokenValid: false }) === false);
+check('E1/B25 P0: missing user + invalid token is not a self-eject',
+  shouldEjectFromMatch({ authUserPresent: false, tokenValid: false }) === false);
+check('E1/B25 P0: background lifecycle never ejects',
+  shouldEjectFromMatch({
+    authUserPresent: false, tokenValid: false, lifecycleEvent: 'visibilitychange',
+  }) === false
+  && shouldEjectFromMatch({
+    confirmedSignOut: true, lifecycleEvent: 'pagehide',
+  }) === false
+  && shouldEjectFromMatch({
+    authUserPresent: false, tokenValid: false, lifecycleEvent: 'pageshow',
+  }) === false);
 check('confirmed sign-out ejects',
   shouldEjectFromMatch({
     authUserPresent: false, tokenValid: false, confirmedSignOut: true,
@@ -233,9 +264,16 @@ console.log('=== B25: session-lost host can still find ZUJMNP ===');
       startedGame: { id: 'g-zuj', lobbyCode: 'ZUJMNP', status: 'active', playerUserIds: ['guest'] },
       userId: 'host',
     }).kind === 'game');
+  check('E1/B25 P0: remembered gameId alone is still a join, never not-found',
+    resolveJoinByCode({ userId: 'host', rememberedGameId: 'g-zuj' }).kind === 'game'
+    && resolveJoinByCode({ userId: 'host', rememberedGameId: 'g-zuj' }).game.id === 'g-zuj');
   check('token hiccup with a signed-in user still loads My Games',
     shouldAbortMyGamesOnTokenHiccup({ authUserPresent: true, tokenValid: false }) === false
     && shouldAbortMyGamesOnTokenHiccup({ authUserPresent: false, tokenValid: false }) === true);
+  check('E1/B25 P0: last match keeps My Games open on token hiccup',
+    shouldAbortMyGamesOnTokenHiccup({
+      authUserPresent: false, tokenValid: false, hasLastMatch: true,
+    }) === false);
   check('My Games merges seat + startedBy and drops finished',
     mergeMyActiveGames({
       bySeat: [{ id: 'a', status: 'active' }, { id: 'done', status: 'finished' }],
@@ -480,6 +518,26 @@ console.log('=== B25 confirmed: last match + host reconnect copy ===');
       games: [],
       lastMatchGame: { id: 'game_zuj', status: 'active', lobbyCode: 'ZUJMNP' },
     }).map((g) => g.id).join(',') === 'game_zuj');
+  check('E1/B25 P0: query failure still lists last match stub',
+    recoverMyGamesOnLoad({
+      games: [],
+      lastMatch: { gameId: 'game_zuj', lobbyCode: 'ZUJMNP' },
+    }).map((g) => g.id).join(',') === 'game_zuj'
+    && stubGameFromLastMatch({ gameId: 'game_zuj', lobbyCode: 'ZUJMNP' }).id === 'game_zuj');
+  check('E1/B25 P0: last match is never wiped on query error',
+    shouldWipeMyGamesOnError({ lastMatch: { gameId: 'game_zuj' } }) === false
+    && shouldWipeMyGamesOnError({ lastMatch: null }) === true
+    && shouldForgetLastMatchOnBackground() === false);
+  check('E1/B25 P0: join copy is never Lobby not found when last match exists',
+    !/Lobby not found/i.test(resolveJoinNotFoundError({
+      lastMatch: { gameId: 'game_zuj', lobbyCode: 'ZUJMNP' },
+      code: 'ZUJMNP',
+    }))
+    && /Still in ZUJMNP/.test(resolveJoinNotFoundError({
+      lastMatch: { gameId: 'game_zuj', lobbyCode: 'ZUJMNP' },
+      code: 'ZUJMNP',
+    }))
+    && !/Lobby not found/i.test(resolveJoinNotFoundError({ code: 'ABCDEF' })));
   forgetLastMatch(mem);
   check('explicit leave forgets the last match', readLastMatch(mem) === null);
   check('idle host is away, not game-over',
@@ -722,6 +780,10 @@ console.log('=== B20–B24 pointer lock / Max / failed Deploy / Leave ===');
     && (presenceSrc.match(/onSnapshot\(/g) || []).length === 1);
   check('E1: no RTDB onDisconnect',
     !syncSrc.includes('onDisconnect') && !presenceSrc.includes('onDisconnect'));
+  check('E1/B25 P0: presence heartbeats on visibilitychange and pageshow persisted',
+    presenceSrc.includes("event: persisted ? 'pageshow-persisted' : 'pageshow'")
+    && presenceSrc.includes("event = visible ? 'visibility-visible' : 'visibility-hidden'")
+    && presenceSrc.includes('shouldHeartbeatNow'));
 }
 
 console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, + steal ===');
@@ -758,6 +820,9 @@ console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, +
     && authBlock.includes('showReconnectOnly')
     && !authBlock.includes('handlePlayOnline()')
     && !authBlock.includes('lobby.show()'));
+  check('E1/B25 P0: auth_error does not treat null user as confirmed sign-out',
+    !authBlock.includes('confirmedSignOut: !authManager.getUser()')
+    && authBlock.includes('confirmedSignOut: false'));
   check('B27: reconnect-only exists and is not Create Game',
     lobbySrc.includes('showReconnectOnly')
     && /_renderReconnect\(user\) \{[\s\S]*?_renderJoin/.test(lobbySrc)

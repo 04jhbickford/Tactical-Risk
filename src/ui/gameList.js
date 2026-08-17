@@ -22,8 +22,9 @@ import {
 } from '../multiplayer/presencePolicy.js';
 import {
   forgetLastMatch,
-  mergeLastMatchIntoMyGames,
   readLastMatch,
+  recoverMyGamesOnLoad,
+  shouldWipeMyGamesOnError,
 } from '../multiplayer/lastMatch.js';
 
 export { shouldOpenLeaveConfirm };
@@ -89,14 +90,17 @@ export class GameList {
       return;
     }
 
-    // Token hiccup after Sign In must still query (B25).
+    // Token hiccup after Sign In must still query (B25). A remembered
+    // last match is enough to keep My Games from going empty.
+    const remembered = readLastMatch();
     const isTokenValid = await this.authManager.validateToken();
     if (shouldAbortMyGamesOnTokenHiccup({
       authUserPresent: !!user,
       tokenValid: isTokenValid,
+      hasLastMatch: !!(remembered?.gameId || remembered?.lobbyCode),
     })) {
       console.warn('[GameList] Token validation failed - user needs to re-login');
-      this.games = [];
+      this.games = recoverMyGamesOnLoad({ games: [], lastMatch: remembered });
       this.isLoading = false;
       return;
     }
@@ -118,20 +122,22 @@ export class GameList {
       });
       const byStarter = starterSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       this.games = mergeMyActiveGames({ bySeat, byStarter });
-      const remembered = readLastMatch();
+      let lastGame = null;
       if (remembered?.gameId && !this.games.some(g => g.id === remembered.gameId)) {
         try {
           const snap = await getDoc(doc(this.db, 'games', remembered.gameId));
           if (snap.exists()) {
-            this.games = mergeLastMatchIntoMyGames({
-              games: this.games,
-              lastMatchGame: { id: snap.id, ...snap.data() },
-            });
+            lastGame = { id: snap.id, ...snap.data() };
           }
         } catch (err) {
           console.warn('[GameList] last-match getDoc failed', err);
         }
       }
+      this.games = recoverMyGamesOnLoad({
+        games: this.games,
+        lastMatchGame: lastGame,
+        lastMatch: remembered,
+      });
       console.log(`[GameList] Found ${this.games.length} active games for userId ${userId}`);
 
       // Sort by last updated
@@ -155,11 +161,29 @@ export class GameList {
     } catch (error) {
       console.error('[GameList] Error loading games:', error);
 
+      const last = readLastMatch();
+      let lastGame = null;
+      if (last?.gameId) {
+        try {
+          const snap = await getDoc(doc(this.db, 'games', last.gameId));
+          if (snap.exists()) lastGame = { id: snap.id, ...snap.data() };
+        } catch (err) {
+          console.warn('[GameList] last-match getDoc failed after query error', err);
+        }
+      }
+      this.games = recoverMyGamesOnLoad({
+        games: [],
+        lastMatchGame: lastGame,
+        lastMatch: last,
+      });
+
       // Check if it's an auth error - if so, handle re-authentication
       const authResult = await this.authManager.handleFirebaseError(error);
       if (authResult.needsReauth) {
         console.warn('[GameList] Auth error detected - user needs to re-login');
-        this.games = [];
+        if (shouldWipeMyGamesOnError({ lastMatch: last })) {
+          this.games = [];
+        }
         this.isLoading = false;
         return;
       }
@@ -169,7 +193,6 @@ export class GameList {
         console.error('[GameList] INDEX ERROR - May need to create Firestore index!');
         console.error('[GameList] Error details:', error.message);
       }
-      this.games = [];
     }
 
     this.isLoading = false;

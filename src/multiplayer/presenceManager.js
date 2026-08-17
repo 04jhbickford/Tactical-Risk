@@ -161,24 +161,28 @@ export class PresenceManager {
 
   _onVisibility() {
     const visible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-    if (visible && shouldResumeSnapshots({ event: 'visibility-visible' })) {
-      this.lastActivity = Date.now();
-      if (shouldHeartbeatNow({ event: 'visibility-visible' })) {
-        this._updatePresence(PRESENCE_STATES.ONLINE);
-      }
-      this._ensurePresenceSnapshot();
-      return;
+    const event = visible ? 'visibility-visible' : 'visibility-hidden';
+    // Required: heartbeat on every visibilitychange (hidden → idle, visible → online).
+    if (shouldHeartbeatNow({ event })) {
+      if (visible) this.lastActivity = Date.now();
+      this._updatePresence(visible ? PRESENCE_STATES.ONLINE : PRESENCE_STATES.IDLE);
     }
-    this._updatePresence(presenceStateForVisibility('hidden'));
+    if (visible && shouldResumeSnapshots({ event: 'visibility-visible' })) {
+      this._ensurePresenceSnapshot();
+    }
   }
 
   _onPageShow(event) {
+    const persisted = !!(event && event.persisted);
     if (!shouldResumeSnapshots({ event: 'pageshow' })) return;
     this.lastActivity = Date.now();
-    if (shouldHeartbeatNow({ event: 'pageshow' })) {
+    if (shouldHeartbeatNow({
+      event: persisted ? 'pageshow-persisted' : 'pageshow',
+      persisted,
+    })) {
       this._updatePresence(PRESENCE_STATES.ONLINE);
     }
-    this._ensurePresenceSnapshot({ persistedPageShow: !!(event && event.persisted) });
+    this._ensurePresenceSnapshot({ persistedPageShow: persisted });
   }
 
   _onPageHide() {

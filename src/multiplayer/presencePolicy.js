@@ -38,9 +38,30 @@ export function presenceStateForVisibility(visibilityState) {
   return visibilityState === 'visible' ? 'online' : 'idle';
 }
 
-export function shouldHeartbeatNow({ event } = {}) {
-  return event === 'visibility-visible'
+// Background / bfcache / freeze must never sign out or self-eject.
+export function isBackgroundLifecycleEvent(event) {
+  return event === 'visibilitychange'
+    || event === 'visibility-hidden'
+    || event === 'visibility-visible'
+    || event === 'pagehide'
     || event === 'pageshow'
+    || event === 'pageshow-persisted'
+    || event === 'beforeunload'
+    || event === 'freeze'
+    || event === 'resume';
+}
+
+export function shouldSignOutOnBackground({ event } = {}) {
+  return false;
+}
+
+export function shouldHeartbeatNow({ event, persisted = false } = {}) {
+  if (persisted) return true;
+  return event === 'visibility-visible'
+    || event === 'visibility-hidden'
+    || event === 'visibilitychange'
+    || event === 'pageshow'
+    || event === 'pageshow-persisted'
     || event === 'interval';
 }
 
@@ -78,16 +99,16 @@ export function shouldStartHostFailover({
 }
 
 // A single permission-denied / network blip is not a sign-out.
-// Eject only when the session is actually gone.
+// Background + a null user is not Exit. Eject only on the Sign Out button.
 export function shouldEjectFromMatch({
   authUserPresent = false,
   tokenValid = false,
   confirmedSignOut = false,
+  lifecycleEvent = null,
 } = {}) {
+  if (isBackgroundLifecycleEvent(lifecycleEvent)) return false;
   if (confirmedSignOut) return true;
-  if (authUserPresent && tokenValid) return false;
-  if (authUserPresent) return false;
-  return !tokenValid;
+  return false;
 }
 
 export const MY_GAMES_ACTIVE_STATUSES = ['active', 'starting'];
@@ -98,10 +119,13 @@ export function isMyGamesActiveStatus(status) {
 
 // Token hiccup after Sign In must still list games. Wiping the list here
 // is how B25 showed "No active games found" while Bastion stayed signed in.
+// A remembered last match is enough to keep My Games from going empty.
 export function shouldAbortMyGamesOnTokenHiccup({
   authUserPresent = false,
   tokenValid = false,
+  hasLastMatch = false,
 } = {}) {
+  if (hasLastMatch) return false;
   if (authUserPresent) return false;
   return !tokenValid;
 }
@@ -158,6 +182,11 @@ export function resolveJoinByCode({
   // this code must never be "Lobby not found" — the host is reconnecting.
   if (startedGame) {
     return { kind: 'game', game: startedGame };
+  }
+  // getDoc / lobby query missed, but this browser still has the gameId.
+  // Reconnect by id — never "Lobby not found" for the live match.
+  if (rememberedGameId) {
+    return { kind: 'game', game: { id: rememberedGameId } };
   }
   if (anyLobby && anyLobby.status && anyLobby.status !== 'waiting') {
     return { kind: 'started-lobby', lobby: anyLobby };

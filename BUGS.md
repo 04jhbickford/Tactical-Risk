@@ -48,6 +48,7 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B34: Clicking own capital (East US) to select it ended the turn at 0 deployed. Map / overlay click must not Done. Own-land tap still only selects.
 - B35: Next YOUR TURN arrived DEPLOYED 6/6. Spectated host 6 was kept by the B28 max() after the seat flag flipped. Reset when `unitsPlacedThisRoundOwnerId` is not the new seat. Same-actor stale 0 still keeps local 1 (B28).
 - B36: One Infantry + jumped 1→4 and added Armour. Compatibility mouse after the pointer click reset the one-shot and stole a row. Do not begin a new queue gesture within 400ms of an apply. Overlay commit is + / Max only.
+- E1 / B25 P0 (ZUJMNP died): Host backgrounded → Sign In on that tab → Join ZUJMNP = “Lobby not found”, My Games empty, while the guest was still in the match. Then the game died. `auth_error` treated `!getUser()` as `confirmedSignOut` and self-ejected. A null user after background is not Sign Out. Heartbeat on every `visibilitychange` (hidden → idle) and `pageshow` (including `persisted`). No self-eject. No sign-out on background. Last-match stub keeps My Games listed when seat/`startedBy` queries miss. Remembered `gameId` alone is a join — never “Lobby not found” for the live match. Guest stays; host reconnects to the same game. SCHEMA 11.
 
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`, `node tools/test-undo-and-turn-notice.mjs`.
 
