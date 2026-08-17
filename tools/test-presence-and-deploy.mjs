@@ -49,6 +49,10 @@ const {
   shouldHeartbeatNow,
   shouldEjectFromMatch,
   shouldSignOutOnBackground,
+  shouldCallSetPersistenceOnInit,
+  shouldTreatReloadAsSignOut,
+  shouldAwaitAuthBeforeSignIn,
+  shouldShowSignInForm,
   isBackgroundLifecycleEvent,
   resolveJoinByCode,
   shouldDeleteLobbyOnHostLeave,
@@ -159,6 +163,16 @@ check('E1/B25 P0: background never signs out',
   && shouldSignOutOnBackground({ event: 'pageshow-persisted' }) === false
   && isBackgroundLifecycleEvent('visibilitychange')
   && isBackgroundLifecycleEvent('pageshow'));
+check('E1/B25: reload / version refresh is not a sign-out',
+  shouldTreatReloadAsSignOut() === false
+  && shouldSignOutOnBackground({ event: 'reload' }) === false
+  && isBackgroundLifecycleEvent('reload')
+  && shouldCallSetPersistenceOnInit() === false
+  && shouldAwaitAuthBeforeSignIn() === true);
+check('E1/B25: Sign In form waits for auth restore',
+  shouldShowSignInForm({ authReady: false, userPresent: false }) === false
+  && shouldShowSignInForm({ authReady: true, userPresent: true }) === false
+  && shouldShowSignInForm({ authReady: true, userPresent: false }) === true);
 check('E1: resume on visible and pageshow (incl. bfcache)',
   shouldResumeSnapshots({ event: 'visibility-visible' })
   && shouldResumeSnapshots({ event: 'pageshow' })
@@ -823,6 +837,24 @@ console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, +
   check('E1/B25 P0: auth_error does not treat null user as confirmed sign-out',
     !authBlock.includes('confirmedSignOut: !authManager.getUser()')
     && authBlock.includes('confirmedSignOut: false'));
+  check('E1/B25: Play Online waits for auth restore before Sign In',
+    mainSrc.includes('isAuthReady')
+    && mainSrc.includes('shouldShowSignInForm'));
+  const firebaseSrc = readFileSync(join(root, 'src/multiplayer/firebase.js'), 'utf8');
+  const authSrc = readFileSync(join(root, 'src/multiplayer/auth.js'), 'utf8');
+  check('E1/B25: init does not call setPersistence (IndexedDB race)',
+    !/setPersistence\s*\(/.test(firebaseSrc)
+    && !firebaseSrc.includes('browserLocalPersistence'));
+  check('E1/B25: restored Firebase user is applied before Firestore lastLogin',
+    authSrc.includes('_applyFirebaseUser')
+    && authSrc.includes('authStateReady')
+    && /onAuthStateChanged\([\s\S]*_updateUserDocument\(user\)\.catch/.test(authSrc)
+    && !/onAuthStateChanged\([\s\S]*await this\._updateUserDocument/.test(authSrc));
+  const authUiSrc = readFileSync(join(root, 'src/ui/authScreen.js'), 'utf8');
+  check('E1/B25: AuthScreen restores session before the password form',
+    authUiSrc.includes("mode === 'restoring'")
+    && authUiSrc.includes('whenReady')
+    && authUiSrc.includes('shouldShowSignInForm'));
   check('B27: reconnect-only exists and is not Create Game',
     lobbySrc.includes('showReconnectOnly')
     && /_renderReconnect\(user\) \{[\s\S]*?_renderJoin/.test(lobbySrc)

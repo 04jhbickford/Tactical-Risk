@@ -80,6 +80,7 @@ import {
   shouldAccumulateHostOfflineMs,
   shouldStartHostFailover,
   presenceStopReason,
+  shouldShowSignInForm,
 } from './multiplayer/presencePolicy.js';
 import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
 import {
@@ -1646,28 +1647,45 @@ async function init() {
   };
 
   // Handle Play Online button click
-  const handlePlayOnline = () => {
+  const handlePlayOnline = async () => {
     if (!isFirebaseConfigured()) {
       alert('Multiplayer is not configured. Please set up Firebase in src/multiplayer/firebase.js');
       lobby.show();
       return;
     }
 
+    // Reload / version refresh: a restored Firebase user is still signed in
+    // even before authReady. Only show Sign In after restore finishes empty.
     if (authManager.isLoggedIn()) {
+      if (authScreen) authScreen.hide();
       ensureMultiplayerLobby();
       multiplayerLobby.show();
-    } else {
+      return;
+    }
+
+    if (!authManager.isAuthReady()
+      || shouldShowSignInForm({
+        authReady: authManager.isAuthReady(),
+        userPresent: authManager.isLoggedIn(),
+      })) {
       if (!authScreen) {
         authScreen = new AuthScreen((user) => {
-          if (user) {
-            handlePlayOnline();
-          } else {
-            lobby.show();
-          }
+          if (user) handlePlayOnline();
+          else lobby.show();
         });
+      } else {
+        authScreen.onComplete = (user) => {
+          if (user) handlePlayOnline();
+          else lobby.show();
+        };
       }
       authScreen.show();
+      return;
     }
+
+    if (authScreen) authScreen.hide();
+    ensureMultiplayerLobby();
+    multiplayerLobby.show();
   };
 
   // Lobby (local games)

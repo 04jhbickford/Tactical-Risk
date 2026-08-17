@@ -1,13 +1,14 @@
 // Authentication Screen UI for Tactical Risk multiplayer
 
 import { getAuthManager } from '../multiplayer/auth.js';
+import { shouldShowSignInForm } from '../multiplayer/presencePolicy.js';
 
 export class AuthScreen {
   constructor(onComplete) {
     this.onComplete = onComplete;
     this.authManager = getAuthManager();
     this.el = null;
-    this.mode = 'login'; // 'login', 'signup', 'phone', 'verify'
+    this.mode = 'login'; // 'restoring', 'login', 'signup', 'phone', 'verify'
     this.phoneNumber = '';
     this.isLoading = false;
   }
@@ -17,6 +18,32 @@ export class AuthScreen {
       this._create();
     }
     this.el.classList.remove('hidden');
+    if (this.authManager.isLoggedIn()) {
+      this.hide();
+      if (this.onComplete) this.onComplete(this.authManager.getUser());
+      return;
+    }
+    if (!shouldShowSignInForm({
+      authReady: this.authManager.isAuthReady(),
+      userPresent: this.authManager.isLoggedIn(),
+    })) {
+      this.mode = 'restoring';
+      this._render();
+      this._restoreThenContinue();
+      return;
+    }
+    if (this.mode === 'restoring') this.mode = 'login';
+    this._render();
+  }
+
+  async _restoreThenContinue() {
+    await this.authManager.whenReady();
+    if (this.authManager.isLoggedIn()) {
+      this.hide();
+      if (this.onComplete) this.onComplete(this.authManager.getUser());
+      return;
+    }
+    this.mode = 'login';
     this._render();
   }
 
@@ -47,14 +74,16 @@ export class AuthScreen {
           <div class="auth-container">
             <div class="lobby-brand">
               <h1 class="lobby-logo">Tactical Risk</h1>
-              <p class="lobby-tagline">Sign in to play online</p>
+              <p class="lobby-tagline">${this.mode === 'restoring' ? 'Restoring your session' : 'Sign in to play online'}</p>
             </div>
 
+            ${this.mode === 'restoring' ? '' : `
             <div class="auth-tabs modern">
               <button class="auth-tab ${this.mode === 'login' ? 'active' : ''}" data-mode="login">Sign In</button>
               <button class="auth-tab ${this.mode === 'signup' ? 'active' : ''}" data-mode="signup">Sign Up</button>
               <button class="auth-tab ${this.mode === 'phone' || this.mode === 'verify' ? 'active' : ''}" data-mode="phone">Phone</button>
             </div>
+            `}
 
             <div class="auth-form-container">
               ${this._renderForm()}
@@ -74,6 +103,12 @@ export class AuthScreen {
   }
 
   _renderForm() {
+    if (this.mode === 'restoring') {
+      return `
+        <p class="mp-no-games">Restoring your session…</p>
+        <p class="mp-no-games-hint">You were signed in. The match is still there.</p>
+      `;
+    }
     if (this.mode === 'login') {
       return `
         <form class="auth-form modern" data-form="login">

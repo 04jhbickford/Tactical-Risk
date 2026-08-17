@@ -47,12 +47,38 @@ export function isBackgroundLifecycleEvent(event) {
     || event === 'pageshow'
     || event === 'pageshow-persisted'
     || event === 'beforeunload'
+    || event === 'reload'
     || event === 'freeze'
     || event === 'resume';
 }
 
 export function shouldSignOutOnBackground({ event } = {}) {
   return false;
+}
+
+// getAuth() already persists via IndexedDB. Calling setPersistence on every
+// init races the restore and is what dropped Bastion to Sign In on the
+// V2.77 reload (E1/B25).
+export function shouldCallSetPersistenceOnInit() {
+  return false;
+}
+
+export function shouldTreatReloadAsSignOut() {
+  return false;
+}
+
+export function shouldAwaitAuthBeforeSignIn() {
+  return true;
+}
+
+// Do not show the password form until Firebase has finished restoring.
+// A null user before authReady is "still loading", not signed out.
+export function shouldShowSignInForm({
+  authReady = false,
+  userPresent = false,
+} = {}) {
+  if (!authReady) return false;
+  return !userPresent;
 }
 
 export function shouldHeartbeatNow({ event, persisted = false } = {}) {
