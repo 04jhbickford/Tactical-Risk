@@ -1,0 +1,135 @@
+// James lock — HUD copy. If a player could mistake the game for broken,
+// the strip must say whose turn, what last landed, and that the match lives.
+// No Firebase. HUD and harnesses share this.
+
+import { GAME_PHASES } from '../state/gameState.js';
+import { formatMobilePhaseLabel } from './mobileShell.js';
+import { resolveTurnChrome } from './playerPanel.js';
+import { placementBudgetCopy } from '../state/placeQueue.js';
+import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
+
+export function resolveHudPhaseLabel({ phase, turnPhase } = {}) {
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Place Capital';
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Initial Deployment';
+  return formatMobilePhaseLabel(phase, turnPhase) || 'Setup';
+}
+
+export function resolveHudWhoseTurn({
+  isMultiplayer = false,
+  localUserId = null,
+  currentPlayerOderId = null,
+  currentPlayerName = null,
+} = {}) {
+  const chrome = resolveTurnChrome({
+    isMultiplayer,
+    localUserId,
+    currentPlayerOderId,
+    currentPlayerName,
+  });
+  const name = currentPlayerName || chrome.currentPlayerName;
+  return {
+    ownSeat: chrome.ownSeat,
+    badge: chrome.badge,
+    line: chrome.ownSeat
+      ? `YOUR TURN · ${name}`
+      : (isMultiplayer ? `WAITING · ${name}` : name),
+  };
+}
+
+export function formatHudLastAction(entry) {
+  if (!entry) return 'Last action: none yet this session';
+  const msg = entry.data?.message || entry.type;
+  return `Last action: ${msg}`;
+}
+
+export function formatHudClickLanded(lastClick) {
+  if (!lastClick) return 'Click: tap the map — this line updates when it lands';
+  if (lastClick.landed === false) {
+    return `Click missed${lastClick.label ? ` (${lastClick.label})` : ''} — try the territory again`;
+  }
+  return `Click landed: ${lastClick.label || 'map'}`;
+}
+
+export function resolveHudDeployBudget({
+  phase,
+  deployedThisRound = 0,
+  limit = 6,
+  poolRemaining = 0,
+} = {}) {
+  if (phase !== GAME_PHASES.UNIT_PLACEMENT) return null;
+  const copy = placementBudgetCopy({ deployedThisRound, limit, poolRemaining });
+  return `${copy.deployedLabel} ${copy.deployedText} · ${copy.remainingLabel} ${copy.remainingText}`;
+}
+
+export function resolveHudMatchStatus({
+  gameCode = null,
+  justResumed = false,
+  sessionLost = false,
+  hostPresence = null,
+  hostName = 'Host',
+  isHost = false,
+} = {}) {
+  const code = gameCode || null;
+  if (sessionLost) {
+    return code
+      ? `You were away — still in ${code}. Sign in and rejoin.`
+      : 'You were away — the match is still there. Open My Games.';
+  }
+  if (justResumed && code) {
+    return `Still in ${code} — you were away.`;
+  }
+  if (!isHost && shouldShowAway(hostPresence)) {
+    return resolveHostReconnectCopy({ hostPresence, hostName, gameCode: code });
+  }
+  return code ? `In ${code}` : null;
+}
+
+function shouldShowAway(hostPresence) {
+  return hostPresence === 'idle' || hostPresence === 'offline';
+}
+
+export function resolveHudClarity({
+  isMultiplayer = false,
+  localUserId = null,
+  currentPlayerOderId = null,
+  currentPlayerName = null,
+  phase = null,
+  turnPhase = null,
+  lastActionEntry = null,
+  lastClick = null,
+  deployedThisRound = 0,
+  limit = 6,
+  poolRemaining = 0,
+  gameCode = null,
+  justResumed = false,
+  sessionLost = false,
+  hostPresence = null,
+  hostName = 'Host',
+  isHost = false,
+} = {}) {
+  const whose = resolveHudWhoseTurn({
+    isMultiplayer,
+    localUserId,
+    currentPlayerOderId,
+    currentPlayerName,
+  });
+  return {
+    whoseTurn: whose.line,
+    ownSeat: whose.ownSeat,
+    badge: whose.badge,
+    phase: resolveHudPhaseLabel({ phase, turnPhase }),
+    budget: resolveHudDeployBudget({
+      phase, deployedThisRound, limit, poolRemaining,
+    }),
+    lastAction: formatHudLastAction(lastActionEntry),
+    click: formatHudClickLanded(lastClick),
+    match: resolveHudMatchStatus({
+      gameCode, justResumed, sessionLost, hostPresence, hostName, isHost,
+    }),
+  };
+}
+
+export function resolveHostAwayBanner({ lobbyCode = null } = {}) {
+  const code = lobbyCode || 'the match';
+  return `You were away — still in ${code}. The other player is still there. Rejoin.`;
+}

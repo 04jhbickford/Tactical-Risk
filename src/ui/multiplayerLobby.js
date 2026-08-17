@@ -6,6 +6,7 @@ import { getAuthManager } from '../multiplayer/auth.js';
 import { GAME_VERSION } from './lobby.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import { readLastMatch } from '../multiplayer/lastMatch.js';
+import { resolveHostAwayBanner } from '../ui/hudClarity.js';
 
 // Available factions (should match setup data)
 const FACTIONS = [
@@ -210,7 +211,7 @@ export class MultiplayerLobby {
     const code = last.lobbyCode || 'your last match';
     return `
       <div class="mp-last-match" data-last-match="1">
-        <p>You were in <strong>${code}</strong>. The guest is still there — rejoin. Do not start a new game.</p>
+        <p>${resolveHostAwayBanner({ lobbyCode: last.lobbyCode })}</p>
         <button type="button" class="mp-primary-btn" data-action="rejoin-last">Rejoin ${code}</button>
       </div>
     `;

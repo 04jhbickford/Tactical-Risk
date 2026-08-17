@@ -84,6 +84,12 @@ const {
   emitYourTurnEvent,
   shouldAutoCommitPhoneCapital,
 } = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
+const {
+  resolveHudClarity,
+  resolveHudPhaseLabel,
+  formatHudClickLanded,
+  resolveHostAwayBanner,
+} = await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
 
 let failures = 0;
 const check = (label, cond) => {
@@ -457,6 +463,59 @@ console.log('=== B25 confirmed: last match + host reconnect copy ===');
     })));
   check('online host has no reconnect banner',
     resolveHostReconnectCopy({ hostPresence: 'online' }) === null);
+}
+
+console.log('=== James lock HUD: whose turn / last action / click landed ===');
+{
+  const waiting = resolveHudClarity({
+    isMultiplayer: true,
+    localUserId: 'james',
+    currentPlayerOderId: 'host',
+    currentPlayerName: 'Bastion',
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    turnPhase: 'purchase',
+    lastActionEntry: { type: 'placement', data: { message: 'Bastion placed infantry in Ukraine' } },
+    lastClick: { landed: true, label: 'East Canada' },
+    deployedThisRound: 6,
+    limit: 6,
+    poolRemaining: 1,
+    gameCode: 'ZUJMNP',
+    hostPresence: 'offline',
+    hostName: 'Bastion',
+    isHost: false,
+  });
+  check('HUD never says Your turn while WAITING',
+    waiting.whoseTurn === 'WAITING · Bastion'
+    && !waiting.whoseTurn.includes('YOUR TURN'));
+  check('leftover purchase still reads Initial Deployment',
+    waiting.phase === 'Initial Deployment'
+    && resolveHudPhaseLabel({ phase: GAME_PHASES.UNIT_PLACEMENT, turnPhase: 'purchase' }) === 'Initial Deployment');
+  check('6/6 + 1 leftover is next-round copy on the HUD',
+    /Deployed this round 6\/6/.test(waiting.budget)
+    && /Still in your pool 1 next round/.test(waiting.budget)
+    && !/Remaining to deploy/.test(waiting.budget));
+  check('last action is the log line',
+    waiting.lastAction === 'Last action: Bastion placed infantry in Ukraine');
+  check('click landed names the territory',
+    waiting.click === 'Click landed: East Canada'
+    && formatHudClickLanded({ landed: false, label: 'map' }).includes('missed'));
+  check('guest HUD says host is reconnecting, still in ZUJMNP',
+    /reconnect/i.test(waiting.match) && /ZUJMNP/.test(waiting.match));
+  const resumed = resolveHudClarity({
+    isMultiplayer: true,
+    localUserId: 'host',
+    currentPlayerOderId: 'host',
+    currentPlayerName: 'Bastion',
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    gameCode: 'ZUJMNP',
+    justResumed: true,
+    isHost: true,
+  });
+  check('host resume is still in ZUJMNP, not an empty lobby',
+    resumed.whoseTurn === 'YOUR TURN · Bastion'
+    && resumed.match === 'Still in ZUJMNP — you were away.');
+  check('away banner tells the host to rejoin, not that the game died',
+    resolveHostAwayBanner({ lobbyCode: 'ZUJMNP' }) === 'You were away — still in ZUJMNP. The other player is still there. Rejoin.');
 }
 
 console.log('=== Undo / capital / leave row ===');

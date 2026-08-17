@@ -854,6 +854,13 @@ async function init() {
         hostName: (lobbyData?.lobbyData?.players || lobbyData?.players || [])
           .find((p) => p.isHost)?.displayName || null,
       });
+      hud.setClarityContext({
+        localUserId: authManager.getUser()?.id || null,
+        gameCode: currentGameCode,
+        justResumed: true,
+        hostName: (lobbyData?.lobbyData?.players || lobbyData?.players || [])
+          .find((p) => p.isHost)?.displayName || null,
+      });
 
       // CRITICAL: Hide all multiplayer overlays immediately
       if (multiplayerLobby) {
@@ -901,6 +908,7 @@ async function init() {
 
     // Set host flag on syncManager (for AI control - original host controls AI)
     syncManager.setIsHost(isHost);
+    hud.setClarityContext({ isHost, localUserId: user?.id || null });
 
     // Host-failover authority: if the host goes offline, the first online
     // non-surrendered human (in turn order) takes over running AI turns so the
@@ -1191,6 +1199,14 @@ async function init() {
     let lastPresenceStates = null;
     presenceManager.subscribe((presence) => {
       playerPanel.setPresenceData(presence);
+      const hostPlayer = gameState?.players?.find(p => p.isHost)
+        || gameState?.players?.find(p => p.oderId && !p.isAI);
+      if (hostPlayer) {
+        hud.setClarityContext({
+          hostPresence: presenceManager.getPlayerPresence(hostPlayer.oderId),
+          hostName: hostPlayer.name,
+        });
+      }
 
       const myId = authManager.getUser()?.id;
       if (lastPresenceStates) {
@@ -1200,9 +1216,12 @@ async function init() {
           const wasOffline = !prev || prev === 'offline';
           const isOffline = info.state === 'offline';
           if (wasOffline && !isOffline) {
-            showNotification(`${info.displayName || 'A player'} is back online`);
+            showNotification(`${info.displayName || 'A player'} is back — still in ${currentGameCode || 'the match'}`);
           } else if (!wasOffline && isOffline) {
-            showNotification(`${info.displayName || 'A player'} went offline`);
+            const hostGone = hostPlayer && oderId === hostPlayer.oderId;
+            showNotification(hostGone
+              ? `${info.displayName || 'Host'} is reconnecting — you are still in ${currentGameCode || 'the match'}. Do not leave.`
+              : `${info.displayName || 'A player'} went offline`);
           }
         }
       }
@@ -1279,6 +1298,7 @@ async function init() {
 
     // Wire up components
     hud.setGameState(gameState);
+    hud.setActionLog(actionLog);
     // Pass-and-play handoff overlay (self-disables for multiplayer/AI-only)
     handoffScreen.setGameState(gameState);
     hud.setNextPhaseCallback(async () => {
@@ -2092,6 +2112,7 @@ async function init() {
         }
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
+        hud.setLastClick({ landed: true, label: hit.name });
         // Phone setup: tap places / selects — do not open the inspect sheet.
         // Playing still tap-to-toggles. Long-press inspect is a small edge card.
         // Tablet (fromTouch, not mobile-shell) keeps the V2.64 peek.
@@ -2126,6 +2147,7 @@ async function init() {
         }
         selectedTerritory = null;
         playerPanel.setSelectedTerritory(null);
+        hud.setLastClick({ landed: false, label: 'map' });
         movementUI.cancel();
       }
       camera.dirty = true;

@@ -64,6 +64,43 @@ html, body {
   cursor: move;
 }
 
+/* James lock: whose turn / last action / click landed. Sibling of #hud
+   so the 48px bar height stays frozen. */
+#hud-clarity {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  right: 0;
+  z-index: 9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 4px 16px 6px;
+  background: rgba(20, 20, 40, 0.88);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #e2e8f0;
+  pointer-events: none;
+}
+
+#hud-clarity[hidden] {
+  display: none;
+}
+
+#hud-clarity.waiting .hud-clarity-turn {
+  color: #ffcc80;
+}
+
+#hud-clarity.your-turn .hud-clarity-turn {
+  color: #c8e6c9;
+}
+
+.hud-clarity-match {
+  color: #ffe0b2;
+}
+
 /* --- HUD --- */
 #hud {
   position: absolute;
@@ -16875,6 +16912,13 @@ html, body {
     justify-content: space-between;
     height: var(--mobile-top-bar);
     z-index: 70;
+  }
+
+  html.mobile-shell #hud-clarity {
+    top: var(--mobile-top-bar, calc(48px + env(safe-area-inset-top, 0px)));
+    font-size: 11px;
+    padding: 4px 10px 6px;
+    z-index: 69;
   }
 
   /* Kill the 3-row desktop HUD pieces if JS has not swapped the tree yet */
