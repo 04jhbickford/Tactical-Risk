@@ -8,6 +8,14 @@ import { fileURLToPath } from 'url';
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 import { readFileSync } from 'fs';
 
+if (typeof globalThis.localStorage === 'undefined') {
+  globalThis.localStorage = {
+    getItem() { return null; },
+    setItem() {},
+    removeItem() {},
+  };
+}
+
 const { GameState } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { computeInitialPlacementUX, resolvePhoneStickyUnitType } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
