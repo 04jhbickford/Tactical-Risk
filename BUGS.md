@@ -42,6 +42,7 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B28: After Deploy 1/6, selecting another territory showed 0/6. `loadFromJSON` used `unitsPlacedThisRound || 0`, and `shouldResetDeployedThisRound` treated remote 0 as a reset. Reset only on seat / wave change; same seat keeps max(local, remote). Select never zeros DEPLOYED.
 - B29: Max did nothing on TacticalBomber. + / Max required a legal tile (`isValidPlacement`) and exact-type pool lookup. Staging does not need a tile; Deploy still does. `quantityAvailableForType` accepts `TacticalBomber` / `tacticalBomber`.
 - B30: Destroyer + also incremented Transport (4→6). Same family as B14 row-offset / steal. Pointerdown locks `data-unit`; a retarget onto another type within 400ms is ignored. One gesture changes one unitType.
+- B31: Max hover still selected East US and opened LOG (B22 family). Canvas under the panel and the LOG tab won the hit stack. Queue controls win `elementsFromPoint`; a click whose coordinates sit in the panel never selects a territory; Max lock cannot become a tab. If the canvas ate mouseup, the locked Max still commits.
 
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`, `node tools/test-undo-and-turn-notice.mjs`.
 

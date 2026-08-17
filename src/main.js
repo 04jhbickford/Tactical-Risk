@@ -1704,6 +1704,13 @@ async function init() {
 
   // Mouse events
   canvas.addEventListener('mousedown', (e) => {
+    // B31: Max hover can sit over the map / LOG. A click whose coordinates
+    // are inside the deploy panel must never select a territory.
+    if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+      e.preventDefault();
+      playerPanel._onPanelPointerDown(e);
+      return;
+    }
     e.preventDefault();
     // Phone tap-to-toggle: keep the card up through mousedown so mouseup
     // can close the same territory instead of immediately re-showing it.
@@ -1986,9 +1993,10 @@ async function init() {
     console.log('[MouseUp] wasDrag:', wasDrag, 'Phase:', gameState?.phase);
 
     if (!wasDrag) {
-      // A panel + / Deploy tap that shrinks the tray must not select the
-      // territory now under the finger (B22 East US → East Canada).
-      if (playerPanel.shouldBlockMapSelect()) {
+      // A panel + / Max / Deploy tap must not select the territory under
+      // the finger (B22 / B31 East US) even when the canvas is the target.
+      if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+        playerPanel.commitLockedPanelGesture(e);
         camera.dirty = true;
         return;
       }

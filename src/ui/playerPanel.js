@@ -35,6 +35,8 @@ import {
   isQueueGestureAction,
   shouldIgnoreQueueRetarget,
   resolveQueueUnitType,
+  pickPanelHitFromStack,
+  isPointInPanelRect,
   PANEL_QUEUE_GUARD_MS,
 } from './panelClickLock.js';
 
@@ -390,6 +392,7 @@ export class PlayerPanel {
     this._lastQueueGestureAt = 0;
     this._lastQueueUnitType = null;
     this._queueLockType = null;
+    this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -398,13 +401,28 @@ export class PlayerPanel {
     this.contentEl.addEventListener('change', (e) => this._onPanelChange(e));
   }
 
-  _readPointerLock(target) {
+  _readPointerLock(e) {
+    const target = e?.target;
+    const stack = (typeof document !== 'undefined' && typeof document.elementsFromPoint === 'function'
+      && e && Number.isFinite(e.clientX) && Number.isFinite(e.clientY))
+      ? document.elementsFromPoint(e.clientX, e.clientY)
+      : [target];
+    const fromStack = pickPanelHitFromStack(stack, { panelEl: this.el });
+    if (fromStack?.kind && fromStack.kind !== 'none') return fromStack;
+
+    const btn = target?.closest?.('[data-action]');
+    if (btn && this.el.contains(btn) && isQueueGestureAction(btn.dataset.action)) {
+      return capturePanelPointerLock({
+        action: btn.dataset.action,
+        disabled: !!btn.disabled,
+        dataset: { ...btn.dataset },
+      });
+    }
     const tab = target?.closest?.('.pp-tab');
-    if (tab && this.contentEl.contains(tab)) {
+    if (tab && this.el.contains(tab)) {
       return capturePanelPointerLock({ tabId: tab.dataset.tab });
     }
-    const btn = target?.closest?.('[data-action]');
-    if (btn && this.contentEl.contains(btn)) {
+    if (btn && this.el.contains(btn)) {
       return capturePanelPointerLock({
         action: btn.dataset.action,
         disabled: !!btn.disabled,
@@ -416,7 +434,7 @@ export class PlayerPanel {
 
   _onPanelPointerDown(e) {
     this._panelPointerAt = Date.now();
-    this._pointerLock = this._readPointerLock(e.target);
+    this._pointerLock = this._readPointerLock(e);
     const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
       || this._pointerLock?.dataset?.unit
       || null;
@@ -425,10 +443,30 @@ export class PlayerPanel {
     }
   }
 
-  shouldBlockMapSelect(now = Date.now()) {
+  containsPoint(clientX, clientY) {
+    if (!this.el || this.el.classList?.contains('hidden')) return false;
+    return isPointInPanelRect(clientX, clientY, this.el.getBoundingClientRect?.());
+  }
+
+  shouldBlockMapSelect(now = Date.now(), point = null) {
+    const pointInPanel = !!(point && this.containsPoint(point.x, point.y));
     return shouldBlockMapSelectAfterPanel({
       panelPointerAt: this._panelPointerAt || 0,
       now,
+      pointInPanel,
+    });
+  }
+
+  // Canvas received the mouseup but the point is the panel (B31).
+  // Apply the locked Max / + so the gesture is not a no-op.
+  commitLockedPanelGesture(e) {
+    if (!this._pointerLock || this._pointerLock.kind === 'none') {
+      this._onPanelPointerDown(e || {});
+    }
+    this._onPanelClick({
+      target: this.el,
+      preventDefault() {},
+      stopPropagation() {},
     });
   }
 

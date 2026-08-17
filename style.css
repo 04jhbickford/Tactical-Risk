@@ -4705,10 +4705,27 @@ html, body {
 
 .pp-qty-btn.max-btn {
   width: auto;
-  padding: 0 6px;
+  min-width: 36px;
+  min-height: 28px;
+  padding: 0 8px;
   font-size: 9px;
   font-weight: bold;
   color: #4caf50;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
+}
+
+.pp-tabs,
+.phone-detent-tabs {
+  position: relative;
+  z-index: 1;
+}
+
+.player-panel,
+.player-panel .pp-content,
+.player-panel .pp-qty-btn {
+  pointer-events: auto;
 }
 
 .pp-unit-list {

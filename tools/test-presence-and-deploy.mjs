@@ -85,6 +85,8 @@ const {
   shouldBlockMapSelectAfterPanel,
   shouldIgnoreQueueRetarget,
   resolveQueueUnitType,
+  pickPanelHitFromStack,
+  isPointInPanelRect,
 } = await import(pathToFileURL(join(root, 'src/ui/panelClickLock.js')));
 const {
   computeIsLocalPlayerTurn,
@@ -831,6 +833,69 @@ console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, +
   });
   check('B30: Destroyer + does not increment Transport',
     q.destroyer === 1 && q.transport === 4);
+}
+
+console.log('=== B31 Max/panel hit-test: not the map, not LOG ===');
+{
+  const maxBtn = {
+    dataset: { action: 'place-queue-max', unit: 'tacticalBomber' },
+    disabled: false,
+    closest(sel) { return sel === '[data-action]' ? maxBtn : null; },
+  };
+  const logTab = {
+    dataset: { tab: 'log' },
+    className: 'pp-tab',
+    closest(sel) { return sel === '.pp-tab' ? logTab : null; },
+  };
+  const panelEl = { contains: (el) => el === maxBtn || el === logTab };
+  const hit = pickPanelHitFromStack([logTab, maxBtn], { panelEl });
+  check('B31: stack with LOG on top still locks Max',
+    hit.kind === 'action' && hit.action === 'place-queue-max'
+    && hit.dataset.unit === 'tacticalBomber');
+
+  const logLock = capturePanelPointerLock({ tabId: 'log' });
+  const maxWins = resolveLockedPanelClick({
+    lock: logLock,
+    clickAction: 'place-queue-max',
+    clickDataset: { action: 'place-queue-max', unit: 'infantry' },
+    now: 100,
+  });
+  check('B31: pointerdown on LOG + click on Max applies Max, not LOG',
+    maxWins?.kind === 'action' && maxWins.action === 'place-queue-max');
+
+  const maxLock = capturePanelPointerLock({
+    action: 'place-queue-max',
+    dataset: { action: 'place-queue-max', unit: 'infantry' },
+  });
+  const maxThenLog = resolveLockedPanelClick({
+    lock: maxLock,
+    clickTabId: 'log',
+    clickAction: 'phone-detent-tab',
+    now: 100,
+  });
+  check('B31: Max lock does not switch to LOG',
+    maxThenLog?.kind === 'action' && maxThenLog.action === 'place-queue-max');
+
+  check('B31: point inside the panel blocks the map even with no prior pointer',
+    shouldBlockMapSelectAfterPanel({
+      panelPointerAt: 0, now: 1000, pointInPanel: true,
+    }) === true);
+  check('B31: point outside the panel does not block without a recent gesture',
+    shouldBlockMapSelectAfterPanel({
+      panelPointerAt: 0, now: 1000, pointInPanel: false,
+    }) === false);
+  check('B31: panel rect contains the Max click',
+    isPointInPanelRect(900, 400, { left: 800, right: 1120, top: 48, bottom: 800 }) === true
+    && isPointInPanelRect(100, 400, { left: 800, right: 1120, top: 48, bottom: 800 }) === false);
+
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B31: canvas mousedown/up use point-in-panel block',
+    mainSrc.includes('shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })')
+    && mainSrc.includes('commitLockedPanelGesture'));
+  check('B31: panel hit-test prefers the stack over tab-first',
+    panelSrc.includes('pickPanelHitFromStack')
+    && panelSrc.includes('elementsFromPoint'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);
