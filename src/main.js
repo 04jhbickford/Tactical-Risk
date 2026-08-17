@@ -25,8 +25,7 @@ import { UnitRenderer } from './map/unitRenderer.js';
 import {
   PlayerPanel,
   resolveWaitingForSyncAfterRemoteSnapshot,
-  computeIsLocalPlayerTurn,
-  resolveTabTitle,
+  resolveTurnChrome,
   emitYourTurnEvent,
 } from './ui/playerPanel.js';
 import { TerritoryTooltip } from './ui/territoryTooltip.js';
@@ -1047,15 +1046,15 @@ async function init() {
 
         // Async-play awareness: flag the browser tab while it's your turn so a
         // backgrounded player can see it at a glance
-        const isLocalPlayerTurn = computeIsLocalPlayerTurn({
+        const turnChrome = resolveTurnChrome({
           isMultiplayer: true,
-          isWaitingForSync: playerPanel.isWaitingForSync,
           localUserId: playerPanel.localUserId || syncManager.userId,
           currentPlayerOderId: gameState.currentPlayer?.oderId,
+          currentPlayerName: gameState.currentPlayer?.name,
         });
-        document.title = resolveTabTitle({ isLocalPlayerTurn });
+        document.title = turnChrome.tabTitle;
         emitYourTurnEvent({
-          yourTurn: isLocalPlayerTurn,
+          yourTurn: turnChrome.ownSeat,
           playerName: gameState.currentPlayer?.name,
           gameId,
         });

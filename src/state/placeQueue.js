@@ -79,6 +79,32 @@ export function deployedThisRoundDisplay(placedThisRound) {
   return Math.max(0, Number(placedThisRound) || 0);
 }
 
+// James lock: 6/6 this round + 1 still in the pool is not a contradiction.
+// Never label that as "Remaining to deploy: 1" next to Deployed 6/6.
+export function placementBudgetCopy({
+  deployedThisRound = 0,
+  limit = 6,
+  poolRemaining = 0,
+} = {}) {
+  const deployed = deployedThisRoundDisplay(deployedThisRound);
+  const cap = Math.max(1, Number(limit) || 6);
+  const pool = Math.max(0, Number(poolRemaining) || 0);
+  const roundFull = deployed >= cap;
+  const leftoverAfterCap = roundFull && pool > 0;
+  return {
+    deployedLabel: 'Deployed this round',
+    deployedText: `${deployed}/${cap}`,
+    remainingLabel: leftoverAfterCap ? 'Still in your pool' : 'Remaining in your pool',
+    remainingText: leftoverAfterCap
+      ? `${pool} next round`
+      : `${pool} unit${pool === 1 ? '' : 's'}`,
+    remainingHint: leftoverAfterCap
+      ? `Round cap is ${cap}. ${pool} unit${pool === 1 ? '' : 's'} wait for your next placement turn.`
+      : null,
+    leftoverAfterCap,
+  };
+}
+
 // Keep the staged queue when Deploy places 0 (invalid tile / empty batch)
 // so the next tap is not a no-op (B24).
 export function queueAfterDeployAttempt({ queueBefore = {}, placed = 0 } = {}) {

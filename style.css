@@ -16070,6 +16070,29 @@ html, body {
   color: #FF9800;
 }
 
+/* Phone / peek: same seat words as the desktop badge and the tab title. */
+.pp-seat-chip {
+  margin: 6px 12px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.pp-seat-chip.your-turn {
+  background: rgba(76, 175, 80, 0.35);
+  border: 1px solid #4CAF50;
+  color: #c8e6c9;
+}
+
+.pp-seat-chip.waiting {
+  background: rgba(255, 152, 0, 0.28);
+  border: 1px solid #FF9800;
+  color: #ffcc80;
+}
+
 .pp-header.not-your-turn {
   opacity: 0.85;
 }
@@ -17728,6 +17751,21 @@ html, body {
     font-size: 12px;
     font-weight: 700;
     color: #94a3b8;
+  }
+
+  .phone-place-pool {
+    font-size: 12px;
+    font-weight: 600;
+    color: #cbd5e1;
+  }
+
+  .phone-place-done {
+    min-height: 44px;
+    border-radius: 10px;
+    border: 1px solid #4CAF50;
+    background: rgba(76, 175, 80, 0.25);
+    color: #e8f5e9;
+    font-weight: 700;
   }
 
   .phone-place-hint {

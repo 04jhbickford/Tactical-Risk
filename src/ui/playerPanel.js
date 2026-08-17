@@ -21,6 +21,7 @@ import {
   expandPlaceQueue,
   queuedCount,
   deployedThisRoundDisplay,
+  placementBudgetCopy,
   queueAfterDeployAttempt,
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
@@ -62,7 +63,40 @@ export function computeIsLocalPlayerTurn({ isMultiplayer, isWaitingForSync, loca
     (!isWaitingForSync && !!localUserId && currentPlayerOderId === localUserId);
 }
 
-export function resolveTabTitle({ isLocalPlayerTurn } = {}) {
+// James lock: tab title, YOUR TURN / WAITING badge, and the your-turn
+// ping share the loaded seat. The waiting lock must never make the tab
+// say "Your turn" while the panel says WAITING.
+export function resolveTurnChrome({
+  isMultiplayer = false,
+  localUserId = null,
+  currentPlayerOderId = null,
+  currentPlayerName = null,
+} = {}) {
+  const ownSeat = !isMultiplayer || isCurrentPlayerLocal({ localUserId, currentPlayerOderId });
+  const badge = isMultiplayer ? (ownSeat ? 'YOUR TURN' : 'WAITING') : null;
+  const waitingName = currentPlayerName || 'the other player';
+  const tabTitle = ownSeat
+    ? '● Your turn — Tactical Risk'
+    : (isMultiplayer ? `Waiting: ${waitingName} — Tactical Risk` : 'Tactical Risk');
+  const seatLabel = ownSeat ? 'YOUR TURN' : `WAITING · ${waitingName}`;
+  return { ownSeat, badge, tabTitle, seatLabel, currentPlayerName: waitingName };
+}
+
+export function resolveTabTitle({
+  isLocalPlayerTurn,
+  isMultiplayer,
+  localUserId,
+  currentPlayerOderId,
+  currentPlayerName,
+} = {}) {
+  if (isMultiplayer || currentPlayerOderId != null || localUserId != null) {
+    return resolveTurnChrome({
+      isMultiplayer: isMultiplayer !== false,
+      localUserId,
+      currentPlayerOderId,
+      currentPlayerName,
+    }).tabTitle;
+  }
   return isLocalPlayerTurn ? '● Your turn — Tactical Risk' : 'Tactical Risk';
 }
 
@@ -654,16 +688,23 @@ export class PlayerPanel {
     // the same live check the multiplayer guard enforces. (The cached
     // isActivePlayer flag can lag or diverge from state; trusting it here let
     // the sidebar disagree with what actions were actually allowed.)
+    const chrome = resolveTurnChrome({
+      isMultiplayer,
+      localUserId,
+      currentPlayerOderId,
+      currentPlayerName: player?.name,
+    });
+    const isOwnSeat = chrome.ownSeat;
+    // Actions still honor the Done lock. Title / badge never do.
     const isLocalPlayerTurn = computeIsLocalPlayerTurn({
       isMultiplayer,
       isWaitingForSync: this.isWaitingForSync,
       localUserId,
       currentPlayerOderId
     });
-    const isOwnSeat = !isMultiplayer || isCurrentPlayerLocal({
-      localUserId,
-      currentPlayerOderId,
-    });
+    if (typeof document !== 'undefined' && isMultiplayer) {
+      document.title = chrome.tabTitle;
+    }
 
     let html = '';
 
@@ -692,6 +733,7 @@ export class PlayerPanel {
     this.el.classList.toggle('player-panel--place-tray', phoneTray && !peek);
 
     if (mobile) {
+      html += this._renderSeatChip(chrome);
       html += this._renderPhoneDetentTabs();
       html += `<div class="phone-tray-body">`;
       if (this.phoneDetentTab === 'stats') {
@@ -729,7 +771,7 @@ export class PlayerPanel {
     }
 
     // Fixed bottom actions bar — hidden for spectators / waiting clients
-    const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn);
+    const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn, isOwnSeat);
     if (bottomActions) {
       html += bottomActions;
     }
@@ -744,13 +786,16 @@ export class PlayerPanel {
     if (restored) restored.scrollTop = this._unitListScrollTop || 0;
   }
 
-  _renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn = true) {
+  _renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn = true, isOwnSeat = isLocalPlayerTurn) {
     // Don't show for AI, or for a multiplayer client that is not the active player.
     // The Actions tab already hides on this predicate; the bottom bar used to
     // ignore it and drew the current player's green End-phase button for everyone.
+    // Placement Done follows the loaded seat so a stuck waiting lock cannot
+    // hide the only way out of leftover ships (James lock).
+    const showBar = phase === GAME_PHASES.UNIT_PLACEMENT ? isOwnSeat : isLocalPlayerTurn;
     if (!shouldShowBottomTurnActions({
       isMultiplayer: !!this.gameState?.isMultiplayer,
-      isLocalPlayerTurn,
+      isLocalPlayerTurn: showBar,
       isAI: player.isAI
     })) {
       return '';
@@ -934,6 +979,12 @@ export class PlayerPanel {
     if (mobile) html += `</div>`;
     html += `</div>`;
     return html;
+  }
+
+  _renderSeatChip(chrome) {
+    if (!chrome?.badge) return '';
+    const cls = chrome.ownSeat ? 'your-turn' : 'waiting';
+    return `<div class="pp-seat-chip ${cls}" data-seat="${cls}">${chrome.seatLabel}</div>`;
   }
 
   _renderHeader(player, isMultiplayer = false, isLocalPlayerTurn = true, isOwnSeat = isLocalPlayerTurn) {
@@ -2110,7 +2161,16 @@ export class PlayerPanel {
     if (ux.stuckWithNaval && ux.hint) hint = ux.hint;
 
     let html = `<div class="phone-place-tray">`;
-    html += `<div class="phone-place-meta">${placedThisRound}/${limit} this round</div>`;
+    const budget = placementBudgetCopy({
+      deployedThisRound: placedThisRound,
+      limit,
+      poolRemaining: remaining.reduce((sum, u) => sum + (Number(u.quantity) || 0), 0),
+    });
+    html += `<div class="phone-place-meta">${budget.deployedLabel}: ${budget.deployedText}</div>`;
+    html += `<div class="phone-place-pool">${budget.remainingLabel}: ${budget.remainingText}</div>`;
+    if (budget.remainingHint) {
+      html += `<div class="phone-place-hint">${budget.remainingHint}</div>`;
+    }
     html += `<div class="phone-place-hint">${hint}</div>`;
     html += `<div class="phone-place-list">`;
     for (const unit of remaining) {
@@ -2127,7 +2187,13 @@ export class PlayerPanel {
     if (remaining.length === 0) {
       html += `<div class="phone-place-empty">All units placed</div>`;
     }
-    html += `</div></div>`;
+    html += `</div>`;
+    if (ux.showDone) {
+      html += `<button type="button" class="phone-place-done" data-action="finish-placement">${
+        ux.canSkipNaval ? 'Done — skip leftover ships →' : 'Done — next player →'
+      }</button>`;
+    }
+    html += `</div>`;
     return html;
   }
 
@@ -2171,19 +2237,25 @@ export class PlayerPanel {
     // Panel count is units actually on the map this round. Queue is not
     // committed until Deploy — Max / + must not bump this (B24).
     const deployedThisRound = deployedThisRoundDisplay(placedThisRound);
+    const budget = placementBudgetCopy({
+      deployedThisRound,
+      limit,
+      poolRemaining: actualRemaining,
+    });
 
     let html = `
       <div class="pp-inline-placement">
         <div class="pp-budget-bar">
-          <span class="pp-budget-label">Deployed:</span>
-          <span class="pp-budget-value ${deployedThisRound >= limit ? 'full' : ''}">${deployedThisRound}</span>
-          <span class="pp-budget-sep">/</span>
-          <span class="pp-budget-total">${limit} this round</span>
+          <span class="pp-budget-label">${budget.deployedLabel}:</span>
+          <span class="pp-budget-value ${deployedThisRound >= limit ? 'full' : ''}">${budget.deployedText}</span>
         </div>
         <div class="pp-placement-remaining">
-          <span class="pp-remaining-label">Remaining to deploy:</span>
-          <span class="pp-remaining-value">${actualRemaining} units</span>
+          <span class="pp-remaining-label">${budget.remainingLabel}:</span>
+          <span class="pp-remaining-value">${budget.remainingText}</span>
         </div>`;
+    if (budget.remainingHint) {
+      html += `<div class="pp-hint">${budget.remainingHint}</div>`;
+    }
 
     // Selected tile + skip hint stay visible when Done/skip is offered
     // (James B19-class: 1/6 naval-only still needs a Done next to Undo).

@@ -37,6 +37,7 @@ const {
   queuedCount,
   shouldResetDeployedThisRound,
   deployedThisRoundDisplay,
+  placementBudgetCopy,
   queueAfterDeployAttempt,
 } = await import(pathToFileURL(join(root, 'src/state/placeQueue.js')));
 const {
@@ -53,6 +54,7 @@ const {
   isMyGamesActiveStatus,
   resolvePresenceState,
   shouldOpenLeaveConfirm,
+  shouldJoinGameFromRowClick,
   isLeaveControlTarget,
   shouldReplaceSnapshotListener,
   shouldResumeSnapshots,
@@ -68,6 +70,7 @@ const {
 const {
   computeIsLocalPlayerTurn,
   resolveTabTitle,
+  resolveTurnChrome,
   emitYourTurnEvent,
   shouldAutoCommitPhoneCapital,
 } = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
@@ -334,7 +337,7 @@ console.log('=== Title and banner agree; your-turn event ===');
     }),
   });
   check('WAITING guest is not ● Your turn',
-    waiting === true && title === 'Tactical Risk');
+    waiting === true && !title.includes('Your turn'));
   const yourTurn = computeIsLocalPlayerTurn({
     isMultiplayer: true,
     isWaitingForSync: false,
@@ -347,6 +350,57 @@ console.log('=== Title and banner agree; your-turn event ===');
   const ev = emitYourTurnEvent({ yourTurn: true, playerName: 'James', gameId: 'ZUJMNP' });
   check('your-turn event payload is pingable',
     ev.yourTurn === true && ev.playerName === 'James' && ev.gameId === 'ZUJMNP');
+}
+
+console.log('=== James lock: if it can look broken, it is broken ===');
+{
+  const other = resolveTurnChrome({
+    isMultiplayer: true,
+    localUserId: 'james',
+    currentPlayerOderId: 'host',
+    currentPlayerName: 'Bastion',
+  });
+  check('other seat: tab title is Waiting, never Your turn',
+    other.tabTitle === 'Waiting: Bastion — Tactical Risk'
+    && other.badge === 'WAITING'
+    && other.ownSeat === false
+    && !other.tabTitle.includes('Your turn'));
+  check('waiting lock cannot force Your turn on the other seat',
+    resolveTabTitle({
+      isMultiplayer: true,
+      isLocalPlayerTurn: true,
+      localUserId: 'james',
+      currentPlayerOderId: 'host',
+      currentPlayerName: 'Bastion',
+    }) === 'Waiting: Bastion — Tactical Risk');
+  const mine = resolveTurnChrome({
+    isMultiplayer: true,
+    localUserId: 'james',
+    currentPlayerOderId: 'james',
+    currentPlayerName: 'James',
+  });
+  check('own seat: title and badge are both YOUR TURN',
+    mine.tabTitle === '● Your turn — Tactical Risk' && mine.badge === 'YOUR TURN');
+  const cap = placementBudgetCopy({
+    deployedThisRound: 6, limit: 6, poolRemaining: 1,
+  });
+  check('6/6 + 1 in pool is next-round copy, not Remaining to deploy: 1',
+    cap.deployedText === '6/6'
+    && cap.remainingLabel === 'Still in your pool'
+    && cap.remainingText === '1 next round'
+    && cap.leftoverAfterCap === true
+    && !`${cap.remainingLabel} ${cap.remainingText}`.includes('Remaining to deploy'));
+  check('open pool still says remaining in your pool',
+    placementBudgetCopy({ deployedThisRound: 2, limit: 6, poolRemaining: 19 })
+      .remainingLabel === 'Remaining in your pool');
+  const titleEl = { closest: (sel) => sel === '[data-role="join-game"]' ? titleEl : null };
+  const leaveEl = { closest: (sel) => sel === '[data-leave-game]' ? leaveEl : null };
+  check('row title resumes; it does not open surrender',
+    shouldJoinGameFromRowClick({ eventTarget: titleEl }) === true
+    && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: titleEl }) === false);
+  check('only Leave opens surrender',
+    shouldJoinGameFromRowClick({ eventTarget: leaveEl }) === false
+    && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: leaveEl }) === true);
 }
 
 console.log('=== Undo / capital / leave row ===');

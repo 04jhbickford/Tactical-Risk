@@ -171,3 +171,10 @@ export function shouldOpenLeaveConfirm({
   if (eventTarget) return isLeaveControlTarget(eventTarget);
   return true;
 }
+
+// Row title / join hit target must resume the match. Leave is a sibling.
+export function shouldJoinGameFromRowClick({ eventTarget = null } = {}) {
+  if (!eventTarget || typeof eventTarget.closest !== 'function') return false;
+  if (isLeaveControlTarget(eventTarget)) return false;
+  return !!eventTarget.closest('[data-role="join-game"]');
+}

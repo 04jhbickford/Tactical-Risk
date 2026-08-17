@@ -16,6 +16,7 @@ import { leaveGame } from '../multiplayer/surrender.js';
 import {
   mergeMyActiveGames,
   shouldAbortMyGamesOnTokenHiccup,
+  shouldJoinGameFromRowClick,
   shouldOpenLeaveConfirm,
 } from '../multiplayer/presencePolicy.js';
 
@@ -287,9 +288,10 @@ export class GameList {
           <div class="mp-game-status">
             ${statusHtml}
           </div>
+          <span class="mp-game-join">Resume</span>
         </button>
         <div class="mp-game-row-actions">
-          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" data-role="leave-game" title="Leave this game (surrender)">Leave</button>
+          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" data-role="leave-game" title="Surrender and leave this game">Leave</button>
         </div>
         ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}
       </div>
@@ -346,6 +348,7 @@ export class GameList {
       item.addEventListener('click', async (e) => {
         if (e.target.closest('[data-leave-game]')) return;
         if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false, eventTarget: e.target })) return;
+        if (!shouldJoinGameFromRowClick({ eventTarget: e.target })) return;
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
         console.log('[GameList] Game clicked:', { gameId, game });

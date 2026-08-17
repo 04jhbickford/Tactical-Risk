@@ -257,7 +257,10 @@ export class LobbyManager {
       return { success: false, error: 'Game already started' };
     }
     if (resolved.kind === 'not-found') {
-      return { success: false, error: 'Lobby not found' };
+      return {
+        success: false,
+        error: 'No waiting lobby with that code. If the match already started, open My Games — it stays listed there.',
+      };
     }
     const lobby = resolved.lobby;
 

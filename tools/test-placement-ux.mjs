@@ -55,6 +55,7 @@ console.log('=== computeInitialPlacementUX: land selected, only naval remain, va
     selectedKind: 'owned-land',
   });
   check('B19: Done/skip shown on inland land (not gated on 6/6)', ux.showDone === true);
+  check('James lock: leftover ships always have a Done', ux.showDone === true);
   check('B19: sea-zone hint still shown so ships can be placed', ux.needSeaHint === true);
   check('not stuck (legal sea exists)', ux.stuckWithNaval === false);
   check('B19: can skip leftover ships from a non-sea tile', ux.canSkipNaval === true);
@@ -115,6 +116,21 @@ console.log('=== computeInitialPlacementUX: landlocked / no legal naval drop ===
   check('stuck flag set', ux.stuckWithNaval === true);
   check('hint explains there is no legal sea zone',
     /no legal sea zone/i.test(ux.hint));
+}
+
+console.log('=== James lock: 6/6 this round still offers Done ===');
+{
+  const ux = computeInitialPlacementUX({
+    placedThisRound: 6,
+    limit: 6,
+    totalRemaining: 1,
+    landAirRemaining: 1,
+    navalRemaining: 0,
+    hasPlaceable: true,
+    totalQueued: 0,
+    selectedKind: 'owned-land',
+  });
+  check('round cap offers Done so 6/6 is not a dead screen', ux.showDone === true);
 }
 
 console.log('=== computeInitialPlacementUX: mixed land+naval, land selected ===');
