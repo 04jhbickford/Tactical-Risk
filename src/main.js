@@ -80,6 +80,7 @@ import {
   shouldEjectFromMatch,
   shouldAccumulateHostOfflineMs,
   shouldStartHostFailover,
+  presenceStopReason,
 } from './multiplayer/presencePolicy.js';
 import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
 import { AuthScreen } from './ui/authScreen.js';
@@ -1135,7 +1136,7 @@ async function init() {
           syncManager = null;
         }
         if (presenceManager) {
-          presenceManager.stop();
+          presenceManager.stop({ reason: presenceStopReason({ explicitLeave: false }) });
         }
         gameState = null;
 

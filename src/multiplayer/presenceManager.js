@@ -104,8 +104,9 @@ export class PresenceManager {
     return true;
   }
 
-  // Stop tracking presence
-  stop() {
+  // Stop tracking presence. Exit / Leave deletes the doc. Session loss
+  // (Sign In after a backgrounded tab) must not — that is B25.
+  stop({ reason = 'explicit-leave' } = {}) {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
@@ -124,7 +125,7 @@ export class PresenceManager {
     window.removeEventListener('pageshow', this._boundPageShowHandler);
     window.removeEventListener('pagehide', this._boundPageHideHandler);
 
-    this._goOffline({ reason: 'explicit-leave' });
+    this._goOffline({ reason });
     this.gameId = null;
     this.playerPresence = {};
   }

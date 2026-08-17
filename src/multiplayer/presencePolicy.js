@@ -28,6 +28,12 @@ export function shouldDeletePresenceDoc({ reason } = {}) {
   return reason === 'explicit-leave';
 }
 
+// Auth eject / Sign In after a backgrounded tab is not Exit. Keep the
+// presence doc so failover does not treat the host as gone (B25).
+export function presenceStopReason({ explicitLeave = false } = {}) {
+  return explicitLeave ? 'explicit-leave' : 'session-lost';
+}
+
 export function presenceStateForVisibility(visibilityState) {
   return visibilityState === 'visible' ? 'online' : 'idle';
 }
@@ -84,11 +90,59 @@ export function shouldEjectFromMatch({
   return !tokenValid;
 }
 
+export const MY_GAMES_ACTIVE_STATUSES = ['active', 'starting'];
+
+export function isMyGamesActiveStatus(status) {
+  return MY_GAMES_ACTIVE_STATUSES.includes(status);
+}
+
+// Token hiccup after Sign In must still list games. Wiping the list here
+// is how B25 showed "No active games found" while Bastion stayed signed in.
+export function shouldAbortMyGamesOnTokenHiccup({
+  authUserPresent = false,
+  tokenValid = false,
+} = {}) {
+  if (authUserPresent) return false;
+  return !tokenValid;
+}
+
+export function mergeMyActiveGames({ bySeat = [], byStarter = [] } = {}) {
+  const byId = new Map();
+  for (const game of [...bySeat, ...byStarter]) {
+    if (!game?.id) continue;
+    if (!isMyGamesActiveStatus(game.status)) continue;
+    byId.set(game.id, game);
+  }
+  return [...byId.values()];
+}
+
+// Empty [] is truthy — do not treat it as "not seated". B25: host Sign In
+// then join ZUJMNP must land in the live game.
+export function isSeatedInStartedGame({ game, lobby, userId } = {}) {
+  if (!userId) return false;
+  if (!game && !lobby) return false;
+
+  const ids = game?.playerUserIds;
+  if (Array.isArray(ids) && ids.length > 0) {
+    return ids.includes(userId);
+  }
+
+  const lobbyPlayers = lobby?.players || game?.lobbyData?.players || [];
+  if (lobbyPlayers.some((p) => p && p.oderId === userId)) return true;
+  if (game?.startedBy === userId) return true;
+  if (lobby?.hostId === userId) return true;
+  return !!game;
+}
+
 // Join-by-code: a started match is still the same code. Waiting lobby
 // first; otherwise any lobby/game with that code.
 export function resolveJoinByCode({ waitingLobby, anyLobby, startedGame, userId } = {}) {
   if (waitingLobby) return { kind: 'lobby', lobby: waitingLobby };
-  if (startedGame && (!startedGame.playerUserIds || startedGame.playerUserIds.includes(userId))) {
+  if (startedGame && isSeatedInStartedGame({
+    game: startedGame,
+    lobby: anyLobby,
+    userId,
+  })) {
     return { kind: 'game', game: startedGame };
   }
   if (anyLobby && anyLobby.status && anyLobby.status !== 'waiting') {

@@ -46,6 +46,11 @@ const {
   shouldEjectFromMatch,
   resolveJoinByCode,
   shouldDeleteLobbyOnHostLeave,
+  presenceStopReason,
+  isSeatedInStartedGame,
+  shouldAbortMyGamesOnTokenHiccup,
+  mergeMyActiveGames,
+  isMyGamesActiveStatus,
   resolvePresenceState,
   shouldOpenLeaveConfirm,
   isLeaveControlTarget,
@@ -156,6 +161,47 @@ console.log('=== Join-by-code finds a started match ===');
   check('started lobby is never deleted when the host backgrounds',
     shouldDeleteLobbyOnHostLeave({ lobbyStatus: 'starting', remainingHumans: 0 }) === false
     && shouldDeleteLobbyOnHostLeave({ lobbyStatus: 'waiting', remainingHumans: 0 }) === true);
+}
+
+console.log('=== B25: session-lost host can still find ZUJMNP ===');
+{
+  const emptyIds = { id: 'g-zuj', lobbyCode: 'ZUJMNP', status: 'active', playerUserIds: [], startedBy: 'host' };
+  const missingIds = { id: 'g-zuj', lobbyCode: 'ZUJMNP', status: 'active', startedBy: 'host' };
+  const lobbySeat = {
+    id: 'l-zuj', status: 'starting', code: 'ZUJMNP', hostId: 'host',
+    players: [{ oderId: 'host' }, { oderId: 'guest' }],
+    gameId: 'g-zuj',
+  };
+  check('session-lost does not delete the presence doc',
+    shouldDeletePresenceDoc({ reason: presenceStopReason({ explicitLeave: false }) }) === false
+    && presenceStopReason({ explicitLeave: false }) === 'session-lost');
+  check('Exit still deletes the presence doc',
+    shouldDeletePresenceDoc({ reason: presenceStopReason({ explicitLeave: true }) }) === true);
+  check('empty playerUserIds is still seated via startedBy',
+    isSeatedInStartedGame({ game: emptyIds, userId: 'host' }) === true);
+  check('empty playerUserIds is still seated via lobby players',
+    isSeatedInStartedGame({ game: emptyIds, lobby: lobbySeat, userId: 'guest' }) === true);
+  check('populated playerUserIds still excludes a stranger',
+    isSeatedInStartedGame({
+      game: { ...emptyIds, playerUserIds: ['host', 'guest'] },
+      userId: 'stranger',
+    }) === false);
+  check('join-by-code finds started game with empty playerUserIds',
+    resolveJoinByCode({ startedGame: emptyIds, anyLobby: lobbySeat, userId: 'host' }).kind === 'game'
+    && resolveJoinByCode({ startedGame: missingIds, userId: 'host' }).kind === 'game');
+  check('join-by-code does not say not-found when the game exists',
+    resolveJoinByCode({ startedGame: emptyIds, userId: 'host' }).kind !== 'not-found');
+  check('token hiccup with a signed-in user still loads My Games',
+    shouldAbortMyGamesOnTokenHiccup({ authUserPresent: true, tokenValid: false }) === false
+    && shouldAbortMyGamesOnTokenHiccup({ authUserPresent: false, tokenValid: false }) === true);
+  check('My Games merges seat + startedBy and drops finished',
+    mergeMyActiveGames({
+      bySeat: [{ id: 'a', status: 'active' }, { id: 'done', status: 'finished' }],
+      byStarter: [{ id: 'a', status: 'active' }, { id: 'b', status: 'starting' }],
+    }).map((g) => g.id).sort().join(',') === 'a,b');
+  check('My Games status filter is client-side (no compound in)',
+    isMyGamesActiveStatus('active') && isMyGamesActiveStatus('starting')
+    && isMyGamesActiveStatus('finished') === false);
 }
 
 console.log('=== Deploy queue: + is exactly one row by 1 ===');

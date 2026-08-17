@@ -19,7 +19,11 @@ import {
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { resolveJoinByCode, shouldDeleteLobbyOnHostLeave } from './presencePolicy.js';
+import {
+  mergeMyActiveGames,
+  resolveJoinByCode,
+  shouldDeleteLobbyOnHostLeave,
+} from './presencePolicy.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -125,16 +129,33 @@ export class LobbyManager {
   // Find game by lobby code (for rejoining started games)
   async findGameByCode(code) {
     // Single-field query only — compound query (lobbyCode + status) needs a composite index
-    const q = query(
-      collection(this.db, 'games'),
-      where('lobbyCode', '==', code.toUpperCase())
-    );
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return null;
-    const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status))
-      || snapshot.docs[0];
-    if (!active) return null;
-    return { id: active.id, ...active.data() };
+    try {
+      const q = query(
+        collection(this.db, 'games'),
+        where('lobbyCode', '==', code.toUpperCase())
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status))
+        || snapshot.docs[0];
+      if (!active) return null;
+      return { id: active.id, ...active.data() };
+    } catch (error) {
+      console.error('Error finding game by code:', error);
+      return null;
+    }
+  }
+
+  async getGameById(gameId) {
+    if (!this.db || !gameId) return null;
+    try {
+      const snap = await getDoc(doc(this.db, 'games', gameId));
+      if (!snap.exists()) return null;
+      return { id: snap.id, ...snap.data() };
+    } catch (error) {
+      console.error('Error loading game by id:', error);
+      return null;
+    }
   }
 
   // Get all open public lobbies (no password, waiting status)
@@ -182,13 +203,16 @@ export class LobbyManager {
     if (!user) return [];
 
     try {
-      const q = query(
-        collection(this.db, 'games'),
-        where('playerUserIds', 'array-contains', user.id),
-        where('status', 'in', ['active', 'starting'])
-      );
-      const snapshot = await getDocs(q);
-      const games = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      // Equality / array-contains only — no compound `in` (empty indexes.json).
+      const gamesRef = collection(this.db, 'games');
+      const [seatSnap, starterSnap] = await Promise.all([
+        getDocs(query(gamesRef, where('playerUserIds', 'array-contains', user.id))),
+        getDocs(query(gamesRef, where('startedBy', '==', user.id))),
+      ]);
+      const games = mergeMyActiveGames({
+        bySeat: seatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        byStarter: starterSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+      });
       games.sort((a, b) => {
         const aTime = a.updatedAt?.toMillis?.() || 0;
         const bTime = b.updatedAt?.toMillis?.() || 0;
@@ -209,7 +233,10 @@ export class LobbyManager {
     if (!user) return { success: false, error: 'Not logged in' };
 
     const lobbyDoc = await this._findLobbyByCode(code);
-    const game = await this.findGameByCode(code);
+    let game = await this.findGameByCode(code);
+    if (!game && lobbyDoc?.gameId) {
+      game = await this.getGameById(lobbyDoc.gameId);
+    }
     const waitingLobby = lobbyDoc?.status === 'waiting' ? lobbyDoc : null;
     const resolved = resolveJoinByCode({
       waitingLobby,
@@ -221,6 +248,9 @@ export class LobbyManager {
       return { success: true, isGame: true, gameId: resolved.game.id, game: resolved.game };
     }
     if (resolved.kind === 'started-lobby') {
+      if (!game && resolved.lobby?.gameId) {
+        game = await this.getGameById(resolved.lobby.gameId);
+      }
       if (game) {
         return { success: true, isGame: true, gameId: game.id, game };
       }

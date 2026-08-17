@@ -13,7 +13,11 @@ import { getFirebaseDb } from '../multiplayer/firebase.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { leaveGame } from '../multiplayer/surrender.js';
-import { shouldOpenLeaveConfirm } from '../multiplayer/presencePolicy.js';
+import {
+  mergeMyActiveGames,
+  shouldAbortMyGamesOnTokenHiccup,
+  shouldOpenLeaveConfirm,
+} from '../multiplayer/presencePolicy.js';
 
 export { shouldOpenLeaveConfirm };
 
@@ -67,7 +71,8 @@ export class GameList {
     this.isLoading = true;
     this._render();
 
-    const userId = this.authManager.getUserId();
+    const user = this.authManager.getUser();
+    const userId = user?.id || this.authManager.getUserId();
     console.log('[GameList] Loading games for userId:', userId);
 
     if (!userId || !this.db) {
@@ -77,9 +82,12 @@ export class GameList {
       return;
     }
 
-    // Validate token before making Firestore queries
+    // Token hiccup after Sign In must still query (B25).
     const isTokenValid = await this.authManager.validateToken();
-    if (!isTokenValid) {
+    if (shouldAbortMyGamesOnTokenHiccup({
+      authUserPresent: !!user,
+      tokenValid: isTokenValid,
+    })) {
       console.warn('[GameList] Token validation failed - user needs to re-login');
       this.games = [];
       this.isLoading = false;
@@ -87,30 +95,23 @@ export class GameList {
     }
 
     try {
-      // Query games where user is a player
-      // Include both 'active' and 'starting' (in case host hasn't initialized yet)
-      console.log('[GameList] Querying games with:', {
-        userId,
-        statuses: ['active', 'starting']
+      // Equality / array-contains only — compound `in` needs a composite index
+      // (firestore.indexes.json is empty). Filter status client-side.
+      console.log('[GameList] Querying games with:', { userId });
+
+      const gamesRef = collection(this.db, 'games');
+      const [seatSnap, starterSnap] = await Promise.all([
+        getDocs(query(gamesRef, where('playerUserIds', 'array-contains', userId))),
+        getDocs(query(gamesRef, where('startedBy', '==', userId))),
+      ]);
+      const bySeat = seatSnap.docs.map(d => {
+        const data = d.data();
+        console.log(`[GameList] Game ${d.id}: status=${data.status}, playerUserIds=`, data.playerUserIds);
+        return { id: d.id, ...data };
       });
-
-      const q = query(
-        collection(this.db, 'games'),
-        where('playerUserIds', 'array-contains', userId),
-        where('status', 'in', ['active', 'starting'])
-      );
-
-      const snapshot = await getDocs(q);
-      console.log(`[GameList] Found ${snapshot.docs.length} games for userId ${userId}`);
-
-      this.games = snapshot.docs.map(doc => {
-        const data = doc.data();
-        console.log(`[GameList] Game ${doc.id}: status=${data.status}, playerUserIds=`, data.playerUserIds);
-        return {
-          id: doc.id,
-          ...data
-        };
-      });
+      const byStarter = starterSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      this.games = mergeMyActiveGames({ bySeat, byStarter });
+      console.log(`[GameList] Found ${this.games.length} active games for userId ${userId}`);
 
       // Sort by last updated
       this.games.sort((a, b) => {
