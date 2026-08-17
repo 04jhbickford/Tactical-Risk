@@ -96,6 +96,11 @@ const {
   shouldPrefillJoinCodeFromLastMatch,
   shouldAutoResumeLastMatch,
   resolveResumeFailureView,
+  shouldLeaveLobbyView,
+  shouldNavigateToHome,
+  shouldClearLobbyOnSnapshotError,
+  shouldKeepLastKnownLobby,
+  resolveLobbyViewAfterLoss,
   joinFormFieldAttrs,
   joinFormFieldAttrString,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
@@ -146,7 +151,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.78', GAME_VERSION === 'V2.78');
+check('GAME_VERSION is V2.79', GAME_VERSION === 'V2.79');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1304,6 +1309,91 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
     mainSrc.includes('resolveResumeFailureView')
     && mainSrc.includes('showReconnectOnly')
     && lobbyMgrSrc.includes('reused: true'));
+
+  // B41 — 6V9ZXK: host waiting-room dumped to Local Play / Play Online
+  check('B41: snapshot error / flicker is not Leave',
+    shouldLeaveLobbyView({ snapshotError: true }) === false
+    && shouldLeaveLobbyView({ snapshotMissing: true }) === false
+    && shouldLeaveLobbyView({ presenceFlicker: true }) === false
+    && shouldLeaveLobbyView({ sessionLost: true }) === false);
+  check('B41: only explicit Leave leaves the waiting room',
+    shouldLeaveLobbyView({ explicitLeave: true }) === true
+    && shouldLeaveLobbyView({ confirmedLeave: true }) === true);
+  check('B41: never navigate home while 6V9ZXK is remembered',
+    shouldNavigateToHome({
+      explicitExit: true,
+      lastMatch: { lobbyCode: '6V9ZXK' },
+    }) === false
+    && shouldNavigateToHome({
+      lastMatch: { lobbyCode: '6V9ZXK' },
+    }) === false
+    && shouldNavigateToHome({ liveLobby: true, explicitExit: true }) === false);
+  check('B41: Sign Out may go home; empty lastMatch + Exit may go home',
+    shouldNavigateToHome({ confirmedSignOut: true, lastMatch: { lobbyCode: '6V9ZXK' } }) === true
+    && shouldNavigateToHome({ explicitExit: true, lastMatch: null }) === true);
+  check('B41: snapshot error keeps the last known lobby',
+    shouldClearLobbyOnSnapshotError() === false
+    && shouldKeepLastKnownLobby({ snapshotError: true }) === true
+    && shouldKeepLastKnownLobby({ snapshotExists: false }) === true);
+  check('B41: lost view restores lobby from lastMatch, not home',
+    resolveLobbyViewAfterLoss({
+      currentLobby: null,
+      lastMatch: { lobbyCode: '6V9ZXK' },
+    }) === 'lobby'
+    && resolveLobbyViewAfterLoss({
+      currentLobby: null,
+      lastMatch: { gameId: 'game_6v9', lobbyCode: '6V9ZXK' },
+    }) === 'game'
+    && resolveLobbyViewAfterLoss({
+      currentLobby: { code: '6V9ZXK' },
+      lastMatch: null,
+    }) === 'lobby'
+    && resolveLobbyViewAfterLoss({ explicitLeave: true }) === 'home');
+  {
+    const store = new Map();
+    const storage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, v),
+      removeItem: (k) => store.delete(k),
+    };
+    const saved = rememberLastMatch({ lobbyCode: '6V9ZXK', hostName: 'Bastion' }, storage);
+    check('B41: waiting lobby is remembered without a gameId',
+      saved?.lobbyCode === '6V9ZXK'
+      && saved?.gameId === null
+      && readLastMatch(storage)?.lobbyCode === '6V9ZXK'
+      && shouldAutoResumeLastMatch({ signedIn: true, lastMatch: readLastMatch(storage) }) === true);
+  }
+  check('B41: waiting-lobby resume miss is lobby, not home',
+    resolveResumeFailureView({
+      resumed: false,
+      lastMatch: { lobbyCode: '6V9ZXK' },
+    }) === 'lobby'
+    && resolveResumeFailureView({ resumed: false, lastMatch: null }) === 'home');
+  check('B41: Start stays gated at 1/2',
+    resolveHostLobbyPrimaryCta({
+      isHost: true,
+      playerCount: 1,
+      allHaveFactions: true,
+      hostHasFaction: true,
+    })?.disabled === true
+    && resolveHostLobbyPrimaryCta({
+      isHost: true,
+      playerCount: 2,
+      allHaveFactions: true,
+      hostHasFaction: true,
+    })?.disabled === false);
+  check('B41: create/join remembers lobbyCode; snapshot error does not null',
+    lobbyMgrSrc.includes('rememberLastMatch')
+    && lobbyMgrSrc.includes('shouldClearLobbyOnSnapshotError')
+    && lobbyMgrSrc.includes('shouldKeepLastKnownLobby')
+    && lobbyMgrSrc.includes('forgetLastMatch()'));
+  check('B41: home is gated; restoreLiveLobbyOrGame exists',
+    mainSrc.includes('shouldNavigateToHome')
+    && mainSrc.includes('restoreLiveLobbyOrGame')
+    && mainSrc.includes('onCoverHome')
+    && lobbySrc.includes('_restoreLiveLobby')
+    && lobbySrc.includes('_renderLobbyRestoring')
+    && lobbySrc.includes('shouldLeaveLobbyView'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

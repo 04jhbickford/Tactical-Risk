@@ -175,13 +175,69 @@ export function shouldAutoResumeLastMatch({
 }
 
 // Failed resume of a live code must not dump to Create Game (B38/B40).
+// A waiting lobby (B41 / 6V9ZXK) restores the room, not home.
 export function resolveResumeFailureView({
   resumed = false,
   lastMatch = null,
 } = {}) {
   if (resumed) return 'game';
-  if (lastMatch?.gameId || lastMatch?.lobbyCode) return 'reconnect';
+  if (lastMatch?.gameId) return 'reconnect';
+  if (lastMatch?.lobbyCode) return 'lobby';
   return 'home';
+}
+
+// Waiting-room dump (B41): same family as B38. Presence/snapshot flicker
+// and a discarded-tab restart are not Leave. Only Leave / Sign Out leave.
+export function shouldLeaveLobbyView({
+  explicitLeave = false,
+  confirmedLeave = false,
+  sessionLost = false,
+  snapshotError = false,
+  snapshotMissing = false,
+  presenceFlicker = false,
+} = {}) {
+  if (explicitLeave || confirmedLeave) return true;
+  return false;
+}
+
+export function shouldNavigateToHome({
+  explicitExit = false,
+  confirmedSignOut = false,
+  lastMatch = null,
+  liveLobby = false,
+} = {}) {
+  if (confirmedSignOut) return true;
+  if (liveLobby) return false;
+  if (lastMatch?.gameId || lastMatch?.lobbyCode) return false;
+  return explicitExit === true;
+}
+
+export function shouldClearLobbyOnSnapshotError() {
+  return false;
+}
+
+export function shouldKeepLastKnownLobby({
+  snapshotExists = true,
+  snapshotError = false,
+  explicitLeave = false,
+} = {}) {
+  if (explicitLeave) return false;
+  if (snapshotError) return true;
+  if (!snapshotExists) return true;
+  return true;
+}
+
+// If the client loses the lobby view, restore the live room — never home.
+export function resolveLobbyViewAfterLoss({
+  currentLobby = null,
+  lastMatch = null,
+  explicitLeave = false,
+} = {}) {
+  if (explicitLeave) return 'home';
+  if (currentLobby) return 'lobby';
+  if (lastMatch?.gameId) return 'game';
+  if (lastMatch?.lobbyCode) return 'lobby';
+  return 'reconnect';
 }
 
 export function shouldPrefillJoinCodeFromLastMatch() {
