@@ -30,6 +30,7 @@ import {
   recoverMyGamesOnLoad,
   resolveJoinNotFoundError,
 } from './lastMatch.js';
+import { resolveStartGameTarget } from './lobbyStart.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -654,6 +655,14 @@ export class LobbyManager {
     const playersWithoutFaction = this.currentLobby.players.filter(p => !p.factionId);
     if (playersWithoutFaction.length > 0) {
       return { success: false, error: 'All players must select a faction' };
+    }
+
+    const existing = resolveStartGameTarget({
+      existingGameId: this.currentLobby.gameId,
+      lobbyStatus: this.currentLobby.status,
+    });
+    if (existing.reuse) {
+      return { success: true, gameId: existing.gameId, reused: true };
     }
 
     const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

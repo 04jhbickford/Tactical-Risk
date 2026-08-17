@@ -818,8 +818,14 @@ export class MultiplayerLobby {
         alert(result.error);
         btn.disabled = false;
         btn.textContent = originalText;
+        return;
       }
-      // On success the lobby subscription transitions everyone into the game
+      // Already-started lobby (CEVX6F): reopen that gameId. Do not wait
+      // for a status snapshot that will not fire again.
+      if (result.reused && result.gameId && this.onStart) {
+        this.hide();
+        this.onStart(result.gameId, this.lobbyManager.currentLobby);
+      }
     });
 
     // Publish lobby (make visible in Open Games, then go to browse)

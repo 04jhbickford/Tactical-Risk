@@ -174,6 +174,16 @@ export function shouldAutoResumeLastMatch({
   return !!(lastMatch?.gameId || lastMatch?.lobbyCode);
 }
 
+// Failed resume of a live code must not dump to Create Game (B38/B40).
+export function resolveResumeFailureView({
+  resumed = false,
+  lastMatch = null,
+} = {}) {
+  if (resumed) return 'game';
+  if (lastMatch?.gameId || lastMatch?.lobbyCode) return 'reconnect';
+  return 'home';
+}
+
 export function shouldPrefillJoinCodeFromLastMatch() {
   return false;
 }

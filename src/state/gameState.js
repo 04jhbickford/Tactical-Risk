@@ -1192,7 +1192,8 @@ export class GameState {
   // First UNIT_PLACEMENT wave with no land/air in the seat pool is a
   // deserialize / key miss — not "this faction has no land IPC."
   ensureInitialDeployPools() {
-    if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) return;
+    if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) return false;
+    let restored = false;
     for (const p of this.players || []) {
       const rows = resolvePlayerDeployPool(this.unitsToPlace, p.id, [p.name]);
       this.unitsToPlace[p.id] = rows;
@@ -1205,8 +1206,11 @@ export class GameState {
         this.unitsToPlace[p.id] = this._buildStartingDeployPool({
           factoryAlreadyPlaced: !!this.playerState?.[p.id]?.hasPlacedCapital,
         });
+        restored = true;
       }
     }
+    if (restored) this._deployPoolRestored = true;
+    return restored;
   }
 
   // Get units that current player still needs to place (Risk mode)

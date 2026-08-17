@@ -95,10 +95,11 @@ const {
   shouldOpenMyGames,
   shouldPrefillJoinCodeFromLastMatch,
   shouldAutoResumeLastMatch,
+  resolveResumeFailureView,
   joinFormFieldAttrs,
   joinFormFieldAttrString,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
-const { resolveHostLobbyPrimaryCta } =
+const { resolveHostLobbyPrimaryCta, resolveStartGameTarget, shouldCreateNewGameOnResume } =
   await import(pathToFileURL(join(root, 'src/multiplayer/lobbyStart.js')));
 const { shouldPeekPhoneTray } =
   await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
@@ -1277,6 +1278,32 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
     panelSrcB38.includes('↩ Undo')
     && panelSrcB38.includes('data-action="confirm-placement"')
     && panelSrcB38.includes('canDeploy'));
+
+  check('CEVX6F hold: resume never creates a new game',
+    shouldCreateNewGameOnResume() === false);
+  check('CEVX6F hold: Start on a started lobby reuses that gameId',
+    resolveStartGameTarget({
+      existingGameId: 'game_cevx6f',
+      lobbyStatus: 'starting',
+    }).reuse === true
+    && resolveStartGameTarget({
+      existingGameId: 'game_cevx6f',
+      lobbyStatus: 'starting',
+    }).gameId === 'game_cevx6f');
+  check('CEVX6F hold: a waiting lobby with no gameId may create once',
+    resolveStartGameTarget({
+      existingGameId: null,
+      lobbyStatus: 'waiting',
+    }).reuse === false);
+  check('B38: failed resume of CEVX6F is reconnect, not Create Game home',
+    resolveResumeFailureView({
+      resumed: false,
+      lastMatch: { gameId: 'game_cevx', lobbyCode: 'CEVX6F' },
+    }) === 'reconnect');
+  check('B38: boot/Play Online use reconnect-only on resume miss',
+    mainSrc.includes('resolveResumeFailureView')
+    && mainSrc.includes('showReconnectOnly')
+    && lobbyMgrSrc.includes('reused: true'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

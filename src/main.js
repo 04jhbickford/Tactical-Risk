@@ -90,6 +90,7 @@ import {
   resolveLobbyCodeFromGameDoc,
   shouldLeaveGameView,
   shouldAutoResumeLastMatch,
+  resolveResumeFailureView,
 } from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
@@ -1277,6 +1278,17 @@ async function init() {
     // Wire up all the UI components (same as local game)
     wireUpGameComponents();
 
+    // CEVX6F hold: a healed first-wave pool must reach the other client.
+    // Do not open a new game — push the same doc.
+    if (gameState._deployPoolRestored && syncManager && !syncManager.isLoading?.()) {
+      if (typeof syncManager.pushStateNow === 'function') {
+        await syncManager.pushStateNow();
+      } else if (typeof syncManager.forcePush === 'function') {
+        await syncManager.forcePush();
+      }
+      gameState._deployPoolRestored = false;
+    }
+
     // Start with map overview
     camera.dirty = true;
     if (isMobileShell()) {
@@ -1660,8 +1672,20 @@ async function init() {
     // even before authReady. Only show Sign In after restore finishes empty.
     if (authManager.isLoggedIn()) {
       if (authScreen) authScreen.hide();
+      const last = readLastMatch();
+      if (shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last }) && last?.gameId) {
+        await startMultiplayerGame(last.gameId, {
+          id: last.gameId,
+          lobbyCode: last.lobbyCode,
+        });
+        if (gameState?.players?.length) return;
+      }
       ensureMultiplayerLobby();
-      multiplayerLobby.show();
+      if (resolveResumeFailureView({ resumed: false, lastMatch: last }) === 'reconnect') {
+        multiplayerLobby.showReconnectOnly();
+      } else {
+        multiplayerLobby.show();
+      }
       return;
     }
 
@@ -1754,7 +1778,18 @@ async function init() {
     } catch (err) {
       console.warn('[Main] Auto-resume last match failed — staying on home', err);
     }
-    if (!resumedLastMatch) lobby.show();
+    if (!resumedLastMatch) {
+      const view = resolveResumeFailureView({
+        resumed: false,
+        lastMatch: lastAtBoot,
+      });
+      if (view === 'reconnect') {
+        ensureMultiplayerLobby();
+        multiplayerLobby.showReconnectOnly();
+      } else {
+        lobby.show();
+      }
+    }
   }
 
   // Canvas sizing

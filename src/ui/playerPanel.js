@@ -2133,6 +2133,7 @@ export class PlayerPanel {
 
   // Shared inputs for the initial-deploy Done button and naval-remainder hint.
   _getInitialPlacementUX(player) {
+    this.gameState.ensureInitialDeployPools?.();
     const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
     const totalRemaining = this.gameState.getTotalUnitsToPlace(player.id, this.unitDefs);
     const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;

@@ -20,3 +20,21 @@ export function resolveHostLobbyPrimaryCta({
     hint,
   };
 }
+
+// CEVX6F hold: Start on an already-started lobby must reopen that
+// gameId. A second setDoc is a new match.
+export function resolveStartGameTarget({
+  existingGameId = null,
+  lobbyStatus = null,
+} = {}) {
+  const id = existingGameId || null;
+  const started = lobbyStatus === 'starting'
+    || lobbyStatus === 'in_progress'
+    || lobbyStatus === 'active';
+  if (id && started) return { reuse: true, gameId: id };
+  return { reuse: false, gameId: null };
+}
+
+export function shouldCreateNewGameOnResume() {
+  return false;
+}
