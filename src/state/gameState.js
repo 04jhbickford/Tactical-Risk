@@ -182,6 +182,9 @@ export class GameState {
 
     // Movement history for current turn: [{ from, to, units }]
     this.moveHistory = [];
+    // Moves at or below this index are locked after combat resolve / leaving
+    // combat movement. Retreat still reads the full history (no combat math change).
+    this.undoLockMoveCount = 0;
 
     // Air unit origins: { territory: { unitType: { origin: territoryName, distance: n } } }
     // Tracks where air units came from and how far they traveled for post-combat landing
@@ -1692,6 +1695,19 @@ export class GameState {
     return { success: true };
   }
 
+  // Undo the last pending purchase (one unit). Purchase + is undoable;
+  // leaving the phase / passing the seat is not.
+  undoLastPurchase(unitDefs) {
+    if (!shouldShowPurchase(this.phase, this.turnPhase)) {
+      return { success: false, error: 'Can only undo during purchase' };
+    }
+    const player = this.currentPlayer;
+    if (!player) return { success: false, error: 'No current player' };
+    const mine = (this.pendingPurchases || []).filter(p => p.owner === player.id && p.quantity > 0);
+    if (mine.length === 0) return { success: false, error: 'No purchases to undo' };
+    return this.removeFromPendingPurchases(mine[mine.length - 1].type, unitDefs);
+  }
+
   // Get pending purchases for current player
   getPendingPurchases() {
     const player = this.currentPlayer;
@@ -2070,6 +2086,7 @@ export class GameState {
     this.pendingPurchases = [];
     this.combatQueue = [];
     this.moveHistory = [];
+    this.undoLockMoveCount = 0;
     this.placementHistory = [];
     this.mobilizationHistory = []; // Reset mobilization undo history for new turn
     this.airUnitOrigins = {}; // Reset air unit tracking for new turn
@@ -2186,6 +2203,12 @@ export class GameState {
         // Auto-advance to next player
         this.nextTurn();
         return;
+      }
+
+      // Leaving combat movement commits those moves. Undo stays available
+      // for later NCM moves. Combat phase itself is never undoable.
+      if (this.turnPhase === TURN_PHASES.COMBAT_MOVE) {
+        this.undoLockMoveCount = this.moveHistory.length;
       }
 
       // Set the phase and break
@@ -2823,8 +2846,15 @@ export class GameState {
 
   // Undo the last movement (during combat or non-combat move phase)
   undoLastMove() {
+    if (this.turnPhase === TURN_PHASES.COMBAT) {
+      return { success: false, error: 'Cannot undo after combat resolve' };
+    }
     if (this.turnPhase !== TURN_PHASES.COMBAT_MOVE && this.turnPhase !== TURN_PHASES.NON_COMBAT_MOVE) {
       return { success: false, error: 'Can only undo during movement phases' };
+    }
+
+    if (this.moveHistory.length <= (this.undoLockMoveCount || 0)) {
+      return { success: false, error: 'Cannot undo a committed combat move' };
     }
 
     if (this.moveHistory.length === 0) {

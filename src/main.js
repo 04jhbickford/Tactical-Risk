@@ -77,6 +77,7 @@ import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
 import { shouldEjectFromMatch } from './multiplayer/presencePolicy.js';
+import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -327,6 +328,7 @@ async function init() {
           camera.dirty = true;
           selectedTerritory = null;
           playerPanel.setSelectedTerritory(null);
+          notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
         }
         break;
@@ -393,8 +395,10 @@ async function init() {
 
       case 'undo-purchase':
         if (!shouldShowPurchase(gameState.phase, gameState.turnPhase)) break;
-        if (data.unitType) {
-          const undoPurchaseResult = gameState.removeFromPendingPurchases(data.unitType, unitDefs);
+        {
+          const undoPurchaseResult = data.unitType
+            ? gameState.removeFromPendingPurchases(data.unitType, unitDefs)
+            : gameState.undoLastPurchase(unitDefs);
           if (undoPurchaseResult.success) {
             camera.dirty = true;
           }
@@ -535,6 +539,7 @@ async function init() {
         if (gameState.isMultiplayer) {
           playerPanel.setWaitingForSync(true);
         }
+        const prevSeat = gameState.currentPlayer;
         const pass = gameState.finishPlacementRound(unitDefs, {
           allowNavalSkip: !!data?.allowNavalSkip,
         });
@@ -542,6 +547,7 @@ async function init() {
           playerPanel.setWaitingForSync(false);
           break;
         }
+        notifyTurnSwap(prevSeat, gameState.currentPlayer);
         if (syncManager) {
           const pushed = await syncManager.pushStateNow();
           if (!pushed) playerPanel.setWaitingForSync(false);
@@ -734,6 +740,7 @@ async function init() {
         }
 
         gameState.nextPhase();
+        notifyTurnSwap(prevPlayer, gameState.currentPlayer);
         if (syncManager) {
           const pushed = await syncManager.pushStateNow();
           if (!pushed) playerPanel.setWaitingForSync(false);
@@ -789,6 +796,21 @@ async function init() {
   let authScreen = null;
   let multiplayerLobby = null;
   let gameListUI = null;
+  let currentGameCode = null;
+  let lastTurnNoticeSeatId = null;
+
+  const notifyTurnSwap = (prevPlayer, nextPlayer) => {
+    const nextId = nextPlayer?.oderId || nextPlayer?.id || null;
+    const prevId = prevPlayer?.oderId || prevPlayer?.id || lastTurnNoticeSeatId;
+    maybePostTurnNotice({
+      prevPlayerId: prevId,
+      nextPlayerId: nextId,
+      nextPlayerName: nextPlayer?.name || null,
+      gameCode: currentGameCode,
+      phase: gameState?.phase || null,
+    });
+    if (nextId) lastTurnNoticeSeatId = nextId;
+  };
 
   // Pass-and-play handoff overlay (hotseat games only)
   const handoffScreen = new HandoffScreen();
@@ -813,6 +835,7 @@ async function init() {
   const startMultiplayerGame = async (gameId, lobbyData) => {
     try {
       console.log('[MP] startMultiplayerGame called with:', { gameId, lobbyData });
+      currentGameCode = lobbyData?.lobbyData?.code || lobbyData?.code || gameId || null;
 
       // CRITICAL: Hide all multiplayer overlays immediately
       if (multiplayerLobby) {
@@ -1179,6 +1202,7 @@ async function init() {
 
   // Function to wire up all game components (shared between local and multiplayer)
   const wireUpGameComponents = () => {
+    lastTurnNoticeSeatId = gameState.currentPlayer?.oderId || gameState.currentPlayer?.id || null;
     // Check if there are AI players
     const hasAIPlayers = gameState.players?.some(p => p.isAI);
 
@@ -1195,7 +1219,8 @@ async function init() {
       aiController.setGameState(gameState);
       aiController.setOnAction((action) => {
         camera.dirty = true;
-        if (action === 'finishPlacement' || action === 'placeCapital') {
+        if (action === 'finishPlacement' || action === 'placeCapital' || action === 'nextPhase') {
+          notifyTurnSwap(null, gameState.currentPlayer);
           syncManager?.pushStateNow();
         }
       });
@@ -1230,6 +1255,7 @@ async function init() {
       const prevPlayer = gameState.currentPlayer;
       const prevRound = gameState.round;
       gameState.nextPhase();
+      notifyTurnSwap(prevPlayer, gameState.currentPlayer);
       if (syncManager) await syncManager.pushStateNow();
       camera.dirty = true;
 

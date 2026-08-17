@@ -24,6 +24,7 @@ import {
   queueAfterDeployAttempt,
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
+import { resolveUndoAction, canUndoLastMove } from '../state/undoPolicy.js';
 import {
   capturePanelPointerLock,
   resolveLockedPanelClick,
@@ -249,9 +250,12 @@ export function shouldShowPhoneSetupUndo({
   mobile, phase, canUndoPlacement, canUndoCapital,
 } = {}) {
   if (!mobile) return false;
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) return !!canUndoPlacement || !!canUndoCapital;
-  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return !!canUndoCapital;
-  return false;
+  const resolved = resolveUndoAction({
+    phase,
+    canUndoPlacement,
+    canUndoCapital,
+  });
+  return resolved.show && (resolved.action === 'undo-placement' || resolved.action === 'undo-capital');
 }
 
 // Display string for a combat-move history row. Empty string = do not render
@@ -886,14 +890,25 @@ export class PlayerPanel {
     if (mobile) {
       const canUndoPlacement = !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
       const canUndoCapital = !!this.gameState.canUndoLastCapital?.();
-      const showUndo = shouldShowPhoneSetupUndo({
-        mobile: true, phase, canUndoPlacement, canUndoCapital,
-      }) && Date.now() >= (this._ignoreUndoUntil || 0);
+      const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
+      const undo = resolveUndoAction({
+        phase,
+        turnPhase,
+        canUndoPlacement,
+        canUndoCapital,
+        canUndoMove: canUndoLastMove({
+          turnPhase,
+          moveHistoryLength: (this.gameState.moveHistory || []).length,
+          undoLockMoveCount: this.gameState.undoLockMoveCount || 0,
+        }),
+        canUndoPurchase: pendingPurchases.some(p => p.quantity > 0),
+        canUndoMobilize: (this.gameState.mobilizationHistory || []).length > 0,
+      });
+      const showUndo = undo.show && Date.now() >= (this._ignoreUndoUntil || 0);
       html += `<div class="pp-peek-undo-slot">`;
       if (showUndo) {
-        const undoAction = canUndoPlacement ? 'undo-placement' : 'undo-capital';
         html += `
-        <button class="pp-confirm-btn undoable" data-action="${undoAction}">
+        <button class="pp-confirm-btn undoable" data-action="${undo.action}">
           Undo
         </button>`;
       }
@@ -1137,9 +1152,16 @@ export class PlayerPanel {
           html += this._renderRocketsUI(player);
         }
 
-        // Show recent moves with individual undo option (only during combat move phase)
+        // Recent moves: undo the last one during combat or non-combat move.
+        // Hidden after combat resolve (locked stack / COMBAT phase).
         const moveHistory = this.gameState.moveHistory || [];
-        if (turnPhase === TURN_PHASES.COMBAT_MOVE && moveHistory.length > 0) {
+        const showMoveUndo = canUndoLastMove({
+          turnPhase,
+          moveHistoryLength: moveHistory.length,
+          undoLockMoveCount: this.gameState.undoLockMoveCount || 0,
+        });
+        if ((turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)
+          && moveHistory.length > 0) {
           const recentMoves = moveHistory.slice(-5).reverse();
           const rows = [];
           for (let i = 0; i < recentMoves.length; i++) {
@@ -1155,7 +1177,7 @@ export class PlayerPanel {
               html += `
               <div class="pp-move-item ${row.isLast ? 'last' : ''}">
                 <span class="pp-move-desc">${row.desc}</span>
-                ${row.isLast ? `<button class="pp-undo-btn" data-action="undo-move">↩</button>` : ''}
+                ${row.isLast && showMoveUndo ? `<button class="pp-undo-btn" data-action="undo-move">↩</button>` : ''}
               </div>`;
             }
             html += `</div>`;
@@ -1845,6 +1867,7 @@ export class PlayerPanel {
           <div class="pp-cart-total">Total: ${pendingCost} IPCs</div>
         </div>
         <div class="pp-purchase-actions">
+          <button class="pp-action-btn secondary" data-action="undo-purchase">↩ Undo</button>
           <button class="pp-action-btn secondary" data-action="clear-purchases">Clear All</button>
           <button class="pp-action-btn primary" data-action="confirm-purchase">Buy ${totalUnits} Unit${totalUnits > 1 ? 's' : ''}</button>
         </div>`;
@@ -3784,6 +3807,20 @@ export class PlayerPanel {
         if (action === 'undo-mobilize') {
           if (this.onAction) {
             this.onAction('undo-mobilize', {});
+          }
+          return;
+        }
+
+        if (action === 'undo-purchase') {
+          if (this.onAction) {
+            this.onAction('undo-purchase', { unitType: btn.dataset.unit || null });
+          }
+          return;
+        }
+
+        if (action === 'undo-move') {
+          if (this.onAction) {
+            this.onAction('undo-move', {});
           }
           return;
         }

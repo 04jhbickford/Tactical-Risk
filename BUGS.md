@@ -30,8 +30,10 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B22: Artillery + switched the panel to Log and jumped East US → East Canada. + lock cannot become a tab; a panel gesture blocks the map hit now under the finger.
 - B23 P0: Game tab self-navigated to the lobby (auth eject — already on main). Clicking the game *row title* opened surrender. Leave is a compact sibling; title/join never opens the confirm. Do not enlarge Leave.
 - B24: Max bumped DEPLOYED before deploy; Deploy 1 placed 0 twice, then a bomber. DEPLOYED is placed-this-round only. Failed Deploy restores the queue.
+- Undo lock: place / deploy / purchase / move are undoable by default. Undo is hidden after combat resolve and after Done / next-player pass. Combat math and retreat history are unchanged.
+- Turn notice hook: when currentPlayer changes, POST `{ gameCode, currentPlayerName, phase }` to `TACTICAL_RISK_TURN_NOTICE_URL` (window / env / localStorage). Unused if unset. No WhatsApp from the client. No phone numbers.
 
-Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
+Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`, `node tools/test-undo-and-turn-notice.mjs`.
 
 ---
 
