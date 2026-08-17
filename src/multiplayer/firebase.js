@@ -2,7 +2,7 @@
 // Uses Firebase v9 modular SDK
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getAuth, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 // Firebase configuration
@@ -34,6 +34,9 @@ export function initializeFirebase(config = null) {
 
   app = initializeApp(finalConfig);
   auth = getAuth(app);
+  setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('[Firebase] Could not set local auth persistence', err);
+  });
   db = getFirestore(app);
 
   return { app, auth, db };

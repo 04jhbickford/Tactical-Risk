@@ -91,7 +91,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.76', GAME_VERSION === 'V2.76');
+check('GAME_VERSION is V2.77', GAME_VERSION === 'V2.77');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -576,10 +576,10 @@ check('inspect hold does not commit a setup tap',
   && shouldCommitPhoneSetupTap({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
   }) === true);
-check('phone deploy hint is Tap a unit, then the map',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit, then the map');
-check('phone capital hint is Tap your land until Confirm is the verb',
-  resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land'
+check('phone deploy hint is Tap a territory to select',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a territory to select');
+check('phone capital hint is Tap your land, then Confirm',
+  resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land, then Confirm'
   && shouldShowPhoneSetupPeekHint({
     phase: GAME_PHASES.CAPITAL_PLACEMENT, hasPrimaryCta: false,
   }) === true
@@ -593,14 +593,14 @@ check('desktop deploy PHASE_HINTS stay Click to place units',
   resolvePhaseHint(GAME_PHASES.UNIT_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT]);
 check('desktop capital PHASE_HINTS stay Click your territory',
   resolvePhaseHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.CAPITAL_PLACEMENT]);
-check('noun-first: deploy tap without a peeked unit does not apply',
+check('own-land tap selects even without a peeked unit',
   shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.UNIT_PLACEMENT,
     selectedUnitType: null,
     tappedIsOwnedLand: true,
     hasHit: true,
-  }) === false
+  }) === true
   && shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.UNIT_PLACEMENT,
@@ -748,10 +748,10 @@ check('unknown leftover is not sticky-selected when defs are passed',
     { type: 'tacticalBomber', quantity: 1 },
     { type: 'infantry', quantity: 2 },
   ], { infantry: { isLand: true } }) === 'infantry');
-check('phone capital tap on owned land auto-commits (desktop does not)',
+check('phone capital tap selects only — Confirm is the verb',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
-  }) === true
+  }) === false
   && shouldAutoCommitPhoneCapital({
     mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
   }) === false
@@ -768,9 +768,9 @@ check('phone setup undo is required for place and last capital',
   && shouldShowPhoneSetupUndo({
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
   }) === false);
-check('selected type changes the deploy hint to tap the map',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap the map to place'
-  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit, then the map');
+check('selected type changes the deploy hint to select then Deploy',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Select a territory, then Deploy'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a territory to select');
 check('place-tap still does not inspect (V2.69 split stays)',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
   && shouldInspectPhoneHold({

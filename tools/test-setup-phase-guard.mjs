@@ -18,6 +18,7 @@ const {
   GameState,
   GAME_PHASES,
   TURN_PHASES,
+  SETUP_TURN_PHASE,
   shouldDrivePlayingTurnPhase,
   shouldShowTechResearch,
   shouldShowPurchase,
@@ -111,13 +112,13 @@ function presentsAsPlaceableSetup(gs) {
     && shouldShowTechResearch(gs.phase, gs.turnPhase) === false
     && formatMobilePhaseLabel(gs.phase, gs.turnPhase) === 'Initial Deployment'
     && resolvePhaseHint(gs.phase, gs.turnPhase) === 'Click to place units'
-    && resolvePhonePeekHint(gs.phase, gs.turnPhase, null) === 'Tap a unit, then the map'
+    && resolvePhonePeekHint(gs.phase, gs.turnPhase, null) === 'Tap a territory to select'
     && shouldShowPhonePanelBody({ mobile: true, phase: gs.phase, turnPhase: gs.turnPhase }) === true
     && shouldShowPhonePeekUnitRow({ mobile: true, phase: gs.phase, turnPhase: gs.turnPhase }) === true;
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.76', GAME_VERSION === 'V2.76');
+check('GAME_VERSION is V2.77', GAME_VERSION === 'V2.77');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== nextTurn() during unit_placement is a no-op ===');
@@ -168,8 +169,9 @@ console.log('=== loadFromJSON of unit_placement + purchase does not wedge into t
   const loaded = makeSetupTable({ turnPhase: TURN_PHASES.DEVELOP_TECH });
   loaded.loadFromJSON(dump);
   check('phase remains unit_placement', loaded.phase === GAME_PHASES.UNIT_PLACEMENT);
-  check('leftover purchase is NOT healed into develop_tech',
-    loaded.turnPhase === TURN_PHASES.PURCHASE);
+  check('leftover purchase normalizes to setup, not develop_tech',
+    loaded.turnPhase === SETUP_TURN_PHASE
+    && loaded.turnPhase !== TURN_PHASES.DEVELOP_TECH);
   check('tech research stays off',
     shouldShowTechResearch(loaded.phase, loaded.turnPhase) === false);
   check('presents as placeable setup, not unplaceable tech',

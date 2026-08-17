@@ -76,7 +76,8 @@ export function shouldApplyPhoneSetupLandTap({
   if (!mobile) return true;
   if (inspected) return false;
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-    return !!selectedUnitType && !!hasHit;
+    void selectedUnitType;
+    return !!hasHit;
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
     return !!tappedIsOwnedLand;

@@ -19,6 +19,7 @@ import {
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
 import { possessivePhrase } from '../utils/possessive.js';
+import { resolveJoinByCode, shouldDeleteLobbyOnHostLeave } from './presencePolicy.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -116,7 +117,9 @@ export class LobbyManager {
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
     const waiting = snapshot.docs.find(d => d.data().status === 'waiting');
-    return waiting ? { id: waiting.id, ...waiting.data() } : null;
+    if (waiting) return { id: waiting.id, ...waiting.data() };
+    const any = snapshot.docs[0];
+    return any ? { id: any.id, ...any.data() } : null;
   }
 
   // Find game by lobby code (for rejoining started games)
@@ -128,7 +131,8 @@ export class LobbyManager {
     );
     const snapshot = await getDocs(q);
     if (snapshot.empty) return null;
-    const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status));
+    const active = snapshot.docs.find(d => ['starting', 'active'].includes(d.data().status))
+      || snapshot.docs[0];
     if (!active) return null;
     return { id: active.id, ...active.data() };
   }
@@ -204,23 +208,28 @@ export class LobbyManager {
     const user = this.authManager.getUser();
     if (!user) return { success: false, error: 'Not logged in' };
 
-    // First try to find a waiting lobby
-    let lobby = await this._findLobbyByCode(code);
-
-    // If no lobby found, check if there's a started game with this code
-    if (!lobby) {
-      const game = await this.findGameByCode(code);
+    const lobbyDoc = await this._findLobbyByCode(code);
+    const game = await this.findGameByCode(code);
+    const waitingLobby = lobbyDoc?.status === 'waiting' ? lobbyDoc : null;
+    const resolved = resolveJoinByCode({
+      waitingLobby,
+      anyLobby: lobbyDoc,
+      startedGame: game,
+      userId: user.id,
+    });
+    if (resolved.kind === 'game') {
+      return { success: true, isGame: true, gameId: resolved.game.id, game: resolved.game };
+    }
+    if (resolved.kind === 'started-lobby') {
       if (game) {
-        // Check if user is a player in this game
-        if (game.playerUserIds?.includes(user.id)) {
-          // Return game info for rejoining
-          return { success: true, isGame: true, gameId: game.id, game };
-        } else {
-          return { success: false, error: 'Game already started' };
-        }
+        return { success: true, isGame: true, gameId: game.id, game };
       }
+      return { success: false, error: 'Game already started' };
+    }
+    if (resolved.kind === 'not-found') {
       return { success: false, error: 'Lobby not found' };
     }
+    const lobby = resolved.lobby;
 
     // Check password
     if (lobby.password && lobby.password !== password) {
@@ -293,8 +302,12 @@ export class LobbyManager {
       const nextHumanPlayer = remainingPlayers.find(p => !p.isAI);
 
       if (remainingPlayers.length === 0 || !nextHumanPlayer) {
-        // No players left or only AI players remain - delete lobby
-        // AI should never be host
+        if (!shouldDeleteLobbyOnHostLeave({
+          lobbyStatus: lobby.status,
+          remainingHumans: nextHumanPlayer ? 1 : 0,
+        })) {
+          return { success: true };
+        }
         try {
           await deleteDoc(doc(this.db, 'lobbies', lobbyId));
         } catch (error) {

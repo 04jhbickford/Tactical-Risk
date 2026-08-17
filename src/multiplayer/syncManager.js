@@ -13,6 +13,7 @@ import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
 import { GAME_VERSION, compareGameVersions } from '../version.js';
 import { createPushQueue } from './pushCoalesce.js';
+import { shouldApplyRemoteGameState } from '../state/placementPass.js';
 
 export class SyncManager {
   constructor(gameId, gameState) {
@@ -262,24 +263,22 @@ export class SyncManager {
             return;
           }
 
-          // Only update if version is newer
-          if (newData.stateVersion > this.localVersion) {
-            console.log(`[Sync] Loading newer state: ${this.localVersion} -> ${newData.stateVersion}`);
-            this.localVersion = newData.stateVersion;
+          // Newer version, or the seat changed at the same version — guest
+          // must load unitsToPlace / unitsPlacedThisRound or they inherit
+          // the previous actor's 6/6 and leftover pool.
+          if (this._shouldApplyRemote(newData)) {
+            console.log(`[Sync] Loading remote state: ${this.localVersion} -> ${newData.stateVersion}, seat ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
+            this.localVersion = Math.max(this.localVersion, newData.stateVersion || 0);
 
-            // Load new state - set flag to prevent subscription from pushing back
             if (newData.state) {
               this.isLoadingRemoteState = true;
               this.gameState.loadFromJSON(newData.state);
               this.isLoadingRemoteState = false;
             }
 
-            // Update active player status
             this._updateActivePlayer(newData.currentPlayerId);
-
             this._notifyListeners('state_updated', this._turnSnapshotPayload(newData.currentPlayerId));
           } else if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
-            // Turn changed without version bump (shouldn't happen, but handle it)
             console.log(`[Sync] Turn changed without version bump: ${this._lastCurrentPlayerId} -> ${newData.currentPlayerId}`);
             this._updateActivePlayer(newData.currentPlayerId);
             this._notifyListeners('turn_changed', this._turnSnapshotPayload(newData.currentPlayerId));
@@ -361,6 +360,15 @@ export class SyncManager {
       currentPlayerId,
       isActivePlayer: this.checkIsActivePlayer(),
     };
+  }
+
+  _shouldApplyRemote(newData) {
+    return shouldApplyRemoteGameState({
+      remoteVersion: newData?.stateVersion || 0,
+      localVersion: this.localVersion,
+      remoteCurrentPlayerId: newData?.currentPlayerId || null,
+      localCurrentPlayerId: this._lastCurrentPlayerId || null,
+    });
   }
 
   // Update active player status

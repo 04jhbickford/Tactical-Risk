@@ -11,6 +11,13 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
+import {
+  PRESENCE_HEARTBEAT_MS,
+  presenceStateForVisibility,
+  resolvePresenceState,
+  shouldDeletePresenceDoc,
+  shouldHeartbeatNow,
+} from './presencePolicy.js';
 
 // Presence states
 export const PRESENCE_STATES = {
@@ -35,6 +42,9 @@ export class PresenceManager {
     this.playerPresence = {}; // { oderId: { state, lastSeen, displayName } }
     this._listeners = [];
     this._boundActivityHandler = this._onActivity.bind(this);
+    this._boundVisibilityHandler = this._onVisibility.bind(this);
+    this._boundPageShowHandler = this._onPageShow.bind(this);
+    this._boundPageHideHandler = this._onPageHide.bind(this);
   }
 
   get db() {
@@ -67,23 +77,25 @@ export class PresenceManager {
 
     // Start heartbeat
     this.heartbeatInterval = setInterval(() => {
+      if (!shouldHeartbeatNow({ event: 'interval' })) return;
       const state = this._isActive() ? PRESENCE_STATES.ONLINE : PRESENCE_STATES.IDLE;
       this._updatePresence(state);
-    }, HEARTBEAT_INTERVAL);
+    }, PRESENCE_HEARTBEAT_MS);
 
     // Listen for activity
     document.addEventListener('mousemove', this._boundActivityHandler);
     document.addEventListener('keydown', this._boundActivityHandler);
     document.addEventListener('click', this._boundActivityHandler);
     document.addEventListener('touchstart', this._boundActivityHandler);
+    document.addEventListener('visibilitychange', this._boundVisibilityHandler);
+    window.addEventListener('pageshow', this._boundPageShowHandler);
+    window.addEventListener('pagehide', this._boundPageHideHandler);
 
     // Subscribe to all presence documents
     this._subscribeToPresence();
 
-    // Handle page unload
-    window.addEventListener('beforeunload', () => {
-      this._goOffline();
-    });
+    // Do NOT delete the presence doc on beforeunload — mobile browsers
+    // fire that when backgrounding. Explicit Exit is the only delete.
 
     console.log(`[Presence] Started tracking for user ${user.id} in game ${gameId}`);
     return true;
@@ -105,8 +117,11 @@ export class PresenceManager {
     document.removeEventListener('keydown', this._boundActivityHandler);
     document.removeEventListener('click', this._boundActivityHandler);
     document.removeEventListener('touchstart', this._boundActivityHandler);
+    document.removeEventListener('visibilitychange', this._boundVisibilityHandler);
+    window.removeEventListener('pageshow', this._boundPageShowHandler);
+    window.removeEventListener('pagehide', this._boundPageHideHandler);
 
-    this._goOffline();
+    this._goOffline({ reason: 'explicit-leave' });
     this.gameId = null;
     this.playerPresence = {};
   }
@@ -124,13 +139,11 @@ export class PresenceManager {
   // Get presence state for a player
   getPlayerPresence(oderId) {
     const presence = this.playerPresence[oderId];
-    if (!presence) return PRESENCE_STATES.OFFLINE;
-
-    // Check if presence is stale (> 2 minutes = offline)
-    const age = Date.now() - (presence.lastSeen || 0);
-    if (age > 120000) return PRESENCE_STATES.OFFLINE;
-
-    return presence.state || PRESENCE_STATES.OFFLINE;
+    return resolvePresenceState({
+      hasDoc: !!presence,
+      lastSeen: presence?.lastSeen,
+      state: presence?.state,
+    });
   }
 
   // Get all player presence
@@ -140,6 +153,27 @@ export class PresenceManager {
 
   _onActivity() {
     this.lastActivity = Date.now();
+  }
+
+  _onVisibility() {
+    const visible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+    if (visible && shouldHeartbeatNow({ event: 'visibility-visible' })) {
+      this.lastActivity = Date.now();
+      this._updatePresence(PRESENCE_STATES.ONLINE);
+      return;
+    }
+    this._updatePresence(presenceStateForVisibility('hidden'));
+  }
+
+  _onPageShow() {
+    if (!shouldHeartbeatNow({ event: 'pageshow' })) return;
+    this.lastActivity = Date.now();
+    this._updatePresence(PRESENCE_STATES.ONLINE);
+  }
+
+  _onPageHide() {
+    // Keep the doc. A delete here is what made a backgrounded host look gone.
+    this._updatePresence(presenceStateForVisibility('hidden'));
   }
 
   _isActive() {
@@ -165,14 +199,16 @@ export class PresenceManager {
     }
   }
 
-  async _goOffline() {
-    if (this.presenceRef) {
-      try {
-        // Delete presence document when going offline
-        await deleteDoc(this.presenceRef);
-      } catch (error) {
-        console.error('[Presence] Error going offline:', error);
-      }
+  async _goOffline({ reason } = {}) {
+    if (!this.presenceRef) return;
+    if (!shouldDeletePresenceDoc({ reason })) {
+      await this._updatePresence(PRESENCE_STATES.IDLE);
+      return;
+    }
+    try {
+      await deleteDoc(this.presenceRef);
+    } catch (error) {
+      console.error('[Presence] Error going offline:', error);
     }
   }
 
@@ -186,15 +222,11 @@ export class PresenceManager {
 
       snapshot.forEach(doc => {
         const data = doc.data();
-        const age = Date.now() - (data.lastSeen || 0);
-
-        // Determine state based on lastSeen time
-        let state = data.state;
-        if (age > 120000) {
-          state = PRESENCE_STATES.OFFLINE;
-        } else if (age > ACTIVITY_TIMEOUT && state === PRESENCE_STATES.ONLINE) {
-          state = PRESENCE_STATES.IDLE;
-        }
+        const state = resolvePresenceState({
+          hasDoc: true,
+          lastSeen: data.lastSeen,
+          state: data.state,
+        });
 
         presence[data.oderId] = {
           ...data,

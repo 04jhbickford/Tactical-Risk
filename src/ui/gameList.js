@@ -13,6 +13,9 @@ import { getFirebaseDb } from '../multiplayer/firebase.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { leaveGame } from '../multiplayer/surrender.js';
+import { shouldOpenLeaveConfirm } from '../multiplayer/presencePolicy.js';
+
+export { shouldOpenLeaveConfirm };
 
 export class GameList {
   constructor(onSelectGame, onBack) {
@@ -273,7 +276,7 @@ export class GameList {
 
     return `
       <div class="mp-game-row">
-        <button class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
+        <button type="button" class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-game-id="${game.id}">
           <div class="mp-game-info">
             <span class="mp-game-name">${playerNames}</span>
             <span class="mp-game-details">
@@ -284,7 +287,9 @@ export class GameList {
             ${statusHtml}
           </div>
         </button>
-        <button class="mp-leave-game" data-leave-game="${game.id}" title="Leave this game (surrender)">Leave</button>
+        <div class="mp-game-row-actions">
+          <button type="button" class="mp-leave-game" data-leave-game="${game.id}" title="Leave this game (surrender)">Leave</button>
+        </div>
         ${isAdmin ? `<button class="mp-admin-delete" data-delete-game="${game.id}" title="Delete (Admin)">🗑</button>` : ''}
       </div>
     `;
@@ -337,7 +342,9 @@ export class GameList {
 
     // Game items - click to join
     this.el.querySelectorAll('.mp-game-item[data-game-id]').forEach(item => {
-      item.addEventListener('click', async () => {
+      item.addEventListener('click', async (e) => {
+        if (e.target.closest('[data-leave-game]')) return;
+        if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false })) return;
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
         console.log('[GameList] Game clicked:', { gameId, game });
@@ -355,7 +362,10 @@ export class GameList {
     // Leave game (surrender) buttons
     this.el.querySelectorAll('[data-leave-game]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
+        e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
+        if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true })) return;
         const gameId = btn.dataset.leaveGame;
         const game = this.games.find(g => g.id === gameId);
         const isStarted = game?.stateVersion > 0;

@@ -2,6 +2,25 @@
 
 ---
 
+## 8.17.26 — V2.77 host background killed ZUJMNP; deploy/undo looked broken
+
+Live V2.76 two-human (Bastion host Russians, James guest Americans), game ZUJMNP. Host tab backgrounded ~3 min → host signed out → lobby gone → guest join “ZUJMNP not found” → guest WAITING on a ghost. Client also self-ejected to title / MY ACTIVE GAMES with no click. Same table: Undo passed the turn; own-capital tap ended the turn / opened surrender; game-row click opened “Leave this game?”; Infantry + jumped 1→4 or also added Armour; next YOUR TURN arrived 6/6; Deploy N clipped at y≈733; unit list truncated to tacticalBomber; selection jumped after deploy.
+
+Cause:
+- `presenceManager` deleted the presence doc on `beforeunload` (mobile fires that on background). Missing doc + 2 min stale = host offline. `auth_error` + `needsReauth` immediately `stopSync`, deleted presence again, nulled `gameState`, and `lobby.show()`. `leaveLobby` deleted a started lobby when the host seat looked empty. Join-by-code only returned `waiting` lobbies, so a live `starting` match was “not found”.
+- Background timers freeze, so even a kept doc went “offline” at 2 min and failover / UI treated the host as gone.
+- Guest `startSyncAndWaitForState` flipped the active-player flag on seat change without `loadFromJSON`, so James inherited host `unitsPlacedThisRound=6` and a stale 25 pool. Constructor leftover `turnPhase=purchase` was advertised on every setup push.
+- `querySelectorAll('[data-action]')` rebound every render; `+` / Undo `_render()` mid-click retargeted onto Done or another row. Phone one-tap capital / place committed on map tap. Leave sat on the game-row hit target. DEPLOYED counted queued units. Deploy lived in the clipped tray body.
+
+Fix (SCHEMA 11, no map/rules/combat math change):
+- Presence doc is deleted only on explicit leave. `visibilitychange` / `pageshow` / `pagehide` write idle/online and heartbeat. Existing idle doc stays idle for 15 min (3 min background ≠ offline). Auth hiccup stays in the match unless the session is actually gone. Started lobbies are never deleted on host leave. Join-by-code finds the live game.
+- Persist `turnPhase=setup` during capital/unit placement (never leftover `purchase`). Deep-clone `unitsToPlace`. Guest applies remote state when the version is newer **or** the seat changes. `nextTurn` / Done reset `unitsPlacedThisRound` to 0.
+- One delegated panel click + rAF render. `+`/`−`/`Max` are pure one-row queue math; Deploy commits; panel count is units actually placed. Undo never passes. Own land/capital tap selects (Confirm / Deploy are the verbs). Leave is a separate control, not the row. Deploy N sits on the phone peek CTA. `tacticalrisk:your-turn` + `window.__tacticalRiskTurn` for WhatsApp. Tab title uses the same “is it my turn?” predicate as the banner.
+
+Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`.
+
+---
+
 ## 8.16.26 — V2.76 AA fire silent; phone rotate swaps chrome; empty rematch after push_exhausted
 
 Live V2.75 playtest. Unit placement PASSED. Guest Robert007 dump 2026-08-16T23:49:45Z: playing / combat, local v89, isActivePlayer true, not host. Sync: v85 purchase; v86–87 combat_move; v88–89 combat; v90 combat ×3; push_failed ×3 (version undefined); push_exhausted. James + Robert: AA unclear; phone rotate horizontal→vertical weirdly changes UI; yellow toast then the same Anglo-Sudan Egypt combat again with no enemy units.

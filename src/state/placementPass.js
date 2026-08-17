@@ -74,3 +74,50 @@ export function pickAuthoritativePlacementSnapshot({
   }
   return remote;
 }
+
+// Point-in-time copy so a Done/place write cannot share a live
+// unitsToPlace reference that another client never sees decrement.
+export function cloneUnitsToPlace(unitsToPlace) {
+  const src = unitsToPlace && typeof unitsToPlace === 'object' ? unitsToPlace : {};
+  const out = {};
+  for (const [playerId, rows] of Object.entries(src)) {
+    out[playerId] = (Array.isArray(rows) ? rows : []).map((u) => ({
+      type: u?.type,
+      quantity: Number(u?.quantity) || 0,
+    }));
+  }
+  return out;
+}
+
+export function remainingDeployByPlayer(unitsToPlace, playerIds, unitDefs) {
+  const ids = Array.isArray(playerIds) ? playerIds : Object.keys(unitsToPlace || {});
+  const out = {};
+  for (const id of ids) {
+    out[id] = countKnownUnitsToPlace(unitsToPlace?.[id], unitDefs);
+  }
+  return out;
+}
+
+// Guest must apply the remote doc when the seat changes even if
+// stateVersion did not bump — otherwise currentPlayer flips and
+// unitsToPlace stays at the starting 25.
+export function shouldApplyRemoteGameState({
+  remoteVersion = 0,
+  localVersion = 0,
+  remoteCurrentPlayerId = null,
+  localCurrentPlayerId = null,
+  force = false,
+} = {}) {
+  if (force) return true;
+  if (Number(remoteVersion) > Number(localVersion)) return true;
+  if (remoteCurrentPlayerId && remoteCurrentPlayerId !== localCurrentPlayerId) {
+    return true;
+  }
+  return false;
+}
+
+// Sync debug / push labels must advertise game phase, never leftover turnPhase.
+export function syncPushPhaseLabel(phase, _turnPhase) {
+  void _turnPhase;
+  return phase || null;
+}

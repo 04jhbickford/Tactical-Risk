@@ -2534,6 +2534,12 @@ html, body {
   gap: 8px;
 }
 
+.mp-game-row-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
 .mp-game-row.own-lobby {
   position: relative;
 }
@@ -16618,6 +16624,16 @@ html, body {
 
   .mp-game-item {
     min-height: 56px;
+  }
+
+  .mp-game-row {
+    flex-wrap: wrap;
+  }
+
+  .mp-game-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+    padding-top: 4px;
   }
 
   /* Multiplayer join flow (the tablet-as-client path): auth tabs, menu

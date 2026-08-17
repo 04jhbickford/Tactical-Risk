@@ -4,6 +4,7 @@ import {
   knownUnitsToPlace,
   countKnownUnitsToPlace,
   canFinishPlacementRound as canFinishPlacementRoundPred,
+  cloneUnitsToPlace,
 } from './placementPass.js';
 
 export const GAME_PHASES = {
@@ -44,13 +45,18 @@ export const TURN_PHASE_NAMES = {
   [TURN_PHASES.COLLECT_INCOME]: 'Collect Income',
 };
 
-// Setup (capital / initial deployment) does not use turnPhase.
-// Leftover values — constructor default `purchase`, or a prior
-// `develop_tech` dummy from the V2.53–V2.73 load heal — are unused
-// storage. Playing UI, techUI, AI `_handlePlayingPhase`, nextPhase,
-// and nextTurn all require phase === PLAYING. Do not "heal" leftover
-// purchase into develop_tech: that rewrite is what made the V2.73
-// dump (unit_placement + develop_tech) look already-valid.
+// Setup (capital / initial deployment) does not use playing turnPhase.
+// Constructor used to default to `purchase`, so every initial-deploy
+// push advertised phase=purchase (ZUJMNP V2.76). Persist `setup` instead
+// of any PLAYING leftover. Do not rewrite leftovers into develop_tech —
+// that is the V2.73 dump combo. Playing UI still requires phase === PLAYING.
+export const SETUP_TURN_PHASE = 'setup';
+
+export function resolvePersistedTurnPhase(phase, turnPhase) {
+  if (phase !== GAME_PHASES.PLAYING) return SETUP_TURN_PHASE;
+  return turnPhase || TURN_PHASES.DEVELOP_TECH;
+}
+
 export function isSetupPhase(phase) {
   return phase === GAME_PHASES.CAPITAL_PLACEMENT
     || phase === GAME_PHASES.UNIT_PLACEMENT;
@@ -156,7 +162,7 @@ export class GameState {
     this.currentPlayerIndex = 0;
     this.round = 1;
     this.phase = GAME_PHASES.LOBBY;
-    this.turnPhase = TURN_PHASES.PURCHASE;
+    this.turnPhase = SETUP_TURN_PHASE;
 
     // Territory state: { territoryName: { owner: playerId, isCapital: bool } }
     this.territoryState = {};
@@ -1108,6 +1114,7 @@ export class GameState {
       if (this.currentPlayerIndex >= this.players.length) {
         this.currentPlayerIndex = 0;
         this.phase = GAME_PHASES.UNIT_PLACEMENT;
+        this.turnPhase = SETUP_TURN_PHASE;
         this.unitsPlacedThisRound = 0;
       }
       capGuard++;
@@ -1508,6 +1515,9 @@ export class GameState {
     }
 
     this.unitsPlacedThisRound = 0;
+    this.turnPhase = this.phase === GAME_PHASES.PLAYING
+      ? this.turnPhase
+      : SETUP_TURN_PHASE;
     this.placementHistory = []; // Clear undo history for this round
 
     // Check if all players have finished placing - either no units left OR no placeable units
@@ -2015,6 +2025,7 @@ export class GameState {
     }
     // Reset turn state - start with tech development phase
     this.turnPhase = TURN_PHASES.DEVELOP_TECH;
+    this.unitsPlacedThisRound = 0;
     this.pendingPurchases = [];
     this.combatQueue = [];
     this.moveHistory = [];
@@ -4967,7 +4978,7 @@ export class GameState {
       currentPlayerIndex: this.currentPlayerIndex,
       round: this.round,
       phase: this.phase,
-      turnPhase: this.turnPhase,
+      turnPhase: resolvePersistedTurnPhase(this.phase, this.turnPhase),
       territoryState: this.territoryState,
       units: this.units,
       playerState: this.playerState,
@@ -4979,7 +4990,7 @@ export class GameState {
       playerTechs: this.playerTechs,
       riskCards: this.riskCards,
       cardTradeCount: this.cardTradeCount,
-      unitsToPlace: this.unitsToPlace,
+      unitsToPlace: cloneUnitsToPlace(this.unitsToPlace),
       placementRound: this.placementRound,
       // Additive (no schema bump): mid-wave rejoin must restore the 6-unit cap.
       unitsPlacedThisRound: this.unitsPlacedThisRound || 0,
@@ -5010,7 +5021,7 @@ export class GameState {
     this.currentPlayerIndex = data.currentPlayerIndex;
     this.round = data.round;
     this.phase = data.phase;
-    this.turnPhase = data.turnPhase || TURN_PHASES.DEVELOP_TECH;
+    this.turnPhase = resolvePersistedTurnPhase(this.phase, data.turnPhase);
     // Load AND apply (syncManager uses this method) share one rule:
     // setup phases ignore turnPhase. Do not rewrite leftover `purchase`
     // into `develop_tech` — that "heal" created/preserved the V2.73
@@ -5072,8 +5083,8 @@ export class GameState {
   // After load/apply: a wedged setup doc must present as setup, not
   // Research. turnPhase is unused storage until phase === PLAYING.
   _normalizeAfterLoad() {
-    if (isSetupPhase(this.phase)) {
-      return;
+    if (this.phase !== GAME_PHASES.PLAYING) {
+      this.turnPhase = SETUP_TURN_PHASE;
     }
   }
 

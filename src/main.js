@@ -22,7 +22,13 @@ import { MapRenderer } from './map/mapRenderer.js';
 import { TerritoryRenderer } from './map/territoryRenderer.js';
 import { TerritoryMap } from './map/territoryMap.js';
 import { UnitRenderer } from './map/unitRenderer.js';
-import { PlayerPanel, resolveWaitingForSyncAfterRemoteSnapshot } from './ui/playerPanel.js';
+import {
+  PlayerPanel,
+  resolveWaitingForSyncAfterRemoteSnapshot,
+  computeIsLocalPlayerTurn,
+  resolveTabTitle,
+  emitYourTurnEvent,
+} from './ui/playerPanel.js';
 import { TerritoryTooltip } from './ui/territoryTooltip.js';
 import { PurchasePopup } from './ui/purchasePopup.js';
 import { MovementUI } from './ui/movementUI.js';
@@ -36,6 +42,7 @@ import { Minimap } from './ui/minimap.js';
 import { Lobby } from './ui/lobby.js';
 import { ContinentPanel } from './ui/continentPanel.js';
 import { GameState, GAME_PHASES, TURN_PHASES, shouldShowPurchase } from './state/gameState.js';
+import { syncPushPhaseLabel } from './state/placementPass.js';
 import { VictoryScreen } from './ui/victoryScreen.js';
 import { AIController } from './ai/aiController.js';
 import { ActionLog } from './ui/actionLog.js';
@@ -69,6 +76,7 @@ import { createSyncManager } from './multiplayer/syncManager.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
+import { shouldEjectFromMatch } from './multiplayer/presencePolicy.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
@@ -973,7 +981,7 @@ async function init() {
     lastTurnEventIndex = gameState.getTurnEventsLastIndex();
 
     // Subscribe to sync events
-    syncManager.subscribe((event, data) => {
+    syncManager.subscribe(async (event, data) => {
       // Log all sync events to debug tab
       playerPanel.logSyncEvent(event, {
         version: data?.version,
@@ -986,9 +994,18 @@ async function init() {
 
         // Async-play awareness: flag the browser tab while it's your turn so a
         // backgrounded player can see it at a glance
-        document.title = syncManager?.checkIsActivePlayer()
-          ? '● Your turn — Tactical Risk'
-          : 'Tactical Risk';
+        const isLocalPlayerTurn = computeIsLocalPlayerTurn({
+          isMultiplayer: true,
+          isWaitingForSync: playerPanel.isWaitingForSync,
+          localUserId: playerPanel.localUserId || syncManager.userId,
+          currentPlayerOderId: gameState.currentPlayer?.oderId,
+        });
+        document.title = resolveTabTitle({ isLocalPlayerTurn });
+        emitYourTurnEvent({
+          yourTurn: isLocalPlayerTurn,
+          playerName: gameState.currentPlayer?.name,
+          gameId,
+        });
 
         // A remote snapshot that makes THIS client current must drop the
         // optimistic waiting lock. state_updated used to omit isActivePlayer,
@@ -1046,11 +1063,21 @@ async function init() {
 
       // Handle auth errors - redirect to login
       if (event === 'auth_error' && data?.needsReauth) {
+        const tokenValid = await authManager.validateToken();
+        const eject = shouldEjectFromMatch({
+          authUserPresent: !!authManager.getUser(),
+          tokenValid,
+          confirmedSignOut: !authManager.getUser() && !authManager.isLoggedIn(),
+        });
+        if (!eject) {
+          console.warn('[Main] Auth hiccup — staying in the match');
+          showNotification('Connection hiccup — still in the match.');
+          return;
+        }
         console.warn('[Main] Auth error detected - returning to lobby');
         document.title = 'Tactical Risk';
         showNotification('Session expired. Please sign in again.');
 
-        // Stop sync and clean up
         if (syncManager) {
           syncManager.stopSync();
           syncManager = null;
@@ -1060,7 +1087,6 @@ async function init() {
         }
         gameState = null;
 
-        // Return to lobby
         lobby.show();
       }
     });
@@ -1076,7 +1102,7 @@ async function init() {
         playerPanel.logSyncEvent('state_push', {
           version: syncManager.localVersion + 1,
           currentPlayer: gameState.currentPlayer?.name,
-          phase: gameState.turnPhase
+          phase: syncPushPhaseLabel(gameState.phase, gameState.turnPhase)
         });
         syncManager.pushState();
       }

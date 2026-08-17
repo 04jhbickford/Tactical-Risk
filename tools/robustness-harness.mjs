@@ -179,7 +179,7 @@ const noRewind = (doc) => !doc.writes.some((w, i) => {
 });
 const sane = (doc, label) => {
   check(`${label}: no invalid phase/turnPhase combo ever pushed`,
-    !doc.writes.some(w => w.phase !== 'playing' && w.turnPhase !== 'develop_tech'));
+    !doc.writes.some(w => w.phase !== 'playing' && w.turnPhase !== 'setup'));
   check(`${label}: turn order never rewound`, noRewind(doc));
 };
 
