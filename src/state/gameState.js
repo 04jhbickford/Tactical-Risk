@@ -239,6 +239,7 @@ export class GameState {
     // Initial setup state for Risk mode
     this.unitsToPlace = {}; // { playerId: [{ type, quantity }] }
     this.unitsPlacedThisRound = 0;
+    this.unitsPlacedThisRoundOwnerId = null;
     this.placementRound = 0;
 
     // Multiplayer state
@@ -1121,6 +1122,7 @@ export class GameState {
         this.phase = GAME_PHASES.UNIT_PLACEMENT;
         this.turnPhase = SETUP_TURN_PHASE;
         this.unitsPlacedThisRound = 0;
+        this.unitsPlacedThisRoundOwnerId = null;
       }
       capGuard++;
     } while (this.players[this.currentPlayerIndex]?.surrendered && capGuard < this.players.length);
@@ -1376,6 +1378,7 @@ export class GameState {
             onCarrier: true,
           });
           this.unitsPlacedThisRound++;
+          this.unitsPlacedThisRoundOwnerId = player.id;
           this._lastCapital = null;
           this._notify();
           return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
@@ -1409,6 +1412,7 @@ export class GameState {
             onTransport: true,
           });
           this.unitsPlacedThisRound++;
+          this.unitsPlacedThisRoundOwnerId = player.id;
           this._lastCapital = null;
           this._notify();
           return { success: true, unitsPlacedThisRound: this.unitsPlacedThisRound };
@@ -1439,6 +1443,7 @@ export class GameState {
     });
 
     this.unitsPlacedThisRound++;
+    this.unitsPlacedThisRoundOwnerId = player.id;
     this._lastCapital = null;
 
     this._notify();
@@ -1560,6 +1565,7 @@ export class GameState {
     }
 
     this.unitsPlacedThisRound = 0;
+    this.unitsPlacedThisRoundOwnerId = null;
     this.turnPhase = this.phase === GAME_PHASES.PLAYING
       ? this.turnPhase
       : SETUP_TURN_PHASE;
@@ -2084,6 +2090,7 @@ export class GameState {
     // Reset turn state - start with tech development phase
     this.turnPhase = TURN_PHASES.DEVELOP_TECH;
     this.unitsPlacedThisRound = 0;
+    this.unitsPlacedThisRoundOwnerId = null;
     this.pendingPurchases = [];
     this.combatQueue = [];
     this.moveHistory = [];
@@ -5117,14 +5124,21 @@ export class GameState {
     this.unitsToPlace = data.unitsToPlace || {};
     this.placementRound = data.placementRound || 0;
     // Same seat + stale remote 0/missing must not wipe a local 1/6 (B28).
+    const nextPlayerId = this.players?.[this.currentPlayerIndex]?.id;
     this.unitsPlacedThisRound = resolveDeployedThisRoundAfterLoad({
       prevPlayerId,
-      nextPlayerId: this.players?.[this.currentPlayerIndex]?.id,
+      nextPlayerId,
       remotePlacedThisRound: data.unitsPlacedThisRound,
       localPlacedThisRound: prevPlacedThisRound,
       prevPlacementRound,
       nextPlacementRound: this.placementRound,
+      localPlacedOwnerId: this.unitsPlacedThisRoundOwnerId,
     });
+    this.unitsPlacedThisRoundOwnerId = this.unitsPlacedThisRound > 0
+      ? (this.unitsPlacedThisRoundOwnerId && this.unitsPlacedThisRoundOwnerId === nextPlayerId
+        ? this.unitsPlacedThisRoundOwnerId
+        : nextPlayerId || null)
+      : null;
 
     // v8: Restore air unit tracking for proper landing calculation
     this.airUnitOrigins = data.airUnitOrigins || {};

@@ -85,10 +85,16 @@ const {
   shouldBlockMapSelectAfterPanel,
   shouldIgnoreQueueRetarget,
   shouldApplyQueueGesture,
+  shouldBeginNewQueueGesture,
+  shouldCommitOverlayGesture,
   resolveQueueUnitType,
   pickPanelHitFromStack,
   isPointInPanelRect,
 } = await import(pathToFileURL(join(root, 'src/ui/panelClickLock.js')));
+const {
+  shouldPassPlacementTurn,
+  shouldApplyUndoAction,
+} = await import(pathToFileURL(join(root, 'src/state/undoPolicy.js')));
 const {
   computeIsLocalPlayerTurn,
   resolveTabTitle,
@@ -920,6 +926,92 @@ console.log('=== B32 + is exactly +1 per gesture (not +2) ===');
     panelSrc.includes('shouldApplyQueueGesture')
     && panelSrc.includes('_queueGestureApplied')
     && /commitLockedPanelGesture[\s\S]*alreadyApplied/.test(panelSrc));
+}
+
+console.log('=== B33–B36 undo/select must not pass; new seat is 0/6; + is +1 ===');
+{
+  const undoLock = capturePanelPointerLock({
+    action: 'undo-placement',
+    dataset: { action: 'undo-placement' },
+  });
+  const undoThenDone = resolveLockedPanelClick({
+    lock: undoLock,
+    clickAction: 'finish-placement',
+    now: 100,
+  });
+  check('B33: Undo lock does not become Done',
+    undoThenDone?.action === 'undo-placement');
+  check('B33: Undo must not pass the turn',
+    shouldPassPlacementTurn({
+      action: 'finish-placement', lockAction: 'undo-placement',
+    }) === false);
+  check('B34: overlay / map click does not Done at 0 deployed',
+    shouldPassPlacementTurn({ action: 'finish-placement', fromOverlayCommit: true }) === false
+    && shouldPassPlacementTurn({ action: 'finish-placement', mapClick: true }) === false
+    && shouldCommitOverlayGesture('finish-placement') === false);
+  check('B34: own-capital tap is not auto-commit',
+    shouldAutoCommitPhoneCapital({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, tappedIsOwnedLand: true,
+    }) === false);
+
+  check('B35: spectated host 6/6 does not carry onto James YOUR TURN',
+    resolveDeployedThisRoundAfterLoad({
+      prevPlayerId: 'usa', nextPlayerId: 'usa',
+      remotePlacedThisRound: 0, localPlacedThisRound: 6,
+      localPlacedOwnerId: 'ussr',
+    }) === 0);
+  check('B28 still: same actor keeps local 1 against stale 0',
+    resolveDeployedThisRoundAfterLoad({
+      prevPlayerId: 'usa', nextPlayerId: 'usa',
+      remotePlacedThisRound: 0, localPlacedThisRound: 1,
+      localPlacedOwnerId: 'usa',
+    }) === 1);
+
+  const territories = [
+    { name: 'East US', isWater: false, connections: [] },
+    { name: 'Ukraine', isWater: false, connections: [] },
+  ];
+  const gs = new GameState({ risk: { factions: [] } }, territories, []);
+  gs.players = [
+    { id: 'usa', name: 'James', oderId: 'james', isAI: false },
+    { id: 'ussr', name: 'Bastion', oderId: 'host', isAI: false },
+  ];
+  gs.currentPlayerIndex = 1;
+  gs.phase = GAME_PHASES.UNIT_PLACEMENT;
+  gs.turnPhase = SETUP_TURN_PHASE;
+  gs.unitsPlacedThisRound = 6;
+  gs.unitsPlacedThisRoundOwnerId = 'ussr';
+  gs.unitsToPlace = { usa: [{ type: 'infantry', quantity: 25 }], ussr: [{ type: 'infantry', quantity: 19 }] };
+  const next = gs.toJSON();
+  next.currentPlayerIndex = 0;
+  next.unitsPlacedThisRound = 0;
+  gs.currentPlayerIndex = 0;
+  gs.loadFromJSON(next);
+  check('B35: load after seat flip is 0/6, not leftover 6/6',
+    gs.currentPlayer?.id === 'usa' && gs.unitsPlacedThisRound === 0);
+
+  check('B36: compatibility mouse after + does not start a new gesture',
+    shouldBeginNewQueueGesture({
+      alreadyApplied: true, elapsedMs: 50,
+    }) === false);
+  check('B36: a later tap may start a new gesture',
+    shouldBeginNewQueueGesture({
+      alreadyApplied: true, elapsedMs: 500,
+    }) === true);
+  let q = { infantry: 1 };
+  q = applyPlaceQueueDelta({
+    queue: q, unitType: 'infantry', delta: 1, available: 10, slotsRemaining: 6,
+  });
+  check('B36: one Infantry + is 1→2, not 1→4', q.infantry === 2 && !q.armour);
+  q = applyPlaceQueueDelta({
+    queue: q, unitType: 'armour', delta: 1, available: 3, slotsRemaining: 5,
+  });
+  check('B36: Armour + is a separate row, not stolen by Infantry',
+    q.infantry === 2 && q.armour === 1);
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('B36: overlay commit is queue-only; gesture does not reset mid-click',
+    panelSrc.includes('shouldCommitOverlayGesture')
+    && panelSrc.includes('shouldBeginNewQueueGesture'));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

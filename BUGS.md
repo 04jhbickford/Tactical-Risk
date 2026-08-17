@@ -44,6 +44,10 @@ Follow-up (same ZUJMNP V2.76 James client, still V2.77 / SCHEMA 11):
 - B30: Destroyer + also incremented Transport (4→6). Same family as B14 row-offset / steal. Pointerdown locks `data-unit`; a retarget onto another type within 400ms is ignored. One gesture changes one unitType.
 - B31: Max hover still selected East US and opened LOG (B22 family). Canvas under the panel and the LOG tab won the hit stack. Queue controls win `elementsFromPoint`; a click whose coordinates sit in the panel never selects a territory; Max lock cannot become a tab. If the canvas ate mouseup, the locked Max still commits.
 - B32: + incremented by 2 (Armour 1→3, then every later + added 2). B31 canvas mouseup committed the lock, then the real click applied again. One pointerdown = one ±1; `shouldApplyQueueGesture` is one-shot until the next pointerdown.
+- B33: Undo ended the turn (banner → Bastion WAITING). Undo lock was retargeted onto Done. Undo cannot become finish-placement; overlay commit never Done.
+- B34: Clicking own capital (East US) to select it ended the turn at 0 deployed. Map / overlay click must not Done. Own-land tap still only selects.
+- B35: Next YOUR TURN arrived DEPLOYED 6/6. Spectated host 6 was kept by the B28 max() after the seat flag flipped. Reset when `unitsPlacedThisRoundOwnerId` is not the new seat. Same-actor stale 0 still keeps local 1 (B28).
+- B36: One Infantry + jumped 1→4 and added Armour. Compatibility mouse after the pointer click reset the one-shot and stole a row. Do not begin a new queue gesture within 400ms of an apply. Overlay commit is + / Max only.
 
 Harness: `node tools/test-presence-and-deploy.mjs`, `node tools/test-setup-phase-guard.mjs`, `node tools/test-placement-ux.mjs`, `node tools/test-tablet-chrome.mjs`, `node tools/test-mp-turn-sync.mjs`, `node tools/test-undo-and-turn-notice.mjs`.
 

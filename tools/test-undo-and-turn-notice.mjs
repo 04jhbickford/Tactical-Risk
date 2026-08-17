@@ -18,7 +18,7 @@ const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
 const { GameState, GAME_PHASES, TURN_PHASES } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
-const { resolveUndoAction, canUndoLastMove } =
+const { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } =
   await import(pathToFileURL(join(root, 'src/state/undoPolicy.js')));
 const {
   resolveTurnNoticeUrl,
@@ -73,6 +73,25 @@ check('Done/pass with empty history hides undo',
   resolveUndoAction({
     phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: false,
   }).show === false);
+check('B33: Undo lock does not pass the turn',
+  shouldPassPlacementTurn({
+    action: 'finish-placement', lockAction: 'undo-placement',
+  }) === false);
+check('B33: Undo still applies when the click retargets to Done',
+  shouldApplyUndoAction({
+    action: 'undo-placement', lockAction: 'undo-placement',
+  }) === true);
+check('B34: map / overlay click does not Done',
+  shouldPassPlacementTurn({
+    action: 'finish-placement', fromOverlayCommit: true,
+  }) === false
+  && shouldPassPlacementTurn({
+    action: 'finish-placement', mapClick: true,
+  }) === false);
+check('B34: an explicit Done lock still passes',
+  shouldPassPlacementTurn({
+    action: 'finish-placement', lockAction: 'finish-placement',
+  }) === true);
 check('locked combat moves are not undoable',
   canUndoLastMove({
     turnPhase: TURN_PHASES.NON_COMBAT_MOVE,

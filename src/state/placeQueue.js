@@ -108,6 +108,7 @@ export function resolveDeployedThisRoundAfterLoad({
   localPlacedThisRound = 0,
   prevPlacementRound,
   nextPlacementRound,
+  localPlacedOwnerId = null,
 } = {}) {
   const remoteNum = remotePlacedThisRound == null
     ? 0
@@ -121,6 +122,11 @@ export function resolveDeployedThisRoundAfterLoad({
     prevPlacementRound,
     nextPlacementRound,
   })) {
+    return remoteNum;
+  }
+  // B35: a spectated 6/6 belongs to the previous seat. Do not keep it
+  // when YOUR TURN arrives (even if currentPlayer was already flipped).
+  if (localPlacedOwnerId && nextPlayerId && localPlacedOwnerId !== nextPlayerId) {
     return remoteNum;
   }
   return Math.max(localNum, remoteNum);

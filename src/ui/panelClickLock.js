@@ -9,6 +9,7 @@ const AFTER_QUEUE_BLOCK = new Set([
   'finish-placement',
   'phone-detent-tab',
 ]);
+const UNDO_ACTIONS = new Set(['undo-placement', 'undo-capital']);
 
 export function capturePanelPointerLock({
   tabId = null,
@@ -76,6 +77,17 @@ export function pickPanelHitFromStack(stack = [], { panelEl = null } = {}) {
 
   for (const el of stack) {
     const btn = actionButtonFrom(el);
+    if (btn && inPanel(btn) && UNDO_ACTIONS.has(btn.dataset.action)) {
+      return capturePanelPointerLock({
+        action: btn.dataset.action,
+        disabled: !!btn.disabled,
+        dataset: { ...btn.dataset },
+      });
+    }
+  }
+
+  for (const el of stack) {
+    const btn = actionButtonFrom(el);
     if (btn && inPanel(btn) && btn.dataset.action !== 'phone-detent-tab') {
       return capturePanelPointerLock({
         action: btn.dataset.action,
@@ -119,6 +131,14 @@ export function resolveLockedPanelClick({
   // B31: Max / + wins over LOG even if pointerdown hit the tab on top.
   if (lock?.kind === 'tab' && QUEUE_ACTIONS.has(clickAction)) {
     return { kind: 'action', action: clickAction, dataset: { ...clickDataset, action: clickAction } };
+  }
+
+  // B33: Undo lock cannot become Done / pass.
+  if (UNDO_ACTIONS.has(lock?.action) && clickAction === 'finish-placement') {
+    return { kind: 'action', action: lock.action, dataset: lock.dataset || { action: lock.action } };
+  }
+  if (UNDO_ACTIONS.has(lock?.action)) {
+    return { kind: 'action', action: lock.action, dataset: lock.dataset || { action: lock.action } };
   }
 
   if (lock?.kind === 'tab') {
@@ -183,4 +203,19 @@ export function resolveQueueUnitType({
 // must not apply + twice (B32 Armour 1→3).
 export function shouldApplyQueueGesture({ alreadyApplied = false } = {}) {
   return alreadyApplied !== true;
+}
+
+// Compatibility mouse events after a pointer click must not open a
+// second gesture (B36 Infantry 1→4). Stay in the same one-shot window.
+export function shouldBeginNewQueueGesture({
+  alreadyApplied = false,
+  elapsedMs = Number.POSITIVE_INFINITY,
+  windowMs = PANEL_QUEUE_GUARD_MS,
+} = {}) {
+  if (!alreadyApplied) return true;
+  return Number(elapsedMs) >= Number(windowMs);
+}
+
+export function shouldCommitOverlayGesture(action) {
+  return QUEUE_ACTIONS.has(action);
 }

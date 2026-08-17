@@ -70,3 +70,30 @@ export function shouldShowUndoChrome({
     canUndoMobilize,
   });
 }
+
+const PASS_LOCKS = new Set(['finish-placement']);
+const UNDO_LOCKS = new Set(['undo-placement', 'undo-capital']);
+const QUEUE_LOCKS = new Set(['place-queue', 'place-queue-max']);
+
+// Undo must not pass. A map / overlay click must not Done (B33 / B34).
+export function shouldPassPlacementTurn({
+  action = null,
+  lockAction = null,
+  fromOverlayCommit = false,
+  mapClick = false,
+} = {}) {
+  if (action !== 'finish-placement') return false;
+  if (fromOverlayCommit || mapClick) return false;
+  if (UNDO_LOCKS.has(lockAction) || QUEUE_LOCKS.has(lockAction)) return false;
+  if (lockAction && !PASS_LOCKS.has(lockAction)) return false;
+  return true;
+}
+
+export function shouldApplyUndoAction({
+  action = null,
+  lockAction = null,
+} = {}) {
+  if (action !== 'undo-placement' && action !== 'undo-capital') return false;
+  if (lockAction && PASS_LOCKS.has(lockAction)) return false;
+  return true;
+}

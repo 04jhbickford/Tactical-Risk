@@ -27,7 +27,7 @@ import {
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
 import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
-import { resolveUndoAction, canUndoLastMove } from '../state/undoPolicy.js';
+import { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } from '../state/undoPolicy.js';
 import {
   capturePanelPointerLock,
   resolveLockedPanelClick,
@@ -35,6 +35,8 @@ import {
   isQueueGestureAction,
   shouldIgnoreQueueRetarget,
   shouldApplyQueueGesture,
+  shouldBeginNewQueueGesture,
+  shouldCommitOverlayGesture,
   resolveQueueUnitType,
   pickPanelHitFromStack,
   isPointInPanelRect,
@@ -434,7 +436,12 @@ export class PlayerPanel {
   }
 
   _onPanelPointerDown(e) {
-    this._queueGestureApplied = false;
+    if (shouldBeginNewQueueGesture({
+      alreadyApplied: this._queueGestureApplied,
+      elapsedMs: Date.now() - (this._lastQueueGestureAt || 0),
+    })) {
+      this._queueGestureApplied = false;
+    }
     this._panelPointerAt = Date.now();
     this._pointerLock = this._readPointerLock(e);
     const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
@@ -461,12 +468,11 @@ export class PlayerPanel {
 
   // Canvas received the mouseup but the point is the panel (B31).
   // Apply the locked Max / + so the gesture is not a no-op.
+  // Never Done / Undo from an overlay commit (B33 / B34).
   // Do not apply again on the real click (B32 +2).
   commitLockedPanelGesture(e) {
+    if (!shouldCommitOverlayGesture(this._pointerLock?.action)) return;
     if (!shouldApplyQueueGesture({ alreadyApplied: this._queueGestureApplied })) return;
-    if (!this._pointerLock || this._pointerLock.kind === 'none') {
-      this._onPanelPointerDown(e || {});
-    }
     this._onPanelClick({
       target: this.el,
       preventDefault() {},
@@ -487,6 +493,7 @@ export class PlayerPanel {
     e.stopPropagation();
     const clickTab = e.target.closest?.('.pp-tab');
     const clickBtn = e.target.closest?.('[data-action]');
+    const lockAction = this._pointerLock?.action || null;
     const resolved = resolveLockedPanelClick({
       lock: this._pointerLock,
       clickTabId: clickTab && this.contentEl.contains(clickTab) ? clickTab.dataset.tab : null,
@@ -510,7 +517,10 @@ export class PlayerPanel {
         this._queueGestureApplied = true;
         this._lastQueueGestureAt = Date.now();
       }
-      this._dispatchAction({ dataset: resolved.dataset || { action: resolved.action } });
+      this._dispatchAction({
+        dataset: resolved.dataset || { action: resolved.action },
+        lockAction,
+      });
     }
   }
 
@@ -3497,15 +3507,23 @@ export class PlayerPanel {
 
   _dispatchAction(btn) {
         const action = btn.dataset.action;
+        const lockAction = btn.lockAction || null;
         const territory = btn.dataset.territory;
         const setIndex = btn.dataset.set;
         if ((action === 'undo-placement' || action === 'undo-capital')
           && Date.now() < (this._ignoreUndoUntil || 0)) {
           return;
         }
+        if ((action === 'undo-placement' || action === 'undo-capital')
+          && !shouldApplyUndoAction({ action, lockAction })) {
+          return;
+        }
 
         if (action === 'finish-placement') {
           if (Date.now() < (this._lastQueueGestureAt || 0) + PANEL_QUEUE_GUARD_MS) {
+            return;
+          }
+          if (!shouldPassPlacementTurn({ action, lockAction })) {
             return;
           }
           const { ux } = this._getInitialPlacementUX(this.gameState.currentPlayer);
