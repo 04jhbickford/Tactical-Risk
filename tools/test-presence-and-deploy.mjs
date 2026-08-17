@@ -89,6 +89,9 @@ const {
   resolveMenuCardAction,
   shouldOpenJoinByCode,
   shouldOpenMyGames,
+  shouldPrefillJoinCodeFromLastMatch,
+  joinFormFieldAttrs,
+  joinFormFieldAttrString,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
 const {
   capturePanelPointerLock,
@@ -818,6 +821,23 @@ console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, +
   check('B26: join-by-code never calls onBack rejoin',
     /_openJoinByCode\(\) \{[^}]*this\.mode = 'join'/.test(lobbySrc)
     && !/_openJoinByCode\(\) \{[^}]*onBack\('rejoin'\)/.test(lobbySrc));
+  check('B37: join code and lobby password do not autocomplete',
+    shouldPrefillJoinCodeFromLastMatch() === false
+    && joinFormFieldAttrs('code').autocomplete === 'off'
+    && joinFormFieldAttrs('code').name === 'tr-join-lobby-code'
+    && joinFormFieldAttrs('password').autocomplete === 'off'
+    && joinFormFieldAttrs('password').name === 'tr-join-lobby-secret'
+    && joinFormFieldAttrs('password').name !== 'password');
+  check('B37: join form markup has autocomplete off and unique names',
+    lobbySrc.includes('data-form="join" autocomplete="off"')
+    && lobbySrc.includes('joinFormFieldAttrString(\'code\')')
+    && lobbySrc.includes('joinFormFieldAttrString(\'password\')')
+    && !/#join-code[^>]*value="\$\{readLastMatch/.test(lobbySrc)
+    && !/console\.(log|warn|error|debug).*password/.test(lobbySrc));
+  check('B37: attr string is off + unique name, no leftover value',
+    /autocomplete="off"/.test(joinFormFieldAttrString('code'))
+    && /name="tr-join-lobby-code"/.test(joinFormFieldAttrString('code'))
+    && /name="tr-join-lobby-secret"/.test(joinFormFieldAttrString('password')));
 
   check('B27: session-lost does not leave the game view',
     shouldLeaveGameView({ sessionLost: true }) === false);

@@ -160,3 +160,31 @@ export function shouldOpenJoinByCode(action) {
 export function shouldOpenMyGames(action) {
   return resolveMenuCardAction(action) === 'my-games';
 }
+
+// B37: browser autocomplete treated Game Code as a name (BICKFO) and
+// the lobby password as a saved login. Off + unique names; never prefill.
+export function shouldPrefillJoinCodeFromLastMatch() {
+  return false;
+}
+
+export function joinFormFieldAttrs(kind) {
+  if (kind === 'password') {
+    return {
+      autocomplete: 'off',
+      name: 'tr-join-lobby-secret',
+    };
+  }
+  return {
+    autocomplete: 'off',
+    name: 'tr-join-lobby-code',
+    autocorrect: 'off',
+    spellcheck: 'false',
+  };
+}
+
+export function joinFormFieldAttrString(kind) {
+  const attrs = joinFormFieldAttrs(kind);
+  return Object.entries(attrs)
+    .map(([key, value]) => `${key}="${value}"`)
+    .join(' ');
+}

@@ -10,6 +10,8 @@ import {
   resolveMenuCardAction,
   shouldOpenJoinByCode,
   shouldOpenMyGames,
+  shouldPrefillJoinCodeFromLastMatch,
+  joinFormFieldAttrString,
 } from '../multiplayer/lastMatch.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
 
@@ -293,7 +295,7 @@ export class MultiplayerLobby {
         <h2>Create New Game</h2>
       </div>
 
-      <form class="mp-form modern" data-form="create">
+      <form class="mp-form modern" data-form="create" autocomplete="off">
         <div class="mp-field">
           <label>Game Name</label>
           <input type="text" id="create-name" placeholder="${possessivePhrase(user?.displayName, 'Game')}" maxlength="30" class="modern-input">
@@ -326,7 +328,7 @@ export class MultiplayerLobby {
         </label>
         <div class="mp-password-field hidden" id="password-field">
           <label>Password</label>
-          <input type="password" id="create-password" class="modern-input" placeholder="">
+          <input type="password" id="create-password" class="modern-input" placeholder="" ${joinFormFieldAttrString('password')}>
         </div>
 
         <div class="mp-error hidden" id="create-error"></div>
@@ -345,14 +347,14 @@ export class MultiplayerLobby {
         <h2>Join Game</h2>
       </div>
 
-      <form class="mp-form modern" data-form="join">
+      <form class="mp-form modern" data-form="join" autocomplete="off">
         <div class="mp-field">
           <label>Game Code</label>
-          <input type="text" id="join-code" placeholder="ABC123" maxlength="6" class="modern-input code-input" value="${readLastMatch()?.lobbyCode || ''}">
+          <input type="text" id="join-code" placeholder="ABC123" maxlength="6" class="modern-input code-input" ${joinFormFieldAttrString('code')}${shouldPrefillJoinCodeFromLastMatch() && readLastMatch()?.lobbyCode ? ` value="${readLastMatch().lobbyCode}"` : ''}>
         </div>
         <div class="mp-field">
           <label>Password (if required)</label>
-          <input type="password" id="join-password" placeholder="Leave empty if none" class="modern-input">
+          <input type="password" id="join-password" placeholder="Leave empty if none" class="modern-input" ${joinFormFieldAttrString('password')}>
         </div>
 
         <div class="mp-error hidden" id="join-error"></div>
