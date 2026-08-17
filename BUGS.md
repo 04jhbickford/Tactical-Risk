@@ -2,6 +2,16 @@
 
 ---
 
+## 8.17.26 — V2.78 ship (CEVX6F B38–B40)
+
+CoS-approved squash to main. SCHEMA 11. No map/rule change. No Vercel billing from this ship.
+
+B38: panel paints at default zoom; signed-in reload resumes the match (or Rejoin), not home / Create Game.
+B39: first-wave land kit is real (not “Russians have no land IPC”); + / Max / Undo / Deploy; place 6 and Done.
+B40: 2/2 host CTA is Start Game; an already-started lobby reopens that gameId.
+
+---
+
 ## 8.17.26 — V2.77 host background killed ZUJMNP; deploy/undo looked broken
 
 Live V2.76 two-human (Bastion host Russians, James guest Americans), game ZUJMNP. Host tab backgrounded ~3 min → host signed out → lobby gone → guest join “ZUJMNP not found” → guest WAITING on a ghost. Client also self-ejected to title / MY ACTIVE GAMES with no click. Same table: Undo passed the turn; own-capital tap ended the turn / opened surrender; game-row click opened “Leave this game?”; Infantry + jumped 1→4 or also added Armour; next YOUR TURN arrived 6/6; Deploy N clipped at y≈733; unit list truncated to tacticalBomber; selection jumped after deploy.
