@@ -62,16 +62,20 @@ export function poolHasLandOrAir(pool, unitDefs) {
   });
 }
 
-// First placement wave, 0 deployed, and the seat has no land/air left
+// First placement wave, 0 deployed, and THIS seat has no land/air left
 // in the pool — restore the starting kit. Later waves may legitimately
-// be ships-only.
+// be ships-only. A finished earlier seat's empty pool is not a deserialize
+// miss: using the current seat's 0-placed flag to restock everyone is
+// what rewound turn order after a refresh (A3/A4).
 export function shouldRestoreStartingDeployPool({
   phase,
   placementRound = 1,
   placedThisRound = 0,
   pool,
   unitDefs,
+  isCurrentSeat = true,
 } = {}) {
+  if (isCurrentSeat === false) return false;
   if (String(phase) !== 'unit_placement') return false;
   if (Number(placedThisRound) > 0) return false;
   if (Number(placementRound) > 1) return false;

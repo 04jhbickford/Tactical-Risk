@@ -2,6 +2,12 @@
 
 ---
 
+## 8.26.26 — V2.80 A3/A4 turn-order rewind on refresh
+
+`ensureInitialDeployPools` used the current seat's wave-1 / 0-placed flags to restock every empty pool. After the first human Done, a host refresh restocked finished seats, extra placement waves ran, and `finishPlacementRound` skipped a finished index (2→0). Restore the starting kit only for the current seat. SCHEMA 11. GAME_VERSION V2.80.
+
+---
+
 ## 8.17.26 — V2.79 B41 host lobby dumped home (6V9ZXK)
 
 Same family as B38. Production V2.78, lobby **6V9ZXK** (Bastion's Game), host Bastion / abramlockheed. Host created a 2-player no-AI lobby, stayed at 1/2 (Start not clicked). View dumped to Local Play / Play Online with no Leave, no Start, no Delete Lobby, no surrender. Still signed in. Guest (James) was still joining. Do not treat as surrendered. Rejoin **6V9ZXK** only — no new game.

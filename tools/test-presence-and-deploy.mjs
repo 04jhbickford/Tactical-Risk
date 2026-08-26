@@ -151,7 +151,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.79', GAME_VERSION === 'V2.79');
+check('GAME_VERSION is V2.80', GAME_VERSION === 'V2.80');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1217,6 +1217,14 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
       pool: [{ type: 'transport', quantity: 1 }],
       unitDefs: liveUnits,
     }) === false);
+  check('A3/A4: a finished earlier seat is not restocked from the current seat flags',
+    shouldRestoreStartingDeployPool({
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      placementRound: 1,
+      placedThisRound: 0,
+      pool: [],
+      isCurrentSeat: false,
+    }) === false);
 
   const broken = new GameState({ risk: { factions: [] } }, territories, []);
   broken.players = [
@@ -1232,6 +1240,22 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
   broken.ensureInitialDeployPools();
   check('B39: load of transport-only Russians restores infantry',
     broken.getUnitsToPlace('Russians').some((u) => u.type === 'infantry' && u.quantity > 0));
+
+  const midWave = new GameState({ risk: { factions: [] } }, territories, []);
+  midWave.players = [
+    { id: 'h0', name: 'Human0', oderId: 'user_0' },
+    { id: 'a0', name: 'Bot0', oderId: 'ai_0', isAI: true },
+  ];
+  midWave.currentPlayerIndex = 1;
+  midWave.phase = GAME_PHASES.UNIT_PLACEMENT;
+  midWave.placementRound = 1;
+  midWave.unitsPlacedThisRound = 0;
+  midWave.playerState = { h0: { hasPlacedCapital: true }, a0: { hasPlacedCapital: true } };
+  midWave.unitsToPlace = { h0: [], a0: [{ type: 'infantry', quantity: 6 }] };
+  midWave.ensureInitialDeployPools();
+  check('A3/A4: load on a later seat does not restock a finished empty pool',
+    (midWave.getUnitsToPlace('h0') || []).every((u) => !(u.quantity > 0))
+    && midWave.getUnitsToPlace('a0').some((u) => u.type === 'infantry' && u.quantity === 6));
 
   const cta = resolveHostLobbyPrimaryCta({
     isHost: true,

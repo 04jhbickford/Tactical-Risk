@@ -1194,14 +1194,16 @@ export class GameState {
   ensureInitialDeployPools() {
     if (this.phase !== GAME_PHASES.UNIT_PLACEMENT) return false;
     let restored = false;
-    for (const p of this.players || []) {
+    for (const [i, p] of (this.players || []).entries()) {
       const rows = resolvePlayerDeployPool(this.unitsToPlace, p.id, [p.name]);
       this.unitsToPlace[p.id] = rows;
+      const isCurrentSeat = i === this.currentPlayerIndex;
       if (shouldRestoreStartingDeployPool({
         phase: this.phase,
         placementRound: this.placementRound || 1,
-        placedThisRound: this.unitsPlacedThisRound || 0,
+        placedThisRound: isCurrentSeat ? (this.unitsPlacedThisRound || 0) : 0,
         pool: rows,
+        isCurrentSeat,
       })) {
         this.unitsToPlace[p.id] = this._buildStartingDeployPool({
           factoryAlreadyPlaced: !!this.playerState?.[p.id]?.hasPlacedCapital,

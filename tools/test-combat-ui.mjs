@@ -110,7 +110,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.79', GAME_VERSION === 'V2.79');
+check('GAME_VERSION is V2.80', GAME_VERSION === 'V2.80');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
