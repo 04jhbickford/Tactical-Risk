@@ -17,7 +17,7 @@ export class TechUI {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'techPopup';
-    this.el.className = 'tech-popup hidden';
+    this.el.className = 'tech-popup board-research hidden';
     document.body.appendChild(this.el);
   }
 
@@ -58,7 +58,7 @@ export class TechUI {
     let html = `
       <div class="tech-content">
         <div class="tech-header">
-          <div class="tech-title">Technology Research</div>
+          <div class="tech-title"><span class="board-battle-kicker">Research</span> Technology</div>
           <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
         </div>
 

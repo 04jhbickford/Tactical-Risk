@@ -255,7 +255,7 @@ export class TerritoryRenderer {
       if (skin) {
         const owner = this.gameState?.getOwner?.(t.name);
         const player = owner ? this.gameState.getPlayer(owner) : null;
-        color = player?.color ? hexToRgba(player.color, 0.5) : PARCHMENT_LAND;
+        color = player?.color ? hexToRgba(player.color, 0.58) : PARCHMENT_LAND;
         alpha = 1;
       }
 
@@ -573,7 +573,7 @@ export class TerritoryRenderer {
   renderTerritoryOutlines(ctx) {
     // Land territory borders
     ctx.strokeStyle = isBoardSkin() ? INK : 'rgba(0, 0, 0, 0.6)';
-    ctx.lineWidth = isBoardSkin() ? 1.55 : 1;
+    ctx.lineWidth = isBoardSkin() ? 1.85 : 1;
 
     for (const t of this.territories) {
       if (t.isWater) continue;

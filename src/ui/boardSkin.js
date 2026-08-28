@@ -4,9 +4,9 @@ import { GAME_VERSION } from '../version.js';
 import { playActionSound, playBoardSound, unlockBoardAudio, setBoardAudioMuted, isBoardAudioMuted } from '../audio/boardAudio.js';
 
 export const MAP_FILTER = 'sepia(0.42) saturate(0.62) contrast(1.08) brightness(1.1)';
-export const OCEAN_PARCHMENT = '#6A8490';
-export const INK = 'rgba(42, 28, 14, 0.88)';
-export const PARCHMENT_LAND = 'rgba(232, 214, 168, 0.42)';
+export const OCEAN_PARCHMENT = '#5C7382';
+export const INK = 'rgba(32, 20, 10, 0.92)';
+export const PARCHMENT_LAND = 'rgba(236, 218, 172, 0.5)';
 
 export function isBoardSkin() {
   return document.documentElement.classList.contains('board-skin');

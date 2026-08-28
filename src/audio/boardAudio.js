@@ -84,6 +84,8 @@ function noise(duration, peak, hp = 400, lp = 2400) {
 }
 
 export function playBoardSound(kind) {
+  const ac = audio();
+  if (ac && ac.state === 'suspended') ac.resume();
   switch (kind) {
     case 'ui-click':
       tone(220, 'triangle', 0.07, 0.18, 0.004);

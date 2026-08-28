@@ -54,7 +54,7 @@ export class CombatUI {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'combatPopup';
-    this.el.className = 'combat-popup hidden';
+    this.el.className = 'combat-popup board-combat hidden';
     document.body.appendChild(this.el);
   }
 
@@ -1643,7 +1643,7 @@ export class CombatUI {
     let html = `
       <div class="combat-content">
         <div class="combat-header">
-          <div class="combat-title">⚔ ${this.currentTerritory}</div>
+          <div class="combat-title"><span class="board-battle-kicker">Battle</span> ${this.currentTerritory}</div>
           <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
         </div>
 

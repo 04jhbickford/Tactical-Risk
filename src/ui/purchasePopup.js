@@ -135,7 +135,7 @@ export class PurchasePopup {
 
     let html = `
             <div class="pp-header">
-        <div class="pp-title">Purchase Units</div>
+        <div class="pp-title">Requisition</div>
         <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
       </div>
 
@@ -284,7 +284,7 @@ export class PurchasePopup {
 
     let html = `
       <div class="pp-header">
-        <div class="pp-title">Purchase Units</div>
+        <div class="pp-title">Requisition</div>
         <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
       </div>
 
