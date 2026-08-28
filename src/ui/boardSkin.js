@@ -105,15 +105,23 @@ export function initBoardSkin() {
   document.documentElement.classList.add('board-skin');
   document.body.classList.add('board-skin');
   const minimap = document.getElementById('minimap');
-  if (minimap) minimap.hidden = true;
+  if (minimap) {
+    minimap.hidden = true;
+    minimap.setAttribute('hidden', '');
+    minimap.style.display = 'none';
+  }
   const zoom = document.getElementById('zoom-controls');
   if (zoom) zoom.remove();
+  document.querySelectorAll('.zoom-btn').forEach((n) => n.remove());
   const clarity = document.getElementById('hud-clarity');
   if (clarity) {
     clarity.hidden = true;
     clarity.setAttribute('hidden', '');
     clarity.innerHTML = '';
+    clarity.style.display = 'none';
   }
+  const closeBtn = document.getElementById('sidebarClose');
+  if (closeBtn) closeBtn.remove();
   ensureBanner();
   bindTableFeel();
 }

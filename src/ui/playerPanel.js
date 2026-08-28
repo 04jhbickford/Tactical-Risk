@@ -455,7 +455,12 @@ export class PlayerPanel {
 
   containsPoint(clientX, clientY) {
     if (!this.el || this.el.classList?.contains('hidden')) return false;
-    return isPointInPanelRect(clientX, clientY, this.el.getBoundingClientRect?.());
+    if (isPointInPanelRect(clientX, clientY, this.el.getBoundingClientRect?.())) return true;
+    const extras = this.el.querySelectorAll('.pp-bottom-actions, .pp-placement-actions, .pp-confirm-btn, .pp-action-btn');
+    for (const node of extras) {
+      if (isPointInPanelRect(clientX, clientY, node.getBoundingClientRect?.())) return true;
+    }
+    return false;
   }
 
   shouldBlockMapSelect(now = Date.now(), point = null) {
@@ -957,6 +962,17 @@ export class PlayerPanel {
     // in the tray body). Done only after the queue is empty.
     else if (phase === GAME_PHASES.UNIT_PLACEMENT) {
       const { ux, totalQueued, isValidPlacement } = this._getInitialPlacementUX(player);
+      if (isBoardSkin()) {
+        const canUndoPlacement = !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
+        if (canUndoPlacement && Date.now() >= (this._ignoreUndoUntil || 0)) {
+          buttons.push({
+            action: 'undo-placement',
+            label: 'Undo',
+            disabled: false,
+            undoable: true,
+          });
+        }
+      }
 
       if (totalQueued > 0 && isValidPlacement) {
         buttons.push({
@@ -2376,8 +2392,9 @@ export class PlayerPanel {
       poolRemaining: actualRemaining,
     });
 
-    let html = `
-      <div class="pp-inline-placement">
+    let html = `<div class="pp-inline-placement">`;
+    if (!isBoardSkin()) {
+      html += `
         <div class="pp-budget-bar">
           <span class="pp-budget-label">${budget.deployedLabel}:</span>
           <span class="pp-budget-value ${deployedThisRound >= limit ? 'full' : ''}">${budget.deployedText}</span>
@@ -2386,8 +2403,9 @@ export class PlayerPanel {
           <span class="pp-remaining-label">${budget.remainingLabel}:</span>
           <span class="pp-remaining-value">${budget.remainingText}</span>
         </div>`;
-    if (budget.remainingHint) {
-      html += `<div class="pp-hint">${budget.remainingHint}</div>`;
+      if (budget.remainingHint) {
+        html += `<div class="pp-hint">${budget.remainingHint}</div>`;
+      }
     }
 
     // Selected tile + skip hint stay visible when Done/skip is offered
@@ -2535,16 +2553,18 @@ export class PlayerPanel {
 
     html += `</div>`;
 
-    // Action buttons — always painted. Missing Undo/Deploy looks like a
-    // dead first turn (B39) even when they are disabled.
-    html += `<div class="pp-placement-actions">`;
-    html += `<button class="pp-action-btn secondary small" data-action="undo-placement"${canUndo ? '' : ' disabled'}>↩ Undo</button>`;
-    if (showDoneButton) {
-      html += `<button class="pp-action-btn primary" data-action="finish-placement">${ux.canSkipNaval ? 'Done — skip leftover ships →' : 'Done - Next Player →'}</button>`;
+    // Board-skin: Undo / Deploy / Done live once on the wood rail.
+    // A second footer Deploy over the map retargeted onto sea tiles.
+    if (!isBoardSkin()) {
+      html += `<div class="pp-placement-actions">`;
+      html += `<button class="pp-action-btn secondary small" data-action="undo-placement"${canUndo ? '' : ' disabled'}>↩ Undo</button>`;
+      if (showDoneButton) {
+        html += `<button class="pp-action-btn primary" data-action="finish-placement">${ux.canSkipNaval ? 'Done — skip leftover ships →' : 'Done - Next Player →'}</button>`;
+      }
+      const canDeploy = totalQueued > 0 && isValidPlacement;
+      html += `<button class="pp-action-btn primary" data-action="confirm-placement"${canDeploy ? '' : ' disabled'}>Deploy${totalQueued > 0 ? ` ${totalQueued}` : ''}</button>`;
+      html += `</div>`;
     }
-    const canDeploy = totalQueued > 0 && isValidPlacement;
-    html += `<button class="pp-action-btn primary" data-action="confirm-placement"${canDeploy ? '' : ' disabled'}>Deploy${totalQueued > 0 ? ` ${totalQueued}` : ''}</button>`;
-    html += `</div>`;
 
     html += `</div>`;
     return html;

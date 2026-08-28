@@ -18,7 +18,14 @@ export class HUD {
     this.onMenuOpen = null;
     this.el = document.getElementById('hud');
     this.clarityEl = document.getElementById('hud-clarity');
-    if (!this.clarityEl && this.el?.parentNode) {
+    if (isBoardSkin()) {
+      if (this.clarityEl) {
+        this.clarityEl.hidden = true;
+        this.clarityEl.innerHTML = '';
+        this.clarityEl.setAttribute('hidden', '');
+        this.clarityEl.style.display = 'none';
+      }
+    } else if (!this.clarityEl && this.el?.parentNode) {
       this.clarityEl = document.createElement('div');
       this.clarityEl.id = 'hud-clarity';
       this.el.after(this.clarityEl);
@@ -211,6 +218,15 @@ export class HUD {
       this.clarityEl.setAttribute('hidden', '');
     }
     const c = inGame ? this._clarityModel() : null;
+    const placed = inGame && this.gameState.phase === GAME_PHASES.UNIT_PLACEMENT
+      ? (this.gameState.unitsPlacedThisRound || 0)
+      : null;
+    const limit = inGame && placed != null
+      ? (this.gameState.getUnitsPerRoundLimit?.() || 6)
+      : null;
+    const budget = (placed != null)
+      ? '<span class="rail-budget" title="Placed this wave">' + placed + '/' + limit + '</span>'
+      : '';
     const slip = c
       ? '<span class="rail-slip">' + (c.lastAction || '') + (c.click ? ' · ' + c.click : '') + '</span>'
       : '';
@@ -221,6 +237,7 @@ export class HUD {
         + (player.flag ? '<img src="assets/flags/' + player.flag + '" alt="">' : '')
         + '<span class="rail-seat-name">' + player.name + '</span>'
         + '<span class="rail-phase">' + phaseName + '</span>'
+        + budget
         + '</div>'
         + slip
         + '<div class="rail-bank" title="IPCs">' + chips + '<span class="rail-bank-count">' + ipcs + '</span></div>'
@@ -369,13 +386,16 @@ export class HUD {
   }
 
   _renderClarity() {
-    if (!this.clarityEl) return;
     if (isBoardSkin()) {
-      this.clarityEl.hidden = true;
-      this.clarityEl.innerHTML = '';
-      this.clarityEl.setAttribute('hidden', '');
+      if (this.clarityEl) {
+        this.clarityEl.hidden = true;
+        this.clarityEl.innerHTML = '';
+        this.clarityEl.setAttribute('hidden', '');
+        this.clarityEl.style.display = 'none';
+      }
       return;
     }
+    if (!this.clarityEl) return;
     const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY;
     if (!inGame) {
       this.clarityEl.hidden = true;

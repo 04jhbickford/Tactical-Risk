@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp deploy-phase nits (preview only)
+
+272b820 play: parchment #hud-clarity still said YOUR TURN / Deployed 0/6 on the map; deploy sheet had two Deploy 1 buttons and the footer click hit Borneo Sea Zone; a dark zoom/minimap disc floated on the art; tooltip used a gold IPC coin. Folded into this branch: strip stays dead (0/6 on the rail); one rail Deploy/Undo; panel rect blocks map hits; zoom/minimap/close disc gone; tooltip IPC is ink. SCHEMA 11. V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp fifth chrome pass (preview only)
 
 James playtest of 272b820: lobby felt cards PASS; board FAIL (clarity strip + tall Actions sheet on the art). Fourth pass hid the strip and shrunk the sheet; fifth pass takes the sheet off the art (Done/Undo/place on the wood rail), docks combat as a felt dice tray with wood-pip dice and plastic take-tokens (no CSS-3D modal), and slides the stationed canvas sculpt (source/dest count hidden while it moves). SCHEMA 11. V3.00-exp. Do not merge.

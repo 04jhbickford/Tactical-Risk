@@ -66,7 +66,11 @@ html.board-skin .hud-turn-order {
 html.board-skin #hud-clarity,
 html.board-skin .hud-clarity,
 html.board-skin #hud-clarity.your-turn,
-html.board-skin #hud-clarity.waiting {
+html.board-skin #hud-clarity.waiting,
+html.board-skin.mobile-shell #hud-clarity,
+html.mobile-shell.board-skin #hud-clarity,
+html.board-skin.mobile-shell #hud-clarity.your-turn,
+html.mobile-shell.board-skin #hud-clarity.your-turn {
   display: none !important;
   visibility: hidden !important;
   height: 0 !important;
@@ -76,6 +80,20 @@ html.board-skin #hud-clarity.waiting {
   border: 0 !important;
   overflow: hidden !important;
   pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+html.board-skin #zoom-controls,
+html.board-skin .zoom-btn,
+html.board-skin #minimap,
+html.board-skin #sidebarClose,
+html.board-skin .risk-cards-dropdown,
+html.board-skin .pp-placement-actions {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
   opacity: 0 !important;
 }
 
@@ -175,6 +193,14 @@ html.board-skin .rail-slip {
   font: 12px/1.2 'Source Serif 4', Georgia, serif;
   color: #efe0b8;
   opacity: 0.85;
+}
+
+html.board-skin .rail-budget {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid #8a6a32;
+  color: #efe0b8;
+  font: 700 11px Cinzel, Palatino, serif;
 }
 
 html.board-skin .hud-current-turn,
@@ -601,7 +627,8 @@ html.board-skin .player-panel,
 html.board-skin .pp-panel,
 html.board-skin #playerPanel,
 html.board-skin #sidebar.player-panel.table-edge-card,
-html.board-skin .player-panel.table-edge-card {
+html.board-skin .player-panel.table-edge-card,
+html.board-skin #sidebar.table-edge-card.has-table-work {
   position: fixed !important;
   top: auto !important;
   right: auto !important;
@@ -611,6 +638,8 @@ html.board-skin .player-panel.table-edge-card {
   max-width: min(300px, 40vw) !important;
   height: auto !important;
   max-height: 30vh !important;
+  pointer-events: auto !important;
+  z-index: 65 !important;
   background:
     linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
     url('assets/board/felt.svg') center / 140px 140px repeat !important;
@@ -754,10 +783,21 @@ html.board-skin #unitTooltip {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
-html.board-skin #minimap {
-  border: 3px solid #3a2410;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
-  background: #2a160a;
+html.board-skin .tt-ipc,
+html.board-skin .territory-tooltip .tt-ipc,
+html.mobile-shell.board-skin .territory-tooltip .tt-ipc {
+  color: #2a1c0e !important;
+  background: none !important;
+}
+
+html.board-skin #minimap,
+html.board-skin.mobile-shell #minimap,
+html.mobile-shell.board-skin #minimap {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 html.board-skin .phone-tray,

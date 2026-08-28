@@ -3,6 +3,7 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { isMobileShell, readableFactionTextColor } from './mobileShell.js';
 import { GAME_PHASES } from '../state/gameState.js';
+import { isBoardSkin } from './boardSkin.js';
 
 // Phone tooltip sits under #hud (70) so the full-screen menu sheet covers it.
 // Desktop / tablet keep the unscoped z-index: 100.
@@ -241,7 +242,7 @@ export class TerritoryTooltip {
         const ownerColor = readableFactionTextColor(player?.color || '#888');
         const ipc = this.gameState.getEffectiveIpc?.(t.name) ?? (t.production || 0);
         html += `<div class="tt-owner"><span style="color:${ownerColor}">${player?.name || owner || ''}</span></div>`;
-        html += `<div class="tt-stats"><span class="tt-ipc">💰 ${ipc} IPC</span></div>`;
+        html += `<div class="tt-stats"><span class="tt-ipc">${isBoardSkin() ? '' : '💰 '}${ipc} IPC</span></div>`;
       } else {
         html += `<div class="tt-type">🌊 Sea Zone</div>`;
       }
@@ -295,7 +296,7 @@ export class TerritoryTooltip {
     if (isLand) {
       const effectiveIpc = this.gameState?.getEffectiveIpc(t.name) ?? (t.production || 0);
       html += `<div class="tt-stats">`;
-      html += `<span class="tt-ipc">💰 ${effectiveIpc} IPC</span>`;
+      html += `<span class="tt-ipc">${isBoardSkin() ? '' : '💰 '}${effectiveIpc} IPC</span>`;
       if (continent) {
         html += `<span class="tt-continent" style="border-color:${continent.color}">${continent.name} (+${continent.bonus})</span>`;
       }
