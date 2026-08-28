@@ -92,26 +92,30 @@ export class MapRenderer {
     const endRow = Math.min(ROWS - 1, Math.floor((viewport.y + viewport.height) / TILE_SIZE));
 
     // Draw base tiles on top (opaque — covers the small map where tiles exist).
-    // Skip 1×1 placeholders: drawImage stretches them into 256×256 axis-aligned
-    // washes (Novosibirsk / French Africa at 1024×525). Gaps keep the poster.
+    // 1×1 stubs are (0,0,255,127): drawImage stretches them into 256×256
+    // axis-aligned washes (Novosibirsk / French Africa at 1024×525).
+    // Use the real relief cell as the printed stand-in so the gap is terrain,
+    // not a flat plate against neighboring 256 tiles.
     for (let col = startCol; col <= endCol; col++) {
       for (let row = startRow; row <= endRow; row++) {
         const key = `${col}_${row}`;
-        const img = this.baseTiles[key];
-        if (isRealMapTile(img)) {
-          ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        const base = this.baseTiles[key];
+        const relief = this.reliefTiles[key];
+        if (isRealMapTile(base)) {
+          ctx.drawImage(base, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        } else if (isRealMapTile(relief)) {
+          ctx.drawImage(relief, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
       }
     }
 
-    // Relief only where the base tile is real. A 256px shade over a placeholder
-    // gap is the same rectangular wash.
     ctx.globalAlpha = 0.5;
     for (let col = startCol; col <= endCol; col++) {
       for (let row = startRow; row <= endRow; row++) {
         const key = `${col}_${row}`;
+        const base = this.baseTiles[key];
         const img = this.reliefTiles[key];
-        if (isRealMapTile(this.baseTiles[key]) && isRealMapTile(img)) {
+        if (isRealMapTile(base) && isRealMapTile(img)) {
           ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
       }

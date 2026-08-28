@@ -255,25 +255,13 @@ export class TerritoryRenderer {
       if (skin) {
         const owner = this.gameState?.getOwner?.(t.name);
         const player = owner ? this.gameState.getPlayer(owner) : null;
-        color = player?.color ? hexToRgba(player.color, 0.42) : PARCHMENT_LAND;
+        // Light faction tint only — a second parchment undercoat flattened
+        // stub-tile gaps into axis-aligned plates (Novosibirsk / Africa).
+        color = player?.color ? hexToRgba(player.color, 0.28) : 'rgba(236, 218, 172, 0.10)';
         alpha = 1;
       }
 
       ctx.save();
-      if (skin) {
-        ctx.fillStyle = PARCHMENT_LAND;
-        ctx.globalAlpha = 1;
-        for (const polygon of t.polygons) {
-          if (!polygon || polygon.length < 3) continue;
-          ctx.beginPath();
-          ctx.moveTo(polygon[0][0], polygon[0][1]);
-          for (let i = 1; i < polygon.length; i++) {
-            ctx.lineTo(polygon[i][0], polygon[i][1]);
-          }
-          ctx.closePath();
-          ctx.fill();
-        }
-      }
       ctx.fillStyle = color;
       ctx.globalAlpha = alpha;
 
