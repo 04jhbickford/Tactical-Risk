@@ -8,7 +8,7 @@ export class AuthScreen {
     this.onComplete = onComplete;
     this.authManager = getAuthManager();
     this.el = null;
-    this.mode = 'login'; // 'restoring', 'login', 'signup', 'phone', 'verify'
+    this.mode = 'google'; // 'restoring', 'google', 'login', 'signup', 'phone', 'verify'
     this.phoneNumber = '';
     this.isLoading = false;
   }
@@ -33,7 +33,7 @@ export class AuthScreen {
       this._restoreThenContinue();
       return;
     }
-    if (this.mode === 'restoring') this.mode = 'login';
+    if (this.mode === 'restoring') this.mode = 'google';
     this._render();
   }
 
@@ -124,6 +124,9 @@ export class AuthScreen {
         <p class="mp-no-games">Restoring your session…</p>
         <p class="mp-no-games-hint">You were signed in. The match is still there.</p>
       `;
+    }
+    if (this.mode === 'google') {
+      return `<p class="auth-seat-note">Continue with Google for the live table.</p>`;
     }
     if (this.mode === 'login') {
       return `
