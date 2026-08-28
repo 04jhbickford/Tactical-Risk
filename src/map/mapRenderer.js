@@ -71,9 +71,10 @@ export class MapRenderer {
     const skin = isBoardSkin();
     if (skin) ctx.filter = MAP_FILTER;
 
-    // Printed board: keep the A&A tiles, but skip the teal thumbnail underlay
-    // so letterbox / gaps read as table wood instead of V2.80 ocean.
-    if (this.smallMap && !skin) {
+    // Fill tile gaps with the printed poster. Board-skin already has MAP_FILTER
+    // on the context, so the thumbnail reads as parchment, not teal V2.80 ocean.
+    // Letterbox outside the map stays table wood (filled before the camera).
+    if (this.smallMap) {
       ctx.drawImage(this.smallMap, 0, 0, MAP_WIDTH, MAP_HEIGHT);
     }
 

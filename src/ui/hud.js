@@ -227,7 +227,8 @@ export class HUD {
     const budget = (placed != null)
       ? '<span class="rail-budget" title="Placed this wave">' + placed + '/' + limit + '</span>'
       : '';
-    const slip = c
+    const phone = isMobileShell();
+    const slip = (!phone && c)
       ? '<span class="rail-slip">' + (c.lastAction || '') + (c.click ? ' · ' + c.click : '') + '</span>'
       : '';
 
@@ -236,11 +237,13 @@ export class HUD {
         '<div class="rail-seat" style="--nation:' + player.color + '">'
         + (player.flag ? '<img src="assets/flags/' + player.flag + '" alt="">' : '')
         + '<span class="rail-seat-name">' + player.name + '</span>'
-        + '<span class="rail-phase">' + phaseName + '</span>'
+        + (phone ? '' : '<span class="rail-phase">' + phaseName + '</span>')
         + budget
         + '</div>'
         + slip
-        + '<div class="rail-bank" title="IPCs">' + chips + '<span class="rail-bank-count">' + ipcs + '</span></div>'
+        + '<div class="rail-bank" title="IPCs">'
+        + (phone ? '' : chips)
+        + '<span class="rail-bank-count">' + ipcs + '</span></div>'
       )
       : '<span class="rail-idle">Tactical Risk</span>';
 

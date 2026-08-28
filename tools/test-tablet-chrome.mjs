@@ -91,7 +91,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.80', GAME_VERSION === 'V2.80');
+check('GAME_VERSION is V3.00-exp', GAME_VERSION === 'V3.00-exp');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -548,10 +548,10 @@ check('phone peek still uses PHASE_HINTS when they exist',
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
 }
 
-console.log('=== V2.69 phone setup tap places; inspect is long-press edge card ===');
-check('phone setup tap does not open the tooltip',
-  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false
-  && shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+console.log('=== V3.00-exp phone setup tap inspects; second tap / Confirm commits ===');
+check('phone setup tap opens the inspect card',
+  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === true
+  && shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
 check('phone playing tap still can show the tooltip',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.PLAYING }) === true);
 check('desktop tap predicate is off (hover path unchanged)',
@@ -569,12 +569,17 @@ check('long-press on setup is inspect, not a tap',
   && shouldInspectPhoneHold({
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, heldMs: PHONE_INSPECT_HOLD_MS, movedPx: 0,
   }) === false);
-check('inspect hold does not commit a setup tap',
+check('first setup tap does not commit; second tap on peeked tile may',
   shouldCommitPhoneSetupTap({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: true,
   }) === false
   && shouldCommitPhoneSetupTap({
-    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, inspected: false,
+    peekedName: null, tappedName: 'French Indo China',
+  }) === false
+  && shouldCommitPhoneSetupTap({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, inspected: false,
+    peekedName: 'French Indo China', tappedName: 'French Indo China',
   }) === true);
 check('phone deploy hint is Tap a territory to select',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a territory to select');
@@ -593,20 +598,22 @@ check('desktop deploy PHASE_HINTS stay Click to place units',
   resolvePhaseHint(GAME_PHASES.UNIT_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT]);
 check('desktop capital PHASE_HINTS stay Click your territory',
   resolvePhaseHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.CAPITAL_PLACEMENT]);
-check('own-land tap selects even without a peeked unit',
+check('first land tap inspects; second tap on peeked tile selects',
   shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.UNIT_PLACEMENT,
     selectedUnitType: null,
     tappedIsOwnedLand: true,
     hasHit: true,
-  }) === true
+  }) === false
   && shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.UNIT_PLACEMENT,
     selectedUnitType: 'infantry',
     tappedIsOwnedLand: true,
     hasHit: true,
+    peekedName: 'Germany',
+    tappedName: 'Germany',
   }) === true);
 check('place-tap does not clear a pending Place Capital confirm',
   shouldApplyPhoneSetupLandTap({
@@ -626,6 +633,14 @@ check('place-tap does not clear a pending Place Capital confirm',
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     tappedIsOwnedLand: true,
     hasHit: true,
+  }) === false
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    tappedIsOwnedLand: true,
+    hasHit: true,
+    peekedName: 'French Indo China',
+    tappedName: 'French Indo China',
   }) === true);
 check('desktop setup land tap still applies',
   shouldApplyPhoneSetupLandTap({
@@ -771,8 +786,8 @@ check('phone setup undo is required for place and last capital',
 check('selected type changes the deploy hint to select then Deploy',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Select a territory, then Deploy'
   && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a territory to select');
-check('place-tap still does not inspect (V2.69 split stays)',
-  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
+check('place-tap inspects first (V3.00-exp phone)',
+  shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
   && shouldInspectPhoneHold({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, heldMs: 500, movedPx: 0,
   }) === true);
@@ -782,6 +797,21 @@ check('place-tap still does not inspect (V2.69 split stays)',
     !/drag-place|peek-drag|chip-drag/.test(src)
     && /shouldAutoCommitPhoneCapital/.test(src)
     && /resolvePhoneStickyUnitType/.test(src));
+  check('board-skin phone does not emit the tray toggle',
+    /const mobilePeek = mobile && !isBoardSkin\(\)/.test(src)
+    && !/<button[^>]*class="phone-tray-toggle"/.test(src));
+}
+{
+  const css = readFileSync(join(root, 'board-skin.css'), 'utf8');
+  check('board-skin hides the phone tray disc',
+    /html\.board-skin \.phone-tray-toggle,/.test(css)
+    && /display:\s*none !important/.test(css));
+  check('390px board-skin rail is one 44px strip',
+    /html\.board-skin\.mobile-shell #hud\.table-rail \{[\s\S]*?height:\s*44px !important/.test(css)
+    && /html\.board-skin\.mobile-shell \.exp-audio-toggle \{[\s\S]*?min-height:\s*44px !important/.test(css)
+    && /padding-right:\s*210px !important/.test(css));
+  check('board-skin Fit uses the whole poster, not a cluster',
+    readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8').includes('camera.fitWorld({ ...insets, fillFrame: true })'));
 }
 
 if (failures) {

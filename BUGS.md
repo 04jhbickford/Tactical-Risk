@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp phone inspect-first, one-strip rail (preview only)
+
+35a6479 phone FAIL: first tap on French Indo China armed Place Capital; EXPERIMENT chip clipped RUSSIAN; map zoomed to Asia. Phone tap now inspects first; second tap / Confirm commits. 390px rail is one 44px strip. Board-skin Fit is the whole poster. Live Google on a Vercel preview still fails `auth/unauthorized-domain` — add that preview hostname (or the stable branch alias) to Firebase authorized domains. SCHEMA 11. V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp he-correct: live table + kill map boxes (preview only)
 
 272b820 play was local-table only; By post now opens the existing SCHEMA 11 lobby (join code, two seats, presence, undo-except-battle, WhatsApp hook). Google sign-in so James/Bastion are not asked for a typed password. Map boxes: no white selection rect, no leftover Turn Summary strip, no zoom disc, one rail Deploy, ink tooltip IPC. Phone: 44px rail stamps, inspect≠commit unchanged. SCHEMA 11. V3.00-exp. Do not merge.

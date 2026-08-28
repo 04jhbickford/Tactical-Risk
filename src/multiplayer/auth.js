@@ -398,7 +398,8 @@ export class AuthManager {
       'auth/invalid-phone-number': 'Please enter a valid phone number.',
       'auth/invalid-verification-code': 'Invalid verification code.',
       'auth/too-many-requests': 'Too many attempts. Please try again later.',
-      'auth/network-request-failed': 'Network error. Check your connection.'
+      'auth/network-request-failed': 'Network error. Check your connection.',
+      'auth/unauthorized-domain': 'This preview host is not in Firebase authorized domains — add the Vercel hostname there (same Google stack, no new auth).'
     };
 
     return errorMessages[error.code] || error.message || 'An error occurred.';

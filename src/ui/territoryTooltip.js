@@ -34,11 +34,11 @@ export function isPhoneSetupPlacementPhase(phase) {
   return phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT;
 }
 
-// Place Capital / Initial Deployment: a tap commits (select / place).
-// It must not open the half-screen inspect card. Playing keeps tap-to-toggle.
+// Phone tap always inspects first (setup included). Commit is a second
+// tap on the peeked tile or an explicit Confirm — never the first tap.
 export function shouldShowPhoneTooltipOnTap({ mobile, phase } = {}) {
-  if (!mobile) return false;
-  return !isPhoneSetupPlacementPhase(phase);
+  void phase;
+  return !!mobile;
 }
 
 // Phone has no hover inspect — the 400ms hover timer would pop the sheet
@@ -57,9 +57,16 @@ export function shouldInspectPhoneHold({ mobile, phase, heldMs, movedPx } = {}) 
     && Number(movedPx) < PHONE_INSPECT_MOVE_PX;
 }
 
-export function shouldCommitPhoneSetupTap({ mobile, phase, inspected } = {}) {
+export function shouldCommitPhoneSetupTap({
+  mobile,
+  phase,
+  inspected,
+  peekedName = null,
+  tappedName = null,
+} = {}) {
   if (!mobile || !isPhoneSetupPlacementPhase(phase)) return true;
-  return !inspected;
+  if (inspected) return false;
+  return !!peekedName && !!tappedName && peekedName === tappedName;
 }
 
 // Noun first on phone setup. Same handlers; this only decides whether a
@@ -73,15 +80,18 @@ export function shouldApplyPhoneSetupLandTap({
   selectedUnitType,
   tappedIsOwnedLand,
   hasHit,
+  peekedName = null,
+  tappedName = null,
 } = {}) {
   if (!mobile) return true;
   if (inspected) return false;
+  const confirming = !!peekedName && !!tappedName && peekedName === tappedName;
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
     void selectedUnitType;
-    return !!hasHit;
+    return confirming && !!hasHit;
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-    return !!tappedIsOwnedLand;
+    return confirming && !!tappedIsOwnedLand;
   }
   return true;
 }

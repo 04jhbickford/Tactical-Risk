@@ -972,7 +972,9 @@ export class PlayerPanel {
       if (owner === player.id) {
         buttons.push({
           action: 'place-capital',
-          label: `Place Capital: ${this.selectedTerritory.name}`,
+          label: (isBoardSkin() && isMobileShell())
+            ? 'Confirm'
+            : `Place Capital: ${this.selectedTerritory.name}`,
           disabled: false,
           primary: true,
           territory: this.selectedTerritory.name
@@ -1045,10 +1047,13 @@ export class PlayerPanel {
     // illegal/disabled actions stay hidden (not greyed over another green).
     // Peek stack: phase hint (own row) + unit/action chips + thumb-zone CTA.
     const mobile = isMobileShell();
+    const mobilePeek = mobile && !isBoardSkin();
     let peekHint = '';
     let peekRow = '';
     if (mobile) {
       buttons = pickMobilePrimaryButtons(buttons);
+    }
+    if (mobilePeek) {
       const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
       const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
       peekHint = shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta: buttons.length > 0 })
@@ -1063,20 +1068,16 @@ export class PlayerPanel {
     // No buttons to show (a warning-only bar is still useful — e.g. naval hint)
     if (buttons.length === 0 && !warningHtml && !peekHint && !mobile) return '';
 
-    let html = `<div class="pp-bottom-actions${mobile ? ' pp-tray-peek' : ''}">`;
+    let html = `<div class="pp-bottom-actions${mobilePeek ? ' pp-tray-peek' : ''}">`;
     if (peekHint) {
       html += `<span class="pp-tray-hint">${peekHint}</span>`;
     }
     html += peekRow;
     html += warningHtml;
-    if (mobile) html += `<div class="pp-peek-cta-row">`;
-    if (mobile) {
-      const expanded = !!this.trayExpanded;
-      html += `<button type="button" class="phone-tray-toggle" data-action="phone-toggle-tray" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="${expanded ? 'Show map' : 'Show list'}">${expanded ? '▾' : '▴'}</button>`;
-    }
+    if (mobilePeek) html += `<div class="pp-peek-cta-row">`;
     html += `<div class="pp-bottom-buttons">`;
 
-    if (mobile) {
+    if (mobilePeek) {
       const canUndoPlacement = !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
       const canUndoCapital = !!this.gameState.canUndoLastCapital?.();
       const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
@@ -1118,9 +1119,9 @@ export class PlayerPanel {
         </button>`;
     }
 
-    if (mobile) html += `</div>`;
+    if (mobilePeek) html += `</div>`;
     html += `</div>`;
-    if (mobile) html += `</div>`;
+    if (mobilePeek) html += `</div>`;
     html += `</div>`;
     return html;
   }

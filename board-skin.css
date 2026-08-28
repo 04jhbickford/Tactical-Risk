@@ -476,6 +476,11 @@ html.board-skin .felt-post-grid .mp-menu-card {
   min-height: 88px;
 }
 
+html.board-skin #auth-screen,
+html.board-skin #multiplayer-lobby {
+  z-index: 120 !important;
+}
+
 html.board-skin #auth-screen.hidden,
 html.board-skin #multiplayer-lobby.hidden {
   display: none !important;
@@ -781,23 +786,133 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
 }
 
 @media (pointer: coarse) {
-  html.board-skin #hud,
-  html.board-skin #hud.table-rail,
-  html.board-skin #sidebar.table-edge-card.rail-only,
-  html.board-skin .pp-rail-actions,
-  html.board-skin .table-edge-card .pp-bottom-actions {
+  html.board-skin:not(.mobile-shell) #hud,
+  html.board-skin:not(.mobile-shell) #hud.table-rail,
+  html.board-skin:not(.mobile-shell) #sidebar.table-edge-card.rail-only,
+  html.board-skin:not(.mobile-shell) .pp-rail-actions,
+  html.board-skin:not(.mobile-shell) .table-edge-card .pp-bottom-actions {
     height: 48px !important;
     max-height: 48px !important;
   }
 
-  html.board-skin .pp-rail-actions .pp-confirm-btn,
-  html.board-skin .pp-rail-actions .pp-action-btn,
   html.board-skin .auth-google-btn,
   html.board-skin .felt-stamp {
     min-height: 44px !important;
     height: auto !important;
     font-size: 14px !important;
     padding: 8px 14px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  html.board-skin.mobile-shell #hud,
+  html.board-skin.mobile-shell #hud.table-rail,
+  html.mobile-shell.board-skin #hud.table-rail,
+  html.board-skin.mobile-shell #sidebar.table-edge-card.rail-only,
+  html.board-skin.mobile-shell .pp-rail-actions {
+    height: 44px !important;
+    max-height: 44px !important;
+    min-height: 44px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  html.board-skin.mobile-shell #hud.table-rail {
+    padding-right: 210px !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+  }
+
+  html.board-skin.mobile-shell #hud.table-rail .hud-menu-container,
+  html.board-skin.mobile-shell #hud.table-rail .hud-menu-btn,
+  html.board-skin.mobile-shell #hud.table-rail .hud-menu-btn.rail-stamp {
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: visible !important;
+    flex-shrink: 0 !important;
+  }
+
+  html.board-skin.mobile-shell #exp-banner,
+  html.mobile-shell.board-skin #exp-banner {
+    top: 0 !important;
+    right: 0 !important;
+    left: auto !important;
+    height: 44px !important;
+    max-height: 44px !important;
+    max-width: 128px !important;
+    flex-wrap: nowrap !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 6px !important;
+    gap: 4px !important;
+    z-index: 67 !important;
+  }
+
+  html.board-skin.mobile-shell #exp-banner .exp-banner-mark,
+  html.board-skin.mobile-shell #exp-banner .exp-banner-note {
+    display: none !important;
+  }
+
+  html.board-skin.mobile-shell #exp-banner .exp-banner-ver {
+    font-size: 8px;
+    padding: 1px 4px;
+    flex-shrink: 0;
+  }
+
+  html.board-skin.mobile-shell .exp-audio-toggle {
+    min-width: 44px !important;
+    min-height: 44px !important;
+    height: 44px !important;
+    padding: 0 8px !important;
+    font-size: 10px !important;
+    white-space: nowrap !important;
+  }
+
+  html.board-skin.mobile-shell .rail-slip,
+  html.board-skin.mobile-shell .rail-phase,
+  html.board-skin.mobile-shell .rail-bank .ipc-chip {
+    display: none !important;
+  }
+
+  html.board-skin.mobile-shell .rail-seat {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+
+  html.board-skin.mobile-shell .rail-seat-name {
+    max-width: 8em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html.board-skin.mobile-shell .pp-rail-actions,
+  html.board-skin.mobile-shell .table-edge-card .pp-bottom-actions {
+    top: 0 !important;
+    right: 128px !important;
+    left: auto !important;
+    height: 44px !important;
+    max-height: 44px !important;
+    max-width: 84px !important;
+    overflow: hidden !important;
+  }
+
+  html.board-skin.mobile-shell .pp-rail-actions .pp-confirm-btn,
+  html.board-skin.mobile-shell .pp-rail-actions .pp-action-btn {
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 8px !important;
+    font-size: 11px !important;
+    white-space: nowrap !important;
   }
 }
 
@@ -1092,10 +1207,23 @@ html.mobile-shell.board-skin .pp-tray-hint {
   letter-spacing: 0.04em;
 }
 
-html.board-skin.mobile-shell .phone-peek-chip,
-html.mobile-shell.board-skin .phone-peek-chip,
+html.board-skin .phone-tray-toggle,
 html.board-skin.mobile-shell .phone-tray-toggle,
 html.mobile-shell.board-skin .phone-tray-toggle {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+html.board-skin.mobile-shell .phone-peek-chip,
+html.mobile-shell.board-skin .phone-peek-chip {
   background: #fff8e4;
   border: 2px solid #3a2410;
   color: #2a1c0e;
@@ -1294,7 +1422,7 @@ html.board-skin .board-dice-tray .die-3d .die-face {
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  #exp-banner {
+  html.board-skin:not(.mobile-shell) #exp-banner {
     top: 4px;
     left: auto;
     right: 8px;
@@ -1306,7 +1434,7 @@ html.board-skin .board-dice-tray .die-3d .die-face {
     pointer-events: auto;
   }
 
-  #exp-banner .exp-banner-note {
+  html.board-skin:not(.mobile-shell) #exp-banner .exp-banner-note {
     display: none;
   }
 }
@@ -1390,11 +1518,22 @@ html.board-skin .felt-nation-card.seated {
   box-shadow: 0 8px 0 #5c1212, inset 0 0 0 3px #8b1e1e;
 }
 
-html.board-skin .felt-nation-flag img {
+html.board-skin .felt-nation-flag {
+  display: block;
   width: 72px;
   height: 48px;
-  object-fit: cover;
+  background: var(--nation, #8b1e1e);
   border: 2px solid #3a2410;
+  overflow: hidden;
+}
+
+html.board-skin .felt-nation-flag img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 0;
+  display: block;
+  background: var(--nation, #8b1e1e);
 }
 
 html.board-skin .felt-nation-name {
@@ -1474,8 +1613,12 @@ html.board-skin .felt-stamp.deal {
 
 html.board-skin .felt-stamp.disabled,
 html.board-skin .felt-stamp:disabled {
-  background: #b8a888;
-  color: #5a4630;
+  background: #efe0b8;
+  color: #3a2410;
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 html.board-skin #hud.table-rail {

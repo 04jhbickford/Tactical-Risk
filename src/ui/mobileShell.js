@@ -10,6 +10,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { MAP_WIDTH, MAP_HEIGHT } from '../map/camera.js';
+import { isBoardSkin } from './boardSkin.js';
 
 export const MOBILE_SHELL_MAX_WIDTH = 480;
 export const MOBILE_SHELL_QUERY = `(max-width: ${MOBILE_SHELL_MAX_WIDTH}px)`;
@@ -479,6 +480,11 @@ export function applyPhoneCameraFit(camera, {
     padTop: PHONE_FIT_PAD_TOP,
     padBottom: PHONE_FIT_PAD_BOTTOM,
   };
+  // Board-skin phone: the whole poster, not a cluster zoomed to Asia.
+  if (typeof document !== 'undefined' && isBoardSkin()) {
+    camera.fitWorld({ ...insets, fillFrame: true });
+    return;
+  }
   const playerId = gameState?.currentPlayer?.id;
   const ownedNames = [];
   if (playerId && territories) {

@@ -63,6 +63,7 @@ import {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
+  isPhoneSetupPlacementPhase,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
 } from './ui/territoryTooltip.js';
@@ -212,6 +213,7 @@ async function init() {
   let phoneHoldTimer = null;
   let phoneHoldStart = null;
   let phoneInspected = false;
+  let phonePeekedName = null;
 
   const clearPhoneHold = () => {
     if (phoneHoldTimer) {
@@ -2301,8 +2303,14 @@ async function init() {
           mobile: true,
           phase: gameState.phase,
           inspected: phoneInspected,
+          peekedName: phonePeekedName,
+          tappedName: hit.name,
         })) {
           phoneInspected = false;
+          if (isPhoneSetupPlacementPhase(gameState.phase)) {
+            phonePeekedName = hit.name;
+            tooltip.show(hit, e.clientX, e.clientY, { inspect: true });
+          }
           camera.dirty = true;
           return;
         }
@@ -2318,6 +2326,8 @@ async function init() {
           selectedUnitType: playerPanel.selectedUnitType,
           tappedIsOwnedLand,
           hasHit: true,
+          peekedName: phonePeekedName,
+          tappedName: hit.name,
         })) {
           camera.dirty = true;
           return;
@@ -2353,6 +2363,8 @@ async function init() {
           selectedUnitType: playerPanel.selectedUnitType,
           tappedIsOwnedLand: false,
           hasHit: false,
+          peekedName: phonePeekedName,
+          tappedName: null,
         })) {
           camera.dirty = true;
           return;
