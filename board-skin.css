@@ -39,17 +39,37 @@ html.board-skin .lobby-overlay.board-table {
 
 html.board-skin #hud,
 html.board-skin.mobile-shell #hud,
-html.mobile-shell.board-skin #hud {
-  height: 56px !important;
-  min-height: 56px !important;
+html.mobile-shell.board-skin #hud,
+html.board-skin #hud.table-rail {
+  height: 36px !important;
+  min-height: 36px !important;
   background:
-    linear-gradient(180deg, rgba(244, 230, 192, 0.16), transparent 40%),
     linear-gradient(#5a3418, #3d2110) !important;
-  border-bottom: 3px solid #1a1008 !important;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+  border-bottom: 4px solid #1a1008 !important;
+  box-shadow: 0 4px 0 #2a160a !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   color: #f3e2b0 !important;
+  gap: 10px !important;
+}
+
+html.board-skin #zoom-controls,
+html.board-skin #minimap,
+html.board-skin .hud-title::after,
+html.board-skin .phase-dots,
+html.board-skin .hud-phase-progress,
+html.board-skin .hud-legend,
+html.board-skin .hud-turn-order {
+  display: none !important;
+}
+
+html.board-skin #hud-clarity {
+  top: 36px !important;
+  height: auto !important;
+  background: #efe0b8 !important;
+  color: #2a1c0e !important;
+  border-bottom: 2px solid #3a2410 !important;
+  font-family: 'Source Serif 4', Georgia, serif !important;
 }
 
 html.board-skin ::-webkit-scrollbar-track {
@@ -214,6 +234,13 @@ html.board-skin .board-table-scene {
   display: flex;
   align-items: stretch;
   justify-content: center;
+  padding: 18px 0;
+  background:
+    radial-gradient(ellipse 80% 70% at 50% 50%, rgba(80, 28, 24, 0.18), transparent 70%),
+    url('assets/board/felt.svg') center / 160px 160px repeat;
+  border: 6px solid #3a2410;
+  border-radius: 10px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
 }
 
 html.board-skin .lobby-container,
@@ -284,9 +311,9 @@ html.board-skin .lobby-phone-card:hover,
 html.board-skin .lobby-saved-games-btn:hover,
 html.board-skin .player-card.modern:hover,
 html.board-skin .player-card.board-table:hover {
-  transform: translateY(-1px);
+  transform: none;
   border-color: #5c1212;
-  box-shadow: inset 0 1px 0 #fff4d4, 0 6px 0 #2a160a, 0 10px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 #fff4d4, 0 4px 0 #2a160a;
 }
 
 html.board-skin .lobby-menu-card.online {
@@ -953,5 +980,236 @@ html.board-skin .felt-cards .pu-card {
 
   #exp-banner .exp-banner-note {
     display: none;
+  }
+}
+
+/* Third chrome pass — table furniture, not a restyled web app. */
+html.board-skin .felt-table-cloth {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 48%, rgba(90, 24, 20, 0.18), transparent 62%),
+    url('assets/board/felt.svg') center / 160px 160px repeat;
+}
+
+html.board-skin .felt-deal {
+  width: min(920px, 96vw);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+html.board-skin .felt-deal-rail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #f4e6c0;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .felt-deal-mark {
+  padding: 2px 8px;
+  background: #f4e6c0;
+  color: #5c1212;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+html.board-skin .felt-deal-note {
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+html.board-skin .felt-deal-hand {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+html.board-skin .felt-nation-card {
+  width: 148px;
+  min-height: 190px;
+  padding: 12px 10px 14px;
+  background:
+    linear-gradient(#efe0b8, #d8c08a);
+  border: 3px solid #3a2410;
+  border-bottom-width: 8px;
+  border-bottom-color: var(--nation, #3a2410);
+  color: #2a1c0e;
+  box-shadow: 0 8px 0 #1a1008;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-family: Cinzel, serif;
+  cursor: pointer;
+  transform: none;
+}
+
+html.board-skin .felt-nation-card:hover,
+html.board-skin .felt-nation-card:focus {
+  transform: none;
+  filter: brightness(1.03);
+}
+
+html.board-skin .felt-nation-card.seated {
+  box-shadow: 0 8px 0 #5c1212, inset 0 0 0 3px #8b1e1e;
+}
+
+html.board-skin .felt-nation-flag img {
+  width: 72px;
+  height: 48px;
+  object-fit: cover;
+  border: 2px solid #3a2410;
+}
+
+html.board-skin .felt-nation-name {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+html.board-skin .felt-nation-alliance,
+html.board-skin .felt-nation-seat {
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 12px;
+  color: #5a4630;
+}
+
+html.board-skin .felt-deal-stakes,
+html.board-skin .felt-deal-stamps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+html.board-skin .felt-stakes-label {
+  color: #f4e6c0;
+  font-family: Cinzel, serif;
+  letter-spacing: 0.1em;
+}
+
+html.board-skin .felt-chip,
+html.board-skin .ipc-chip,
+html.board-skin .rail-bank .ipc-chip,
+html.board-skin i.ipc-chip {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f0d8a8, #8b1e1e 70%);
+  border: 2px solid #3a100c;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 2px 0 #2a0c0a;
+}
+
+html.board-skin .felt-chip {
+  width: auto;
+  min-width: 36px;
+  height: 28px;
+  border-radius: 14px;
+  color: #f4e6c0;
+  font: 700 12px Cinzel, serif;
+  padding: 0 10px;
+  background: radial-gradient(circle at 35% 30%, #c45c26, #8b1e1e 70%);
+}
+
+html.board-skin .felt-chip.selected {
+  outline: 2px solid #f4e6c0;
+}
+
+html.board-skin .felt-stamp {
+  min-height: 44px;
+  padding: 8px 16px;
+  background: #efe0b8;
+  color: #2a1c0e;
+  border: 2px solid #3a2410;
+  font: 700 14px Cinzel, serif;
+  box-shadow: 0 3px 0 #1a1008;
+  transform: none;
+}
+
+html.board-skin .felt-stamp:hover {
+  transform: none;
+}
+
+html.board-skin .felt-stamp.deal {
+  background: linear-gradient(#c45c26, #8b1e1e);
+  color: #f4e6c0;
+}
+
+html.board-skin .felt-stamp.disabled,
+html.board-skin .felt-stamp:disabled {
+  background: #b8a888;
+  color: #5a4630;
+}
+
+html.board-skin #hud.table-rail {
+  display: flex !important;
+  align-items: center;
+}
+
+html.board-skin .rail-seat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 10px;
+  background: var(--nation, #5c1212);
+  border: 1px solid #1a1008;
+  color: #f4e6c0;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .rail-seat img {
+  width: 22px;
+  height: 16px;
+  object-fit: cover;
+  border: 1px solid #1a1008;
+}
+
+html.board-skin .rail-phase {
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+html.board-skin .rail-bank {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+}
+
+html.board-skin .rail-bank-count,
+html.board-skin .rail-idle {
+  font-family: Cinzel, serif;
+  color: #f4e6c0;
+}
+
+html.board-skin .casualty-sculpt {
+  width: 22px;
+  height: 28px;
+  display: inline-block;
+  background: var(--plastic, #8B1A1A);
+  border: 2px solid #1a1008;
+  border-radius: 4px 4px 6px 6px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.35), 0 3px 0 #1a1008;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+html.board-skin .casualty-unit.has-casualties {
+  outline: 2px solid #c45c26;
+}
+
+@media (max-width: 820px) {
+  html.board-skin .felt-nation-card {
+    width: 120px;
+    min-height: 160px;
   }
 }

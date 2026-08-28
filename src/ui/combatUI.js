@@ -2,6 +2,8 @@
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { setShellFlag } from './mobileShell.js';
+import { isBoardSkin } from './boardSkin.js';
+import { liftPiecesOffTile } from './boardMotion.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -2682,6 +2684,9 @@ export class CombatUI {
     for (const u of units.filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory')) {
       const def = this.unitDefs[u.type];
       const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
+      const pieceMark = isBoardSkin()
+        ? `<span class="casualty-sculpt sculpt-${u.type}" style="--plastic:${this.gameState?.getPlayerColor?.(u.owner) || '#8B1A1A'}" title="${u.type}"></span>`
+        : (imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : '');
 
       // Special handling for battleships (2-hit system)
       if (u.type === 'battleship') {
@@ -2694,7 +2699,7 @@ export class CombatUI {
           html += `
             <div class="casualty-unit ${damageSelected > 0 ? 'has-casualties' : ''}">
               <div class="casualty-unit-info">
-                ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="battleship" title="Battleship (Damage): Absorb hit without destroying">` : ''}
+                ${pieceMark}
                 <span class="casualty-name">Battleship</span>
                 <span class="casualty-avail damage">(${undamagedCount} undamaged)</span>
               </div>
@@ -2723,7 +2728,7 @@ export class CombatUI {
           html += `
             <div class="casualty-unit ${destroySelected > 0 ? 'has-casualties' : ''}">
               <div class="casualty-unit-info">
-                ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon damaged" alt="battleship" title="Battleship (Destroy): Remove from battle">` : ''}
+                ${pieceMark}
                 <span class="casualty-name">Battleship</span>
                 <span class="casualty-avail destroy">${statusText}</span>
               </div>
@@ -2747,7 +2752,7 @@ export class CombatUI {
         html += `
           <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
             <div class="casualty-unit-info">
-              ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
+              ${pieceMark}
               <span class="casualty-name">${u.type}</span>
               <span class="casualty-avail">(${u.quantity})</span>
             </div>
@@ -2781,12 +2786,15 @@ export class CombatUI {
     return airUnits.map(u => {
       const def = this.unitDefs[u.type];
       const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
+      const pieceMark = isBoardSkin()
+        ? `<span class="casualty-sculpt sculpt-${u.type}" style="--plastic:${this.gameState?.getPlayerColor?.(u.owner) || '#8B1A1A'}" title="${u.type}"></span>`
+        : (imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : '');
       const selectedCount = selectedAACasualties[u.type] || 0;
 
       return `
         <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
           <div class="casualty-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
+            ${pieceMark}
             <span class="casualty-name">${u.type}</span>
             <span class="casualty-avail">(${u.quantity})</span>
           </div>
@@ -2808,12 +2816,15 @@ export class CombatUI {
     return defenders.filter(u => u.quantity > 0 && u.type !== 'transport' && u.type !== 'factory').map(u => {
       const def = this.unitDefs[u.type];
       const imageSrc = u.owner ? getUnitIconPath(u.type, u.owner) : (def?.image ? `assets/units/${def.image}` : null);
+      const pieceMark = isBoardSkin()
+        ? `<span class="casualty-sculpt sculpt-${u.type}" style="--plastic:${this.gameState?.getPlayerColor?.(u.owner) || '#8B1A1A'}" title="${u.type}"></span>`
+        : (imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}">` : '');
       const selectedCount = selectedBombardmentCasualties[u.type] || 0;
 
       return `
         <div class="casualty-unit ${selectedCount > 0 ? 'has-casualties' : ''}">
           <div class="casualty-unit-info">
-            ${imageSrc ? `<img src="${imageSrc}" class="casualty-icon" alt="${u.type}" title="${u.type}: Attack ${def?.attack || 0}, Defense ${def?.defense || 0}, Cost ${def?.cost || 0}">` : ''}
+            ${pieceMark}
             <span class="casualty-name">${u.type}</span>
             <span class="casualty-avail">(${u.quantity})</span>
           </div>
@@ -2911,6 +2922,9 @@ export class CombatUI {
         const casualtyType = btn.dataset.casualtyType;
         const unitType = btn.dataset.unit;
         const delta = btn.classList.contains('plus') ? 1 : -1;
+        if (delta > 0) {
+          liftPiecesOffTile(this.currentTerritory, '#5c1212');
+        }
 
         if (casualtyType === 'aa') {
           this._adjustAACasualty(unitType, delta);

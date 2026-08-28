@@ -5,6 +5,13 @@ import { isMobileShell, phoneUnitIconSize, shouldHideUnitsAtZoom } from '../ui/m
 import { isBoardSkin } from '../ui/boardSkin.js';
 import { drawPlasticSculpt } from './plasticSculpts.js';
 
+function boardUnitIconSize(zoom, mobile) {
+  if (isBoardSkin()) {
+    return Math.max(28, Math.min(44, (mobile ? 36 : 34) * Math.max(Number(zoom) || 0, 0.45)));
+  }
+  return phoneUnitIconSize(zoom, { mobile });
+}
+
 export class UnitRenderer {
   constructor(gameState, territories, unitDefs) {
     this.gameState = gameState;
@@ -59,9 +66,9 @@ export class UnitRenderer {
     const mobile = isMobileShell();
     if (shouldHideUnitsAtZoom(zoom, { mobile })) return;
 
-    const iconSize = phoneUnitIconSize(zoom, { mobile });
-    const spacingX = iconSize + 4;
-    const spacingY = iconSize + 8;
+    const iconSize = boardUnitIconSize(zoom, mobile);
+    const spacingX = iconSize + (isBoardSkin() ? 10 : 4);
+    const spacingY = iconSize + (isBoardSkin() ? 14 : 8);
 
     for (const [territory, placements] of Object.entries(this.gameState.units)) {
       const t = this.territoryByName[territory];
@@ -676,28 +683,33 @@ export class UnitRenderer {
   }
 
   _drawBadge(ctx, x, y, count, zoom) {
-    const fontSize = Math.max(9, Math.min(12, 11 * zoom));
     const text = count.toString();
+    if (isBoardSkin()) {
+      const fontSize = Math.max(10, Math.min(14, 12 * Math.max(zoom, 0.5)));
+      ctx.font = `700 ${fontSize}px Cinzel, Palatino, serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = 'rgba(244, 232, 204, 0.95)';
+      ctx.lineWidth = 3;
+      ctx.strokeText(text, x, y);
+      ctx.fillStyle = '#2A1C0E';
+      ctx.fillText(text, x, y);
+      return;
+    }
 
-    ctx.font = isBoardSkin()
-      ? `700 ${fontSize}px Cinzel, Palatino, serif`
-      : `bold ${fontSize}px sans-serif`;
+    const fontSize = Math.max(9, Math.min(12, 11 * zoom));
+    ctx.font = `bold ${fontSize}px sans-serif`;
     const metrics = ctx.measureText(text);
     const width = Math.max(metrics.width + 6, fontSize + 2);
     const height = fontSize + 4;
 
-    // Badge background
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.beginPath();
     ctx.roundRect(x - width / 2, y - height / 2, width, height, 4);
     ctx.fill();
-
-    // Badge border
     ctx.strokeStyle = 'rgba(255,255,255,0.3)';
     ctx.lineWidth = 1;
     ctx.stroke();
-
-    // Badge text
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -790,9 +802,9 @@ export class UnitRenderer {
     const mobile = isMobileShell();
     if (shouldHideUnitsAtZoom(zoom, { mobile })) return null;
 
-    const iconSize = phoneUnitIconSize(zoom, { mobile });
-    const spacingX = iconSize + 4;
-    const spacingY = iconSize + 8;
+    const iconSize = boardUnitIconSize(zoom, mobile);
+    const spacingX = iconSize + (isBoardSkin() ? 10 : 4);
+    const spacingY = iconSize + (isBoardSkin() ? 14 : 8);
     const hitRadius = (iconSize + 4) / 2;
 
     for (const [territory, placements] of Object.entries(this.gameState.units)) {

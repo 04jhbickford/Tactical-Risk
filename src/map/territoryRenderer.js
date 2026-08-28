@@ -384,6 +384,7 @@ export class TerritoryRenderer {
 
   /** Draw small flag markers on each territory to show ownership */
   renderOwnershipFlags(ctx, zoom) {
+    if (isBoardSkin()) return;
     if (!this.gameState || zoom < 0.35) return;
 
     const flagWidth = Math.max(16, Math.min(28, 22 * zoom));

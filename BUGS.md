@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp third chrome pass (preview only)
+
+Throw away SaaS leftover: lobby is faction cards on felt (no Local Play / Play Online menu). HUD is a 36px table-edge rail with IPC chips; zoom/minimap hidden. Units are larger plastic sculpts with ink counts, no ownership-flag PNG stacks. Combat casualties are plastic marks; + pulls a piece off the tile. No hover-lift. SCHEMA 11. GAME_VERSION V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp fail-bar rebuild (preview only)
 
 First two analog-skin commits still read as V2.80 web chrome: Grok splash via `.lobby-overlay::before`, teal `#3CC0BF` letterbox, PNG unit stacks, 48px glass HUD, CSS combat modal, silent AudioContext. Fail-bar rebuild kills Grok with `!important`, paints a wood table + cream/muted-ocean board, draws plastic sculpts, docks combat as a felt dice tray, flies tokens off the tile, and unlocks table SFX on every gesture. SCHEMA 11. GAME_VERSION V3.00-exp. Preview only — do not merge, do not deploy production.

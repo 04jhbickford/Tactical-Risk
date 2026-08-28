@@ -28,6 +28,7 @@ import {
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
 import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
 import { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } from '../state/undoPolicy.js';
+import { isBoardSkin } from './boardSkin.js';
 import {
   capturePanelPointerLock,
   resolveLockedPanelClick,
@@ -1115,7 +1116,9 @@ export class PlayerPanel {
         <span class="pp-player-name" style="color: ${textColor};">${headerLabel}</span>
         ${aiLabel}
         ${turnIndicator}
-        <span class="pp-resources-inline" style="color: ${textColor};">${ipcs}$ · ${territories}T</span>
+        <span class="pp-resources-inline" style="color: ${textColor};">${isBoardSkin()
+          ? `<span class="bank-chip-row">${Array.from({ length: Math.min(6, Math.max(1, Math.ceil(ipcs / 20))) }, () => '<i class="ipc-chip"></i>').join('')}</span> ${ipcs} · ${territories}T`
+          : `${ipcs}$ · ${territories}T`}</span>`
       </div>`;
   }
 

@@ -4,6 +4,7 @@ import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '..
 import { possessivePhrase } from '../utils/possessive.js';
 import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor } from './mobileShell.js';
 import { resolveHudClarity } from './hudClarity.js';
+import { isBoardSkin } from './boardSkin.js';
 
 export class HUD {
   constructor() {
@@ -85,6 +86,10 @@ export class HUD {
   }
 
   _render() {
+    if (isBoardSkin()) {
+      this._renderTableRail();
+      return;
+    }
     if (isMobileShell()) {
       this._renderMobile();
       return;
@@ -190,6 +195,40 @@ export class HUD {
     this.el.innerHTML = html;
     this._bindEvents();
     this._renderClarity();
+  }
+
+  _renderTableRail() {
+    this.el.classList.add('table-rail');
+    const player = this.gameState?.currentPlayer;
+    const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY && player;
+    const phaseName = inGame ? this._getPhaseName(this.gameState.phase) : '';
+    const ipcs = inGame ? (this.gameState.getIPCs?.(player.id) ?? 0) : 0;
+    const chips = inGame ? this._ipcChipRow(ipcs) : '';
+
+    this.el.innerHTML = `
+      <div class="hud-menu-container">
+        <button class="hud-menu-btn rail-stamp" data-action="toggle-menu" title="Menu">☰</button>
+        <div class="hud-menu-dropdown ${this.menuOpen ? 'open' : ''}">
+          <button class="hud-menu-item" data-action="rules">Rules</button>
+          <button class="hud-menu-item" data-action="exit-lobby">Box the game</button>
+        </div>
+      </div>
+      ${inGame ? `
+        <div class="rail-seat" style="--nation:${player.color}">
+          ${player.flag ? `<img src="assets/flags/${player.flag}" alt="">` : ''}
+          <span class="rail-seat-name">${player.name}</span>
+          <span class="rail-phase">${phaseName}</span>
+        </div>
+        <div class="rail-bank" title="IPCs">${chips}<span class="rail-bank-count">${ipcs}</span></div>
+      ` : `<span class="rail-idle">Tactical Risk</span>`}
+    `;
+    this._bindEvents();
+    this._renderClarity();
+  }
+
+  _ipcChipRow(amount) {
+    const n = Math.min(8, Math.max(1, Math.ceil(Number(amount) / 20) || 1));
+    return Array.from({ length: n }, (_, i) => `<span class="ipc-chip" style="--i:${i}"></span>`).join('');
   }
 
   // Phone top bar: {color} {faction} · {3/7 PHASE}. Phase identity stays

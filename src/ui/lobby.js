@@ -85,53 +85,30 @@ export class Lobby {
         content = phone ? this._renderMobileMainMenu() : this._renderMainMenu();
     }
 
-    this.el.innerHTML = `
-      <div class="board-table-scene">
-      <div class="lobby-container board-table${phone ? ' lobby-phone' : ''}">
-        <div class="lobby-bg-pattern"></div>
-        <div class="lobby-content-wrapper${phone ? ' lobby-phone-wrap' : ''}">
+    if (this.mode === 'main') {
+      this.el.innerHTML = `
+        <div class="felt-table-cloth">
           ${content}
         </div>
-      </div>
-      </div>
-    `;
+      `;
+    } else {
+      this.el.innerHTML = `
+        <div class="board-table-scene">
+        <div class="lobby-container board-table${phone ? ' lobby-phone' : ''}">
+          <div class="lobby-bg-pattern"></div>
+          <div class="lobby-content-wrapper${phone ? ' lobby-phone-wrap' : ''}">
+            ${content}
+          </div>
+        </div>
+        </div>
+      `;
+    }
 
     this._bindEvents();
   }
 
   _renderMobileMainMenu() {
-    const savedGames = this._getSavedGames();
-    const hasSavedGames = savedGames.length > 0;
-
-    return `
-      <div class="lobby-phone-home">
-        <div class="lobby-phone-brand">
-          <h1 class="lobby-phone-logo">Tactical Risk</h1>
-          <p class="lobby-phone-tag">World War II Grand Strategy</p>
-          <span class="lobby-version-badge">${GAME_VERSION} · experiment</span>
-        </div>
-
-        <div class="lobby-phone-actions">
-          <button class="lobby-phone-card" data-action="local-play">
-            <span class="lobby-phone-card-kicker">This device</span>
-            <span class="lobby-phone-card-title">Local Play</span>
-            <span class="lobby-phone-card-desc">Friends or AI on this phone</span>
-          </button>
-          <button class="lobby-phone-card lobby-phone-card-online" data-action="online-play">
-            <span class="lobby-phone-card-kicker">Multiplayer</span>
-            <span class="lobby-phone-card-title">Play Online</span>
-            <span class="lobby-phone-card-desc">Create or join a game</span>
-          </button>
-        </div>
-
-        ${hasSavedGames ? `
-          <button class="lobby-phone-saved" data-action="my-games">
-            <span>My Games</span>
-            <span class="saved-count">${savedGames.length}</span>
-          </button>
-        ` : ''}
-      </div>
-    `;
+    return this._renderFeltDeal();
   }
 
   _initFactionDefaults() {
@@ -241,48 +218,53 @@ export class Lobby {
   }
 
   _renderMainMenu() {
+    return this._renderFeltDeal();
+  }
+
+  _renderFeltDeal() {
+    const factions = this._initFactionDefaults();
     const savedGames = this._getSavedGames();
-    const hasSavedGames = savedGames.length > 0;
+    const seated = this.selectedPlayers.length;
+    const canDeal = seated >= 2;
 
     return `
-      <div class="lobby-main-menu">
-        <div class="lobby-brand">
-          <h1 class="lobby-logo">Tactical Risk</h1>
-          <p class="lobby-tagline">World War II Grand Strategy</p>
-          <span class="lobby-version-badge">${GAME_VERSION} · experiment</span>
+      <div class="felt-deal">
+        <div class="felt-deal-rail">
+          <span class="felt-deal-mark">1942</span>
+          <span class="lobby-version-badge">${GAME_VERSION}</span>
+          <span class="felt-deal-note">Seat two powers, then deal</span>
         </div>
-
-        <div class="lobby-menu-grid">
-          <button class="lobby-menu-card" data-action="local-play">
-            <div class="menu-card-icon">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-            </div>
-            <div class="menu-card-content">
-              <h3>Local Play</h3>
-              <p>Play on this device with friends or AI opponents</p>
-            </div>
-          </button>
-
-          <button class="lobby-menu-card online" data-action="online-play">
-            <div class="menu-card-icon">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-            </div>
-            <div class="menu-card-content">
-              <h3>Play Online</h3>
-              <p>Create or join multiplayer games with players worldwide</p>
-            </div>
-            <span class="menu-card-badge">Multiplayer</span>
-          </button>
+        <div class="felt-deal-hand">
+          ${factions.map((p) => this._renderFeltNationCard(p)).join('')}
         </div>
-
-        ${hasSavedGames ? `
-          <button class="lobby-saved-games-btn" data-action="my-games">
-            <span class="saved-icon">📁</span>
-            <span>My Games</span>
-            <span class="saved-count">${savedGames.length}</span>
+        <div class="felt-deal-stakes">
+          <span class="felt-stakes-label">Bank</span>
+          ${[40, 60, 80, 100].map((n) => `
+            <button type="button" class="felt-chip ${this.startingIPCs === n ? 'selected' : ''}" data-action="set-ipcs" data-ipcs="${n}">${n}</button>
+          `).join('')}
+        </div>
+        <div class="felt-deal-stamps">
+          <button type="button" class="felt-stamp deal ${canDeal ? '' : 'disabled'}" data-action="deal-local" ${canDeal ? '' : 'disabled'}>
+            ${canDeal ? `Deal this table (${seated})` : 'Seat two powers'}
           </button>
-        ` : ''}
+          <button type="button" class="felt-stamp post" data-action="online-play">By post</button>
+          ${savedGames.length ? `<button type="button" class="felt-stamp" data-action="my-games">Saved ${savedGames.length}</button>` : ''}
+        </div>
       </div>
+    `;
+  }
+
+  _renderFeltNationCard(faction) {
+    const seated = this.selectedPlayers.includes(faction.id);
+    const color = this.playerColors[faction.id]?.color || faction.color;
+    const ai = this.playerAI[faction.id] || 'human';
+    return `
+      <button type="button" class="felt-nation-card ${seated ? 'seated' : ''}" data-player="${faction.id}" style="--nation:${color}">
+        <span class="felt-nation-flag"><img src="assets/flags/${faction.flag}" alt=""></span>
+        <span class="felt-nation-name">${faction.name}</span>
+        <span class="felt-nation-alliance">${faction.alliance || ''}</span>
+        <span class="felt-nation-seat">${seated ? (ai === 'human' ? 'Seated' : ai) : 'Empty'}</span>
+      </button>
     `;
   }
 
@@ -521,6 +503,22 @@ export class Lobby {
     this.el.querySelector('[data-action="back"]')?.addEventListener('click', () => {
       this.mode = 'main';
       this._render();
+    });
+
+    this.el.querySelector('[data-action="deal-local"]')?.addEventListener('click', () => {
+      if (this.selectedPlayers.length >= 2) this._startGame();
+    });
+
+    this.el.querySelectorAll('[data-action="set-ipcs"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.startingIPCs = parseInt(btn.dataset.ipcs, 10);
+        this._render();
+      });
+    });
+
+    this.el.querySelectorAll('.felt-nation-card').forEach((card) => {
+      card.addEventListener('click', () => this._togglePlayer(card.dataset.player));
     });
 
     // Player cards
