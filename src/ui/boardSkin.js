@@ -2,7 +2,7 @@
 
 import { GAME_VERSION } from '../version.js';
 import { playActionSound, playBoardSound, unlockBoardAudio, setBoardAudioMuted, isBoardAudioMuted } from '../audio/boardAudio.js';
-import { flyTableToken, liftPiecesOffTile } from './boardMotion.js';
+import { flyTableToken, liftPiecesOffTile, placeTableToken } from './boardMotion.js';
 
 export const MAP_FILTER = 'sepia(0.55) saturate(0.38) contrast(1.12) brightness(1.14) hue-rotate(-8deg)';
 export const OCEAN_PARCHMENT = '#5C7382';
@@ -84,12 +84,18 @@ export function attachBoardActionSounds(actionLog) {
     const from = data?.from;
     const to = data?.to;
     const color = data?.color || '#8B1A1A';
-    if ((type === 'move' || type === 'ncm' || type === 'mobilize') && from && to) {
-      flyTableToken(from, to, color, 'move');
+    const unitType = data?.units?.[0]?.type || data?.unitType || 'infantry';
+    const qty = data?.units?.[0]?.quantity || 1;
+    if ((type === 'move' || type === 'ncm') && from && to) {
+      flyTableToken(from, to, color, 'move', unitType, qty);
     } else if (type === 'attack' && from && to) {
-      flyTableToken(from, to, color, 'combat');
+      flyTableToken(from, to, color, 'combat', unitType, qty);
+    } else if (type === 'placement' && data?.territory) {
+      placeTableToken(data.territory, color, unitType);
+    } else if (type === 'mobilize' && data?.territory) {
+      placeTableToken(data.territory, color, unitType);
     } else if (type === 'combat' || type === 'combat-summary') {
-      liftPiecesOffTile(data?.territory, color);
+      liftPiecesOffTile(data?.territory, color, unitType);
     }
     return original(type, data);
   };

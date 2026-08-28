@@ -796,7 +796,12 @@ export class PlayerPanel {
 
     if (isBoardSkin()) {
       this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
-      html += this._renderActionsTab(phase, turnPhase, player);
+      let actions = this._renderActionsTab(phase, turnPhase, player);
+      const hasWork = /pp-unit-list|pl-unit-row|pu-card|pp-move-item|pp-inline|pp-purchase|pp-tech|pp-rockets|pp-unit-row|pp-placement|open-combat/.test(actions);
+      if (!hasWork) actions = '';
+      this.el.classList.toggle('has-table-work', hasWork);
+      this.el.classList.toggle('rail-only', !hasWork);
+      html += actions;
       const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn, isOwnSeat);
       if (bottomActions) html += bottomActions;
       const list = this.contentEl.querySelector('.pp-unit-list');
@@ -1290,7 +1295,7 @@ export class PlayerPanel {
     // Capital placement - hint only, button is in bottom actions bar.
     // Phone peek already owns this line — do not repeat it in the body.
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      if (!isMobileShell() && (!this.selectedTerritory || this.selectedTerritory.isWater)) {
+      if (!isBoardSkin() && !isMobileShell() && (!this.selectedTerritory || this.selectedTerritory.isWater)) {
         html += `<div class="pp-hint">Click one of your territories to place your capital</div>`;
       }
     }
@@ -1318,7 +1323,7 @@ export class PlayerPanel {
 
         if (hasMovableTerritory) {
           html += this._renderInlineMovement(player, turnPhase);
-        } else {
+        } else if (!isBoardSkin()) {
           html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
         }
 

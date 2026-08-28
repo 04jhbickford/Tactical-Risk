@@ -94,7 +94,7 @@ export class UnitRenderer {
       }
 
       // Group by type - show ALL types including cargo
-      const grouped = this._groupUnits(placements, true);
+      const grouped = this._groupUnitsForView(placements, true, territory);
       const types = Object.keys(grouped);
       if (types.length === 0) continue;
 
@@ -115,17 +115,17 @@ export class UnitRenderer {
 
   hasActiveSlides() {
     const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    this.slides = (this.slides || []).filter((s) => now - s.start < s.dur);
+    this.slides = (this.slides || []).filter((s) => now < s.start + s.dur);
     return this.slides.length > 0;
   }
 
-  slideSculpt(fromName, toName, unitType, color, kind = 'move') {
+  slideSculpt(fromName, toName, unitType, color, kind = 'move', delay = 0) {
     const fromT = this.territoryByName[fromName];
     if (!fromT) return;
-    const [sx, sy] = this._getTerritoryCenter(fromT);
+    let [sx, sy] = this._getTerritoryCenter(fromT);
     if (sx == null) return;
-    let ex = sx + 36;
-    let ey = sy - 70;
+    let ex = sx + 28;
+    let ey = sy - 78;
     if (toName) {
       const toT = this.territoryByName[toName];
       if (toT) {
@@ -136,21 +136,52 @@ export class UnitRenderer {
         }
       }
     }
+    if (kind === 'place') {
+      sx = ex;
+      sy = ey - 56;
+    }
     this.slides.push({
       sx, sy, ex, ey,
       type: unitType || 'infantry',
       color: color || '#8B1A1A',
-      start: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
-      dur: kind === 'lift' ? 480 : 560,
+      start: (typeof performance !== 'undefined' ? performance.now() : Date.now()) + (Number(delay) || 0),
+      dur: kind === 'lift' ? 520 : 620,
       kind,
+      fromName,
+      toName,
     });
+  }
+
+  _hiddenBySlide(territoryName, unitType) {
+    if (!isBoardSkin() || !territoryName) return 0;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    let n = 0;
+    for (const s of this.slides || []) {
+      if (now < s.start || now - s.start >= s.dur) continue;
+      if (s.type && unitType && s.type !== unitType) continue;
+      if (s.kind === 'lift' && s.fromName === territoryName) n += 1;
+      if ((s.kind === 'move' || s.kind === 'attack' || s.kind === 'place') && s.toName === territoryName) n += 1;
+    }
+    return n;
+  }
+
+  _groupUnitsForView(placements, includeCargo, territoryName) {
+    const grouped = this._groupUnits(placements, includeCargo);
+    if (!isBoardSkin() || !territoryName) return grouped;
+    for (const key of Object.keys(grouped)) {
+      const hide = this._hiddenBySlide(territoryName, grouped[key].type);
+      grouped[key].total = Math.max(0, (grouped[key].total || 0) - hide);
+      if (grouped[key].total <= 0) delete grouped[key];
+    }
+    return grouped;
   }
 
   _renderSlides(ctx, iconSize) {
     if (!isBoardSkin()) return;
     const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    this.slides = (this.slides || []).filter((s) => now - s.start < s.dur);
+    this.slides = (this.slides || []).filter((s) => now < s.start + s.dur);
     for (const s of this.slides) {
+      if (now < s.start) continue;
       const t = Math.min(1, (now - s.start) / s.dur);
       const ease = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
       const x = s.sx + (s.ex - s.sx) * ease;
@@ -876,7 +907,7 @@ export class UnitRenderer {
         cy = adjusted.y;
       }
 
-      const grouped = this._groupUnits(placements, true);
+      const grouped = this._groupUnitsForView(placements, true, territory);
       const types = Object.keys(grouped);
       if (types.length === 0) continue;
 

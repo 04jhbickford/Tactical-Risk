@@ -870,6 +870,12 @@ export class CombatUI {
           this.combatState.pendingAttackerCasualties = result.defenseHits;
           this.combatState.phase = 'selectCasualties';
           this._autoSelectCasualties();
+          if (isBoardSkin()) {
+            const player = this.gameState.currentPlayer;
+            const defenderOwner = this.combatState.defenders[0]?.owner;
+            this._liftSelectedCasualties(this.combatState.selectedDefenderCasualties, this.gameState.getPlayerColor?.(defenderOwner) || '#5c1212');
+            this._liftSelectedCasualties(this.combatState.selectedAttackerCasualties, player?.color);
+          }
           this._render();
           resolve(result);
         }
@@ -1644,8 +1650,177 @@ export class CombatUI {
     }
   }
 
+  _woodDiceRow(rolls, limit = 8) {
+    if (!rolls?.length) return '';
+    return rolls.slice(0, limit).map((r) => {
+      const n = typeof r === 'number' ? r : r.roll;
+      return this._woodDie(n);
+    }).join('');
+  }
+
+  _liftSelectedCasualties(selected, color) {
+    if (!selected) return;
+    for (const [unitType, n] of Object.entries(selected)) {
+      const raw = String(unitType || 'infantry').replace('_damage', '');
+      const count = Math.min(4, Number(n) || 0);
+      for (let i = 0; i < count; i++) {
+        liftPiecesOffTile(this.currentTerritory, color || '#5c1212', raw);
+      }
+    }
+  }
+
+  _renderTrayCasualtyTokens(units, selected, side) {
+    let html = '';
+    for (const u of (units || []).filter((x) => x.quantity > 0 && x.type !== 'transport' && x.type !== 'factory')) {
+      const taken = selected?.[u.type] || 0;
+      const color = this.gameState?.getPlayerColor?.(u.owner) || '#8B1A1A';
+      html += '<div class="tray-casualty-row" data-side="' + side + '" data-unit="' + u.type + '">';
+      html += '<span class="tray-note">' + u.type + '</span>';
+      for (let i = 0; i < u.quantity; i++) {
+        const isTaken = i < taken;
+        html += '<button type="button" class="tray-piece' + (isTaken ? ' taken' : '') + '" style="--plastic:' + color + '" data-side="' + side + '" data-unit="' + u.type + '" data-delta="' + (isTaken ? '-1' : '1') + '" title="' + (isTaken ? 'Return' : 'Take') + ' ' + u.type + '"></button>';
+      }
+      html += '</div>';
+    }
+    return html;
+  }
+
+  _renderBoardTray() {
+    const player = this.gameState.currentPlayer;
+    const { attackers, defenders, phase, winner } = this.combatState;
+    const defenderOwner = defenders[0]?.owner;
+    const defenderPlayer = this.gameState.getPlayer(defenderOwner);
+    const rolls = this.lastRolls;
+
+    let html = '<div class="combat-content tray-well">';
+    html += '<div class="tray-head">BATTLE · ' + this.currentTerritory + '</div>';
+    html += '<div class="tray-dice dice-animation">';
+    if (phase === 'rolling') {
+      html += '';
+    } else if (rolls) {
+      html += '<div class="dice-row attacking">' + this._woodDiceRow(rolls.attackRolls) + '</div>';
+      html += '<div class="dice-row defending">' + this._woodDiceRow(rolls.defenseRolls) + '</div>';
+    }
+    html += '</div>';
+
+    if (rolls && phase !== 'rolling') {
+      html += '<div class="tray-hits">' + (rolls.attackHits || 0) + ' hit · ' + (rolls.defenseHits || 0) + ' hit</div>';
+    }
+
+    if (phase === 'selectCasualties') {
+      const { selectedAttackerCasualties, selectedDefenderCasualties } = this.combatState;
+      html += '<div class="tray-note">Take pieces off the tile</div>';
+      html += this._renderTrayCasualtyTokens(defenders, selectedDefenderCasualties, 'defender');
+      html += this._renderTrayCasualtyTokens(attackers, selectedAttackerCasualties, 'attacker');
+    }
+
+    if (phase === 'selectAACasualties') {
+      html += this._renderAACasualtyUnits();
+    }
+    if (phase === 'selectBombardmentCasualties') {
+      html += this._renderBombardmentCasualtyUnits();
+    }
+
+    if (phase === 'resolved') {
+      html += '<div class="tray-note">' + (winner === 'attacker'
+        ? (player?.name || 'Attacker') + ' takes ' + this.currentTerritory
+        : (defenderPlayer?.name || 'Defender') + ' holds') + '</div>';
+    }
+
+    if (phase === 'airLanding') {
+      const { airUnitsToLand, selectedLandings, isRetreating } = this.combatState;
+      html += '<div class="tray-note">' + (isRetreating ? 'Retreat — ' : '') + 'Land air units</div>';
+      for (let i = 0; i < airUnitsToLand.length; i++) {
+        const airUnit = airUnitsToLand[i];
+        const unitKey = airUnit.id || airUnit.type;
+        const selectedDest = selectedLandings[unitKey];
+        const hasOptions = airUnit.landingOptions.length > 0;
+        html += '<div class="air-landing-unit">';
+        html += '<span class="tray-note">' + airUnit.type + '</span>';
+        if (hasOptions) {
+          html += '<select class="air-landing-select" data-unit="' + unitKey + '">';
+          html += '<option value="">Land…</option>';
+          html += airUnit.landingOptions.map((opt) =>
+            '<option value="' + opt.territory + '"' + (selectedDest === opt.territory ? ' selected' : '') + '>' + opt.territory + '</option>'
+          ).join('');
+          html += '</select>';
+        } else {
+          html += '<span class="tray-note">No landing — crashes</span>';
+        }
+        html += '</div>';
+      }
+    }
+
+    html += '<div class="combat-actions">';
+    html += this._renderCombatActionButtons(phase);
+    html += '</div></div>';
+
+    this.el.innerHTML = html;
+    this._bindEvents();
+  }
+
+  _renderCombatActionButtons(phase) {
+    let html = '';
+    if (phase === 'bombardment') {
+      html += '<button class="combat-btn roll" data-action="fire-bombardment">Fire Shore Bombardment</button>';
+    } else if (phase === 'selectBombardmentCasualties') {
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties, defenders } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+      const maxAvailable = this._getTotalUnits(defenders);
+      const canConfirm = selectedTotal === pendingBombardmentCasualties || selectedTotal === maxAvailable;
+      html += '<button class="combat-btn confirm" data-action="confirm-bombardment-casualties"' + (!canConfirm ? ' disabled' : '') + '>Confirm Bombardment</button>';
+    } else if (phase === 'aaFire') {
+      html += '<button class="combat-btn roll" data-action="aa-fire">Fire AA Guns</button>';
+    } else if (phase === AA_RESULT_PHASE) {
+      html += '<button class="combat-btn confirm" data-action="confirm-aa-results">Continue</button>';
+    } else if (phase === 'selectAACasualties') {
+      const { pendingAACasualties, selectedAACasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedAACasualties);
+      html += '<button class="combat-btn confirm" data-action="confirm-aa-casualties"' + (selectedTotal < pendingAACasualties ? ' disabled' : '') + '>Confirm AA Losses</button>';
+    } else if (phase === 'submarineFirstStrike') {
+      html += '<button class="combat-btn roll" data-action="submarine-first-strike">Fire First Strike</button>';
+    } else if (phase === 'ready') {
+      const isAmphibiousAssault = this.gameState.hasAmphibiousAssault(this.currentTerritory);
+      html += '<button class="combat-btn roll" data-action="roll">Roll</button>';
+      html += '<button class="combat-btn auto" data-action="auto-battle">Auto</button>';
+      html += isAmphibiousAssault
+        ? '<button class="combat-btn retreat" disabled title="Amphibious assault units cannot retreat">Retreat</button>'
+        : '<button class="combat-btn retreat" data-action="retreat">Retreat</button>';
+    } else if (phase === 'selectRetreat') {
+      const { retreatOptions } = this.combatState;
+      html += (retreatOptions || []).map((dest) =>
+        '<button class="combat-btn retreat-dest-btn" data-action="confirm-retreat" data-destination="' + dest + '">' + dest + '</button>'
+      ).join('');
+    } else if (phase === 'selectCasualties') {
+      const { attackers, defenders, pendingAttackerCasualties, pendingDefenderCasualties,
+              selectedAttackerCasualties, selectedDefenderCasualties } = this.combatState;
+      const attackerTotal = this._getTotalSelectedCasualties(selectedAttackerCasualties);
+      const defenderTotal = this._getTotalSelectedCasualties(selectedDefenderCasualties);
+      const attackerMax = this._getMaxAbsorbableCasualties(attackers);
+      const defenderMax = this._getMaxAbsorbableCasualties(defenders);
+      const effectiveAttacker = Math.min(pendingAttackerCasualties, attackerMax);
+      const effectiveDefender = Math.min(pendingDefenderCasualties, defenderMax);
+      const canConfirm = attackerTotal >= effectiveAttacker && defenderTotal >= effectiveDefender;
+      html += '<button class="combat-btn confirm" data-action="confirm-casualties"' + (!canConfirm ? ' disabled' : '') + '>Confirm</button>';
+    } else if (phase === 'airLanding') {
+      const { airUnitsToLand, selectedLandings } = this.combatState;
+      const allSelected = airUnitsToLand.every((u) => {
+        const unitKey = u.id || u.type;
+        return u.landingOptions.length === 0 || selectedLandings[unitKey];
+      });
+      html += '<button class="combat-btn confirm" data-action="confirm-landing"' + (!allSelected ? ' disabled' : '') + '>Confirm Landings</button>';
+    } else if (phase === 'resolved') {
+      html += '<button class="combat-btn next" data-action="next">' + (this.gameState.combatQueue.length > 1 ? 'Next Battle' : 'End Combat') + '</button>';
+    }
+    return html;
+  }
+
   _render() {
     if (!this.currentTerritory || !this.gameState || !this.combatState) return;
+    if (isBoardSkin()) {
+      this._renderBoardTray();
+      return;
+    }
 
     const player = this.gameState.currentPlayer;
     const { attackers, defenders, phase, winner } = this.combatState;
@@ -2928,6 +3103,20 @@ export class CombatUI {
       });
     });
 
+    this.el.querySelectorAll('.tray-piece').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const side = btn.dataset.side;
+        const unitType = btn.dataset.unit;
+        const delta = Number(btn.dataset.delta) || 1;
+        if (delta > 0) {
+          const owner = (this.combatState?.[side === 'attacker' ? 'attackers' : 'defenders'] || [])
+            .find((u) => u.type === unitType)?.owner;
+          liftPiecesOffTile(this.currentTerritory, this.gameState?.getPlayerColor?.(owner) || '#5c1212', unitType);
+        }
+        this._adjustCasualty(side, unitType, delta);
+      });
+    });
+
     // Casualty selection buttons
     this.el.querySelectorAll('.casualty-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -2937,7 +3126,9 @@ export class CombatUI {
         const delta = btn.classList.contains('plus') ? 1 : -1;
         if (delta > 0) {
           const raw = String(unitType || 'infantry').replace('_damage', '');
-          liftPiecesOffTile(this.currentTerritory, '#5c1212', raw);
+          const owner = (this.combatState?.[side === 'attacker' ? 'attackers' : 'defenders'] || [])
+            .find((u) => u.type === raw)?.owner;
+          liftPiecesOffTile(this.currentTerritory, this.gameState?.getPlayerColor?.(owner) || '#5c1212', raw);
         }
 
         if (casualtyType === 'aa') {

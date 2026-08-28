@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp fifth chrome pass (preview only)
+
+James playtest of 272b820: lobby felt cards PASS; board FAIL (clarity strip + tall Actions sheet on the art). Fourth pass hid the strip and shrunk the sheet; fifth pass takes the sheet off the art (Done/Undo/place on the wood rail), docks combat as a felt dice tray with wood-pip dice and plastic take-tokens (no CSS-3D modal), and slides the stationed canvas sculpt (source/dest count hidden while it moves). SCHEMA 11. V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp fourth chrome pass (preview only)
 
 James playtest of 272b820: lobby felt cards PASS; board FAIL. Kill #hud-clarity overlay (copy now in the wood rail). Actions sheet is a small table-edge card, not a tall sidebar. Combat docks as a felt tray with wood-pip dice. Canvas sculpts slide/place — no overlay chips. SCHEMA 11. V3.00-exp. Do not merge.
