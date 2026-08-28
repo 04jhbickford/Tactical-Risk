@@ -697,8 +697,15 @@ html.board-skin .table-edge-card .pp-hint {
 html.board-skin #sidebar .pp-resources-inline,
 html.board-skin #sidebar .pp-pstat-value,
 html.board-skin #sidebar [style*="ffd700"],
-html.board-skin #sidebar [style*="#ffd700"] {
+html.board-skin #sidebar [style*="#ffd700"],
+html.board-skin #sidebar .cr-bonus,
+html.board-skin #continent-panel .cr-bonus {
   color: #efe0b8 !important;
+}
+
+html.board-skin #continent-panel,
+html.board-skin .sidebar-info-panel {
+  display: none !important;
 }
 
 html.board-skin .pp-pstat-value,
