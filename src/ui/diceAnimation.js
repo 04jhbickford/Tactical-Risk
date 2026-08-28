@@ -1,6 +1,8 @@
 // Unified 3D Dice Animation Component
 // Used for all dice rolls: combat, AA fire, tech research
 
+import { playBoardSound } from '../audio/boardAudio.js';
+
 export class DiceAnimator {
   constructor(container) {
     this.container = container;
@@ -22,6 +24,7 @@ export class DiceAnimator {
 
     // Create dice elements
     this._renderAnimatingDice(diceCount, color);
+    playBoardSound('dice');
 
     // Animate for duration
     const startTime = Date.now();

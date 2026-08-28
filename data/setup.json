@@ -27,40 +27,40 @@
     {
       "id": "Russians",
       "name": "Russians",
-      "color": "#B22222",
-      "lightColor": "#DC143C",
+      "color": "#8B1A1A",
+      "lightColor": "#B22222",
       "flag": "Russians.png",
       "alliance": "Allies"
     },
     {
       "id": "Germans",
       "name": "Germans",
-      "color": "#4A4A4A",
-      "lightColor": "#6A6A6A",
+      "color": "#2C3544",
+      "lightColor": "#4A5568",
       "flag": "Germans.png",
       "alliance": "Axis"
     },
     {
       "id": "British",
       "name": "British",
-      "color": "#B8860B",
-      "lightColor": "#DAA520",
+      "color": "#C4A36A",
+      "lightColor": "#D4B87A",
       "flag": "British.png",
       "alliance": "Allies"
     },
     {
       "id": "Japanese",
       "name": "Japanese",
-      "color": "#FF8C00",
-      "lightColor": "#FFA500",
+      "color": "#C44B1F",
+      "lightColor": "#E06A2F",
       "flag": "Japanese.png",
       "alliance": "Axis"
     },
     {
       "id": "Americans",
       "name": "Americans",
-      "color": "#556B2F",
-      "lightColor": "#6B8E23",
+      "color": "#5C6B3A",
+      "lightColor": "#7A8B4C",
       "flag": "Americans.png",
       "alliance": "Allies"
     }

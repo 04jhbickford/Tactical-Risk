@@ -106,7 +106,7 @@ export class Lobby {
         <div class="lobby-phone-brand">
           <h1 class="lobby-phone-logo">Tactical Risk</h1>
           <p class="lobby-phone-tag">World War II Grand Strategy</p>
-          <span class="lobby-version-badge">${GAME_VERSION}</span>
+          <span class="lobby-version-badge">${GAME_VERSION} · experiment</span>
         </div>
 
         <div class="lobby-phone-actions">
@@ -247,7 +247,7 @@ export class Lobby {
         <div class="lobby-brand">
           <h1 class="lobby-logo">Tactical Risk</h1>
           <p class="lobby-tagline">World War II Grand Strategy</p>
-          <span class="lobby-version-badge">${GAME_VERSION}</span>
+          <span class="lobby-version-badge">${GAME_VERSION} · experiment</span>
         </div>
 
         <div class="lobby-menu-grid">

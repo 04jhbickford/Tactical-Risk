@@ -53,6 +53,7 @@ import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
 import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
+import { initBoardSkin, attachBoardActionSounds } from './ui/boardSkin.js';
 import {
   shouldHidePhoneTooltipOn,
   shouldToggleOffPhoneTooltip,
@@ -66,6 +67,7 @@ import {
 } from './ui/territoryTooltip.js';
 
 initMobileShell();
+initBoardSkin();
 
 // Multiplayer imports
 import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
@@ -313,6 +315,7 @@ async function init() {
 
   // Action Log (game event log)
   const actionLog = new ActionLog();
+  attachBoardActionSounds(actionLog);
 
   // Rules Panel
   const rulesPanel = new RulesPanel();

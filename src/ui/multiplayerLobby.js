@@ -21,11 +21,11 @@ import { resolveHostAwayBanner } from '../ui/hudClarity.js';
 
 // Available factions (should match setup data)
 const FACTIONS = [
-  { id: 'Russians', name: 'Russians', flag: 'Russians.png', color: '#B22222' },
-  { id: 'Germans', name: 'Germans', flag: 'Germans.png', color: '#4A4A4A' },
-  { id: 'British', name: 'British', flag: 'British.png', color: '#B8860B' },
-  { id: 'Japanese', name: 'Japanese', flag: 'Japanese.png', color: '#FF8C00' },
-  { id: 'Americans', name: 'Americans', flag: 'Americans.png', color: '#556B2F' },
+  { id: 'Russians', name: 'Russians', flag: 'Russians.png', color: '#8B1A1A' },
+  { id: 'Germans', name: 'Germans', flag: 'Germans.png', color: '#2C3544' },
+  { id: 'British', name: 'British', flag: 'British.png', color: '#C4A36A' },
+  { id: 'Japanese', name: 'Japanese', flag: 'Japanese.png', color: '#C44B1F' },
+  { id: 'Americans', name: 'Americans', flag: 'Americans.png', color: '#5C6B3A' },
 ];
 
 const FACTION_COLORS = [

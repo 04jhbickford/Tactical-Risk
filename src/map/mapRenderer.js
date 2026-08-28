@@ -2,6 +2,7 @@
 // Uses smallMap.jpeg as a base layer so missing tile gaps show correct ocean color.
 
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
+import { isBoardSkin, MAP_FILTER } from '../ui/boardSkin.js';
 
 const TILE_SIZE = 256;
 const COLS = 14; // 0..13
@@ -67,6 +68,9 @@ export class MapRenderer {
   render(ctx, viewport) {
     if (!this.loaded) return;
 
+    const skin = isBoardSkin();
+    if (skin) ctx.filter = MAP_FILTER;
+
     // Draw the small map as a base layer so any missing tile gaps show correct ocean
     if (this.smallMap) {
       ctx.drawImage(this.smallMap, 0, 0, MAP_WIDTH, MAP_HEIGHT);
@@ -101,5 +105,6 @@ export class MapRenderer {
       }
     }
     ctx.globalAlpha = 1.0;
+    if (skin) ctx.filter = 'none';
   }
 }

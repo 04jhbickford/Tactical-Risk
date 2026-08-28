@@ -6,6 +6,7 @@ import {
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
 } from '../ui/mobileShell.js';
+import { isBoardSkin, OCEAN_PARCHMENT, INK, PARCHMENT_LAND, hexToRgba } from '../ui/boardSkin.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
 // These are land-to-land connections that cross water (like Alaska-Kamchatka in Risk)
@@ -214,7 +215,7 @@ export class TerritoryRenderer {
     ctx.save();
 
     // Solid fill covers the baked rectangle with the correct irregular shape.
-    ctx.fillStyle = TerritoryRenderer.OCEAN_BASE_COLOR;
+    ctx.fillStyle = isBoardSkin() ? OCEAN_PARCHMENT : TerritoryRenderer.OCEAN_BASE_COLOR;
     for (const t of this.territories) {
       if (!t.isWater) continue;
       for (const poly of t.polygons) {
@@ -225,8 +226,9 @@ export class TerritoryRenderer {
 
     // Soft feather along the polygon edge so the mask blends into the PNG's
     // anti-aliased coastline instead of leaving a second hard seam.
-    ctx.strokeStyle = TerritoryRenderer.OCEAN_BASE_COLOR;
-    ctx.shadowColor = TerritoryRenderer.OCEAN_BASE_COLOR;
+    const ocean = isBoardSkin() ? OCEAN_PARCHMENT : TerritoryRenderer.OCEAN_BASE_COLOR;
+    ctx.strokeStyle = ocean;
+    ctx.shadowColor = ocean;
     ctx.shadowBlur = 4;
     ctx.lineWidth = 4;
     ctx.globalAlpha = 0.6;
@@ -243,15 +245,37 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx) {
+    const skin = isBoardSkin();
     for (const t of this.territories) {
       if (t.isWater) continue;
 
       const continent = this.continentByTerritory[t.name];
-      const color = continent?.color || '#888888';
+      let color = continent?.color || '#888888';
+      let alpha = 1.0;
+      if (skin) {
+        const owner = this.gameState?.getOwner?.(t.name);
+        const player = owner ? this.gameState.getPlayer(owner) : null;
+        color = player?.color ? hexToRgba(player.color, 0.5) : PARCHMENT_LAND;
+        alpha = 1;
+      }
 
       ctx.save();
+      if (skin) {
+        ctx.fillStyle = PARCHMENT_LAND;
+        ctx.globalAlpha = 1;
+        for (const polygon of t.polygons) {
+          if (!polygon || polygon.length < 3) continue;
+          ctx.beginPath();
+          ctx.moveTo(polygon[0][0], polygon[0][1]);
+          for (let i = 1; i < polygon.length; i++) {
+            ctx.lineTo(polygon[i][0], polygon[i][1]);
+          }
+          ctx.closePath();
+          ctx.fill();
+        }
+      }
       ctx.fillStyle = color;
-      ctx.globalAlpha = 1.0;
+      ctx.globalAlpha = alpha;
 
       // Fill each polygon directly
       for (const polygon of t.polygons) {
@@ -548,8 +572,8 @@ export class TerritoryRenderer {
   /** Draw territory outlines */
   renderTerritoryOutlines(ctx) {
     // Land territory borders
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = isBoardSkin() ? INK : 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = isBoardSkin() ? 1.55 : 1;
 
     for (const t of this.territories) {
       if (t.isWater) continue;
@@ -565,7 +589,7 @@ export class TerritoryRenderer {
     }
 
     // Sea zone borders - lighter, dashed
-    ctx.strokeStyle = 'rgba(80, 140, 200, 0.35)';
+    ctx.strokeStyle = isBoardSkin() ? 'rgba(42, 52, 62, 0.42)' : 'rgba(80, 140, 200, 0.35)';
     ctx.lineWidth = 1;
     ctx.setLineDash([6, 4]);
 
@@ -1453,7 +1477,10 @@ export class TerritoryRenderer {
     if (zoom < 0.4) return;
 
     const fontSize = Math.max(8, Math.min(13, 11 / zoom * 0.7));
-    ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
+    const labelFont = isBoardSkin()
+      ? `600 ${fontSize}px 'Source Serif 4', Palatino, Georgia, serif`
+      : `bold ${fontSize}px 'Segoe UI', sans-serif`;
+    ctx.font = labelFont;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
@@ -1486,22 +1513,24 @@ export class TerritoryRenderer {
       }
 
       // Background for readability
-      ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+      ctx.strokeStyle = isBoardSkin() ? 'rgba(244, 232, 204, 0.92)' : 'rgba(0,0,0,0.8)';
       ctx.lineWidth = 3;
       ctx.lineJoin = 'round';
       ctx.strokeText(t.name, cx, cy);
 
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = isBoardSkin() ? '#2A1C0E' : '#fff';
       ctx.fillText(t.name, cx, cy);
 
       // Show IPC value below name when zoomed in
       if (zoom > 0.6 && t.production > 0) {
         const smallSize = fontSize * 0.75;
-        ctx.font = `${smallSize}px 'Segoe UI', sans-serif`;
+        ctx.font = isBoardSkin()
+          ? `600 ${smallSize}px 'Source Serif 4', Palatino, Georgia, serif`
+          : `${smallSize}px 'Segoe UI', sans-serif`;
         ctx.strokeText(`${t.production} IPC`, cx, cy + fontSize + 2);
-        ctx.fillStyle = '#ffd700';
+        ctx.fillStyle = isBoardSkin() ? '#6B4A22' : '#ffd700';
         ctx.fillText(`${t.production} IPC`, cx, cy + fontSize + 2);
-        ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
+        ctx.font = labelFont;
       }
     }
   }

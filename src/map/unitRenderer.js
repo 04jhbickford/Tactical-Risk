@@ -2,6 +2,7 @@
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { isMobileShell, phoneUnitIconSize, shouldHideUnitsAtZoom } from '../ui/mobileShell.js';
+import { isBoardSkin } from '../ui/boardSkin.js';
 
 export class UnitRenderer {
   constructor(gameState, territories, unitDefs) {
@@ -534,6 +535,20 @@ export class UnitRenderer {
     const bgSize = size + 4;
     ctx.fillStyle = color;
 
+    if (isBoardSkin()) {
+      ctx.fillStyle = 'rgba(20, 12, 6, 0.35)';
+      ctx.beginPath();
+      ctx.ellipse(x, y + bgSize * 0.46, bgSize * 0.48, bgSize * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.ellipse(x, y + bgSize * 0.34, bgSize * 0.42, bgSize * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(26, 16, 8, 0.55)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
     // Add indicator for units on carriers/transports
     if (isOnCarrier || isOnTransport) {
       // Draw a small boat/carrier symbol underneath
@@ -570,9 +585,17 @@ export class UnitRenderer {
     ctx.lineWidth = 1.5;
 
     ctx.beginPath();
-    ctx.roundRect(x - bgSize / 2, y - bgSize / 2, bgSize, bgSize, 4);
+    const chipRadius = isBoardSkin() ? 7 : 4;
+    ctx.roundRect(x - bgSize / 2, y - bgSize / 2, bgSize, bgSize, chipRadius);
     ctx.fill();
     ctx.stroke();
+    if (isBoardSkin()) {
+      ctx.strokeStyle = 'rgba(255, 244, 212, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(x - bgSize / 2 + 1.5, y - bgSize / 2 + 1.5, bgSize - 3, bgSize * 0.42, chipRadius);
+      ctx.stroke();
+    }
 
     if (highlight) {
       ctx.strokeStyle = 'rgba(250, 204, 21, 0.95)';
@@ -643,7 +666,9 @@ export class UnitRenderer {
     const fontSize = Math.max(9, Math.min(12, 11 * zoom));
     const text = count.toString();
 
-    ctx.font = `bold ${fontSize}px sans-serif`;
+    ctx.font = isBoardSkin()
+      ? `700 ${fontSize}px Cinzel, Palatino, serif`
+      : `bold ${fontSize}px sans-serif`;
     const metrics = ctx.measureText(text);
     const width = Math.max(metrics.width + 6, fontSize + 2);
     const height = fontSize + 4;

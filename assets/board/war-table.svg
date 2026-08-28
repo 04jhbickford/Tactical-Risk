@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0.2">
+      <stop offset="0%" stop-color="#4a2a14"/>
+      <stop offset="50%" stop-color="#6b3f1d"/>
+      <stop offset="100%" stop-color="#3d2110"/>
+    </linearGradient>
+    <radialGradient id="lamp" cx="50%" cy="18%" r="70%">
+      <stop offset="0%" stop-color="#f3e2b0" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#1a1008" stop-opacity="0.55"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="1600" fill="url(#wood)"/>
+  <g stroke="#2a160a" stroke-width="2" opacity="0.2" fill="none">
+    <path d="M0 120 C200 90 400 160 600 110 S1000 80 1200 140"/>
+    <path d="M0 420 C180 460 420 380 700 430 S1040 470 1200 400"/>
+    <path d="M0 780 C260 740 500 830 780 790 S1080 740 1200 810"/>
+    <path d="M0 1160 C220 1200 520 1100 800 1170 S1080 1220 1200 1140"/>
+  </g>
+  <rect x="70" y="180" width="1060" height="1240" rx="8" fill="#e8d5a8" opacity="0.92"/>
+  <rect x="90" y="200" width="1020" height="1200" rx="4" fill="#f4e6c0"/>
+  <g fill="none" stroke="#2a4a5c" stroke-width="3" opacity="0.55">
+    <ellipse cx="600" cy="780" rx="420" ry="220"/>
+    <path d="M250 720 C340 640 480 600 600 610 C760 624 900 700 960 790 C900 880 740 940 600 930 C430 918 300 840 250 720Z"/>
+    <path d="M380 760 C430 700 520 680 600 690 C700 704 790 760 820 820"/>
+    <path d="M480 860 C540 820 620 810 700 840"/>
+  </g>
+  <g fill="#8b1e1e" opacity="0.28">
+    <path d="M620 640 C700 650 760 700 740 760 C700 790 640 780 600 740 Z"/>
+  </g>
+  <g fill="#5c6b3a" opacity="0.26">
+    <path d="M300 700 C360 660 420 680 400 740 C360 760 310 750 300 700Z"/>
+  </g>
+  <g fill="#2c3544" opacity="0.26">
+    <path d="M560 700 C610 690 650 720 640 760 C600 780 550 760 560 700Z"/>
+  </g>
+  <circle cx="600" cy="360" r="70" fill="none" stroke="#8a6a32" stroke-width="4"/>
+  <circle cx="600" cy="360" r="8" fill="#8a6a32"/>
+  <g stroke="#8a6a32" stroke-width="2">
+    <line x1="600" y1="290" x2="600" y2="310"/>
+    <line x1="600" y1="410" x2="600" y2="430"/>
+    <line x1="530" y1="360" x2="550" y2="360"/>
+    <line x1="650" y1="360" x2="670" y2="360"/>
+  </g>
+  <rect width="1200" height="1600" fill="url(#lamp)"/>
+</svg>

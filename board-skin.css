@@ -1,0 +1,659 @@
+/* V3.00-exp analog board-game skin. Visual only. Isolated to html.board-skin. */
+
+html.board-skin,
+html.board-skin body {
+  background:
+    linear-gradient(180deg, rgba(20, 12, 6, 0.28), rgba(20, 12, 6, 0.12)),
+    url('assets/board/wood.svg') center / 380px 380px repeat;
+  color: #2a1c0e;
+  font-family: 'Source Serif 4', Palatino, 'Palatino Linotype', Georgia, serif;
+}
+
+html.board-skin ::-webkit-scrollbar-track {
+  background: rgba(42, 28, 14, 0.25);
+}
+
+html.board-skin ::-webkit-scrollbar-thumb {
+  background: rgba(138, 106, 50, 0.55);
+  border-radius: 3px;
+}
+
+html.board-skin #mapCanvas {
+  box-shadow: inset 0 0 80px rgba(42, 24, 10, 0.35);
+}
+
+#exp-banner {
+  position: fixed;
+  top: 0;
+  right: 12px;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 5px;
+  background: linear-gradient(#8b1e1e, #5c1212);
+  color: #f4e6c0;
+  border: 1px solid #3a100c;
+  border-top: 0;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 0 #2a0c0a, 0 8px 16px rgba(0, 0, 0, 0.35);
+  font-family: Cinzel, 'Palatino Linotype', serif;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  pointer-events: auto;
+}
+
+.exp-banner-mark {
+  font-weight: 700;
+}
+
+.exp-banner-ver {
+  padding: 1px 6px;
+  background: #f4e6c0;
+  color: #5c1212;
+  border-radius: 2px;
+  font-weight: 700;
+}
+
+.exp-audio-toggle {
+  margin-left: 4px;
+  padding: 2px 7px;
+  background: #f0d8a8;
+  color: #3a1f0c;
+  border: 1px solid #3a1f0c;
+  border-radius: 3px;
+  font: 600 10px Cinzel, serif;
+  cursor: pointer;
+}
+
+.exp-audio-toggle.muted {
+  background: #c4b49a;
+  color: #5a4630;
+}
+
+html.board-skin #hud {
+  height: 52px;
+  background:
+    linear-gradient(180deg, rgba(244, 230, 192, 0.16), transparent 40%),
+    linear-gradient(#5a3418, #3d2110);
+  border-bottom: 3px solid #1a1008;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  color: #f3e2b0;
+  font-family: Cinzel, 'Palatino Linotype', serif;
+}
+
+html.board-skin .hud-title {
+  color: #f4e6c0;
+  letter-spacing: 0.14em;
+  text-shadow: 0 1px 0 #1a1008;
+}
+
+html.board-skin .hud-title::after {
+  content: ' 1942';
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  opacity: 0.7;
+}
+
+html.board-skin #hud-clarity {
+  top: 52px;
+  background: rgba(42, 24, 10, 0.88);
+  border-bottom: 1px solid #8a6a32;
+  color: #f0d8a8;
+  font-family: 'Source Serif 4', Georgia, serif;
+}
+
+html.board-skin .hud-current-turn,
+html.board-skin .hud-phase-progress,
+html.board-skin .hud-turn {
+  background: rgba(20, 12, 6, 0.35);
+  border: 1px solid rgba(240, 216, 168, 0.22);
+  border-radius: 4px;
+}
+
+html.board-skin .hud-round-badge {
+  color: #f0d8a8;
+  background: rgba(139, 30, 30, 0.35);
+  border: 1px solid #8a6a32;
+}
+
+html.board-skin .phase-dot {
+  background: #5a4630;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+html.board-skin .phase-dot.active {
+  background: #c4a36a;
+  box-shadow: 0 0 8px #c4a36a;
+}
+
+html.board-skin .phase-dot.past {
+  background: #8a6a32;
+}
+
+html.board-skin .hud-next-phase-btn,
+html.board-skin .hud-btn.end-phase-btn,
+html.board-skin .hud-menu-btn {
+  background: linear-gradient(#d4a574, #8b5a2b);
+  color: #1a1008;
+  border: 1px solid #3a2410;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 #f0d8b0, 0 2px 0 #2a160a;
+  font-family: Cinzel, serif;
+  font-weight: 700;
+}
+
+html.board-skin .hud-next-phase-btn:hover,
+html.board-skin .hud-btn.end-phase-btn:hover,
+html.board-skin .hud-menu-btn:hover {
+  filter: brightness(1.08);
+}
+
+html.board-skin .hud-menu-dropdown {
+  background: #f3e6c4;
+  border: 2px solid #3a2410;
+  color: #2a1c0e;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+}
+
+html.board-skin .hud-menu-item {
+  color: #2a1c0e;
+}
+
+html.board-skin .hud-menu-item:hover {
+  background: rgba(139, 30, 30, 0.12);
+}
+
+html.board-skin .lobby-overlay.modern {
+  background: #2a160a;
+}
+
+html.board-skin .lobby-overlay.modern::before {
+  background:
+    linear-gradient(90deg, rgba(42, 22, 10, 0.15), rgba(42, 22, 10, 0.55)),
+    url('assets/board/war-table.svg') center / cover no-repeat;
+}
+
+html.board-skin .lobby-container.modern {
+  background:
+    linear-gradient(180deg, rgba(243, 230, 196, 0.97), rgba(232, 213, 168, 0.98)),
+    url('assets/board/parchment.svg');
+  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+  border-left: 8px solid #3a2410;
+}
+
+html.board-skin .lobby-bg-pattern {
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(196, 163, 106, 0.18), transparent 60%);
+}
+
+html.board-skin .lobby-logo {
+  font-family: Cinzel, serif;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: none;
+  -webkit-text-fill-color: #2a1c0e;
+  color: #2a1c0e;
+  text-shadow: 0 1px 0 #fff6dc;
+}
+
+html.board-skin .lobby-tagline,
+html.board-skin .lobby-phone-tag {
+  color: #6b4a22;
+  letter-spacing: 0.18em;
+}
+
+html.board-skin .lobby-version-badge {
+  background: #8b1e1e;
+  border: 1px solid #3a100c;
+  color: #f4e6c0;
+  border-radius: 3px;
+  font-family: Cinzel, serif;
+  font-weight: 700;
+}
+
+html.board-skin .lobby-menu-card,
+html.board-skin .lobby-phone-card,
+html.board-skin .lobby-saved-games-btn,
+html.board-skin .player-card.modern,
+html.board-skin .start-game-btn,
+html.board-skin .mp-create-btn,
+html.board-skin .mp-join-btn {
+  background: linear-gradient(#efe0b8, #d8c08a);
+  border: 2px solid #3a2410;
+  border-radius: 6px;
+  color: #2a1c0e;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 4px 0 #2a160a;
+  font-family: 'Source Serif 4', Georgia, serif;
+}
+
+html.board-skin .lobby-menu-card:hover,
+html.board-skin .lobby-phone-card:hover,
+html.board-skin .lobby-saved-games-btn:hover,
+html.board-skin .player-card.modern:hover {
+  transform: translateY(-1px);
+  border-color: #5c1212;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 6px 0 #2a160a, 0 10px 20px rgba(0, 0, 0, 0.25);
+}
+
+html.board-skin .lobby-menu-card.online {
+  border-color: #2c3544;
+}
+
+html.board-skin .menu-card-icon {
+  background: #2c3544;
+  color: #f4e6c0;
+  border-radius: 4px;
+}
+
+html.board-skin .lobby-menu-card.online .menu-card-icon {
+  background: #8b1e1e;
+  color: #f4e6c0;
+}
+
+html.board-skin .menu-card-content h3,
+html.board-skin .lobby-phone-card-title {
+  color: #1a1008;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .menu-card-content p,
+html.board-skin .lobby-phone-card-desc,
+html.board-skin .lobby-phone-card-kicker {
+  color: #5a4630;
+}
+
+html.board-skin .menu-card-badge,
+html.board-skin .saved-count {
+  background: #2c3544;
+  border-color: #1a1008;
+  color: #f4e6c0;
+  border-radius: 3px;
+}
+
+html.board-skin .lobby-phone-home,
+html.board-skin .lobby-phone-brand {
+  color: #2a1c0e;
+}
+
+html.board-skin .lobby-phone-logo {
+  font-family: Cinzel, serif;
+  color: #2a1c0e;
+}
+
+html.board-skin .player-card.modern.selected {
+  outline: 3px solid #8b1e1e;
+  background: linear-gradient(#f6e8c4, #e0c888);
+}
+
+html.board-skin .player-name-input.modern,
+html.board-skin .ai-select.modern,
+html.board-skin .modern-select,
+html.board-skin input,
+html.board-skin select {
+  background: #fff8e4;
+  border: 1px solid #8a6a32;
+  color: #2a1c0e;
+  border-radius: 3px;
+}
+
+html.board-skin .setup-title h2,
+html.board-skin .section-label {
+  color: #2a1c0e;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .setup-title p,
+html.board-skin .game-rules-preview,
+html.board-skin .toggle-text {
+  color: #5a4630;
+}
+
+html.board-skin .start-game-btn {
+  font-family: Cinzel, serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background: linear-gradient(#c45c26, #8b1e1e);
+  color: #f4e6c0;
+}
+
+html.board-skin .start-game-btn.disabled,
+html.board-skin .start-game-btn:disabled {
+  background: #b8a888;
+  color: #5a4630;
+}
+
+html.board-skin .back-btn {
+  background: #efe0b8;
+  border: 2px solid #3a2410;
+  color: #2a1c0e;
+}
+
+html.board-skin .auth-container,
+html.board-skin .mp-lobby,
+html.board-skin .game-list {
+  color: #2a1c0e;
+}
+
+html.board-skin .combat-popup,
+html.board-skin .purchase-panel,
+html.board-skin .tech-popup,
+html.board-skin .placement-panel,
+html.board-skin .mobilize-panel,
+html.board-skin .player-panel,
+html.board-skin .rocket-popup,
+html.board-skin .victory-overlay,
+html.board-skin .handoff-overlay,
+html.board-skin .turn-summary-modal,
+html.board-skin .rules-panel {
+  background:
+    linear-gradient(180deg, rgba(244, 230, 192, 0.97), rgba(228, 208, 160, 0.98)),
+    url('assets/board/parchment.svg');
+  border: 3px solid #3a2410;
+  border-radius: 6px;
+  color: #2a1c0e;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px #c4a36a;
+}
+
+html.board-skin .combat-popup {
+  background:
+    linear-gradient(180deg, rgba(80, 28, 24, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(244, 230, 192, 0.97), rgba(228, 208, 160, 0.98)),
+    url('assets/board/felt.svg');
+}
+
+html.board-skin .combat-popup.minimized,
+html.board-skin .purchase-panel.minimized,
+html.board-skin .tech-popup.minimized {
+  transform: none;
+}
+
+html.board-skin .combat-title,
+html.board-skin .tech-title,
+html.board-skin .pl-header,
+html.board-skin .pp-title {
+  font-family: Cinzel, serif;
+  color: #2a1c0e;
+}
+
+html.board-skin .combat-remaining,
+html.board-skin .tech-player,
+html.board-skin .pp-instructions {
+  color: #5a4630;
+}
+
+html.board-skin .combat-btn,
+html.board-skin .tech-dice-btn,
+html.board-skin .pp-actions button,
+html.board-skin .pl-actions button,
+html.board-skin button.combat-btn,
+html.board-skin .left-modal-minimize-btn {
+  background: linear-gradient(#d4a574, #8b5a2b);
+  border: 2px solid #3a2410;
+  color: #1a1008;
+  border-radius: 4px;
+  font-family: Cinzel, serif;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 #f0d8b0, 0 3px 0 #2a160a;
+}
+
+html.board-skin .combat-btn.roll,
+html.board-skin .combat-btn.auto {
+  background: linear-gradient(#c45c26, #8b1e1e);
+  color: #f4e6c0;
+}
+
+html.board-skin .combat-btn.confirm {
+  background: linear-gradient(#5c6b3a, #3d4a28);
+  color: #f4e6c0;
+}
+
+html.board-skin .combat-btn.retreat {
+  background: linear-gradient(#6a8490, #2c3544);
+  color: #f4e6c0;
+}
+
+html.board-skin .combat-btn:hover,
+html.board-skin .tech-dice-btn:hover,
+html.board-skin .pp-actions button:hover {
+  filter: brightness(1.06);
+}
+
+html.board-skin .board-pressed {
+  transform: translateY(2px);
+  box-shadow: inset 0 1px 0 #f0d8b0, 0 1px 0 #2a160a;
+}
+
+html.board-skin .combat-forces,
+html.board-skin .combat-result,
+html.board-skin .tech-budget,
+html.board-skin .pp-budget,
+html.board-skin .pp-cart {
+  background: rgba(255, 248, 228, 0.7);
+  border: 1px solid #8a6a32;
+  border-radius: 4px;
+}
+
+html.board-skin .die-3d .die-face {
+  background: linear-gradient(#f7efe0, #d8c4a0);
+  border: 2px solid #3a2410;
+  color: #1a1008;
+  font-family: Cinzel, serif;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 #fff, 0 3px 0 #2a160a;
+  border-radius: 5px;
+}
+
+html.board-skin .die-3d.hit .die-face {
+  background: linear-gradient(#c45c26, #8b1e1e);
+  color: #f4e6c0;
+}
+
+html.board-skin .die-3d.rolling .die-face {
+  animation: board-die-tumble 0.18s linear infinite;
+}
+
+@keyframes board-die-tumble {
+  0% { transform: rotateX(0) rotateY(0); }
+  50% { transform: rotateX(18deg) rotateY(-12deg); }
+  100% { transform: rotateX(0) rotateY(0); }
+}
+
+html.board-skin #sidebar,
+html.board-skin .player-panel,
+html.board-skin .pp-panel,
+html.board-skin #playerPanel {
+  background:
+    linear-gradient(180deg, rgba(243, 230, 196, 0.96), rgba(228, 208, 160, 0.98)),
+    url('assets/board/parchment.svg');
+  border-left: 6px solid #3a2410;
+  color: #2a1c0e;
+}
+
+html.board-skin .pp-header.compact {
+  border-bottom: 2px solid #3a2410;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .pp-turn-badge.your-turn {
+  background: #f4e6c0;
+  color: #5c1212;
+  border: 1px solid #3a100c;
+}
+
+html.board-skin .pp-turn-badge.waiting {
+  background: #2c3544;
+  color: #f4e6c0;
+}
+
+html.board-skin .pp-tab,
+html.board-skin .pp-tabs button {
+  background: #efe0b8;
+  border: 1px solid #8a6a32;
+  color: #2a1c0e;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .pp-tab.active {
+  background: #8b1e1e;
+  color: #f4e6c0;
+}
+
+html.board-skin .tt-tooltip,
+html.board-skin .ut-tooltip,
+html.board-skin .territory-tooltip,
+html.board-skin #territoryTooltip,
+html.board-skin #unitTooltip {
+  background: #f3e6c4;
+  border: 2px solid #3a2410;
+  color: #2a1c0e;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+}
+
+html.board-skin #minimap {
+  border: 3px solid #3a2410;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  background: #2a160a;
+}
+
+html.board-skin .phone-tray,
+html.board-skin .phone-bar,
+html.board-skin .phone-menu-sheet,
+html.board-skin .mobile-shell {
+  background: linear-gradient(#5a3418, #3d2110);
+  color: #f4e6c0;
+  border-color: #1a1008;
+}
+
+html.board-skin .phone-tray button,
+html.board-skin .phone-bar button {
+  background: linear-gradient(#d4a574, #8b5a2b);
+  color: #1a1008;
+  border: 1px solid #3a2410;
+}
+
+html.board-skin .victory-overlay h1,
+html.board-skin .handoff-overlay h2 {
+  font-family: Cinzel, serif;
+  color: #2a1c0e;
+}
+
+html.board-skin .lobby-container.modern,
+html.board-skin .purchase-panel:not(.hidden),
+html.board-skin .tech-popup:not(.hidden) {
+  animation: board-rise 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes board-rise {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+html.board-skin .combat-popup:not(.hidden):not(.minimized) {
+  animation: board-combat-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes board-combat-in {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(0.98); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+html.board-skin .mp-menu-card,
+html.board-skin .mp-game-item,
+html.board-skin .mp-identity-box,
+html.board-skin .auth-tab,
+html.board-skin .mp-primary-btn,
+html.board-skin .auth-back-btn,
+html.board-skin .phone-menu-row,
+html.board-skin .phone-menu-sheet {
+  background: linear-gradient(#efe0b8, #d8c08a);
+  border: 2px solid #3a2410;
+  color: #2a1c0e;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 3px 0 #2a160a;
+}
+
+html.board-skin .mp-primary-btn,
+html.board-skin .mp-game-join {
+  background: linear-gradient(#c45c26, #8b1e1e);
+  color: #f4e6c0;
+  font-family: Cinzel, serif;
+  font-weight: 700;
+}
+
+html.board-skin .mp-card-content h3,
+html.board-skin .mp-form-header h2,
+html.board-skin .mp-section-title,
+html.board-skin .mp-welcome,
+html.board-skin .phone-menu-title,
+html.board-skin .phone-menu-wordmark {
+  color: #2a1c0e;
+  font-family: Cinzel, serif;
+}
+
+html.board-skin .mp-card-content p,
+html.board-skin .mp-game-players,
+html.board-skin .mp-user-id,
+html.board-skin .mp-no-games,
+html.board-skin .mp-field label {
+  color: #5a4630;
+}
+
+html.board-skin .modern-input,
+html.board-skin .mp-field input {
+  background: #fff8e4;
+  border: 1px solid #8a6a32;
+  color: #2a1c0e;
+}
+
+html.board-skin .phone-menu-sheet {
+  background:
+    linear-gradient(180deg, rgba(243, 230, 196, 0.98), rgba(228, 208, 160, 0.98)),
+    url('assets/board/parchment.svg');
+}
+
+html.board-skin .phone-menu-row:hover,
+html.board-skin .mp-menu-card:hover {
+  border-color: #5c1212;
+}
+
+html.board-skin .hud-mobile-player.current {
+  outline: 2px solid #c4a36a;
+}
+
+html.board-skin .pu-card,
+html.board-skin .purchase-unit,
+html.board-skin .pp-unit,
+html.board-skin .pl-unit,
+html.board-skin .placement-unit {
+  background: #fff8e4;
+  border: 1px solid #8a6a32;
+  border-radius: 4px;
+  color: #2a1c0e;
+}
+
+@media (max-width: 820px) {
+  html.board-skin .lobby-overlay.modern {
+    flex-direction: column;
+  }
+
+  html.board-skin .lobby-overlay.modern::before {
+    min-height: 28vh;
+    min-width: 100%;
+    flex: 0 0 28vh;
+  }
+
+  html.board-skin .lobby-container.modern {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border-left: 0;
+    border-top: 8px solid #3a2410;
+  }
+
+  #exp-banner {
+    right: auto;
+    left: 8px;
+    font-size: 9px;
+    max-width: calc(100vw - 16px);
+  }
+}
