@@ -817,19 +817,20 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
   }
 
   html.board-skin.mobile-shell #hud.table-rail {
-    padding-right: 210px !important;
+    padding-right: 168px !important;
     gap: 6px !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    align-items: center !important;
   }
 
   html.board-skin.mobile-shell #hud.table-rail .hud-menu-container,
   html.board-skin.mobile-shell #hud.table-rail .hud-menu-btn,
   html.board-skin.mobile-shell #hud.table-rail .hud-menu-btn.rail-stamp {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-    max-height: 44px !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
     padding: 0 !important;
     margin: 0 !important;
     display: flex !important;
@@ -837,6 +838,9 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
     justify-content: center !important;
     overflow: visible !important;
     flex-shrink: 0 !important;
+    align-self: center !important;
+    position: relative !important;
+    top: 0 !important;
   }
 
   html.board-skin.mobile-shell #exp-banner,
@@ -889,7 +893,7 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
   }
 
   html.board-skin.mobile-shell .rail-seat-name {
-    max-width: 8em;
+    max-width: 9.5em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
