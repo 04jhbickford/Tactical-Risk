@@ -59,7 +59,7 @@ export class Lobby {
     console.log('[Lobby] _create() called');
     this.el = document.createElement('div');
     this.el.id = 'lobby';
-    this.el.className = 'lobby-overlay modern';
+    this.el.className = 'lobby-overlay board-table';
     console.log('[Lobby] Element created, calling _render()');
     this._render();
     console.log('[Lobby] _render() complete, appending to body');
@@ -86,11 +86,13 @@ export class Lobby {
     }
 
     this.el.innerHTML = `
-      <div class="lobby-container modern${phone ? ' lobby-phone' : ''}">
+      <div class="board-table-scene">
+      <div class="lobby-container board-table${phone ? ' lobby-phone' : ''}">
         <div class="lobby-bg-pattern"></div>
         <div class="lobby-content-wrapper${phone ? ' lobby-phone-wrap' : ''}">
           ${content}
         </div>
+      </div>
       </div>
     `;
 
@@ -199,7 +201,7 @@ export class Lobby {
     const currentTeam = this.playerTeams[faction.id] || null;
 
     return `
-      <div class="player-card modern lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
+      <div class="player-card board-table lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
         <div class="lobby-phone-faction-main">
           <div class="player-avatar" style="border-color: ${currentColor?.color || faction.color}">
             <img src="assets/flags/${faction.flag}" alt="${faction.name}">
@@ -312,7 +314,7 @@ export class Lobby {
                 <span class="toggle-text">Teams</span>
               </label>
             </div>
-            <div class="player-grid modern">
+            <div class="player-grid board-table">
               ${factions.map((p, i) => this._renderPlayerCard(p, i)).join('')}
             </div>
           </div>
@@ -353,7 +355,7 @@ export class Lobby {
     const currentTeam = this.playerTeams[faction.id] || null;
 
     return `
-      <div class="player-card modern ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
+      <div class="player-card board-table ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
         <div class="player-card-top">
           <div class="player-avatar" style="border-color: ${currentColor?.color || faction.color}">
             <img src="assets/flags/${faction.flag}" alt="${faction.name}">
@@ -363,7 +365,7 @@ export class Lobby {
           </div>
         </div>
         <div class="player-card-body">
-          <input type="text" class="player-name-input modern"
+          <input type="text" class="player-name-input board-table">
                  data-player="${faction.id}"
                  placeholder="${faction.name}"
                  value="${this.playerNames[faction.id] || (isSelected ? faction.name : '')}"
@@ -522,7 +524,7 @@ export class Lobby {
     });
 
     // Player cards
-    this.el.querySelectorAll('.player-card.modern').forEach(card => {
+    this.el.querySelectorAll('.player-card.board-table, .player-card.modern').forEach(card => {
       card.addEventListener('click', (e) => {
         if (e.target.closest('.player-name-input')) return;
         if (e.target.closest('.ai-select')) return;

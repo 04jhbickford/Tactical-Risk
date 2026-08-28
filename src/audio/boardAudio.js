@@ -12,7 +12,7 @@ function audio() {
     if (!AC) return null;
     ctx = new AC();
     master = ctx.createGain();
-    master.gain.value = 0.22;
+    master.gain.value = 0.48;
     master.connect(ctx.destination);
   }
   return ctx;
@@ -102,14 +102,19 @@ export function playBoardSound(kind) {
       noise(0.08, 0.12, 200, 900);
       break;
     case 'dice':
-      noise(0.09, 0.16, 600, 3500);
-      tone(180 + Math.random() * 40, 'square', 0.06, 0.08, 0.001);
-      setTimeout(() => noise(0.07, 0.12, 700, 3200), 40);
-      setTimeout(() => tone(140, 'triangle', 0.08, 0.1, 0.002), 90);
+      noise(0.1, 0.28, 600, 3500);
+      tone(180 + Math.random() * 40, 'square', 0.07, 0.16, 0.001);
+      setTimeout(() => noise(0.08, 0.2, 700, 3200), 40);
+      setTimeout(() => tone(140, 'triangle', 0.09, 0.16, 0.002), 90);
+      break;
+    case 'plastic':
+      tone(210 + Math.random() * 40, 'triangle', 0.09, 0.22, 0.002);
+      noise(0.07, 0.14, 500, 2200);
+      tone(90, 'sine', 0.08, 0.12, 0.001);
       break;
     case 'move':
-      tone(196, 'sine', 0.14, 0.1, 0.01);
-      noise(0.1, 0.06, 300, 900);
+      tone(196, 'sine', 0.14, 0.16, 0.01);
+      noise(0.1, 0.1, 300, 900);
       break;
     case 'combat':
       tone(70, 'sine', 0.22, 0.32, 0.003);
@@ -149,8 +154,8 @@ export function playBoardSound(kind) {
 
 export function playActionSound(type) {
   const map = {
-    move: 'move',
-    ncm: 'move',
+    move: 'plastic',
+    ncm: 'plastic',
     attack: 'combat',
     combat: 'hit',
     'combat-summary': 'hit',

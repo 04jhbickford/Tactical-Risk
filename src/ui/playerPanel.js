@@ -379,7 +379,7 @@ export class PlayerPanel {
     // Create panel element
     this.el = document.getElementById('sidebar');
     this.el.innerHTML = '';
-    this.el.className = 'player-panel hidden';
+    this.el.className = 'player-panel felt-cards hidden';
 
     // Create content wrapper
     this.contentEl = document.createElement('div');

@@ -62,13 +62,14 @@ export class AuthScreen {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'auth-screen';
-    this.el.className = 'lobby-overlay modern';
+    this.el.className = 'lobby-overlay board-table';
     document.body.appendChild(this.el);
   }
 
   _render() {
     const html = `
-      <div class="lobby-container modern">
+      <div class="board-table-scene">
+      <div class="lobby-container board-table">
         <div class="lobby-bg-pattern"></div>
         <div class="lobby-content-wrapper">
           <div class="auth-container">
@@ -95,6 +96,7 @@ export class AuthScreen {
             </button>
           </div>
         </div>
+      </div>
       </div>
     `;
 

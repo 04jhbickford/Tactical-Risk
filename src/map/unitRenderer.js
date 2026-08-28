@@ -3,6 +3,7 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { isMobileShell, phoneUnitIconSize, shouldHideUnitsAtZoom } from '../ui/mobileShell.js';
 import { isBoardSkin } from '../ui/boardSkin.js';
+import { drawPlasticSculpt } from './plasticSculpts.js';
 
 export class UnitRenderer {
   constructor(gameState, territories, unitDefs) {
@@ -527,6 +528,32 @@ export class UnitRenderer {
   }
 
   _drawUnitIcon(ctx, x, y, size, unitType, color, factionId, isOnCarrier = false, isOnTransport = false, damaged = 0, isFlying = false, highlight = false) {
+    if (isBoardSkin()) {
+      drawPlasticSculpt(ctx, x, y, size + 6, unitType, color, { highlight, damaged });
+      if (isOnCarrier || isOnTransport) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(42, 28, 14, 0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x - size * 0.45, y + size * 0.52);
+        ctx.lineTo(x + size * 0.45, y + size * 0.52);
+        ctx.stroke();
+        ctx.restore();
+      }
+      if (isFlying) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(90, 70, 40, 0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x - size * 0.28, y - size * 0.58);
+        ctx.lineTo(x, y - size * 0.72);
+        ctx.lineTo(x + size * 0.28, y - size * 0.58);
+        ctx.stroke();
+        ctx.restore();
+      }
+      return;
+    }
+
     const img = this._getUnitImage(unitType, factionId);
 
     ctx.save();
@@ -534,20 +561,6 @@ export class UnitRenderer {
     // Draw colored background circle/square
     const bgSize = size + 4;
     ctx.fillStyle = color;
-
-    if (isBoardSkin()) {
-      ctx.fillStyle = 'rgba(20, 12, 6, 0.35)';
-      ctx.beginPath();
-      ctx.ellipse(x, y + bgSize * 0.46, bgSize * 0.48, bgSize * 0.16, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.ellipse(x, y + bgSize * 0.34, bgSize * 0.42, bgSize * 0.14, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(26, 16, 8, 0.55)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
 
     // Add indicator for units on carriers/transports
     if (isOnCarrier || isOnTransport) {

@@ -255,7 +255,7 @@ export class TerritoryRenderer {
       if (skin) {
         const owner = this.gameState?.getOwner?.(t.name);
         const player = owner ? this.gameState.getPlayer(owner) : null;
-        color = player?.color ? hexToRgba(player.color, 0.58) : PARCHMENT_LAND;
+        color = player?.color ? hexToRgba(player.color, 0.42) : PARCHMENT_LAND;
         alpha = 1;
       }
 
@@ -482,7 +482,9 @@ export class TerritoryRenderer {
     if (zoom > 0.6) return; // Only show when zoomed out
 
     const fontSize = Math.max(18, Math.min(28, 24 / zoom * 0.4));
-    ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
+    ctx.font = isBoardSkin()
+      ? `700 ${fontSize}px Cinzel, Palatino, serif`
+      : `bold ${fontSize}px 'Segoe UI', sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
@@ -513,14 +515,16 @@ export class TerritoryRenderer {
       ctx.lineJoin = 'round';
       ctx.strokeText(continent.name, cx, cy);
 
-      ctx.fillStyle = continent.color;
+      ctx.fillStyle = isBoardSkin() ? '#2A1C0E' : continent.color;
       ctx.fillText(continent.name, cx, cy);
 
       // Bonus indicator below name
       const smallSize = fontSize * 0.6;
-      ctx.font = `${smallSize}px 'Segoe UI', sans-serif`;
+      ctx.font = isBoardSkin()
+        ? `600 ${smallSize}px Cinzel, Palatino, serif`
+        : `${smallSize}px 'Segoe UI', sans-serif`;
       ctx.strokeText(`+${continent.bonus}`, cx, cy + fontSize * 0.8);
-      ctx.fillStyle = '#ffd700';
+      ctx.fillStyle = isBoardSkin() ? '#6B4A22' : '#ffd700';
       ctx.fillText(`+${continent.bonus}`, cx, cy + fontSize * 0.8);
 
       ctx.restore();

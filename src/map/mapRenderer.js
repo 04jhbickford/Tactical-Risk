@@ -71,8 +71,9 @@ export class MapRenderer {
     const skin = isBoardSkin();
     if (skin) ctx.filter = MAP_FILTER;
 
-    // Draw the small map as a base layer so any missing tile gaps show correct ocean
-    if (this.smallMap) {
+    // Printed board: keep the A&A tiles, but skip the teal thumbnail underlay
+    // so letterbox / gaps read as table wood instead of V2.80 ocean.
+    if (this.smallMap && !skin) {
       ctx.drawImage(this.smallMap, 0, 0, MAP_WIDTH, MAP_HEIGHT);
     }
 

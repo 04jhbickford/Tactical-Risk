@@ -61,7 +61,7 @@ export class MultiplayerLobby {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'multiplayer-lobby';
-    this.el.className = 'lobby-overlay modern hidden';
+    this.el.className = 'lobby-overlay board-table hidden';
     this.el.addEventListener('click', (e) => this._onOverlayClick(e));
     document.body.appendChild(this.el);
   }
@@ -204,18 +204,20 @@ export class MultiplayerLobby {
     const tagline = this.mode === 'lobby' ? 'Game Lobby' : 'Online Multiplayer';
 
     this.el.innerHTML = `
-      <div class="lobby-container modern">
+      <div class="board-table-scene">
+      <div class="lobby-container board-table">
         <div class="lobby-bg-pattern"></div>
         <div class="lobby-content-wrapper">
           <div class="mp-lobby-container">
             <div class="lobby-brand mp-brand">
               <h1 class="lobby-logo">Tactical Risk</h1>
               <p class="lobby-tagline">${tagline}</p>
-              <span class="lobby-version-badge">${GAME_VERSION}</span>
+              <span class="lobby-version-badge">${GAME_VERSION} · experiment</span>
             </div>
             ${content}
           </div>
         </div>
+      </div>
       </div>
     `;
 

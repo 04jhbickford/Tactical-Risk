@@ -71,7 +71,7 @@ export class GameList {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'game-list';
-    this.el.className = 'lobby-overlay modern';
+    this.el.className = 'lobby-overlay board-table';
     document.body.appendChild(this.el);
   }
 
@@ -254,7 +254,8 @@ export class GameList {
     }
 
     this.el.innerHTML = `
-      <div class="lobby-container modern">
+      <div class="board-table-scene">
+      <div class="lobby-container board-table">
         <div class="lobby-bg-pattern"></div>
         <div class="lobby-content-wrapper">
           <div class="mp-lobby-container">
@@ -276,6 +277,7 @@ export class GameList {
             </div>
           </div>
         </div>
+      </div>
       </div>
     `;
 

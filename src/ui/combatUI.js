@@ -54,7 +54,7 @@ export class CombatUI {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'combatPopup';
-    this.el.className = 'combat-popup board-combat hidden';
+    this.el.className = 'combat-popup board-combat board-dice-tray hidden';
     document.body.appendChild(this.el);
   }
 

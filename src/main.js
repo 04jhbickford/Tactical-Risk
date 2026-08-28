@@ -53,7 +53,8 @@ import { TurnSummaryModal } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
 import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
-import { initBoardSkin, attachBoardActionSounds } from './ui/boardSkin.js';
+import { initBoardSkin, attachBoardActionSounds, isBoardSkin, TABLE_WOOD } from './ui/boardSkin.js';
+import { setBoardMotionContext, liftPiecesOffTile } from './ui/boardMotion.js';
 import {
   shouldHidePhoneTooltipOn,
   shouldToggleOffPhoneTooltip,
@@ -178,6 +179,14 @@ async function init() {
   const mapRenderer = new MapRenderer();
   const territoryRenderer = new TerritoryRenderer(territories, continents);
   const territoryMap = new TerritoryMap(territories);
+  setBoardMotionContext({
+    camera,
+    canvas,
+    getCenter: (name) => {
+      const t = territoryRenderer.territoryByName[name];
+      return t ? territoryRenderer._getTerritoryCenter(t) : null;
+    },
+  });
 
   function resizeCanvas() {
     const dpr = devicePixelRatio || 1;
@@ -1541,6 +1550,9 @@ async function init() {
       if (t && t.center) {
         camera.panTo(t.center[0], t.center[1]);
       }
+      const owner = gameState?.getOwner?.(territory);
+      const color = owner ? gameState.getPlayer(owner)?.color : '#8B1A1A';
+      liftPiecesOffTile(territory, color);
     });
     // Air landing happens after each combat via player panel inline UI
     combatUI.setOnAirLandingRequired((data) => {
@@ -2445,7 +2457,7 @@ async function init() {
       const dpr = devicePixelRatio || 1;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#3CC0BF';
+      ctx.fillStyle = isBoardSkin() ? TABLE_WOOD : '#3CC0BF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       camera.applyTransform(ctx);

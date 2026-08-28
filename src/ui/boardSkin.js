@@ -2,11 +2,13 @@
 
 import { GAME_VERSION } from '../version.js';
 import { playActionSound, playBoardSound, unlockBoardAudio, setBoardAudioMuted, isBoardAudioMuted } from '../audio/boardAudio.js';
+import { flyTableToken, liftPiecesOffTile } from './boardMotion.js';
 
-export const MAP_FILTER = 'sepia(0.42) saturate(0.62) contrast(1.08) brightness(1.1)';
+export const MAP_FILTER = 'sepia(0.55) saturate(0.38) contrast(1.12) brightness(1.14) hue-rotate(-8deg)';
 export const OCEAN_PARCHMENT = '#5C7382';
+export const TABLE_WOOD = '#4A2A14';
 export const INK = 'rgba(32, 20, 10, 0.92)';
-export const PARCHMENT_LAND = 'rgba(236, 218, 172, 0.5)';
+export const PARCHMENT_LAND = 'rgba(236, 218, 172, 0.78)';
 
 export function isBoardSkin() {
   return document.documentElement.classList.contains('board-skin');
@@ -41,11 +43,14 @@ function ensureBanner() {
     setBoardAudioMuted(!isBoardAudioMuted());
     btn.textContent = isBoardAudioMuted() ? 'Sound off' : 'Sound on';
     btn.classList.toggle('muted', isBoardAudioMuted());
+    if (!isBoardAudioMuted()) playBoardSound('dice');
   });
 }
 
 function bindTableFeel() {
-  document.addEventListener('pointerdown', () => unlockBoardAudio(), { once: true });
+  const unlock = () => unlockBoardAudio();
+  document.addEventListener('pointerdown', unlock, true);
+  document.addEventListener('keydown', unlock, true);
 
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('button, .lobby-menu-card, .lobby-phone-card, .player-card, .mp-color-btn');
@@ -76,6 +81,16 @@ export function attachBoardActionSounds(actionLog) {
   const original = actionLog.log.bind(actionLog);
   actionLog.log = (type, data) => {
     playActionSound(type);
+    const from = data?.from;
+    const to = data?.to;
+    const color = data?.color || '#8B1A1A';
+    if ((type === 'move' || type === 'ncm' || type === 'mobilize') && from && to) {
+      flyTableToken(from, to, color, 'move');
+    } else if (type === 'attack' && from && to) {
+      flyTableToken(from, to, color, 'combat');
+    } else if (type === 'combat' || type === 'combat-summary') {
+      liftPiecesOffTile(data?.territory, color);
+    }
     return original(type, data);
   };
 }

@@ -1,12 +1,55 @@
 /* V3.00-exp analog board-game skin. Visual only. Isolated to html.board-skin. */
 
+/* FAIL-bar kill-switch. Production style.css cannot win these. */
 html.board-skin,
 html.board-skin body {
   background:
     linear-gradient(180deg, rgba(20, 12, 6, 0.28), rgba(20, 12, 6, 0.12)),
-    url('assets/board/wood.svg') center / 380px 380px repeat;
+    url('assets/board/wood.svg') center / 380px 380px repeat !important;
   color: #2a1c0e;
   font-family: 'Source Serif 4', Palatino, 'Palatino Linotype', Georgia, serif;
+}
+
+html.board-skin .lobby-overlay::before,
+html.board-skin .lobby-overlay.modern::before,
+html.board-skin .lobby-overlay.board-table::before,
+html.board-skin .lobby-overlay::after,
+html.board-skin .lobby-overlay.modern::after,
+html.board-skin .lobby-overlay.board-table::after {
+  display: none !important;
+  background: none !important;
+  background-image: none !important;
+  content: none !important;
+  flex: 0 0 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html.board-skin .lobby-overlay,
+html.board-skin .lobby-overlay.modern,
+html.board-skin .lobby-overlay.board-table {
+  background:
+    linear-gradient(180deg, rgba(20, 12, 6, 0.22), rgba(20, 12, 6, 0.08)),
+    url('assets/board/wood.svg') center / 380px 380px repeat !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+html.board-skin #hud,
+html.board-skin.mobile-shell #hud,
+html.mobile-shell.board-skin #hud {
+  height: 56px !important;
+  min-height: 56px !important;
+  background:
+    linear-gradient(180deg, rgba(244, 230, 192, 0.16), transparent 40%),
+    linear-gradient(#5a3418, #3d2110) !important;
+  border-bottom: 3px solid #1a1008 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #f3e2b0 !important;
 }
 
 html.board-skin ::-webkit-scrollbar-track {
@@ -57,13 +100,14 @@ html.board-skin #mapCanvas {
 
 .exp-audio-toggle {
   margin-left: 4px;
-  padding: 2px 7px;
+  padding: 3px 9px;
   background: #f0d8a8;
   color: #3a1f0c;
   border: 1px solid #3a1f0c;
   border-radius: 3px;
-  font: 600 10px Cinzel, serif;
+  font: 700 11px Cinzel, serif;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 2px 0 #3a100c;
 }
 
 .exp-audio-toggle.muted {
@@ -96,7 +140,7 @@ html.board-skin .hud-title::after {
 }
 
 html.board-skin #hud-clarity {
-  top: 52px;
+  top: 56px;
   background: rgba(42, 24, 10, 0.88);
   border-bottom: 1px solid #8a6a32;
   color: #f0d8a8;
@@ -164,22 +208,29 @@ html.board-skin .hud-menu-item:hover {
   background: rgba(139, 30, 30, 0.12);
 }
 
-html.board-skin .lobby-overlay.modern {
-  background: #2a160a;
+html.board-skin .board-table-scene {
+  width: min(560px, 94vw);
+  max-height: 92vh;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
 }
 
-html.board-skin .lobby-overlay.modern::before {
-  background:
-    linear-gradient(90deg, rgba(42, 22, 10, 0.15), rgba(42, 22, 10, 0.55)),
-    url('assets/board/war-table.svg') center / cover no-repeat;
-}
-
-html.board-skin .lobby-container.modern {
+html.board-skin .lobby-container,
+html.board-skin .lobby-container.modern,
+html.board-skin .lobby-container.board-table {
+  width: min(560px, 94vw) !important;
+  min-width: 0 !important;
+  max-width: 560px !important;
+  height: auto !important;
+  max-height: 92vh !important;
   background:
     linear-gradient(180deg, rgba(243, 230, 196, 0.97), rgba(232, 213, 168, 0.98)),
-    url('assets/board/parchment.svg');
-  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
-  border-left: 8px solid #3a2410;
+    url('assets/board/parchment.svg') !important;
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45), inset 0 0 0 1px #c4a36a !important;
+  border: 8px solid #3a2410 !important;
+  border-radius: 8px !important;
+  overflow: auto !important;
 }
 
 html.board-skin .lobby-bg-pattern {
@@ -216,6 +267,7 @@ html.board-skin .lobby-menu-card,
 html.board-skin .lobby-phone-card,
 html.board-skin .lobby-saved-games-btn,
 html.board-skin .player-card.modern,
+html.board-skin .player-card.board-table,
 html.board-skin .start-game-btn,
 html.board-skin .mp-create-btn,
 html.board-skin .mp-join-btn {
@@ -230,7 +282,8 @@ html.board-skin .mp-join-btn {
 html.board-skin .lobby-menu-card:hover,
 html.board-skin .lobby-phone-card:hover,
 html.board-skin .lobby-saved-games-btn:hover,
-html.board-skin .player-card.modern:hover {
+html.board-skin .player-card.modern:hover,
+html.board-skin .player-card.board-table:hover {
   transform: translateY(-1px);
   border-color: #5c1212;
   box-shadow: inset 0 1px 0 #fff4d4, 0 6px 0 #2a160a, 0 10px 20px rgba(0, 0, 0, 0.25);
@@ -281,12 +334,14 @@ html.board-skin .lobby-phone-logo {
   color: #2a1c0e;
 }
 
-html.board-skin .player-card.modern.selected {
+html.board-skin .player-card.modern.selected,
+html.board-skin .player-card.board-table.selected {
   outline: 3px solid #8b1e1e;
   background: linear-gradient(#f6e8c4, #e0c888);
 }
 
 html.board-skin .player-name-input.modern,
+html.board-skin .player-name-input.board-table,
 html.board-skin .ai-select.modern,
 html.board-skin .modern-select,
 html.board-skin input,
@@ -335,7 +390,6 @@ html.board-skin .game-list {
   color: #2a1c0e;
 }
 
-html.board-skin .combat-popup,
 html.board-skin .purchase-panel,
 html.board-skin .tech-popup,
 html.board-skin .placement-panel,
@@ -355,20 +409,39 @@ html.board-skin .rules-panel {
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45), inset 0 0 0 1px #c4a36a;
 }
 
-html.board-skin .combat-popup {
+html.board-skin .combat-popup,
+html.board-skin .combat-popup.board-combat,
+html.board-skin .combat-popup.board-dice-tray {
+  position: fixed !important;
+  top: auto !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: 14px !important;
+  transform: translateX(-50%) !important;
+  width: min(920px, 96vw) !important;
+  max-width: min(920px, 96vw) !important;
+  max-height: 46vh !important;
   background:
-    linear-gradient(180deg, rgba(80, 28, 24, 0.12), transparent 30%),
-    linear-gradient(180deg, rgba(244, 230, 192, 0.97), rgba(228, 208, 160, 0.98)),
-    url('assets/board/felt.svg');
+    linear-gradient(180deg, rgba(40, 16, 12, 0.18), transparent 28%),
+    url('assets/board/felt.svg') center / 160px 160px repeat !important;
+  border: 6px solid #3a2410 !important;
+  border-radius: 14px 14px 8px 8px !important;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 2px #6a2a22 !important;
+  color: #f4e6c0 !important;
 }
 
 html.board-skin .combat-popup.minimized,
 html.board-skin .purchase-panel.minimized,
 html.board-skin .tech-popup.minimized {
-  transform: none;
+  transform: none !important;
 }
 
 html.board-skin .combat-title,
+html.board-skin .board-dice-tray .combat-title {
+  font-family: Cinzel, serif;
+  color: #f4e6c0 !important;
+}
+
 html.board-skin .tech-title,
 html.board-skin .pl-header,
 html.board-skin .pp-title {
@@ -377,6 +450,10 @@ html.board-skin .pp-title {
 }
 
 html.board-skin .combat-remaining,
+html.board-skin .board-dice-tray .combat-remaining {
+  color: #f0d8a8 !important;
+}
+
 html.board-skin .tech-player,
 html.board-skin .pp-instructions {
   color: #5a4630;
@@ -422,6 +499,15 @@ html.board-skin .pp-actions button:hover {
 html.board-skin .board-pressed {
   transform: translateY(2px);
   box-shadow: inset 0 1px 0 #f0d8b0, 0 1px 0 #2a160a;
+}
+
+html.board-skin .board-dice-tray .combat-forces,
+html.board-skin .board-dice-tray .combat-result,
+html.board-skin .board-dice-tray .combat-forces-header,
+html.board-skin .board-dice-tray .combat-forces-expanded {
+  background: rgba(20, 10, 8, 0.35) !important;
+  border: 1px solid #8a6a32 !important;
+  color: #f4e6c0 !important;
 }
 
 html.board-skin .combat-forces,
@@ -538,6 +624,7 @@ html.board-skin .handoff-overlay h2 {
   color: #2a1c0e;
 }
 
+html.board-skin .lobby-container.board-table,
 html.board-skin .lobby-container.modern,
 html.board-skin .purchase-panel:not(.hidden),
 html.board-skin .tech-popup:not(.hidden) {
@@ -550,12 +637,12 @@ html.board-skin .tech-popup:not(.hidden) {
 }
 
 html.board-skin .combat-popup:not(.hidden):not(.minimized) {
-  animation: board-combat-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: board-tray-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@keyframes board-combat-in {
-  from { opacity: 0; transform: translate(-50%, -46%) scale(0.98); }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@keyframes board-tray-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 html.board-skin .mp-menu-card,
@@ -786,23 +873,70 @@ html.board-skin .pp-end-phase {
   box-shadow: inset 0 1px 0 #f0d8b0, 0 3px 0 #2a160a;
 }
 
+html.board-skin #sidebar.player-panel.felt-cards,
+html.board-skin .player-panel.felt-cards {
+  background:
+    linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
+    url('assets/board/felt.svg') center / 140px 140px repeat !important;
+  border-left: 8px solid #3a2410 !important;
+  color: #f4e6c0 !important;
+}
+
+html.board-skin .felt-cards .pp-header.compact {
+  background: transparent !important;
+  border-bottom: 2px solid #8a6a32;
+}
+
+html.board-skin .felt-cards .pp-unit-row,
+html.board-skin .felt-cards .pp-unit,
+html.board-skin .felt-cards .pl-unit-row,
+html.board-skin .felt-cards .pu-card {
+  background: linear-gradient(#efe0b8, #d8c08a) !important;
+  border: 2px solid #3a2410 !important;
+  color: #2a1c0e !important;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 3px 0 #2a160a;
+}
+
+.board-fly-token {
+  position: fixed;
+  width: 22px;
+  height: 28px;
+  border-radius: 4px 4px 6px 6px;
+  border: 2px solid rgba(26, 16, 8, 0.7);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  z-index: 400;
+  pointer-events: none;
+  transition: transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 380ms ease;
+}
+
+.board-fly-lift {
+  transition-duration: 420ms;
+}
+
 @media (max-width: 820px) {
-  html.board-skin .lobby-overlay.modern {
-    flex-direction: column;
-  }
-
-  html.board-skin .lobby-overlay.modern::before {
-    min-height: 28vh;
-    min-width: 100%;
-    flex: 0 0 28vh;
-  }
-
+  html.board-skin .board-table-scene,
+  html.board-skin .lobby-container.board-table,
   html.board-skin .lobby-container.modern {
-    width: 100%;
-    min-width: 0;
-    max-width: none;
-    border-left: 0;
-    border-top: 8px solid #3a2410;
+    width: min(560px, 94vw) !important;
+    min-width: 0 !important;
+    max-width: 94vw !important;
+  }
+
+  html.board-skin .combat-popup,
+  html.board-skin .combat-popup.board-dice-tray {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+    max-height: 40vh !important;
+  }
+
+  html.board-skin.mobile-shell .player-panel.felt-cards,
+  html.mobile-shell.board-skin .player-panel.felt-cards,
+  html.board-skin.mobile-shell #sidebar.player-panel.felt-cards {
+    background:
+      linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
+      url('assets/board/felt.svg') center / 140px 140px repeat !important;
+    border-top: 4px solid #3a2410 !important;
+    color: #f4e6c0 !important;
   }
 
   #exp-banner {
