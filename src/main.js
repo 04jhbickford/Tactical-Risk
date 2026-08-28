@@ -54,7 +54,7 @@ import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
 import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
 import { initBoardSkin, attachBoardActionSounds, isBoardSkin, TABLE_WOOD } from './ui/boardSkin.js';
-import { setBoardMotionContext, liftPiecesOffTile } from './ui/boardMotion.js';
+import { setBoardMotionContext, setSculptMotion, liftPiecesOffTile } from './ui/boardMotion.js';
 import {
   shouldHidePhoneTooltipOn,
   shouldToggleOffPhoneTooltip,
@@ -1466,6 +1466,7 @@ async function init() {
     territoryRenderer.setGameState(gameState);
     continentPanel.setGameState(gameState);
     unitRenderer = new UnitRenderer(gameState, territories, unitDefs);
+    setSculptMotion(unitRenderer);
 
     // Purchase popup
     purchasePopup.setGameState(gameState);
@@ -2442,6 +2443,8 @@ async function init() {
   // Render loop
   function render() {
     camera.update();
+
+    if (unitRenderer?.hasActiveSlides?.()) camera.dirty = true;
 
     if (unitRenderer) {
       const nextHighlight = isMobileShell() ? playerPanel.selectedUnitType : null;

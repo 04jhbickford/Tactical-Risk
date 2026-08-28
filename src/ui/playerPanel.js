@@ -792,6 +792,21 @@ export class PlayerPanel {
     }
 
     let html = '';
+    this.el.classList.toggle('table-edge-card', isBoardSkin());
+
+    if (isBoardSkin()) {
+      this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
+      html += this._renderActionsTab(phase, turnPhase, player);
+      const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn, isOwnSeat);
+      if (bottomActions) html += bottomActions;
+      const list = this.contentEl.querySelector('.pp-unit-list');
+      if (list) this._unitListScrollTop = list.scrollTop;
+      this.contentEl.innerHTML = html;
+      this._bindEvents();
+      const restored = this.contentEl.querySelector('.pp-unit-list');
+      if (restored) restored.scrollTop = this._unitListScrollTop || 0;
+      return;
+    }
 
     // Phone: same Actions / placement / tab HTML, different regions.
     // Default is a peek detent (hint + icon row + one CTA). Expand

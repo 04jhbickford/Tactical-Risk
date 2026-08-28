@@ -24,6 +24,7 @@ export class UnitRenderer {
 
     // Phone tray selection — gold halo on matching stacks. Desktop unused.
     this.highlightUnitType = null;
+    this.slides = [];
 
     // Load unit images per faction
     this.factionUnitImages = {}; // factionId -> { unitType -> Image }
@@ -108,6 +109,54 @@ export class UnitRenderer {
         // Land territory: render all units in flat grid
         this._renderUnitGrid(ctx, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, zoom);
       }
+    }
+    this._renderSlides(ctx, iconSize);
+  }
+
+  hasActiveSlides() {
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this.slides = (this.slides || []).filter((s) => now - s.start < s.dur);
+    return this.slides.length > 0;
+  }
+
+  slideSculpt(fromName, toName, unitType, color, kind = 'move') {
+    const fromT = this.territoryByName[fromName];
+    if (!fromT) return;
+    const [sx, sy] = this._getTerritoryCenter(fromT);
+    if (sx == null) return;
+    let ex = sx + 36;
+    let ey = sy - 70;
+    if (toName) {
+      const toT = this.territoryByName[toName];
+      if (toT) {
+        const dest = this._getTerritoryCenter(toT);
+        if (dest[0] != null) {
+          ex = dest[0];
+          ey = dest[1];
+        }
+      }
+    }
+    this.slides.push({
+      sx, sy, ex, ey,
+      type: unitType || 'infantry',
+      color: color || '#8B1A1A',
+      start: (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+      dur: kind === 'lift' ? 480 : 560,
+      kind,
+    });
+  }
+
+  _renderSlides(ctx, iconSize) {
+    if (!isBoardSkin()) return;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    this.slides = (this.slides || []).filter((s) => now - s.start < s.dur);
+    for (const s of this.slides) {
+      const t = Math.min(1, (now - s.start) / s.dur);
+      const ease = t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2;
+      const x = s.sx + (s.ex - s.sx) * ease;
+      const lift = s.kind === 'lift' ? -48 * Math.sin(t * Math.PI) : 0;
+      const y = s.sy + (s.ey - s.sy) * ease + lift;
+      drawPlasticSculpt(ctx, x, y, iconSize + 8, s.type, s.color, {});
     }
   }
 

@@ -102,6 +102,12 @@ export function initBoardSkin() {
   if (minimap) minimap.hidden = true;
   const zoom = document.getElementById('zoom-controls');
   if (zoom) zoom.remove();
+  const clarity = document.getElementById('hud-clarity');
+  if (clarity) {
+    clarity.hidden = true;
+    clarity.setAttribute('hidden', '');
+    clarity.innerHTML = '';
+  }
   ensureBanner();
   bindTableFeel();
 }

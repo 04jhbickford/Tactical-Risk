@@ -63,13 +63,20 @@ html.board-skin .hud-turn-order {
   display: none !important;
 }
 
-html.board-skin #hud-clarity {
-  top: 36px !important;
-  height: auto !important;
-  background: #efe0b8 !important;
-  color: #2a1c0e !important;
-  border-bottom: 2px solid #3a2410 !important;
-  font-family: 'Source Serif 4', Georgia, serif !important;
+html.board-skin #hud-clarity,
+html.board-skin .hud-clarity,
+html.board-skin #hud-clarity.your-turn,
+html.board-skin #hud-clarity.waiting {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
 }
 
 html.board-skin ::-webkit-scrollbar-track {
@@ -159,12 +166,15 @@ html.board-skin .hud-title::after {
   opacity: 0.7;
 }
 
-html.board-skin #hud-clarity {
-  top: 56px;
-  background: rgba(42, 24, 10, 0.88);
-  border-bottom: 1px solid #8a6a32;
-  color: #f0d8a8;
-  font-family: 'Source Serif 4', Georgia, serif;
+html.board-skin .rail-slip {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 12px/1.2 'Source Serif 4', Georgia, serif;
+  color: #efe0b8;
+  opacity: 0.85;
 }
 
 html.board-skin .hud-current-turn,
@@ -441,19 +451,19 @@ html.board-skin .combat-popup.board-combat,
 html.board-skin .combat-popup.board-dice-tray {
   position: fixed !important;
   top: auto !important;
-  left: 50% !important;
-  right: auto !important;
-  bottom: 14px !important;
-  transform: translateX(-50%) !important;
-  width: min(920px, 96vw) !important;
-  max-width: min(920px, 96vw) !important;
-  max-height: 46vh !important;
+  left: auto !important;
+  right: 12px !important;
+  bottom: 12px !important;
+  transform: none !important;
+  width: min(340px, 42vw) !important;
+  max-width: min(340px, 42vw) !important;
+  max-height: 34vh !important;
   background:
     linear-gradient(180deg, rgba(40, 16, 12, 0.18), transparent 28%),
     url('assets/board/felt.svg') center / 160px 160px repeat !important;
   border: 6px solid #3a2410 !important;
-  border-radius: 14px 14px 8px 8px !important;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5), inset 0 0 0 2px #6a2a22 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 8px 0 #1a1008, 0 14px 24px rgba(0, 0, 0, 0.4) !important;
   color: #f4e6c0 !important;
 }
 
@@ -575,12 +585,50 @@ html.board-skin .die-3d.rolling .die-face {
 html.board-skin #sidebar,
 html.board-skin .player-panel,
 html.board-skin .pp-panel,
-html.board-skin #playerPanel {
+html.board-skin #playerPanel,
+html.board-skin #sidebar.player-panel.table-edge-card,
+html.board-skin .player-panel.table-edge-card {
+  position: fixed !important;
+  top: auto !important;
+  right: auto !important;
+  left: 12px !important;
+  bottom: 12px !important;
+  width: min(300px, 40vw) !important;
+  max-width: min(300px, 40vw) !important;
+  height: auto !important;
+  max-height: 30vh !important;
   background:
-    linear-gradient(180deg, rgba(243, 230, 196, 0.96), rgba(228, 208, 160, 0.98)),
-    url('assets/board/parchment.svg');
-  border-left: 6px solid #3a2410;
-  color: #2a1c0e;
+    linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
+    url('assets/board/felt.svg') center / 140px 140px repeat !important;
+  border: 4px solid #3a2410 !important;
+  border-left: 4px solid #3a2410 !important;
+  color: #f4e6c0 !important;
+  box-shadow: 0 8px 0 #1a1008 !important;
+  overflow: auto !important;
+}
+
+html.board-skin #sidebar.player-panel--peek,
+html.board-skin #sidebar.player-panel--expanded,
+html.board-skin #sidebar.player-panel--place-tray,
+html.board-skin .player-panel--peek,
+html.board-skin .player-panel--expanded {
+  top: auto !important;
+  height: auto !important;
+  max-height: 30vh !important;
+}
+
+html.board-skin .table-edge-card .pp-header,
+html.board-skin .table-edge-card .pp-turn-badge,
+html.board-skin .table-edge-card .pp-tabs,
+html.board-skin .table-edge-card .pp-phase,
+html.board-skin .table-edge-card .pp-identity-bar {
+  display: none !important;
+}
+
+html.board-skin .pp-pstat-value,
+html.board-skin .pp-resources-inline,
+html.board-skin .pp-budget-total {
+  color: #efe0b8 !important;
 }
 
 html.board-skin .pp-header.compact {
@@ -664,12 +712,7 @@ html.board-skin .tech-popup:not(.hidden) {
 }
 
 html.board-skin .combat-popup:not(.hidden):not(.minimized) {
-  animation: board-tray-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes board-tray-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(24px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  animation: none;
 }
 
 html.board-skin .mp-menu-card,
@@ -925,20 +968,36 @@ html.board-skin .felt-cards .pu-card {
   box-shadow: inset 0 1px 0 #fff4d4, 0 3px 0 #2a160a;
 }
 
-.board-fly-token {
-  position: fixed;
-  width: 22px;
-  height: 28px;
-  border-radius: 4px 4px 6px 6px;
-  border: 2px solid rgba(26, 16, 8, 0.7);
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  z-index: 400;
-  pointer-events: none;
-  transition: transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1), opacity 380ms ease;
+.board-fly-token,
+.board-fly-lift {
+  display: none !important;
 }
 
-.board-fly-lift {
-  transition-duration: 420ms;
+html.board-skin .wood-die {
+  position: relative;
+  display: inline-block;
+  width: 26px;
+  height: 26px;
+  margin: 2px;
+  background: linear-gradient(#efe0b8, #d4b878);
+  border: 2px solid #3a2410;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 2px 0 #1a1008;
+  vertical-align: middle;
+}
+
+html.board-skin .wood-pip {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  background: #2a1c0e;
+  border-radius: 50%;
+}
+
+html.board-skin .board-dice-tray .die-3d,
+html.board-skin .board-dice-tray .die-3d .die-face {
+  animation: none !important;
+  transform: none !important;
 }
 
 @media (max-width: 820px) {
@@ -952,18 +1011,27 @@ html.board-skin .felt-cards .pu-card {
 
   html.board-skin .combat-popup,
   html.board-skin .combat-popup.board-dice-tray {
+    right: 8px !important;
+    left: auto !important;
+    transform: none !important;
+    width: min(240px, 46vw) !important;
+    max-width: 46vw !important;
     bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
-    max-height: 40vh !important;
+    max-height: 28vh !important;
   }
 
+  html.board-skin #sidebar,
+  html.board-skin .player-panel.table-edge-card,
   html.board-skin.mobile-shell .player-panel.felt-cards,
   html.mobile-shell.board-skin .player-panel.felt-cards,
   html.board-skin.mobile-shell #sidebar.player-panel.felt-cards {
-    background:
-      linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
-      url('assets/board/felt.svg') center / 140px 140px repeat !important;
+    left: 8px !important;
+    right: auto !important;
+    top: auto !important;
+    width: min(240px, 46vw) !important;
+    max-width: 46vw !important;
+    max-height: 28vh !important;
     border-top: 4px solid #3a2410 !important;
-    color: #f4e6c0 !important;
   }
 
   #exp-banner {

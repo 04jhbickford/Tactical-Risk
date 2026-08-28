@@ -205,6 +205,16 @@ export class HUD {
     const ipcs = inGame ? (this.gameState.getIPCs?.(player.id) ?? 0) : 0;
     const chips = inGame ? this._ipcChipRow(ipcs) : '';
 
+    if (this.clarityEl) {
+      this.clarityEl.hidden = true;
+      this.clarityEl.innerHTML = '';
+      this.clarityEl.setAttribute('hidden', '');
+    }
+    const c = inGame ? this._clarityModel() : null;
+    const slip = c
+      ? '<span class="rail-slip">' + (c.lastAction || '') + (c.click ? ' · ' + c.click : '') + '</span>'
+      : '';
+
     const seat = inGame
       ? (
         '<div class="rail-seat" style="--nation:' + player.color + '">'
@@ -212,6 +222,7 @@ export class HUD {
         + '<span class="rail-seat-name">' + player.name + '</span>'
         + '<span class="rail-phase">' + phaseName + '</span>'
         + '</div>'
+        + slip
         + '<div class="rail-bank" title="IPCs">' + chips + '<span class="rail-bank-count">' + ipcs + '</span></div>'
       )
       : '<span class="rail-idle">Tactical Risk</span>';
@@ -359,6 +370,12 @@ export class HUD {
 
   _renderClarity() {
     if (!this.clarityEl) return;
+    if (isBoardSkin()) {
+      this.clarityEl.hidden = true;
+      this.clarityEl.innerHTML = '';
+      this.clarityEl.setAttribute('hidden', '');
+      return;
+    }
     const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY;
     if (!inGame) {
       this.clarityEl.hidden = true;

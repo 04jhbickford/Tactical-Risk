@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp fourth chrome pass (preview only)
+
+James playtest of 272b820: lobby felt cards PASS; board FAIL. Kill #hud-clarity overlay (copy now in the wood rail). Actions sheet is a small table-edge card, not a tall sidebar. Combat docks as a felt tray with wood-pip dice. Canvas sculpts slide/place — no overlay chips. SCHEMA 11. V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp third chrome pass (preview only)
 
 Throw away SaaS leftover: lobby is faction cards on felt (no Local Play / Play Online menu). HUD is a 36px table-edge rail with IPC chips; zoom/minimap hidden. Units are larger plastic sculpts with ink counts, no ownership-flag PNG stacks. Combat casualties are plastic marks; + pulls a piece off the tile. No hover-lift. SCHEMA 11. GAME_VERSION V3.00-exp. Do not merge.

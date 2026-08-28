@@ -878,21 +878,35 @@ export class CombatUI {
     });
   }
 
+  _woodDie(roll) {
+    const faces = {
+      1: [[50, 50]],
+      2: [[28, 28], [72, 72]],
+      3: [[28, 28], [50, 50], [72, 72]],
+      4: [[28, 28], [72, 28], [28, 72], [72, 72]],
+      5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
+      6: [[28, 28], [72, 28], [28, 50], [72, 50], [28, 72], [72, 72]],
+    };
+    const pips = (faces[roll] || faces[1]).map(([x, y]) =>
+      '<i class="wood-pip" style="left:' + x + '%;top:' + y + '%"></i>'
+    ).join('');
+    return '<span class="wood-die" data-pips="' + roll + '">' + pips + '</span>';
+  }
+
   _renderDiceAnimation() {
-    // Update dice display with random values - 3D rolling effect
     const diceContainer = this.el.querySelector('.dice-animation');
     if (!diceContainer) return;
 
     const { attackers, defenders } = this.combatState;
     const attackCount = this._getTotalUnits(attackers);
     const defenseCount = this._getTotalUnits(defenders);
+    const wood = isBoardSkin();
 
     let html = '<div class="dice-row attacking">';
     html += '<span class="dice-row-label">Attack:</span>';
     for (let i = 0; i < Math.min(attackCount, 10); i++) {
       const roll = Math.floor(Math.random() * 6) + 1;
-      const delay = i * 30;
-      html += `<div class="die die-3d rolling" style="animation-delay: ${delay}ms">${roll}</div>`;
+      html += wood ? this._woodDie(roll) : `<div class="die die-3d rolling">${roll}</div>`;
     }
     if (attackCount > 10) html += `<span class="dice-more">+${attackCount - 10}</span>`;
     html += '</div>';
@@ -901,8 +915,7 @@ export class CombatUI {
     html += '<span class="dice-row-label">Defense:</span>';
     for (let i = 0; i < Math.min(defenseCount, 10); i++) {
       const roll = Math.floor(Math.random() * 6) + 1;
-      const delay = i * 30;
-      html += `<div class="die die-3d rolling" style="animation-delay: ${delay}ms">${roll}</div>`;
+      html += wood ? this._woodDie(roll) : `<div class="die die-3d rolling">${roll}</div>`;
     }
     if (defenseCount > 10) html += `<span class="dice-more">+${defenseCount - 10}</span>`;
     html += '</div>';
@@ -2923,7 +2936,8 @@ export class CombatUI {
         const unitType = btn.dataset.unit;
         const delta = btn.classList.contains('plus') ? 1 : -1;
         if (delta > 0) {
-          liftPiecesOffTile(this.currentTerritory, '#5c1212');
+          const raw = String(unitType || 'infantry').replace('_damage', '');
+          liftPiecesOffTile(this.currentTerritory, '#5c1212', raw);
         }
 
         if (casualtyType === 'aa') {
