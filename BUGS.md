@@ -4,7 +4,7 @@
 
 ## 8.28.26 — V3.00-exp deploy-phase nits (preview only)
 
-272b820 play: parchment #hud-clarity still said YOUR TURN / Deployed 0/6 on the map; deploy sheet had two Deploy 1 buttons and the footer click hit Borneo Sea Zone; a dark zoom/minimap disc floated on the art; tooltip used a gold IPC coin. Folded into this branch: strip stays dead (0/6 on the rail); one rail Deploy/Undo; panel rect blocks map hits; zoom/minimap/close disc gone; tooltip IPC is ink. SCHEMA 11. V3.00-exp. Do not merge.
+272b820 play: parchment #hud-clarity still said YOUR TURN / Deployed 0/6 on the map; deploy sheet had two Deploy 1 buttons and the footer click hit Borneo Sea Zone; a dark zoom/minimap disc floated on the art; tooltip used a gold IPC coin. Folded into this branch: strip stays dead (0/6 on the rail); Deploy/Undo/Place live in a rail sibling (not inside a hidden .pp-content); staging is a small table-edge card, not a right sheet; card+rail rects block map hits; zoom/minimap/close disc gone; tooltip IPC is ink. SCHEMA 11. V3.00-exp. Do not merge.
 
 ---
 

@@ -415,7 +415,7 @@ export class PlayerPanel {
     if (fromStack?.kind && fromStack.kind !== 'none') return fromStack;
 
     const btn = target?.closest?.('[data-action]');
-    if (btn && this.el.contains(btn) && isQueueGestureAction(btn.dataset.action)) {
+    if (btn && this._panelOwns(btn) && isQueueGestureAction(btn.dataset.action)) {
       return capturePanelPointerLock({
         action: btn.dataset.action,
         disabled: !!btn.disabled,
@@ -453,10 +453,30 @@ export class PlayerPanel {
     }
   }
 
+  _panelOwns(node) {
+    return !!(node && this.el?.contains(node));
+  }
+
+  _ensureRailActions() {
+    if (this.railEl) return this.railEl;
+    this.railEl = document.createElement('div');
+    this.railEl.className = 'pp-rail-actions';
+    this.el.appendChild(this.railEl);
+    this.railEl.addEventListener('click', (e) => this._onPanelClick(e));
+    return this.railEl;
+  }
+
   containsPoint(clientX, clientY) {
     if (!this.el || this.el.classList?.contains('hidden')) return false;
     if (isPointInPanelRect(clientX, clientY, this.el.getBoundingClientRect?.())) return true;
-    const extras = this.el.querySelectorAll('.pp-bottom-actions, .pp-placement-actions, .pp-confirm-btn, .pp-action-btn');
+    if (this.contentEl && this.contentEl.classList.contains('table-ref-card')
+      && isPointInPanelRect(clientX, clientY, this.contentEl.getBoundingClientRect?.())) {
+      return true;
+    }
+    if (this.railEl && isPointInPanelRect(clientX, clientY, this.railEl.getBoundingClientRect?.())) {
+      return true;
+    }
+    const extras = this.el.querySelectorAll('.pp-bottom-actions, .pp-placement-actions, .pp-confirm-btn, .pp-action-btn, .table-ref-card');
     for (const node of extras) {
       if (isPointInPanelRect(clientX, clientY, node.getBoundingClientRect?.())) return true;
     }
@@ -502,8 +522,8 @@ export class PlayerPanel {
     const lockAction = this._pointerLock?.action || null;
     const resolved = resolveLockedPanelClick({
       lock: this._pointerLock,
-      clickTabId: clickTab && this.contentEl.contains(clickTab) ? clickTab.dataset.tab : null,
-      clickAction: clickBtn && this.contentEl.contains(clickBtn) && !clickBtn.disabled
+      clickTabId: clickTab && this._panelOwns(clickTab) ? clickTab.dataset.tab : null,
+      clickAction: clickBtn && this._panelOwns(clickBtn) && !clickBtn.disabled
         ? clickBtn.dataset.action
         : null,
       clickDataset: clickBtn ? { ...clickBtn.dataset } : {},
@@ -800,18 +820,19 @@ export class PlayerPanel {
     this.el.classList.toggle('table-edge-card', isBoardSkin());
 
     if (isBoardSkin()) {
-      this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray');
+      this.el.classList.remove('player-panel--peek', 'player-panel--expanded', 'player-panel--place-tray', 'has-table-work');
+      this.el.classList.add('rail-only');
+      const rail = this._ensureRailActions();
       let actions = this._renderActionsTab(phase, turnPhase, player);
       const hasWork = /pp-unit-list|pl-unit-row|pu-card|pp-move-item|pp-inline|pp-purchase|pp-tech|pp-rockets|pp-unit-row|pp-placement|open-combat/.test(actions);
       if (!hasWork) actions = '';
-      this.el.classList.toggle('has-table-work', hasWork);
-      this.el.classList.toggle('rail-only', !hasWork);
-      html += actions;
+      this.contentEl.classList.toggle('table-ref-card', hasWork);
+      this.contentEl.classList.toggle('hidden', !hasWork);
       const bottomActions = this._renderBottomActions(phase, turnPhase, player, isLocalPlayerTurn, isOwnSeat);
-      if (bottomActions) html += bottomActions;
       const list = this.contentEl.querySelector('.pp-unit-list');
       if (list) this._unitListScrollTop = list.scrollTop;
-      this.contentEl.innerHTML = html;
+      this.contentEl.innerHTML = actions;
+      rail.innerHTML = bottomActions || '';
       this._bindEvents();
       const restored = this.contentEl.querySelector('.pp-unit-list');
       if (restored) restored.scrollTop = this._unitListScrollTop || 0;

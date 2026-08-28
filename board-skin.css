@@ -622,37 +622,18 @@ html.board-skin .die-3d.rolling .die-face {
   100% { transform: rotateX(0) rotateY(0); }
 }
 
+/* Sidebar is the wood rail only. Staging lists are a separate edge card.
+   has-table-work must never reopen a right sheet over the map. */
 html.board-skin #sidebar,
 html.board-skin .player-panel,
 html.board-skin .pp-panel,
 html.board-skin #playerPanel,
 html.board-skin #sidebar.player-panel.table-edge-card,
 html.board-skin .player-panel.table-edge-card,
-html.board-skin #sidebar.table-edge-card.has-table-work {
-  position: fixed !important;
-  top: auto !important;
-  right: auto !important;
-  left: 12px !important;
-  bottom: 12px !important;
-  width: min(300px, 40vw) !important;
-  max-width: min(300px, 40vw) !important;
-  height: auto !important;
-  max-height: 30vh !important;
-  pointer-events: auto !important;
-  z-index: 65 !important;
-  background:
-    linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
-    url('assets/board/felt.svg') center / 140px 140px repeat !important;
-  border: 4px solid #3a2410 !important;
-  border-left: 4px solid #3a2410 !important;
-  color: #f4e6c0 !important;
-  box-shadow: 0 8px 0 #1a1008 !important;
-  overflow: auto !important;
-}
-
-/* Hint-only sheet is gone. Done / Undo / place sit on the wood rail. */
+html.board-skin #sidebar.table-edge-card.has-table-work,
 html.board-skin #sidebar.table-edge-card.rail-only,
 html.board-skin .player-panel.table-edge-card.rail-only {
+  position: fixed !important;
   left: 0 !important;
   right: 0 !important;
   top: 0 !important;
@@ -661,21 +642,82 @@ html.board-skin .player-panel.table-edge-card.rail-only {
   max-width: none !important;
   height: 36px !important;
   max-height: 36px !important;
+  pointer-events: none !important;
+  z-index: 61 !important;
   background: none !important;
   border: 0 !important;
   box-shadow: none !important;
   overflow: visible !important;
-  pointer-events: none !important;
 }
 
-html.board-skin #sidebar.table-edge-card.rail-only .pp-content,
-html.board-skin .table-edge-card.rail-only .pp-actions-tab,
+html.board-skin #sidebar.table-edge-card.rail-only .pp-content:not(.table-ref-card),
+html.board-skin #sidebar .pp-content.hidden,
 html.board-skin .table-edge-card.rail-only .pp-hint,
 html.board-skin #sidebarClose {
   display: none !important;
 }
 
-html.board-skin .table-edge-card .pp-bottom-actions {
+html.board-skin #sidebar .pp-content.table-ref-card,
+html.board-skin .player-panel .pp-content.table-ref-card {
+  display: block !important;
+  position: fixed !important;
+  left: 12px !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: 12px !important;
+  width: min(280px, 36vw) !important;
+  max-width: min(280px, 36vw) !important;
+  height: auto !important;
+  max-height: 22vh !important;
+  margin: 0 !important;
+  padding: 6px 8px !important;
+  pointer-events: auto !important;
+  z-index: 65 !important;
+  overflow: auto !important;
+  color: #2a1c0e !important;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 228, 0.96), rgba(232, 212, 168, 0.96)),
+    url('assets/board/parchment.svg') !important;
+  border: 3px solid #3a2410 !important;
+  box-shadow: 0 6px 0 #1a1008 !important;
+}
+
+html.board-skin .table-ref-card .pp-actions-tab,
+html.board-skin .table-ref-card .pp-inline-placement,
+html.board-skin .table-ref-card .pp-unit-list {
+  padding: 0 !important;
+  margin: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html.board-skin .table-ref-card .pp-unit-category-label {
+  margin: 4px 0 2px !important;
+  padding: 0 !important;
+  font-family: Cinzel, serif !important;
+  font-size: 10px !important;
+  letter-spacing: 0.08em !important;
+  color: #5a4630 !important;
+  background: none !important;
+}
+
+html.board-skin .table-ref-card .pp-buy-row,
+html.board-skin .table-ref-card .pp-unit-row {
+  min-height: 0 !important;
+  padding: 2px 0 !important;
+  background: none !important;
+  border: 0 !important;
+}
+
+html.board-skin .table-ref-card .pp-buy-name,
+html.board-skin .table-ref-card .pp-buy-cost {
+  color: #2a1c0e !important;
+}
+
+html.board-skin .pp-rail-actions,
+html.board-skin .table-edge-card .pp-bottom-actions,
+html.board-skin .pp-rail-actions .pp-bottom-actions {
   position: fixed !important;
   top: 0 !important;
   right: 300px !important;
@@ -690,10 +732,12 @@ html.board-skin .table-edge-card .pp-bottom-actions {
   background: none !important;
   border: 0 !important;
   box-shadow: none !important;
-  z-index: 62 !important;
+  z-index: 66 !important;
   pointer-events: auto !important;
 }
 
+html.board-skin .pp-rail-actions .pp-confirm-btn,
+html.board-skin .pp-rail-actions .pp-action-btn,
 html.board-skin .table-edge-card .pp-bottom-actions .pp-confirm-btn,
 html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
   height: 26px !important;
@@ -707,9 +751,9 @@ html.board-skin #sidebar.player-panel--expanded,
 html.board-skin #sidebar.player-panel--place-tray,
 html.board-skin .player-panel--peek,
 html.board-skin .player-panel--expanded {
-  top: auto !important;
-  height: auto !important;
-  max-height: 30vh !important;
+  top: 0 !important;
+  height: 36px !important;
+  max-height: 36px !important;
 }
 
 html.board-skin .table-edge-card .pp-header,
@@ -911,20 +955,16 @@ html.board-skin .placement-unit {
   color: #2a1c0e;
 }
 
-html.board-skin #zoom-controls {
-  gap: 10px;
-}
-
-html.board-skin .zoom-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #f0d8a8, #8b5a2b 70%);
-  color: #1a1008;
-  border: 2px solid #3a2410;
-  font-family: Cinzel, serif;
-  font-weight: 700;
-  box-shadow: inset 0 1px 0 #fff4d4, 0 3px 0 #2a160a;
+html.board-skin #zoom-controls,
+html.board-skin .zoom-btn,
+html.board-skin #minimap,
+html.board-skin #sidebarClose {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
 }
 
 html.board-skin .zoom-btn:hover {
@@ -1023,11 +1063,9 @@ html.mobile-shell.board-skin .phone-peek-count {
 html.board-skin.mobile-shell .player-panel,
 html.mobile-shell.board-skin .player-panel,
 html.board-skin.mobile-shell #sidebar.player-panel {
-  background:
-    linear-gradient(180deg, rgba(243, 230, 196, 0.97), rgba(228, 208, 160, 0.98)),
-    url('assets/board/parchment.svg');
+  background: none !important;
   color: #2a1c0e;
-  border-top: 4px solid #3a2410;
+  border: 0 !important;
 }
 
 html.board-skin .pp-unit-row,
@@ -1068,10 +1106,8 @@ html.board-skin .pp-end-phase {
 
 html.board-skin #sidebar.player-panel.felt-cards,
 html.board-skin .player-panel.felt-cards {
-  background:
-    linear-gradient(180deg, rgba(40, 16, 12, 0.2), transparent 22%),
-    url('assets/board/felt.svg') center / 140px 140px repeat !important;
-  border-left: 8px solid #3a2410 !important;
+  background: none !important;
+  border: 0 !important;
   color: #f4e6c0 !important;
 }
 
@@ -1194,18 +1230,13 @@ html.board-skin .board-dice-tray .die-3d .die-face {
     max-height: 28vh !important;
   }
 
-  html.board-skin #sidebar,
-  html.board-skin .player-panel.table-edge-card,
-  html.board-skin.mobile-shell .player-panel.felt-cards,
-  html.mobile-shell.board-skin .player-panel.felt-cards,
-  html.board-skin.mobile-shell #sidebar.player-panel.felt-cards {
+  html.board-skin #sidebar .pp-content.table-ref-card,
+  html.board-skin .player-panel .pp-content.table-ref-card {
     left: 8px !important;
-    right: auto !important;
-    top: auto !important;
     width: min(240px, 46vw) !important;
     max-width: 46vw !important;
-    max-height: 28vh !important;
-    border-top: 4px solid #3a2410 !important;
+    max-height: 22vh !important;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   #exp-banner {
