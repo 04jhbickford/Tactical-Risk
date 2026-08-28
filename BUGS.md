@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp kill 1×1 tile washes at 1024×525 (preview only)
+
+35a6479 desktop at 1024×525 showed axis-aligned pale boxes over Novosibirsk and French Africa. Those cells are 1×1 placeholder PNGs; drawImage stretched them to 256×256. Skip non-real tiles so the printed poster shows. Phone inspect-first / one-strip rail from the same pass. SCHEMA 11. V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp phone inspect-first, one-strip rail (preview only)
 
 35a6479 phone FAIL: first tap on French Indo China armed Place Capital; EXPERIMENT chip clipped RUSSIAN; map zoomed to Asia. Phone tap now inspects first; second tap / Confirm commits. 390px rail is one 44px strip. Board-skin Fit is the whole poster. Live Google on a Vercel preview still fails `auth/unauthorized-domain` — add that preview hostname (or the stable branch alias) to Firebase authorized domains. SCHEMA 11. V3.00-exp. Do not merge.

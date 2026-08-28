@@ -72,6 +72,8 @@ const {
 } = await import(pathToFileURL(join(root, 'src/ui/mobileShell.js')));
 const { Camera, MAP_WIDTH, MAP_HEIGHT } =
   await import(pathToFileURL(join(root, 'src/map/camera.js')));
+const { isRealMapTile } =
+  await import(pathToFileURL(join(root, 'src/map/mapRenderer.js')));
 const {
   resolvePhaseHint,
   resolvePhonePeekHint,
@@ -813,6 +815,10 @@ check('place-tap inspects first (V3.00-exp phone)',
   check('board-skin Fit uses the whole poster, not a cluster',
     readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8').includes('camera.fitWorld({ ...insets, fillFrame: true })'));
 }
+check('1×1 placeholder tiles are not stretched into 256px washes',
+  isRealMapTile({ naturalWidth: 1, naturalHeight: 1 }) === false
+  && isRealMapTile({ naturalWidth: 256, naturalHeight: 256 }) === true
+  && isRealMapTile(null) === false);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

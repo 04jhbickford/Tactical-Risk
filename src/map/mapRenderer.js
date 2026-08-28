@@ -7,6 +7,13 @@ import { isBoardSkin, MAP_FILTER } from '../ui/boardSkin.js';
 const TILE_SIZE = 256;
 const COLS = 14; // 0..13
 const ROWS = 8;  // 0..7
+const MIN_REAL_TILE_PX = 32;
+
+export function isRealMapTile(img) {
+  const w = img?.naturalWidth ?? img?.width ?? 0;
+  const h = img?.naturalHeight ?? img?.height ?? 0;
+  return !!img && w >= MIN_REAL_TILE_PX && h >= MIN_REAL_TILE_PX;
+}
 
 export class MapRenderer {
   constructor() {
@@ -84,24 +91,27 @@ export class MapRenderer {
     const startRow = Math.max(0, Math.floor(viewport.y / TILE_SIZE));
     const endRow = Math.min(ROWS - 1, Math.floor((viewport.y + viewport.height) / TILE_SIZE));
 
-    // Draw base tiles on top (opaque — covers the small map where tiles exist)
+    // Draw base tiles on top (opaque — covers the small map where tiles exist).
+    // Skip 1×1 placeholders: drawImage stretches them into 256×256 axis-aligned
+    // washes (Novosibirsk / French Africa at 1024×525). Gaps keep the poster.
     for (let col = startCol; col <= endCol; col++) {
       for (let row = startRow; row <= endRow; row++) {
         const key = `${col}_${row}`;
         const img = this.baseTiles[key];
-        if (img) {
+        if (isRealMapTile(img)) {
           ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
       }
     }
 
-    // Draw relief tiles (smallMap base layer ensures no visible rectangles at gaps)
+    // Relief only where the base tile is real. A 256px shade over a placeholder
+    // gap is the same rectangular wash.
     ctx.globalAlpha = 0.5;
     for (let col = startCol; col <= endCol; col++) {
       for (let row = startRow; row <= endRow; row++) {
         const key = `${col}_${row}`;
         const img = this.reliefTiles[key];
-        if (img) {
+        if (isRealMapTile(this.baseTiles[key]) && isRealMapTile(img)) {
           ctx.drawImage(img, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
         }
       }
