@@ -1055,9 +1055,6 @@ html.board-skin .combat-popup:not(.hidden):not(.minimized) {
   animation: none;
 }
 
-html.board-skin .mp-menu-card,
-html.board-skin .mp-game-item,
-html.board-skin .mp-identity-box,
 html.board-skin .auth-tabs.modern {
   background: transparent;
   padding: 0;
@@ -1077,6 +1074,9 @@ html.board-skin .auth-tab.active {
   box-shadow: inset 0 1px 0 #e8a070, 0 3px 0 #2a160a;
 }
 
+html.board-skin .mp-menu-card,
+html.board-skin .mp-game-item,
+html.board-skin .mp-identity-box,
 html.board-skin .auth-tab,
 html.board-skin .mp-primary-btn,
 html.board-skin .auth-back-btn,
@@ -1086,6 +1086,36 @@ html.board-skin .phone-menu-sheet {
   border: 2px solid #3a2410;
   color: #2a1c0e;
   box-shadow: inset 0 1px 0 #fff4d4, 0 3px 0 #2a160a;
+}
+
+html.board-skin .mp-lobby-title-group h2,
+html.board-skin .mp-section-header h3,
+html.board-skin .mp-selection-group h4,
+html.board-skin .mp-player-name,
+html.board-skin .mp-waiting-indicator {
+  color: #2a1c0e;
+}
+
+html.board-skin .mp-code-badge {
+  background: #2a1c0e;
+  border: 2px solid #3a2410;
+  color: #f4e6c0;
+  padding: 8px 14px;
+}
+
+html.board-skin .mp-code-badge .code-label {
+  color: #d8c08a;
+}
+
+html.board-skin .mp-code-badge .code-value {
+  color: #f4e6c0;
+  font-family: Cinzel, serif;
+  font-size: 22px;
+  letter-spacing: 0.18em;
+}
+
+html.board-skin .mp-code-badge .copy-btn {
+  color: #f4e6c0;
 }
 
 html.board-skin .mp-primary-btn,
