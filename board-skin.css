@@ -462,8 +462,7 @@ html.board-skin .auth-seat-note {
 }
 
 html.board-skin .auth-google-btn {
-  width: 100%;
-  margin-bottom: 14px;
+  display: none !important;
 }
 
 html.board-skin .felt-post-grid {
@@ -1059,6 +1058,25 @@ html.board-skin .combat-popup:not(.hidden):not(.minimized) {
 html.board-skin .mp-menu-card,
 html.board-skin .mp-game-item,
 html.board-skin .mp-identity-box,
+html.board-skin .auth-tabs.modern {
+  background: transparent;
+  padding: 0;
+}
+
+html.board-skin .auth-tabs.modern .auth-tab {
+  background: linear-gradient(#efe0b8, #d8c08a);
+  border: 2px solid #3a2410;
+  color: #2a1c0e;
+  box-shadow: inset 0 1px 0 #fff4d4, 0 3px 0 #2a160a;
+}
+
+html.board-skin .auth-tabs.modern .auth-tab.active,
+html.board-skin .auth-tab.active {
+  background: linear-gradient(#c45c26, #8b1e1e);
+  color: #f4e6c0;
+  box-shadow: inset 0 1px 0 #e8a070, 0 3px 0 #2a160a;
+}
+
 html.board-skin .auth-tab,
 html.board-skin .mp-primary-btn,
 html.board-skin .auth-back-btn,

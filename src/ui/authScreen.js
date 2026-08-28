@@ -8,7 +8,7 @@ export class AuthScreen {
     this.onComplete = onComplete;
     this.authManager = getAuthManager();
     this.el = null;
-    this.mode = 'google'; // 'restoring', 'google', 'login', 'signup', 'phone', 'verify'
+    this.mode = 'login'; // 'restoring', 'login', 'signup', 'phone', 'verify'
     this.phoneNumber = '';
     this.isLoading = false;
   }
@@ -18,7 +18,6 @@ export class AuthScreen {
       this._create();
     }
     this.el.classList.remove('hidden');
-    this._consumeRedirect();
     if (this.authManager.isLoggedIn()) {
       this.hide();
       if (this.onComplete) this.onComplete(this.authManager.getUser());
@@ -33,7 +32,7 @@ export class AuthScreen {
       this._restoreThenContinue();
       return;
     }
-    if (this.mode === 'restoring') this.mode = 'google';
+    if (this.mode === 'restoring' || this.mode === 'google') this.mode = 'login';
     this._render();
   }
 
@@ -80,11 +79,7 @@ export class AuthScreen {
             </div>
 
             ${this.mode === 'restoring' ? '' : `
-            <p class="auth-seat-note">James and Bastion sit this table. No typed password.</p>
-            <button type="button" class="mp-primary-btn auth-google-btn" data-action="google" ${this.isLoading ? 'disabled' : ''}>
-              ${this.isLoading ? 'Opening Google…' : 'Continue with Google'}
-            </button>
-            <div class="mp-error hidden" id="google-error"></div>
+            <p class="auth-seat-note">Sign in with your table email to sit By post.</p>
             <div class="auth-tabs modern">
               <button class="auth-tab ${this.mode === 'login' ? 'active' : ''}" data-mode="login">Email</button>
               <button class="auth-tab ${this.mode === 'signup' ? 'active' : ''}" data-mode="signup">New seat</button>
@@ -110,14 +105,6 @@ export class AuthScreen {
     this._bindEvents();
   }
 
-  async _consumeRedirect() {
-    const result = await this.authManager.consumeGoogleRedirect();
-    if (result?.success && result.user) {
-      this.hide();
-      if (this.onComplete) this.onComplete(this.authManager.getUser());
-    }
-  }
-
   _renderForm() {
     if (this.mode === 'restoring') {
       return `
@@ -125,15 +112,12 @@ export class AuthScreen {
         <p class="mp-no-games-hint">You were signed in. The match is still there.</p>
       `;
     }
-    if (this.mode === 'google') {
-      return `<p class="auth-seat-note">Continue with Google for the live table.</p>`;
-    }
     if (this.mode === 'login') {
       return `
         <form class="auth-form modern" data-form="login">
           <div class="mp-field">
             <label for="login-email">Email</label>
-            <input type="email" id="login-email" placeholder="your@email.com" required class="modern-input">
+            <input type="email" id="login-email" placeholder="bickford.james@gmail.com" required class="modern-input">
           </div>
           <div class="mp-field">
             <label for="login-password">Password</label>
@@ -217,10 +201,6 @@ export class AuthScreen {
       });
     });
 
-    this.el.querySelector('[data-action="google"]')?.addEventListener('click', () => {
-      this._handleGoogle();
-    });
-
     // Back button
     this.el.querySelector('.auth-back-btn')?.addEventListener('click', () => {
       this.hide();
@@ -258,25 +238,6 @@ export class AuthScreen {
       this.mode = 'phone';
       this._render();
     });
-  }
-
-  async _handleGoogle() {
-    this.isLoading = true;
-    this._render();
-    const result = await this.authManager.signInWithGoogle();
-    this.isLoading = false;
-    if (result.redirecting) return;
-    if (result.success) {
-      this.hide();
-      if (this.onComplete) this.onComplete(this.authManager.getUser());
-      return;
-    }
-    this._render();
-    const err = this.el.querySelector('#google-error');
-    if (err) {
-      err.textContent = result.error || 'Google sign-in failed';
-      err.classList.remove('hidden');
-    }
   }
 
   async _handleLogin(form) {
