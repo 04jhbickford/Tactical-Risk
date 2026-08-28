@@ -7,7 +7,7 @@ import { drawPlasticSculpt } from './plasticSculpts.js';
 
 function boardUnitIconSize(zoom, mobile) {
   if (isBoardSkin()) {
-    return Math.max(28, Math.min(44, (mobile ? 36 : 34) * Math.max(Number(zoom) || 0, 0.45)));
+    return Math.max(40, Math.min(68, (mobile ? 52 : 58) * Math.max(Number(zoom) || 0.7, 0.7)));
   }
   return phoneUnitIconSize(zoom, { mobile });
 }

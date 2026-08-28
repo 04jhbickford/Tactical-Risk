@@ -125,6 +125,7 @@ export function initTouchInput(canvas, { enablePinch = false } = {}) {
 // desktop trackpads. Purely additive UI; drives the existing wheel handler.
 export function initZoomControls(canvas, { onFit } = {}) {
   if (!canvas || document.getElementById('zoom-controls')) return;
+  if (document.documentElement.classList.contains('board-skin')) return;
 
   const wrap = document.createElement('div');
   wrap.id = 'zoom-controls';

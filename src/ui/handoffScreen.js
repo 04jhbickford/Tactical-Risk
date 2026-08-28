@@ -15,7 +15,7 @@ export class HandoffScreen {
     this.lastConfirmedPlayerId = null;
     this.el = document.createElement('div');
     this.el.id = 'handoffScreen';
-    this.el.className = 'handoff-overlay hidden';
+    this.el.className = 'handoff-overlay board-handoff hidden';
     document.body.appendChild(this.el);
   }
 

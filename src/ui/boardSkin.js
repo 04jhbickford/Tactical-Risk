@@ -98,6 +98,10 @@ export function attachBoardActionSounds(actionLog) {
 export function initBoardSkin() {
   document.documentElement.classList.add('board-skin');
   document.body.classList.add('board-skin');
+  const minimap = document.getElementById('minimap');
+  if (minimap) minimap.hidden = true;
+  const zoom = document.getElementById('zoom-controls');
+  if (zoom) zoom.remove();
   ensureBanner();
   bindTableFeel();
 }

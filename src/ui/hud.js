@@ -205,6 +205,17 @@ export class HUD {
     const ipcs = inGame ? (this.gameState.getIPCs?.(player.id) ?? 0) : 0;
     const chips = inGame ? this._ipcChipRow(ipcs) : '';
 
+    const seat = inGame
+      ? (
+        '<div class="rail-seat" style="--nation:' + player.color + '">'
+        + (player.flag ? '<img src="assets/flags/' + player.flag + '" alt="">' : '')
+        + '<span class="rail-seat-name">' + player.name + '</span>'
+        + '<span class="rail-phase">' + phaseName + '</span>'
+        + '</div>'
+        + '<div class="rail-bank" title="IPCs">' + chips + '<span class="rail-bank-count">' + ipcs + '</span></div>'
+      )
+      : '<span class="rail-idle">Tactical Risk</span>';
+
     this.el.innerHTML = `
       <div class="hud-menu-container">
         <button class="hud-menu-btn rail-stamp" data-action="toggle-menu" title="Menu">☰</button>
@@ -213,14 +224,7 @@ export class HUD {
           <button class="hud-menu-item" data-action="exit-lobby">Box the game</button>
         </div>
       </div>
-      ${inGame ? `
-        <div class="rail-seat" style="--nation:${player.color}">
-          ${player.flag ? `<img src="assets/flags/${player.flag}" alt="">` : ''}
-          <span class="rail-seat-name">${player.name}</span>
-          <span class="rail-phase">${phaseName}</span>
-        </div>
-        <div class="rail-bank" title="IPCs">${chips}<span class="rail-bank-count">${ipcs}</span></div>
-      ` : `<span class="rail-idle">Tactical Risk</span>`}
+      ${seat}
     `;
     this._bindEvents();
     this._renderClarity();

@@ -1074,6 +1074,13 @@ export class PlayerPanel {
     return `<div class="pp-seat-chip ${cls}" data-seat="${cls}">${chrome.seatLabel}</div>`;
   }
 
+  _bankStrip(ipcs, territories) {
+    if (!isBoardSkin()) return `${ipcs}$ · ${territories}T`;
+    const n = Math.min(6, Math.max(1, Math.ceil(ipcs / 20)));
+    const chips = Array.from({ length: n }, () => '<i class="ipc-chip"></i>').join('');
+    return '<span class="bank-chip-row">' + chips + '</span> ' + ipcs + ' · ' + territories + 'T';
+  }
+
   _renderHeader(player, isMultiplayer = false, isLocalPlayerTurn = true, isOwnSeat = isLocalPlayerTurn) {
     const ipcs = this.gameState.getIPCs(player.id);
     const territories = this.gameState.getPlayerTerritories(player.id).length;
@@ -1116,9 +1123,7 @@ export class PlayerPanel {
         <span class="pp-player-name" style="color: ${textColor};">${headerLabel}</span>
         ${aiLabel}
         ${turnIndicator}
-        <span class="pp-resources-inline" style="color: ${textColor};">${isBoardSkin()
-          ? `<span class="bank-chip-row">${Array.from({ length: Math.min(6, Math.max(1, Math.ceil(ipcs / 20))) }, () => '<i class="ipc-chip"></i>').join('')}</span> ${ipcs} · ${territories}T`
-          : `${ipcs}$ · ${territories}T`}</span>`
+        <span class="pp-resources-inline" style="color: ${textColor};">${this._bankStrip(ipcs, territories)}</span>
       </div>`;
   }
 
