@@ -1728,6 +1728,9 @@ async function init() {
       return;
     }
 
+    await authManager.whenReady();
+    await authManager.consumeGoogleRedirect();
+
     // Reload / version refresh: a restored Firebase user is still signed in
     // even before authReady. Only show Sign In after restore finishes empty.
     if (authManager.isLoggedIn()) {

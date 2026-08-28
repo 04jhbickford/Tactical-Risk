@@ -18,6 +18,7 @@ import {
 } from '../multiplayer/lastMatch.js';
 import { resolveHostLobbyPrimaryCta } from '../multiplayer/lobbyStart.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
+import { isBoardSkin } from './boardSkin.js';
 
 // Available factions (should match setup data)
 const FACTIONS = [
@@ -201,7 +202,9 @@ export class MultiplayerLobby {
     }
 
     // Contextual tagline based on mode
-    const tagline = this.mode === 'lobby' ? 'Game Lobby' : 'Online Multiplayer';
+    const tagline = this.mode === 'lobby'
+      ? 'Live table'
+      : (isBoardSkin() ? 'By post — same SCHEMA 11 table' : 'Online Multiplayer');
 
     this.el.innerHTML = `
       <div class="board-table-scene">
@@ -227,25 +230,26 @@ export class MultiplayerLobby {
   _renderMenu(user) {
     // Show clear identity for debugging
     const userIdShort = user?.id ? user.id.slice(-8) : 'unknown';
+    const felt = isBoardSkin();
 
     return `
       <div class="mp-identity-box">
-        <p class="mp-welcome">Welcome, <strong>${user?.displayName || 'Player'}</strong></p>
+        <p class="mp-welcome">${felt ? 'This table' : 'Welcome'}, <strong>${user?.displayName || 'Player'}</strong></p>
         <p class="mp-identity-details">
-          Logged in as: <strong>${user?.email || 'unknown'}</strong>
+          ${felt ? 'Seats: James · Bastion · ' : 'Logged in as: '}<strong>${user?.email || 'unknown'}</strong>
           <span class="mp-user-id">(ID: ...${userIdShort})</span>
         </p>
       </div>
       ${this._renderLastMatchBanner()}
 
-      <div class="mp-menu-grid four-col">
+      <div class="mp-menu-grid ${felt ? 'felt-post-grid' : 'four-col'}">
         <button type="button" class="mp-menu-card mp-menu-card-join" data-action="join-by-code">
           <div class="mp-card-icon">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
           </div>
           <div class="mp-card-content">
             <h3>Join by Code</h3>
-            <p>Enter 6-character code</p>
+            <p>${felt ? 'Six-letter post mark' : 'Enter 6-character code'}</p>
           </div>
         </button>
         <button type="button" class="mp-menu-card" data-action="my-games">
@@ -271,8 +275,8 @@ export class MultiplayerLobby {
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
           </div>
           <div class="mp-card-content">
-            <h3>Create Game</h3>
-            <p>Host a new game</p>
+            <h3>${felt ? 'Host a table' : 'Create Game'}</h3>
+            <p>${felt ? 'Two live seats · join code' : 'Host a new game'}</p>
           </div>
         </button>
       </div>
@@ -340,10 +344,10 @@ export class MultiplayerLobby {
           <div class="mp-field">
             <label>Max Players</label>
             <select id="create-max-players" class="modern-select">
-              <option value="2">2 Players</option>
+              <option value="2" ${isBoardSkin() ? 'selected' : ''}>2 Players</option>
               <option value="3">3 Players</option>
               <option value="4">4 Players</option>
-              <option value="5" selected>5 Players</option>
+              <option value="5" ${isBoardSkin() ? '' : 'selected'}>5 Players</option>
             </select>
           </div>
           <div class="mp-field">
@@ -357,6 +361,7 @@ export class MultiplayerLobby {
             </select>
           </div>
         </div>
+        ${isBoardSkin() ? '' : `
         <label class="mp-checkbox-option standalone">
           <input type="checkbox" id="create-private">
           <span class="checkbox-box"></span>
@@ -365,7 +370,7 @@ export class MultiplayerLobby {
         <div class="mp-password-field hidden" id="password-field">
           <label>Password</label>
           <input type="password" id="create-password" class="modern-input" placeholder="" ${joinFormFieldAttrString('password')}>
-        </div>
+        </div>`}
 
         <div class="mp-error hidden" id="create-error"></div>
 
@@ -388,10 +393,11 @@ export class MultiplayerLobby {
           <label>Game Code</label>
           <input type="text" id="join-code" placeholder="ABC123" maxlength="6" class="modern-input code-input" ${joinFormFieldAttrString('code')}${shouldPrefillJoinCodeFromLastMatch() && readLastMatch()?.lobbyCode ? ` value="${readLastMatch().lobbyCode}"` : ''}>
         </div>
+        ${isBoardSkin() ? '' : `
         <div class="mp-field">
           <label>Password (if required)</label>
           <input type="password" id="join-password" placeholder="Leave empty if none" class="modern-input" ${joinFormFieldAttrString('password')}>
-        </div>
+        </div>`}
 
         <div class="mp-error hidden" id="join-error"></div>
 
@@ -1042,8 +1048,8 @@ export class MultiplayerLobby {
     const name = form.querySelector('#create-name').value;
     const maxPlayers = parseInt(form.querySelector('#create-max-players').value);
     const startingIPCs = parseInt(form.querySelector('#create-ipcs').value);
-    const isPrivate = form.querySelector('#create-private').checked;
-    const password = isPrivate ? form.querySelector('#create-password').value : null;
+    const isPrivate = !!form.querySelector('#create-private')?.checked;
+    const password = isPrivate ? (form.querySelector('#create-password')?.value || null) : null;
 
     const submitBtn = form.querySelector('button[type="submit"]');
     if (submitBtn) submitBtn.disabled = true;
@@ -1078,7 +1084,7 @@ export class MultiplayerLobby {
 
   async _handleJoin(form) {
     const code = form.querySelector('#join-code').value.toUpperCase();
-    const password = form.querySelector('#join-password').value;
+    const password = form.querySelector('#join-password')?.value || null;
 
     const result = await this.lobbyManager.joinLobby(code, password || null);
 

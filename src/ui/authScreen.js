@@ -18,6 +18,7 @@ export class AuthScreen {
       this._create();
     }
     this.el.classList.remove('hidden');
+    this._consumeRedirect();
     if (this.authManager.isLoggedIn()) {
       this.hide();
       if (this.onComplete) this.onComplete(this.authManager.getUser());
@@ -79,9 +80,14 @@ export class AuthScreen {
             </div>
 
             ${this.mode === 'restoring' ? '' : `
+            <p class="auth-seat-note">James and Bastion sit this table. No typed password.</p>
+            <button type="button" class="mp-primary-btn auth-google-btn" data-action="google" ${this.isLoading ? 'disabled' : ''}>
+              ${this.isLoading ? 'Opening Google…' : 'Continue with Google'}
+            </button>
+            <div class="mp-error hidden" id="google-error"></div>
             <div class="auth-tabs modern">
-              <button class="auth-tab ${this.mode === 'login' ? 'active' : ''}" data-mode="login">Sign In</button>
-              <button class="auth-tab ${this.mode === 'signup' ? 'active' : ''}" data-mode="signup">Sign Up</button>
+              <button class="auth-tab ${this.mode === 'login' ? 'active' : ''}" data-mode="login">Email</button>
+              <button class="auth-tab ${this.mode === 'signup' ? 'active' : ''}" data-mode="signup">New seat</button>
               <button class="auth-tab ${this.mode === 'phone' || this.mode === 'verify' ? 'active' : ''}" data-mode="phone">Phone</button>
             </div>
             `}
@@ -102,6 +108,14 @@ export class AuthScreen {
 
     this.el.innerHTML = html;
     this._bindEvents();
+  }
+
+  async _consumeRedirect() {
+    const result = await this.authManager.consumeGoogleRedirect();
+    if (result?.success && result.user) {
+      this.hide();
+      if (this.onComplete) this.onComplete(this.authManager.getUser());
+    }
   }
 
   _renderForm() {
@@ -200,6 +214,10 @@ export class AuthScreen {
       });
     });
 
+    this.el.querySelector('[data-action="google"]')?.addEventListener('click', () => {
+      this._handleGoogle();
+    });
+
     // Back button
     this.el.querySelector('.auth-back-btn')?.addEventListener('click', () => {
       this.hide();
@@ -237,6 +255,25 @@ export class AuthScreen {
       this.mode = 'phone';
       this._render();
     });
+  }
+
+  async _handleGoogle() {
+    this.isLoading = true;
+    this._render();
+    const result = await this.authManager.signInWithGoogle();
+    this.isLoading = false;
+    if (result.redirecting) return;
+    if (result.success) {
+      this.hide();
+      if (this.onComplete) this.onComplete(this.authManager.getUser());
+      return;
+    }
+    this._render();
+    const err = this.el.querySelector('#google-error');
+    if (err) {
+      err.textContent = result.error || 'Google sign-in failed';
+      err.classList.remove('hidden');
+    }
   }
 
   async _handleLogin(form) {

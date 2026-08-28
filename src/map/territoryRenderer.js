@@ -1141,15 +1141,16 @@ export class TerritoryRenderer {
     if (territory.isWater) {
       // Sea zones: brighter semi-transparent fill + dashed glow outline so
       // hover is unambiguous even though the zone has no land mass to fill.
-      ctx.shadowColor = '#40c4ff';
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = 'rgba(100, 210, 255, 0.28)';
+      const skinHoverSea = isBoardSkin();
+      ctx.shadowColor = skinHoverSea ? 'transparent' : '#40c4ff';
+      ctx.shadowBlur = skinHoverSea ? 0 : 12;
+      ctx.fillStyle = skinHoverSea ? 'rgba(42, 52, 62, 0.06)' : 'rgba(100, 210, 255, 0.28)';
       for (const poly of territory.polygons) {
         if (!poly || poly.length < 3) continue;
         this._fillPoly(ctx, poly);
       }
-      ctx.strokeStyle = 'rgba(64, 196, 255, 0.7)';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = skinHoverSea ? 'rgba(42, 52, 62, 0.4)' : 'rgba(64, 196, 255, 0.7)';
+      ctx.lineWidth = skinHoverSea ? 1.4 : 3;
       ctx.setLineDash([8, 4]);
       for (const poly of territory.polygons) {
         if (!poly || poly.length < 3) continue;
@@ -1158,19 +1159,20 @@ export class TerritoryRenderer {
       ctx.setLineDash([]);
     } else {
       // Land territories: softer yellow highlight
-      ctx.shadowColor = '#ffcc00';
-      ctx.shadowBlur = 15;
+      const skinHover = isBoardSkin();
+      ctx.shadowColor = skinHover ? 'transparent' : '#ffcc00';
+      ctx.shadowBlur = skinHover ? 0 : 15;
 
       // Fill with subtle highlight
-      ctx.fillStyle = 'rgba(255, 230, 100, 0.25)';
+      ctx.fillStyle = skinHover ? 'rgba(107, 74, 34, 0.06)' : 'rgba(255, 230, 100, 0.25)';
       for (const poly of territory.polygons) {
         if (!poly || poly.length < 3) continue;
         this._fillPoly(ctx, poly);
       }
 
       // Stroke outline - use external edges only to hide internal borders
-      ctx.strokeStyle = 'rgba(255, 220, 100, 0.8)';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = skinHover ? 'rgba(107, 74, 34, 0.45)' : 'rgba(255, 220, 100, 0.8)';
+      ctx.lineWidth = skinHover ? 1.4 : 3;
       if (territory.polygons.length === 1) {
         this._strokePoly(ctx, territory.polygons[0]);
       } else {
@@ -1189,15 +1191,16 @@ export class TerritoryRenderer {
     if (territory.isWater) {
       // Sea zones: brighter fill + thicker solid outline than hover, so
       // selected-vs-hovered is never ambiguous for a zone with no land fill.
-      ctx.shadowColor = '#40c4ff';
-      ctx.shadowBlur = 16;
-      ctx.fillStyle = 'rgba(120, 220, 255, 0.4)';
+      const skinSea = isBoardSkin();
+      ctx.shadowColor = skinSea ? 'transparent' : '#40c4ff';
+      ctx.shadowBlur = skinSea ? 0 : 16;
+      ctx.fillStyle = skinSea ? 'rgba(42, 52, 62, 0.08)' : 'rgba(120, 220, 255, 0.4)';
       for (const poly of territory.polygons) {
         if (!poly || poly.length < 3) continue;
         this._fillPoly(ctx, poly);
       }
-      ctx.strokeStyle = 'rgba(140, 225, 255, 0.95)';
-      ctx.lineWidth = 4;
+      ctx.strokeStyle = skinSea ? 'rgba(42, 52, 62, 0.55)' : 'rgba(140, 225, 255, 0.95)';
+      ctx.lineWidth = skinSea ? 1.6 : 4;
       for (const poly of territory.polygons) {
         if (!poly || poly.length < 3) continue;
         this._strokePoly(ctx, poly);
@@ -1206,19 +1209,20 @@ export class TerritoryRenderer {
       return;
     }
 
-    ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 12;
+      const skin = isBoardSkin();
+    ctx.shadowColor = skin ? 'transparent' : '#ffffff';
+    ctx.shadowBlur = skin ? 0 : 12;
 
     // Fill with subtle highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillStyle = skin ? 'rgba(107, 74, 34, 0.08)' : 'rgba(255, 255, 255, 0.1)';
     for (const poly of territory.polygons) {
       if (!poly || poly.length < 3) continue;
       this._fillPoly(ctx, poly);
     }
 
     // Stroke outline - use external edges only to hide internal borders
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = skin ? '#6B4A22' : '#ffffff';
+    ctx.lineWidth = skin ? 1.6 : 3;
     if (territory.polygons.length === 1) {
       this._strokePoly(ctx, territory.polygons[0]);
     } else {
@@ -1646,8 +1650,9 @@ export class TerritoryRenderer {
       const [x1, y1, x2, y2] = this._findClosestEdgePoints(t1, t2);
       if (x1 === null) continue;
 
+      const skinBridge = isBoardSkin();
       // Draw subtle glow effect
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.2)';
+      ctx.strokeStyle = skinBridge ? 'rgba(107, 74, 34, 0.15)' : 'rgba(255, 215, 0, 0.2)';
       ctx.lineWidth = lineWidth + 2;
       ctx.setLineDash([]);
       ctx.beginPath();
@@ -1656,7 +1661,7 @@ export class TerritoryRenderer {
       ctx.stroke();
 
       // Draw main line
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)';
+      ctx.strokeStyle = skinBridge ? 'rgba(107, 74, 34, 0.45)' : 'rgba(255, 215, 0, 0.7)';
       ctx.lineWidth = lineWidth;
       ctx.setLineDash([8, 4]);
       ctx.beginPath();
@@ -1666,7 +1671,7 @@ export class TerritoryRenderer {
 
       // Draw small anchor circles at endpoints
       ctx.setLineDash([]);
-      ctx.fillStyle = '#ffd700';
+      ctx.fillStyle = skinBridge ? '#6B4A22' : '#ffd700';
       ctx.strokeStyle = 'rgba(0,0,0,0.5)';
       ctx.lineWidth = 1;
 

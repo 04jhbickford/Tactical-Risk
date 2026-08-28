@@ -449,8 +449,42 @@ html.board-skin .back-btn {
 
 html.board-skin .auth-container,
 html.board-skin .mp-lobby,
+html.board-skin .mp-lobby-container,
 html.board-skin .game-list {
   color: #2a1c0e;
+}
+
+html.board-skin .auth-seat-note {
+  margin: 0 0 12px;
+  font-family: 'Source Serif 4', Georgia, serif;
+  font-size: 13px;
+  color: #5a4630;
+}
+
+html.board-skin .auth-google-btn {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+html.board-skin .felt-post-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+html.board-skin .felt-post-grid .mp-menu-card {
+  min-height: 88px;
+}
+
+html.board-skin #auth-screen.hidden,
+html.board-skin #multiplayer-lobby.hidden {
+  display: none !important;
+}
+
+html.board-skin .turn-summary-overlay.hidden,
+html.board-skin .turn-summary-modal.hidden,
+html.board-skin #turnSummaryModal.hidden {
+  display: none !important;
 }
 
 html.board-skin .purchase-panel,
@@ -744,6 +778,27 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
   padding: 0 10px !important;
   font-size: 11px !important;
   pointer-events: auto !important;
+}
+
+@media (pointer: coarse) {
+  html.board-skin #hud,
+  html.board-skin #hud.table-rail,
+  html.board-skin #sidebar.table-edge-card.rail-only,
+  html.board-skin .pp-rail-actions,
+  html.board-skin .table-edge-card .pp-bottom-actions {
+    height: 48px !important;
+    max-height: 48px !important;
+  }
+
+  html.board-skin .pp-rail-actions .pp-confirm-btn,
+  html.board-skin .pp-rail-actions .pp-action-btn,
+  html.board-skin .auth-google-btn,
+  html.board-skin .felt-stamp {
+    min-height: 44px !important;
+    height: auto !important;
+    font-size: 14px !important;
+    padding: 8px 14px !important;
+  }
 }
 
 html.board-skin #sidebar.player-panel--peek,

@@ -232,7 +232,7 @@ export class Lobby {
         <div class="felt-deal-rail">
           <span class="felt-deal-mark">1942</span>
           <span class="lobby-version-badge">${GAME_VERSION}</span>
-          <span class="felt-deal-note">Seat two powers, then deal</span>
+          <span class="felt-deal-note">Seat two powers, then deal — or By post for a live table</span>
         </div>
         <div class="felt-deal-hand">
           ${factions.map((p) => this._renderFeltNationCard(p)).join('')}
@@ -247,7 +247,7 @@ export class Lobby {
           <button type="button" class="felt-stamp deal ${canDeal ? '' : 'disabled'}" data-action="deal-local" ${canDeal ? '' : 'disabled'}>
             ${canDeal ? `Deal this table (${seated})` : 'Seat two powers'}
           </button>
-          <button type="button" class="felt-stamp post" data-action="online-play">By post</button>
+          <button type="button" class="felt-stamp post" data-action="online-play">By post — live table</button>
           ${savedGames.length ? `<button type="button" class="felt-stamp" data-action="my-games">Saved ${savedGames.length}</button>` : ''}
         </div>
       </div>

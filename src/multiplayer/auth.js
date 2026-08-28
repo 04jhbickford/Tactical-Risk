@@ -5,6 +5,10 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
+  GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
   updateProfile,
@@ -182,6 +186,50 @@ export class AuthManager {
         phoneNumber: result.user.phoneNumber
       };
       return { success: true, user: result.user };
+    } catch (error) {
+      return { success: false, error: this._getErrorMessage(error) };
+    }
+  }
+
+  // Gmail seats (James / Bastion) — no typed password. Same Firebase Auth.
+  async signInWithGoogle() {
+    if (!this.auth) {
+      return { success: false, error: 'Authentication not available' };
+    }
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    const preferRedirect = typeof window !== 'undefined'
+      && window.matchMedia?.('(max-width: 820px)').matches;
+    try {
+      if (preferRedirect) {
+        await signInWithRedirect(this.auth, provider);
+        return { success: true, redirecting: true };
+      }
+      const result = await signInWithPopup(this.auth, provider);
+      this._applyFirebaseUser(result.user);
+      return { success: true, user: result.user };
+    } catch (error) {
+      if (error?.code === 'auth/popup-blocked' || error?.code === 'auth/cancelled-popup-request') {
+        try {
+          await signInWithRedirect(this.auth, provider);
+          return { success: true, redirecting: true };
+        } catch (err) {
+          return { success: false, error: this._getErrorMessage(err) };
+        }
+      }
+      return { success: false, error: this._getErrorMessage(error) };
+    }
+  }
+
+  async consumeGoogleRedirect() {
+    if (!this.auth) return { success: false };
+    try {
+      const result = await getRedirectResult(this.auth);
+      if (result?.user) {
+        this._applyFirebaseUser(result.user);
+        return { success: true, user: result.user };
+      }
+      return { success: false };
     } catch (error) {
       return { success: false, error: this._getErrorMessage(error) };
     }

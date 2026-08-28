@@ -2,6 +2,12 @@
 
 ---
 
+## 8.28.26 — V3.00-exp he-correct: live table + kill map boxes (preview only)
+
+272b820 play was local-table only; By post now opens the existing SCHEMA 11 lobby (join code, two seats, presence, undo-except-battle, WhatsApp hook). Google sign-in so James/Bastion are not asked for a typed password. Map boxes: no white selection rect, no leftover Turn Summary strip, no zoom disc, one rail Deploy, ink tooltip IPC. Phone: 44px rail stamps, inspect≠commit unchanged. SCHEMA 11. V3.00-exp. Do not merge.
+
+---
+
 ## 8.28.26 — V3.00-exp deploy-phase nits (preview only)
 
 272b820 play: parchment #hud-clarity still said YOUR TURN / Deployed 0/6 on the map; deploy sheet had two Deploy 1 buttons and the footer click hit Borneo Sea Zone; a dark zoom/minimap disc floated on the art; tooltip used a gold IPC coin. Folded into this branch: strip stays dead (0/6 on the rail); Deploy/Undo/Place live in a rail sibling (not inside a hidden .pp-content); staging is a small table-edge card, not a right sheet; card+rail rects block map hits; zoom/minimap/close disc gone; tooltip IPC is ink. SCHEMA 11. V3.00-exp. Do not merge.
