@@ -92,6 +92,8 @@ const { formatAiTurnLine, resolveHudWhoseTurn } =
   await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
 const { shouldIgnoreFactionCardToggle, LOBBY_SELECT_TOGGLE_GUARD_MS } =
   await import(pathToFileURL(join(root, 'src/ui/lobby.js')));
+const { shouldShowTurnSummary } =
+  await import(pathToFileURL(join(root, 'src/ui/turnSummaryModal.js')));
 
 const PHONE_CSS_MARKER = 'V2.81 phone chrome tree';
 function phoneCssParts(css) {
@@ -109,7 +111,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81', GAME_VERSION === 'V2.81');
+check('GAME_VERSION is V2.81.1', GAME_VERSION === 'V2.81.1');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -841,6 +843,16 @@ check('phone placement hints say Tap, desktop stay Click',
     /\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?(width|min-width):\s*48px[\s\S]*?(height|min-height):\s*48px/.test(phoneBlock));
   check('occupant Human/AI select is 44–48px on the seated card',
     /\.lobby-phone-faction-tools \.ai-select\.modern \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
+  check('seated cards do not flex-shrink or clip the occupant row',
+    /\.lobby-phone-faction \{\s*flex:\s*0 0 auto;\s*flex-shrink:\s*0;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
+    && /\.lobby-phone-faction\.selected \{\s*min-height:\s*130px;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
+    && /\.lobby-phone-faction-tools \{[\s\S]*?flex-shrink:\s*0;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
+    && /min-width:\s*48px;[\s\S]*?min-height:\s*48px;/.test(
+      phoneBlock.match(/\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?\}/)?.[0] || ''
+    ));
+  check('hidden turn-summary overlay cannot steal phone taps',
+    /\.turn-summary-overlay\.hidden[\s\S]*?display:\s*none !important[\s\S]*?pointer-events:\s*none !important/.test(phoneBlock)
+    || /\.turn-summary-overlay\.hidden[\s\S]*?pointer-events:\s*none !important/.test(css));
   check('Starting IPCs control is a 44pt target',
     /\.lobby-phone-option #starting-ipcs \{[\s\S]*?min-height:\s*44px/.test(phoneBlock)
     || /\.lobby-phone-option \.modern-select[\s\S]*?min-height:\s*44px/.test(phoneBlock));
@@ -863,6 +875,37 @@ check('inspect≠commit still holds — tap never auto-places capital',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
   }) === false);
+check('own-land Place Capital tap applies (peek + Confirm), miss does not clear',
+  shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    inspected: false,
+    tappedIsOwnedLand: true,
+    hasHit: true,
+  }) === true
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    inspected: false,
+    tappedIsOwnedLand: false,
+    hasHit: false,
+  }) === false);
+check('turn summary never covers local Place Capital',
+  shouldShowTurnSummary({
+    events: [{ type: 'combat' }],
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    isMultiplayer: false,
+  }) === false
+  && shouldShowTurnSummary({
+    events: [{ type: 'combat' }],
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    isMultiplayer: true,
+  }) === false
+  && shouldShowTurnSummary({
+    events: [{ type: 'combat' }],
+    phase: GAME_PHASES.PLAYING,
+    isMultiplayer: true,
+  }) === true);
 check('Select units CTA only when phone deploy queue is empty',
   shouldShowSelectUnitsCta({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 0, showDone: false,

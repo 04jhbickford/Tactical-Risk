@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.1 seated occupant clip + dead Place Capital taps (500 play of 22d4b13)
+
+James live play of sha 22d4b13 / V2.81 at ~500 CSS px: holds 2 (IPC 44, Teams 44×44) and 3 (one chip, no ticker, Tap, bottom tray) PASS. Hold 1 FAIL: two seated cards clipped the 48px occupant row under the next card (~10px sliver). Hold 4 FAIL: Ukraine / Russia / Karelia taps were dead (no outline, no Confirm); leftover Turn Summary (Germans / ✕ / OK) still in the DOM.
+
+Cause: `.lobby-phone-factions` is a flex column and `.player-card` has `overflow: hidden`, so seated cards shrink and the swatch + Human/AI sit under the next card. Turn Summary used class `turn-summary-overlay` while hide CSS targeted `.turn-summary-modal`, so `hidden` never took it out of the hit stack.
+
+Fix: seated cards `flex-shrink: 0` / `overflow: visible` with a 130px min-height occupant band (still 48px controls). Overlay hide is `display:none` + `pointer-events:none`; local / setup never shows the sheet; hide on game start. Peek tray box is pointer-events none except the CTA chrome. inspect≠commit kept. SCHEMA 11. GAME_VERSION V2.81.1. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81 iPhone polish (390 play of V2.80 + 500px addendum)
 
 James + CoS FACT from live 390 of production V2.80: seated occupant/color chips and Teams / Starting IPCs were below 44pt; Place Capital HUD triple-repeated the phase plus a stale “Last action: Germans' turn begins” and “Click:” on a phone; +/−/Fit sat on the art; Undo was the blue primary and Confirm stacked under it in the home-indicator zone; first-expand Units tabs / body Deploy sat off an 844 viewport.

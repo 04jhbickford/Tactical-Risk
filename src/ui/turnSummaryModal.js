@@ -1,6 +1,22 @@
 // Turn Summary Modal - shown at the start of a player's turn in multiplayer
 // to recap what other players did during their turns
 
+import { GAME_PHASES } from '../state/gameState.js';
+
+// Local Place Capital must never raise this sheet — a leftover overlay
+// (class mismatch used to leave it in the hit stack) eats map taps.
+export function shouldShowTurnSummary({
+  events,
+  phase,
+  isMultiplayer = false,
+} = {}) {
+  if (!isMultiplayer) return false;
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT) {
+    return false;
+  }
+  return Array.isArray(events) && events.length > 0;
+}
+
 export class TurnSummaryModal {
   constructor() {
     this.gameState = null;
@@ -11,7 +27,9 @@ export class TurnSummaryModal {
   _create() {
     this.el = document.createElement('div');
     this.el.id = 'turnSummaryModal';
-    this.el.className = 'turn-summary-overlay hidden';
+    this.el.className = 'turn-summary-overlay turn-summary-modal hidden';
+    this.el.setAttribute('aria-hidden', 'true');
+    this.el.setAttribute('inert', '');
     this.el.innerHTML = `
       <div class="turn-summary-content">
         <div class="turn-summary-header">
@@ -42,17 +60,26 @@ export class TurnSummaryModal {
     this.gameState = gameState;
   }
 
-  show(events) {
-    if (!events || events.length === 0) return;
+  show(events, extra = {}) {
+    const phase = extra.phase ?? this.gameState?.phase;
+    const isMultiplayer = extra.isMultiplayer ?? !!this.gameState?.isMultiplayer;
+    if (!shouldShowTurnSummary({ events, phase, isMultiplayer })) {
+      this.hide();
+      return;
+    }
 
     const body = this.el.querySelector('#turnSummaryBody');
     body.innerHTML = this._renderEvents(events);
 
     this.el.classList.remove('hidden');
+    this.el.removeAttribute('inert');
+    this.el.setAttribute('aria-hidden', 'false');
   }
 
   hide() {
     this.el.classList.add('hidden');
+    this.el.setAttribute('aria-hidden', 'true');
+    this.el.setAttribute('inert', '');
   }
 
   _renderEvents(events) {

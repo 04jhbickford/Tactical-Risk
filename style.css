@@ -717,6 +717,7 @@ html, body {
 }
 
 .lobby-overlay.hidden {
+  display: none;
   opacity: 0;
   pointer-events: none;
 }
@@ -16464,6 +16465,7 @@ html, body {
    Shows what happened during other players' turns
    ======================================== */
 
+.turn-summary-overlay,
 .turn-summary-modal {
   position: fixed;
   top: 0;
@@ -16477,8 +16479,11 @@ html, body {
   z-index: 1000;
 }
 
+.turn-summary-overlay.hidden,
 .turn-summary-modal.hidden {
-  display: none;
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden;
 }
 
 .turn-summary-content {
@@ -17167,6 +17172,14 @@ html, body {
     padding: 12px 16px;
   }
 
+  html.mobile-shell .turn-summary-overlay.hidden,
+  html.mobile-shell .turn-summary-modal.hidden,
+  .turn-summary-overlay.hidden,
+  .turn-summary-modal.hidden {
+    display: none !important;
+    pointer-events: none !important;
+  }
+
   .turn-summary-header {
     display: flex;
     align-items: center;
@@ -17299,13 +17312,23 @@ html, body {
   }
 
   /* V2.67: peek is hint + icon row + CTA, not a 42/50dvh sheet.
-     #sidebar is the same node as .player-panel — id beats two classes. */
+     #sidebar is the same node as .player-panel — id beats two classes.
+     pointer-events none on the box so a leftover tall hit target cannot
+     eat Place Capital map taps; the tray chrome is re-enabled below. */
   #sidebar.player-panel--peek,
   .player-panel.player-panel--peek,
   #sidebar.player-panel--peek.player-panel--place-tray,
   .player-panel.player-panel--peek.player-panel--place-tray {
     max-height: none;
     height: auto;
+    pointer-events: none;
+  }
+
+  html.mobile-shell #sidebar.player-panel--peek .pp-bottom-actions,
+  html.mobile-shell .player-panel.player-panel--peek .pp-bottom-actions,
+  html.mobile-shell #sidebar.player-panel--peek .pp-seat-chip,
+  html.mobile-shell .player-panel.player-panel--peek .pp-seat-chip {
+    pointer-events: auto;
   }
 
   #sidebar.player-panel--expanded,
@@ -17763,17 +17786,33 @@ html, body {
     padding-bottom: 8px;
   }
 
+  /* Seated cards grow for the 48px occupant row. Do not flex-shrink
+     into the next card — .player-card { overflow:hidden } would clip
+     the swatch + Human/AI when two factions are seated. */
   .lobby-phone-faction {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    height: auto;
+    max-height: none;
     min-height: 64px;
     padding: 10px 12px;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.04);
+    overflow: visible;
+  }
+
+  .lobby-phone-faction:hover,
+  .player-card.modern.lobby-phone-faction:hover {
+    transform: none;
   }
 
   .lobby-phone-faction.selected {
+    min-height: 130px;
     border-color: rgba(74, 222, 128, 0.55);
     background: rgba(22, 163, 74, 0.14);
+    overflow: visible;
+    z-index: 2;
   }
 
   .lobby-phone-faction-main {
@@ -17807,6 +17846,12 @@ html, body {
     gap: 8px;
     margin-top: 8px;
     min-height: 48px;
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    overflow: visible;
+    position: relative;
+    z-index: 2;
+    pointer-events: auto;
   }
 
   .lobby-phone-faction-tools .color-swatch {

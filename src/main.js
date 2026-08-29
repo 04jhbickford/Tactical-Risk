@@ -49,7 +49,7 @@ import { BugTracker } from './ui/bugTracker.js';
 import { AirLandingUI } from './ui/airLandingUI.js';
 import { RocketUI } from './ui/rocketUI.js';
 import { UnitTooltip } from './ui/unitTooltip.js';
-import { TurnSummaryModal } from './ui/turnSummaryModal.js';
+import { TurnSummaryModal, shouldShowTurnSummary } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
 import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
@@ -1124,12 +1124,19 @@ async function init() {
         if (event === 'turn_changed' && data.isActivePlayer) {
           showNotification("It's your turn!");
 
-          // Show turn summary modal with events from other players' turns
+          // Multiplayer playing only. A leftover overlay eats Place Capital
+          // map taps (inspect≠commit cannot fire if peek never reaches canvas).
           const events = gameState.getTurnEventsSince(lastTurnEventIndex);
           lastTurnEventIndex = gameState.getTurnEventsLastIndex();
-          if (events.length > 0) {
-            turnSummaryModal.setGameState(gameState);
+          turnSummaryModal.setGameState(gameState);
+          if (shouldShowTurnSummary({
+            events,
+            phase: gameState.phase,
+            isMultiplayer: !!gameState.isMultiplayer,
+          })) {
             turnSummaryModal.show(events);
+          } else {
+            turnSummaryModal.hide();
           }
         }
       }
@@ -1647,6 +1654,7 @@ async function init() {
     // Show panels (continentPanel hidden - info now in Players/Territory tabs)
     continentPanel.hide();
     playerPanel.show();
+    turnSummaryModal.hide();
   };
 
   const ensureMultiplayerLobby = () => {
