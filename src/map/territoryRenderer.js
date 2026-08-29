@@ -10,6 +10,7 @@ import {
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
+  phoneLegalDashColor,
 } from '../ui/mobileShell.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
@@ -98,8 +99,9 @@ export class TerritoryRenderer {
     this._precomputeCaches();
   }
 
-  setPhoneLegalTerritories(names) {
+  setPhoneLegalTerritories(names, edgeColor = null) {
     this.phoneLegalNames = new Set(Array.isArray(names) ? names : []);
+    this.phoneLegalEdgeColor = edgeColor || null;
   }
 
   renderPhoneLegalHighlights(ctx, zoom = 1) {
@@ -142,9 +144,10 @@ export class TerritoryRenderer {
     const z = Number(zoom);
     const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
     const inner = Math.max(outline * 0.45, outline - 2 / safeZ);
+    const dashColor = phoneLegalDashColor(this.phoneLegalEdgeColor);
     ctx.setLineDash(phoneLegalDashPattern(zoom));
     strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
-    strokeOwned(PHONE_LEGAL_EDGE_COLOR, inner);
+    strokeOwned(dashColor, inner);
 
     ctx.restore();
     if (typeof document !== 'undefined') {

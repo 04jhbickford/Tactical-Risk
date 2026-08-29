@@ -2,6 +2,12 @@
 
 ---
 
+## 8.29.26 — V2.81.25 faction-color dashed legal edge
+
+V2.81.24 painted dashed gold + gold fill-lite on owned land before tap, and a drag no longer peeked. Gold still sat next to the ivory map chrome and could read as the same band. Opening Place Capital / Initial Deploy now strokes a Poly dashed faction-color edge (Russians #B22222) plus gold fill-lite on owned land only. Unowned keeps the cream chrome. Pan ≠ peek. SCHEMA 11. GAME_VERSION V2.81.25. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.24 gold legal marks; pan ≠ peek
 
 James unique play of V2.81.23 at 500×632: setup spine / named Confirm HOLD. FAIL Rule 5: Place Capital opening painted a solid cream hex-edge that matched the baked map chrome on India and East Indies. Owned Russian land stayed continent green 136,163,70 until peek. A drag that started on a land also peeked that land on pointerup.

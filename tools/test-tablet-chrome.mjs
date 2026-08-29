@@ -86,6 +86,7 @@ const {
   PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
   PHONE_LEGAL_CHROME_CREAM,
+  phoneLegalDashColor,
   collectPhoneFitFocusNames,
   expandPhoneFitRegionNames,
   resolvePhoneFitRegionNames,
@@ -135,7 +136,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.24', GAME_VERSION === 'V2.81.24');
+check('GAME_VERSION is V2.81.25', GAME_VERSION === 'V2.81.25');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -529,6 +530,11 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_CHROME_CREAM
     && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_EDGE_INK
     && PHONE_LEGAL_FILL_RGB === '255, 208, 32');
+  check('legal dash uses faction color, never cream chrome',
+    phoneLegalDashColor('#B22222') === '#b22222'
+    && phoneLegalDashColor('#4A4A4A') === '#4a4a4a'
+    && phoneLegalDashColor(null) === PHONE_LEGAL_EDGE_COLOR
+    && phoneLegalDashColor('#B22222') !== PHONE_LEGAL_CHROME_CREAM);
   check('legal dash is a Poly edge, not a solid hairline',
     phoneLegalDashPattern(0.11)[0] > phoneLegalDashPattern(0.11)[1]
     && phoneLegalDashPattern(0.11)[0] >= 16 / 0.11 - 0.01);
@@ -582,6 +588,7 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     !!highlight
     && /phoneLegalNames\.size/.test(highlight[0])
     && /phoneLegalDashPattern/.test(highlight[0])
+    && /phoneLegalDashColor/.test(highlight[0])
     && /PHONE_LEGAL_FILL_RGB/.test(highlight[0])
     && !/#fff3b0/.test(highlight[0])
     && !/selectedTerritory/.test(highlight[0]));
@@ -1344,6 +1351,7 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
   );
   check('opening legal marks paint without a selected land',
     /setPhoneLegalTerritories\(collectPhoneLegalTerritoryNames/.test(mainSrc)
+    && /currentPlayer\?\.color/.test(mainSrc)
     && /renderPhoneLegalHighlights\(ctx, camera\.zoom\)/.test(mainSrc)
     && !/if \(selectedTerritory\)[\s\S]{0,80}renderPhoneLegalHighlights/.test(mainSrc));
   check('setup peek finishes on pointerup after a tap, not pointerdown',

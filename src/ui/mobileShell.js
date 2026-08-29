@@ -665,6 +665,16 @@ export const PHONE_LEGAL_EDGE_COLOR = '#f5c518';
 export const PHONE_LEGAL_FILL_RGB = '255, 208, 32';
 export const PHONE_LEGAL_CHROME_CREAM = '#fff3b0';
 
+// Poly dashed faction-color. Cream/ivory is map chrome — never return it.
+export function phoneLegalDashColor(factionHex) {
+  const raw = String(factionHex ?? '').trim();
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (!m) return PHONE_LEGAL_EDGE_COLOR;
+  let h = m[1];
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  return `#${h.toLowerCase()}`;
+}
+
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;

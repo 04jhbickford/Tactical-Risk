@@ -2725,7 +2725,7 @@ async function init() {
             playerId: gameState.currentPlayer?.id,
             territories,
             getOwner: (name) => gameState.getOwner(name),
-          }));
+          }), gameState.currentPlayer?.color);
           territoryRenderer.renderPhoneLegalHighlights(ctx, camera.zoom);
         } else {
           territoryRenderer.setPhoneLegalTerritories([]);
