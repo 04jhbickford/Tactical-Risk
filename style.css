@@ -17638,7 +17638,9 @@ html, body {
     display: none;
   }
 
-  /* Deploy at 0 units must not look like a live blue no-op. */
+  /* Peek Deploy stays the thumb verb while waiting for land / units. */
+  html.mobile-shell .pp-peek-primary-slot .pp-confirm-btn.disabled,
+  html.mobile-shell .pp-peek-primary-slot .pp-confirm-btn:disabled,
   html.mobile-shell .pp-confirm-btn.pp-select-units,
   html.mobile-shell .pp-confirm-btn.pp-select-units:disabled,
   html.mobile-shell .pp-confirm-btn.pp-select-units.disabled {

@@ -895,6 +895,8 @@ check('phone placement hints say Tap, desktop stay Click',
   check('deploy peek keeps +/−/Max beside chips, not a covering sheet',
     /\.phone-peek-qty-btn \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock)
     && /html\.mobile-shell #sidebarClose \{[\s\S]*?display:\s*none/.test(phoneBlock));
+  check('peek Deploy stays visible while waiting for land',
+    /pp-peek-primary-slot \.pp-confirm-btn\.disabled[\s\S]*?display:\s*flex/.test(phoneBlock));
   check('phone body Deploy is hidden so the peek CTA is the on-screen verb',
     /html\.mobile-shell \.pp-placement-actions \{\s*display:\s*none/.test(phoneBlock));
   check('Deploy at 0 is a visible ghost Select units, not a live blue',
