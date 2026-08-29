@@ -113,8 +113,18 @@ export function formatMobilePhaseWord(gamePhase, turnPhase) {
   return 'Setup';
 }
 
-export function shouldHidePhoneMapLabel({ mobile, name, peekedName } = {}) {
-  return !!mobile && !!name && !!peekedName && name === peekedName;
+export const PHONE_MAP_LABEL_MIN_ZOOM = 0.45;
+export const PHONE_SELECT_PULSE_MS = 150;
+export const PHONE_CONFIRM_PULSE_MS = 250;
+
+export function shouldHidePhoneMapLabel({ mobile, name, peekedName, zoom } = {}) {
+  if (!mobile || !name) return false;
+  if (peekedName && name === peekedName) return true;
+  const z = Number(zoom);
+  // World / regional Fit: flag+stack is the read. Names on Germany /
+  // South Europe sat on the chips (V2.81.25 P0-8).
+  if (Number.isFinite(z) && z < PHONE_MAP_LABEL_MIN_ZOOM) return true;
+  return false;
 }
 
 // Visible chip meta — never title-only IPC / Surrendered.
@@ -151,8 +161,7 @@ export function shouldShowPhoneDeployQty({
   return !!mobile
     && phase === GAME_PHASES.UNIT_PLACEMENT
     && !!unitType
-    && !!territory
-    && !territory.isWater;
+    && !!territory;
 }
 
 export function shouldAutoStagePhoneDeployPair({
@@ -372,23 +381,42 @@ export function boundsFromPoints(points) {
   return { minX, minY, maxX, maxY };
 }
 
+// Pull x onto the copy nearest seedX so Alaska+Europe does not
+// centroid into empty Pacific (V2.81.25 Deploy Fit FAIL).
+export function unwrapFitX(x, seedX, mapW = MAP_WIDTH) {
+  if (!Number.isFinite(x) || !Number.isFinite(seedX)) return x;
+  let n = x;
+  let d = n - seedX;
+  while (d > mapW / 2) { n -= mapW; d = n - seedX; }
+  while (d < -mapW / 2) { n += mapW; d = n - seedX; }
+  return n;
+}
+
+export function unwrapFitPoints(points, seedX) {
+  if (!Array.isArray(points)) return [];
+  if (!Number.isFinite(seedX)) return points.filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  return points
+    .filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+    .map(p => ({ x: unwrapFitX(p.x, seedX), y: p.y }));
+}
+
 // When owned land spans the world, still return a regional window around
-// the centroid so Fit is not a letterboxed world poster.
-export function phoneProblemBounds(points) {
-  const tight = boundsFromPoints(points);
+// the seed (dest/capital) so Fit is not a Pacific wrap poster.
+export function phoneProblemBounds(points, seedX) {
+  const unwrapped = unwrapFitPoints(points, seedX);
+  const tight = boundsFromPoints(unwrapped);
   if (tight) return tight;
-  if (!Array.isArray(points) || points.length === 0) return null;
+  if (!unwrapped.length) return null;
   let sx = 0;
   let sy = 0;
   let n = 0;
-  for (const p of points) {
-    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+  for (const p of unwrapped) {
     sx += p.x;
     sy += p.y;
     n++;
   }
   if (!n) return null;
-  const cx = sx / n;
+  const cx = Number.isFinite(seedX) ? seedX : sx / n;
   const cy = sy / n;
   const hw = MAP_WIDTH * 0.16;
   const hh = MAP_HEIGHT * 0.20;
@@ -515,9 +543,9 @@ function allOwnedClusters(ownedNames, byName) {
   return clusters;
 }
 
-// Worldwide empires: prefer the capital's cluster, else the largest.
-// Never the whole poster. Never a single selected chip.
-export function pickPhoneFitOwnedCluster(ownedNames, territories) {
+// Worldwide empires: prefer the dest/capital cluster, else the largest.
+// Never the whole poster. Never a single selected chip. Never Pacific wrap.
+export function pickPhoneFitOwnedCluster(ownedNames, territories, capitalName) {
   const owned = uniqueNames(ownedNames);
   if (owned.length <= 1) return owned;
   const byName = indexTerritoriesByName(territories);
@@ -528,6 +556,10 @@ export function pickPhoneFitOwnedCluster(ownedNames, territories) {
   }
   if (boundsFromPoints(pts)) return owned;
   const clusters = allOwnedClusters(owned, byName);
+  if (capitalName) {
+    const dest = clusters.find(c => c.includes(capitalName));
+    if (dest) return dest;
+  }
   const capital = clusters.find(c => c.some(n => byName[n]?.isCapital));
   if (capital) return capital;
   clusters.sort((a, b) => b.length - a.length);
@@ -547,11 +579,13 @@ export function resolvePhoneFitRegionNames({
   ownedNames = [],
   selectedName,
   destinationNames = [],
+  capitalName,
   territories,
 } = {}) {
   const byName = indexTerritoriesByName(territories);
   const owned = uniqueNames(ownedNames);
   const dests = uniqueNames(destinationNames);
+  const destSeed = [selectedName, capitalName, ...dests].find(n => owned.includes(n)) || null;
   let seedOwned = owned;
   const ownedPts = [];
   for (const name of owned) {
@@ -559,13 +593,17 @@ export function resolvePhoneFitRegionNames({
     if (p) ownedPts.push(p);
   }
   const worldwide = owned.length > 1 && !boundsFromPoints(ownedPts);
+  // Compact multi-owned seeds stay whole (Germany+Poland). Only a worldwide
+  // wrap (UK+India, or Russians Europe+Asia+Alaska) may shrink to the dest
+  // / capital cluster — otherwise Fit windows the Pacific.
   if (worldwide) {
-    const preferred = owned.includes(selectedName)
-      ? selectedName
-      : (owned.find(n => dests.includes(n)) || null);
+    const preferred = destSeed
+      || (owned.includes(selectedName) ? selectedName : null)
+      || (owned.find(n => dests.includes(n)) || null);
     seedOwned = preferred
-      ? (ownedClusterContaining(owned, preferred, byName) || pickPhoneFitOwnedCluster(owned, territories))
-      : pickPhoneFitOwnedCluster(owned, territories);
+      ? (ownedClusterContaining(owned, preferred, byName)
+        || pickPhoneFitOwnedCluster(owned, territories, preferred))
+      : pickPhoneFitOwnedCluster(owned, territories, capitalName);
   }
   const seed = collectPhoneFitFocusNames({
     ownedNames: seedOwned,
@@ -608,6 +646,7 @@ export function applyPhoneCameraFit(camera, {
   territories,
   selectedName,
   destinationNames,
+  capitalName,
 } = {}) {
   if (!camera) return;
   camera.usePhoneMinZoom = true;
@@ -625,15 +664,22 @@ export function applyPhoneCameraFit(camera, {
       if (gameState.getOwner?.(t.name) === playerId) ownedNames.push(t.name);
     }
   }
+  const capital = capitalName || gameState?.getCapital?.(playerId) || null;
   const focus = resolvePhoneFitRegionNames({
     ownedNames,
     selectedName,
     destinationNames,
+    capitalName: capital,
     territories,
   });
   const focusSet = new Set(focus);
   const pts = collectPhoneFitPoints(territories, (t) => focusSet.has(t.name));
-  const bounds = ensurePhoneFitRegionBounds(phoneProblemBounds(pts));
+  const seedName = [selectedName, capital, ...(destinationNames || [])]
+    .find(n => focusSet.has(n));
+  const seedPt = seedName
+    ? territoryFitPoint(indexTerritoriesByName(territories)[seedName])
+    : null;
+  const bounds = ensurePhoneFitRegionBounds(phoneProblemBounds(pts, seedPt?.x));
   if (bounds) {
     camera.fitBounds(bounds, { ...insets, fillFrame: true });
     return;
@@ -651,19 +697,49 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
   );
 }
 
+/**
+ * Capital STAR only for a land that is actually a confirmed capital.
+ * During Place Capital, also require playerState.capitalTerritory so a
+ * leaked isCapital flag cannot paint a star+glow on opening (James
+ * V2.81.25: star on SE Asia with zero taps).
+ */
+export function shouldDrawPhoneCapitalStar(territoryName, gameState) {
+  if (!territoryName || !gameState?.isCapital?.(territoryName)) return false;
+  if (gameState.phase !== GAME_PHASES.CAPITAL_PLACEMENT) return true;
+  return Object.values(gameState.playerState || {}).some(
+    (p) => p?.capitalTerritory === territoryName,
+  );
+}
+
+/**
+ * Circular capital GLOW reads as inspect=commit. Never on Place Capital
+ * (opening or peek). After both capitals are down (UNIT_PLACEMENT+), glow
+ * may return on confirmed stars.
+ */
+export function shouldDrawPhoneCapitalGlow(gameState) {
+  return gameState?.phase !== GAME_PHASES.CAPITAL_PLACEMENT;
+}
+
 // Opening Place Capital / Initial Deploy: owned lands must read BEFORE
 // the first tap AND look different from unowned. Cream/ivory is the
 // baked map chrome (India and East Indies already wear it) — a cream
 // hex-edge is not a legal mark (V2.81.23 James FAIL). Civ gold-hex
 // class: dashed gold + gold fill-lite on owned land only.
 export const PHONE_LEGAL_FILL_ALPHA = 0.2;
-export const PHONE_LEGAL_OUTLINE_CSS_PX = 5;
-export const PHONE_LEGAL_DASH_CSS_PX = 16;
-export const PHONE_LEGAL_GAP_CSS_PX = 8;
+export const PHONE_LEGAL_OUTLINE_CSS_PX = 3;
+export const PHONE_LEGAL_OUTLINE_WORLD_MAX = 16;
+export const PHONE_LEGAL_DASH_CSS_PX = 10;
+export const PHONE_LEGAL_GAP_CSS_PX = 6;
+export const PHONE_LEGAL_DASH_WORLD_MAX = 14;
+export const PHONE_LEGAL_GAP_WORLD_MAX = 8;
+export const PHONE_LEGAL_SOLID_MAX_ZOOM = 0.28;
 export const PHONE_LEGAL_EDGE_INK = '#3d2800';
 export const PHONE_LEGAL_EDGE_COLOR = '#f5c518';
 export const PHONE_LEGAL_FILL_RGB = '255, 208, 32';
 export const PHONE_LEGAL_CHROME_CREAM = '#fff3b0';
+export const PHONE_COUNTRY_OUTLINE_CSS_PX = 1.25;
+export const PHONE_COUNTRY_OUTLINE_WORLD_MIN = 1;
+export const PHONE_COUNTRY_OUTLINE_WORLD_MAX = 14;
 
 // Poly dashed faction-color. Cream/ivory is map chrome — never return it.
 export function phoneLegalDashColor(factionHex) {
@@ -678,13 +754,57 @@ export function phoneLegalDashColor(factionHex) {
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;
-  return Math.max(PHONE_LEGAL_OUTLINE_CSS_PX, PHONE_LEGAL_OUTLINE_CSS_PX / z);
+  // Cap world-px so Fit (~0.11) is a tile edge, not a 45px continent hull.
+  return Math.min(
+    PHONE_LEGAL_OUTLINE_WORLD_MAX,
+    Math.max(PHONE_LEGAL_OUTLINE_CSS_PX, PHONE_LEGAL_OUTLINE_CSS_PX / z),
+  );
+}
+
+export function phoneLegalUsesSolidStroke(zoom) {
+  const z = Number(zoom);
+  return !Number.isFinite(z) || z <= 0 || z < PHONE_LEGAL_SOLID_MAX_ZOOM;
 }
 
 export function phoneLegalDashPattern(zoom) {
+  if (phoneLegalUsesSolidStroke(zoom)) return [];
   const z = Number(zoom);
   const safe = Number.isFinite(z) && z > 0 ? z : 1;
-  return [PHONE_LEGAL_DASH_CSS_PX / safe, PHONE_LEGAL_GAP_CSS_PX / safe];
+  return [
+    Math.min(PHONE_LEGAL_DASH_WORLD_MAX, PHONE_LEGAL_DASH_CSS_PX / safe),
+    Math.min(PHONE_LEGAL_GAP_WORLD_MAX, PHONE_LEGAL_GAP_CSS_PX / safe),
+  ];
+}
+
+// Country borders at world Fit: ~1.25 CSS px, never a sub-pixel hairline
+// and never a 45px hull. Desktop default zoom (≥0.4) stays 1 world-px.
+export function phoneCountryOutlineWidth(zoom) {
+  const z = Number(zoom);
+  if (!Number.isFinite(z) || z <= 0 || z >= 0.4) return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+  return Math.min(
+    PHONE_COUNTRY_OUTLINE_WORLD_MAX,
+    Math.max(PHONE_COUNTRY_OUTLINE_WORLD_MIN, PHONE_COUNTRY_OUTLINE_CSS_PX / z),
+  );
+}
+
+export function isPhoneLegalSetupSeaDest({
+  seaName,
+  playerId,
+  territories,
+  getOwner,
+  getUnits,
+} = {}) {
+  if (!seaName || !playerId) return false;
+  const byName = indexTerritoriesByName(territories);
+  const sea = byName[seaName];
+  if (!sea?.isWater) return false;
+  const units = getUnits?.(seaName) || [];
+  if (units.some((u) => u?.owner && u.owner !== playerId)) return false;
+  for (const conn of sea.connections || []) {
+    const t = byName[conn];
+    if (t && !t.isWater && getOwner?.(conn) === playerId) return true;
+  }
+  return false;
 }
 
 export function collectPhoneLegalTerritoryNames({
@@ -693,6 +813,7 @@ export function collectPhoneLegalTerritoryNames({
   playerId,
   territories,
   getOwner,
+  getUnits,
 } = {}) {
   if (!shouldHighlightPhoneLegalTerritories({ mobile, phase }) || !playerId) return [];
   const list = Array.isArray(territories) ? territories : Object.values(territories || {});
@@ -700,6 +821,18 @@ export function collectPhoneLegalTerritoryNames({
   for (const t of list) {
     if (!t || t.isWater) continue;
     if (getOwner?.(t.name) === playerId) names.push(t.name);
+  }
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+    for (const t of list) {
+      if (!t?.isWater) continue;
+      if (isPhoneLegalSetupSeaDest({
+        seaName: t.name,
+        playerId,
+        territories: list,
+        getOwner,
+        getUnits,
+      })) names.push(t.name);
+    }
   }
   return names;
 }

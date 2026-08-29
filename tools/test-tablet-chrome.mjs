@@ -80,13 +80,23 @@ const {
   collectPhoneLegalTerritoryNames,
   phoneLegalOutlineWidth,
   phoneLegalDashPattern,
+  phoneLegalUsesSolidStroke,
+  phoneCountryOutlineWidth,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_OUTLINE_CSS_PX,
+  PHONE_LEGAL_OUTLINE_WORLD_MAX,
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
   PHONE_LEGAL_CHROME_CREAM,
   phoneLegalDashColor,
+  shouldDrawPhoneCapitalStar,
+  shouldDrawPhoneCapitalGlow,
+  isPhoneLegalSetupSeaDest,
+  unwrapFitX,
+  PHONE_SELECT_PULSE_MS,
+  PHONE_CONFIRM_PULSE_MS,
+  PHONE_MAP_LABEL_MIN_ZOOM,
   collectPhoneFitFocusNames,
   expandPhoneFitRegionNames,
   resolvePhoneFitRegionNames,
@@ -136,7 +146,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.25', GAME_VERSION === 'V2.81.25');
+check('GAME_VERSION is V2.81.26', GAME_VERSION === 'V2.81.26');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -516,11 +526,11 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     shouldToggleOffPhoneTooltip({
       mobile: true, visibleName: 'Germany', tappedName: 'Germany',
     }) === true);
-  check('gold outline is a ≥3 CSS px dashed edge at Fit (not a 2px hairline on the default border)',
+  check('gold outline is a ≥3 CSS px tile edge at Fit, capped (not a 45px continent hull)',
     PHONE_LEGAL_OUTLINE_CSS_PX >= 3
-    && phoneLegalOutlineWidth(0.11) >= PHONE_LEGAL_OUTLINE_CSS_PX / 0.11 - 0.01
-    && phoneLegalOutlineWidth(0.11) < 60
-    && phoneLegalOutlineWidth(0.11) > 2.5);
+    && phoneLegalOutlineWidth(0.11) <= PHONE_LEGAL_OUTLINE_WORLD_MAX
+    && phoneLegalOutlineWidth(0.11) >= 2.5
+    && phoneLegalOutlineWidth(0.11) < 20);
   check('owned-land fill is fill-lite, not a 55% flood',
     PHONE_LEGAL_FILL_ALPHA > 0
     && PHONE_LEGAL_FILL_ALPHA <= 0.22);
@@ -535,11 +545,18 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneLegalDashColor('#4A4A4A') === '#4a4a4a'
     && phoneLegalDashColor(null) === PHONE_LEGAL_EDGE_COLOR
     && phoneLegalDashColor('#B22222') !== PHONE_LEGAL_CHROME_CREAM);
-  check('legal dash is a Poly edge, not a solid hairline',
-    phoneLegalDashPattern(0.11)[0] > phoneLegalDashPattern(0.11)[1]
-    && phoneLegalDashPattern(0.11)[0] >= 16 / 0.11 - 0.01);
+  check('legal dash is solid at world Fit (no sparkle / continent dashes)',
+    phoneLegalUsesSolidStroke(0.11) === true
+    && phoneLegalDashPattern(0.11).length === 0);
+  check('legal dash returns when zoomed in',
+    phoneLegalUsesSolidStroke(0.5) === false
+    && phoneLegalDashPattern(0.5)[0] > phoneLegalDashPattern(0.5)[1]);
   check('desktop/tablet outline helper stays unused at their default zoom',
     phoneLegalOutlineWidth(0.5) === PHONE_LEGAL_OUTLINE_CSS_PX / 0.5);
+  check('country borders stay ~1 CSS px at world Fit, 1 world-px when zoomed in',
+    phoneCountryOutlineWidth(0.11) <= 14
+    && phoneCountryOutlineWidth(0.11) >= 1.25 / 0.11 - 0.05
+    && phoneCountryOutlineWidth(0.5) === 1);
 }
 
 console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
@@ -592,6 +609,10 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     && /PHONE_LEGAL_FILL_RGB/.test(highlight[0])
     && !/#fff3b0/.test(highlight[0])
     && !/selectedTerritory/.test(highlight[0]));
+  check('legal marks stroke each owned tile, not a continent hull',
+    !!highlight
+    && /_strokePoly/.test(highlight[0])
+    && !/_getExternalEdgesWithTolerance/.test(highlight[0]));
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
   check('tablet 481–900 rail is still 280px after V2.68',
@@ -942,14 +963,12 @@ check('phone placement hints say Tap, desktop stay Click',
   check('Starting IPCs control is a 44pt target',
     /\.lobby-phone-option #starting-ipcs \{[\s\S]*?min-height:\s*44px/.test(phoneBlock)
     || /\.lobby-phone-option \.modern-select[\s\S]*?min-height:\s*44px/.test(phoneBlock));
-  check('Teams checkbox is a 44pt target',
-    /\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
-  check('Teams checkbox is a styled 44px box, not a native white square',
-    /\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?appearance:\s*none/.test(phoneBlock)
-    && /\.lobby-phone-options \{[\s\S]*?overflow:\s*hidden/.test(phoneBlock)
-    && /max-width:\s*44px/.test(
-      phoneBlock.match(/\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?\}/)?.[0] || ''
-    ));
+  check('Teams is a 114×44 labeled control, not a bare checkbox',
+    /\.lobby-phone-teams-toggle \{[\s\S]*?min-width:\s*114px[\s\S]*?min-height:\s*44px/.test(phoneBlock)
+    && /lobby-phone-teams-toggle/.test(readFileSync(join(root, 'src/ui/lobby.js'), 'utf8')));
+  check('Teams toggle sits in the mark→name→meta options row',
+    /\.lobby-phone-options \{[\s\S]*?overflow:\s*hidden/.test(phoneBlock)
+    && /lobby-phone-teams-name/.test(phoneBlock));
   {
     const lobbySrc = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
     const mobileCard = lobbySrc.slice(
@@ -979,9 +998,16 @@ check('phone placement hints say Tap, desktop stay Click',
     check('390 home verbs have a leading mark',
       /lobby-phone-card-mark/.test(lobbySrc));
   }
-  check('Teams label stays off the checkbox',
-    /\.lobby-phone-teams \{[\s\S]*?gap:\s*10px/.test(phoneBlock)
-    && /\.lobby-phone-teams span \{[\s\S]*?white-space:\s*nowrap/.test(phoneBlock));
+  check('Teams label stays off the control',
+    /\.lobby-phone-teams \{[\s\S]*?gap:\s*8px/.test(phoneBlock)
+    && /\.lobby-phone-teams-name[\s\S]*?white-space:\s*nowrap/.test(phoneBlock));
+  check('setup seat gutter is 8 (no 8+8 padding that made a 26px gap)',
+    /\.lobby-phone-seat \{[\s\S]*?padding:\s*0/.test(phoneBlock)
+    && /\.lobby-phone-factions \{[\s\S]*?gap:\s*8px/.test(phoneBlock)
+    && /gap:\s*4px/.test(phoneBlock.match(/\.lobby-phone-faction-main \{[\s\S]*?\}/)?.[0] || ''));
+  check('deploy chips wrap inside the 500 frame',
+    /\.phone-peek-row \{[\s\S]*?flex-wrap:\s*wrap/.test(phoneBlock)
+    && /\.phone-peek-row \{[\s\S]*?overflow-x:\s*hidden/.test(phoneBlock));
   check('in-game labels ellipsize instead of overlapping',
     /\.phone-menu-title \{[\s\S]*?text-overflow:\s*ellipsis/.test(phoneBlock)
     && /\.territory-tooltip \.tt-header[\s\S]*?text-overflow:\s*ellipsis/.test(phoneBlock)
@@ -1018,8 +1044,8 @@ check('phone placement hints say Tap, desktop stay Click',
         mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: null, territory: land,
       }) === false
       && shouldShowPhoneDeployQty({
-        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: water,
-      }) === false
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'transport', territory: water,
+      }) === true
       && shouldShowPhoneDeployQty({
         mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
       }) === false);
@@ -1454,6 +1480,138 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     && /player-panel--peek \.pp-bottom-actions[\s\S]*?pointer-events:\s*none/.test(phoneBlock));
   check('SCHEMA_VERSION stays 11 after the grammar sweep',
     SCHEMA_VERSION === 11);
+}
+
+console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
+{
+  const openingGs = {
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    isCapital: () => true,
+    playerState: {},
+  };
+  const confirmedGs = {
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    isCapital: (n) => n === 'Mongolia',
+    playerState: { ussr: { capitalTerritory: 'Mongolia' } },
+  };
+  check('opening Place Capital draws no capital star even if isCapital leaked',
+    shouldDrawPhoneCapitalStar('French Indo China', openingGs) === false
+    && shouldDrawPhoneCapitalGlow(openingGs) === false);
+  check('after Confirm the star is on the confirmed land only',
+    shouldDrawPhoneCapitalStar('Mongolia', confirmedGs) === true
+    && shouldDrawPhoneCapitalStar('French Indo China', confirmedGs) === false
+    && shouldDrawPhoneCapitalGlow(confirmedGs) === false);
+  check('glow may return after both capitals (deploy+)',
+    shouldDrawPhoneCapitalGlow({ phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
+  check('select / confirm pulses stay on the tile, not chrome bounce',
+    PHONE_SELECT_PULSE_MS === 150
+    && PHONE_CONFIRM_PULSE_MS === 250);
+  const seas = [
+    { name: 'Coast', isWater: false, connections: ['Open Sea'] },
+    { name: 'Open Sea', isWater: true, connections: ['Coast'] },
+    { name: 'Enemy Sea', isWater: true, connections: ['Coast'] },
+  ];
+  check('legal setup sea is adjacent empty/friendly ocean',
+    isPhoneLegalSetupSeaDest({
+      seaName: 'Open Sea',
+      playerId: 'ussr',
+      territories: seas,
+      getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
+      getUnits: () => [],
+    }) === true
+    && isPhoneLegalSetupSeaDest({
+      seaName: 'Enemy Sea',
+      playerId: 'ussr',
+      territories: seas,
+      getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
+      getUnits: () => [{ owner: 'ger' }],
+    }) === false
+    && isPhoneLegalSetupSeaDest({
+      seaName: 'Coast',
+      playerId: 'ussr',
+      territories: seas,
+      getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
+      getUnits: () => [],
+    }) === false);
+  check('deploy collect includes owned land + legal seas',
+    collectPhoneLegalTerritoryNames({
+      mobile: true,
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      playerId: 'ussr',
+      territories: seas,
+      getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
+      getUnits: () => [],
+    }).includes('Open Sea')
+    && collectPhoneLegalTerritoryNames({
+      mobile: true,
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      playerId: 'ussr',
+      territories: seas,
+      getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
+      getUnits: () => [],
+    }).includes('Open Sea') === false);
+  check('legal sea tap applies on Deploy; unowned land still does not',
+    shouldApplyPhoneSetupLandTap({
+      mobile: true,
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      tappedIsOwnedLand: false,
+      tappedIsLegalSea: true,
+      hasHit: true,
+    }) === true
+    && shouldApplyPhoneSetupLandTap({
+      mobile: true,
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      tappedIsOwnedLand: false,
+      tappedIsLegalSea: false,
+      hasHit: true,
+    }) === false
+    && shouldApplyPhoneSetupLandTap({
+      mobile: true,
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      tappedIsOwnedLand: false,
+      tappedIsLegalSea: true,
+      hasHit: true,
+    }) === false);
+  check('unwrap pulls the far copy onto the dest seed (no Pacific centroid)',
+    Math.abs(unwrapFitX(3000, 200) - (3000 - 3500)) < 0.01
+    && Math.abs(unwrapFitX(80, 2800) - (80 + 3500)) < 0.01);
+  const worldRussians = [
+    { name: 'Ukraine S.S.R.', connections: ['West Russia'], center: [1300, 400] },
+    { name: 'West Russia', connections: ['Ukraine S.S.R.'], center: [1400, 380] },
+    { name: 'Mongolia', connections: ['Buryatia S.S.R.'], center: [2800, 420] },
+    { name: 'Buryatia S.S.R.', connections: ['Mongolia'], center: [2750, 380] },
+    { name: 'Alaska', connections: [], center: [80, 280] },
+  ];
+  const mongolFit = resolvePhoneFitRegionNames({
+    ownedNames: ['Ukraine S.S.R.', 'West Russia', 'Mongolia', 'Buryatia S.S.R.', 'Alaska'],
+    capitalName: 'Mongolia',
+    territories: worldRussians,
+  });
+  check('worldwide + capital Mongolia frames that cluster, not UK/Pacific',
+    mongolFit.includes('Mongolia')
+    && mongolFit.includes('Buryatia S.S.R.')
+    && !mongolFit.includes('Ukraine S.S.R.')
+    && !mongolFit.includes('Alaska'));
+  check('phone hides names at world Fit so stacks are the read',
+    PHONE_MAP_LABEL_MIN_ZOOM === 0.45
+    && shouldHidePhoneMapLabel({ mobile: true, name: 'Germany', zoom: 0.11 }) === true
+    && shouldHidePhoneMapLabel({ mobile: true, name: 'Germany', zoom: 0.6 }) === false);
+  const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const placeCapital = mainSrc.slice(
+    mainSrc.indexOf("case 'place-capital'"),
+    mainSrc.indexOf("case 'open-purchase'"),
+  );
+  check('renderer gates capital stars and pulses the confirmed tile',
+    /shouldDrawPhoneCapitalStar/.test(rendererSrc)
+    && /shouldDrawPhoneCapitalGlow/.test(rendererSrc)
+    && /setPhoneTilePulse/.test(rendererSrc)
+    && /renderPhoneTilePulse/.test(mainSrc)
+    && /PHONE_CONFIRM_PULSE_MS/.test(placeCapital)
+    && !/fitPhoneCamera/.test(placeCapital));
+  check('country outlines take zoom so world Fit is not a 1px hairline',
+    /renderTerritoryOutlines\(ctx, zoom/.test(rendererSrc)
+    && /renderTerritoryOutlines\(ctx, camera\.zoom\)/.test(mainSrc));
 }
 
 if (failures) {

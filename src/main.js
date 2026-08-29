@@ -52,7 +52,16 @@ import { UnitTooltip } from './ui/unitTooltip.js';
 import { TurnSummaryModal, shouldShowTurnSummary } from './ui/turnSummaryModal.js';
 import { initTouchInput, initZoomControls } from './input/touchInput.js';
 import { HandoffScreen } from './ui/handoffScreen.js';
-import { initMobileShell, onMobileShellChange, isMobileShell, applyPhoneCameraFit, collectPhoneLegalTerritoryNames } from './ui/mobileShell.js';
+import {
+  initMobileShell,
+  onMobileShellChange,
+  isMobileShell,
+  applyPhoneCameraFit,
+  collectPhoneLegalTerritoryNames,
+  isPhoneLegalSetupSeaDest,
+  PHONE_SELECT_PULSE_MS,
+  PHONE_CONFIRM_PULSE_MS,
+} from './ui/mobileShell.js';
 import {
   shouldHidePhoneTooltipOn,
   shouldToggleOffPhoneTooltip,
@@ -298,13 +307,22 @@ async function init() {
   getPhoneFitFocus = () => {
     const dests = [];
     if (playerPanel.movePendingDest) dests.push(playerPanel.movePendingDest);
+    if (playerPanel._phoneDeployLandName) dests.push(playerPanel._phoneDeployLandName);
+    const capital = gameState?.getCapital?.(gameState.currentPlayer?.id) || null;
+    if (capital) dests.push(capital);
     if (movementUI.hasUnitsSelected()) {
       dests.push(...(movementUI.getValidDestinations() || []));
     }
     const src = movementUI.getSelectedSource?.();
     return {
-      selectedName: src?.name || playerPanel.selectedTerritory?.name || selectedTerritory?.name || null,
+      selectedName: src?.name
+        || playerPanel._phoneDeployLandName
+        || playerPanel._phoneCapitalLandName
+        || selectedTerritory?.name
+        || capital
+        || null,
       destinationNames: dests,
+      capitalName: capital,
     };
   };
 
@@ -361,6 +379,11 @@ async function init() {
           tooltip.hide();
           unitTooltip.hide();
           hidePhoneTooltips('commit');
+          if (isMobileShell()) {
+            territoryRenderer.setPhoneTilePulse(
+              data.territory, 'confirm', PHONE_CONFIRM_PULSE_MS,
+            );
+          }
           selectedTerritory = null;
           playerPanel._phoneCapitalLandName = null;
           playerPanel.setSelectedTerritory(null);
@@ -859,6 +882,7 @@ async function init() {
   // Pass-and-play handoff overlay (hotseat games only)
   const handoffScreen = new HandoffScreen();
   handoffScreen.el.addEventListener('tacticalrisk:handoff-hidden', () => {
+    hidePhoneTooltips('handoff');
     resizeCanvas();
     fitPhoneCamera();
     kickPaint();
@@ -1976,18 +2000,29 @@ async function init() {
       !hit.isWater
       && gameState.getOwner(hit.name) === gameState.currentPlayer?.id
     );
+    const tappedIsLegalSea = isPhoneLegalSetupSeaDest({
+      seaName: hit.name,
+      playerId: gameState.currentPlayer?.id,
+      territories,
+      getOwner: (name) => gameState.getOwner(name),
+      getUnits: (name) => gameState.getUnitsAt?.(name) || [],
+    });
     if (!shouldApplyPhoneSetupLandTap({
       mobile: true,
       phase: gameState.phase,
       inspected: phoneInspected,
       selectedUnitType: playerPanel.selectedUnitType,
       tappedIsOwnedLand,
+      tappedIsLegalSea,
       hasHit: true,
     })) return false;
     selectedTerritory = hit;
-    playerPanel._phoneCapitalLandName = hit.name;
-    if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT && !hit.isWater) {
+    playerPanel._phoneCapitalLandName = hit.isWater ? null : hit.name;
+    if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
       playerPanel._phoneDeployLandName = hit.name;
+    }
+    if (isMobileShell()) {
+      territoryRenderer.setPhoneTilePulse(hit.name, 'select', PHONE_SELECT_PULSE_MS);
     }
     playerPanel.setSelectedTerritory(hit);
     hud.setLastClick({ landed: true, label: hit.name });
@@ -2471,12 +2506,20 @@ async function init() {
           && !hit.isWater
           && gameState.getOwner(hit.name) === gameState.currentPlayer?.id
         );
+        const tappedIsLegalSea = !!(gameState && isPhoneLegalSetupSeaDest({
+          seaName: hit.name,
+          playerId: gameState.currentPlayer?.id,
+          territories,
+          getOwner: (name) => gameState.getOwner(name),
+          getUnits: (name) => gameState.getUnitsAt?.(name) || [],
+        }));
         if (isMobileShell() && gameState && !shouldApplyPhoneSetupLandTap({
           mobile: true,
           phase: gameState.phase,
           inspected: phoneInspected,
           selectedUnitType: playerPanel.selectedUnitType,
           tappedIsOwnedLand,
+          tappedIsLegalSea,
           hasHit: true,
         })) {
           camera.dirty = true;
@@ -2485,6 +2528,12 @@ async function init() {
         selectedTerritory = hit;
         if (isMobileShell() && gameState?.phase === GAME_PHASES.CAPITAL_PLACEMENT && !hit.isWater) {
           playerPanel._phoneCapitalLandName = hit.name;
+        }
+        if (isMobileShell() && gameState?.phase === GAME_PHASES.UNIT_PLACEMENT) {
+          playerPanel._phoneDeployLandName = hit.name;
+        }
+        if (isMobileShell()) {
+          territoryRenderer.setPhoneTilePulse(hit.name, 'select', PHONE_SELECT_PULSE_MS);
         }
         playerPanel.setSelectedTerritory(hit);
         hud.setLastClick({ landed: true, label: hit.name });
@@ -2623,8 +2672,19 @@ async function init() {
   });
 
   // Render loop
+  let lastPhoneSetupPhase = null;
   function render() {
     camera.update();
+    const setupPhase = gameState?.phase || null;
+    if (setupPhase !== lastPhoneSetupPhase) {
+      if (setupPhase === GAME_PHASES.UNIT_PLACEMENT) {
+        hidePhoneTooltips('deploy-open');
+        tooltip.hide();
+        unitTooltip.hide();
+        playerPanel._phoneCapitalLandName = null;
+      }
+      lastPhoneSetupPhase = setupPhase;
+    }
 
     if (unitRenderer) {
       const nextHighlight = isMobileShell() ? playerPanel.selectedUnitType : null;
@@ -2682,7 +2742,7 @@ async function init() {
         territoryRenderer.renderContinentLabels(ctx, camera.zoom);
 
         // Territory outlines
-        territoryRenderer.renderTerritoryOutlines(ctx);
+        territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
 
         // Cross-water connection lines
         territoryRenderer.renderCrossWaterConnections(ctx, camera.zoom);
@@ -2725,8 +2785,11 @@ async function init() {
             playerId: gameState.currentPlayer?.id,
             territories,
             getOwner: (name) => gameState.getOwner(name),
+            getUnits: (name) => gameState.getUnitsAt?.(name) || [],
           }), gameState.currentPlayer?.color);
           territoryRenderer.renderPhoneLegalHighlights(ctx, camera.zoom);
+          territoryRenderer.renderPhoneTilePulse(ctx, camera.zoom);
+          if (territoryRenderer.phoneTilePulseActive()) camera.dirty = true;
         } else {
           territoryRenderer.setPhoneLegalTerritories([]);
         }

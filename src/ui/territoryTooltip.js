@@ -18,6 +18,8 @@ const PHONE_TOOLTIP_HIDE_REASONS = new Set([
   'resize-leave-phone',
   'auto',
   'commit',
+  'deploy-open',
+  'handoff',
 ]);
 
 export function shouldHidePhoneTooltipOn({ mobile, reason } = {}) {
@@ -151,6 +153,7 @@ export function shouldApplyPhoneSetupLandTap({
   inspected,
   selectedUnitType,
   tappedIsOwnedLand,
+  tappedIsLegalSea,
   hasHit,
 } = {}) {
   if (!mobile) return true;
@@ -158,7 +161,7 @@ export function shouldApplyPhoneSetupLandTap({
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
     void selectedUnitType;
     void hasHit;
-    return !!tappedIsOwnedLand;
+    return !!tappedIsOwnedLand || !!tappedIsLegalSea;
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
     return !!tappedIsOwnedLand;

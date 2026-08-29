@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.26 capital star kill; per-tile legal ink; sea-on-ocean; Fit dest; 4/8 setup
+
+James unique play of V2.81.25 at 500×632: setup spine PASS. FAIL Place Capital opening star+glow on SE Asia; continent-scale dashed red hull (`data-phone-legal=31` collected, not drawn as per-tile ink); Fit framed empty Pacific / world+ocean; Deploy chips overflowed past 500; leftover inspect card into Deploy; setup row gutter 26 and Teams as a 44×44 bare checkbox; sea units could not sit on ocean.
+
+Fix: Place Capital opening paints no capital star/glow until Confirm (`capitalTerritory` only). Owned/legal lands get per-tile faction-color edge + fill-lite (solid at world Fit, not a continent hull). Country borders scale to ~1.25 CSS px at min zoom. User Fit / Deploy-open frames dest/capital cluster (unwrap, not Pacific). Capital Confirm still does not auto-Fit. Sea units use the same named-Confirm/Max pair on legal sea zones. Setup row gutter is 8; mark-to-name 4px; Teams is a 114×44 On/Off control. Deploy chips wrap inside 500. Tile select 150ms / confirm 250ms pulse on the land. SCHEMA 11. GAME_VERSION V2.81.26. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.25 faction-color dashed legal edge
 
 V2.81.24 painted dashed gold + gold fill-lite on owned land before tap, and a drag no longer peeked. Gold still sat next to the ivory map chrome and could read as the same band. Opening Place Capital / Initial Deploy now strokes a Poly dashed faction-color edge (Russians #B22222) plus gold fill-lite on owned land only. Unowned keeps the cream chrome. Pan ≠ peek. SCHEMA 11. GAME_VERSION V2.81.25. No production deploy.

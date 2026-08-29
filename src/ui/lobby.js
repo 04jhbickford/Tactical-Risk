@@ -208,8 +208,10 @@ export class Lobby {
             </select>
           </label>
           <label class="lobby-phone-option lobby-phone-teams">
-            <span>Teams</span>
-            <input type="checkbox" id="teams-enabled" class="lobby-phone-teams-check" ${this.teamsEnabled ? 'checked' : ''} aria-label="Teams">
+            <span class="lobby-phone-teams-name">Teams</span>
+            <button type="button" id="teams-enabled" class="lobby-phone-teams-toggle" aria-pressed="${this.teamsEnabled ? 'true' : 'false'}" aria-label="Teams">
+              ${this.teamsEnabled ? 'On' : 'Off'}
+            </button>
           </label>
         </div>
 
@@ -659,6 +661,19 @@ export class Lobby {
     });
 
     // Teams toggle
+    this.el.querySelector('#teams-enabled')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.currentTarget.type === 'checkbox') {
+        this.teamsEnabled = e.currentTarget.checked;
+      } else {
+        this.teamsEnabled = !this.teamsEnabled;
+      }
+      if (!this.teamsEnabled) {
+        this.playerTeams = {};
+      }
+      this._render();
+    });
     this.el.querySelector('#teams-enabled')?.addEventListener('change', (e) => {
       this.teamsEnabled = e.target.checked;
       if (!this.teamsEnabled) {

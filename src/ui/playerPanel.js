@@ -339,6 +339,13 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
 // 22d4b13 Place Capital Confirm. Peek already gated owned land — mount
 // from the selected / peeked name. Do not owner-check here (a dropped
 // selectedTerritory or id mismatch left James with an empty tray).
+export function phonePairAllowWater({ phase, turnPhase } = {}) {
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
+  return turnPhase === TURN_PHASES.MOBILIZE
+    || turnPhase === TURN_PHASES.COMBAT_MOVE
+    || turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+}
+
 export function resolvePhoneDeployLandName({ stagedLandName, selectedTerritory, allowWater = false } = {}) {
   if (stagedLandName) return stagedLandName;
   if (selectedTerritory && (allowWater || !selectedTerritory.isWater)) return selectedTerritory.name;
@@ -814,7 +821,7 @@ export class PlayerPanel {
       phase: this.gameState?.phase,
       turnPhase: this.gameState?.turnPhase,
     })) return false;
-    if (this.gameState?.phase === GAME_PHASES.UNIT_PLACEMENT) return !territory.isWater;
+    if (this.gameState?.phase === GAME_PHASES.UNIT_PLACEMENT) return true;
     return true;
   }
 
@@ -1449,9 +1456,7 @@ export class PlayerPanel {
             territoryName: resolvePhoneDeployLandName({
               stagedLandName: this._phoneDeployLandName,
               selectedTerritory: this.selectedTerritory,
-              allowWater: turnPhase === TURN_PHASES.MOBILIZE
-                || turnPhase === TURN_PHASES.COMBAT_MOVE
-                || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+              allowWater: phonePairAllowWater({ phase, turnPhase }),
             }),
             destName: this.movePendingDest || '',
           })
@@ -1459,9 +1464,7 @@ export class PlayerPanel {
             territoryName: resolvePhoneDeployLandName({
               stagedLandName: this._phoneDeployLandName,
               selectedTerritory: this.selectedTerritory,
-              allowWater: turnPhase === TURN_PHASES.MOBILIZE
-                || turnPhase === TURN_PHASES.COMBAT_MOVE
-                || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+              allowWater: phonePairAllowWater({ phase, turnPhase }),
             }),
             destName: this.movePendingDest || '',
           }) || ''))
@@ -1529,9 +1532,7 @@ export class PlayerPanel {
       const pairLand = resolvePhoneDeployLandName({
         stagedLandName: this._phoneDeployLandName,
         selectedTerritory: this.selectedTerritory,
-        allowWater: turnPhase === TURN_PHASES.MOBILIZE
-          || turnPhase === TURN_PHASES.COMBAT_MOVE
-          || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+        allowWater: phonePairAllowWater({ phase, turnPhase }),
       });
       if (shouldShowPhonePeekMax({
         mobile: true,
@@ -2712,9 +2713,7 @@ export class PlayerPanel {
     const pairLand = resolvePhoneDeployLandName({
       stagedLandName: this._phoneDeployLandName,
       selectedTerritory: this.selectedTerritory,
-      allowWater: turnPhase === TURN_PHASES.MOBILIZE
-        || turnPhase === TURN_PHASES.COMBAT_MOVE
-        || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+      allowWater: phonePairAllowWater({ phase, turnPhase }),
     });
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {

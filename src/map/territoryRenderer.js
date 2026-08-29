@@ -4,8 +4,11 @@ import {
   isMobileShell,
   phoneLegalOutlineWidth,
   phoneLegalDashPattern,
+  phoneCountryOutlineWidth,
   phoneMapStackOffsets,
   shouldHidePhoneMapLabel,
+  shouldDrawPhoneCapitalStar,
+  shouldDrawPhoneCapitalGlow,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
@@ -84,6 +87,7 @@ export class TerritoryRenderer {
     // Phone setup: current player's legal (owned) land. Desktop unused.
     this.phoneLegalNames = new Set();
     this.peekedLabelName = null;
+    this.phoneTilePulse = null;
 
     // Movement arrow for action log hover
     this.movementArrowFrom = null;
@@ -104,12 +108,39 @@ export class TerritoryRenderer {
     this.phoneLegalEdgeColor = edgeColor || null;
   }
 
+  setPhoneTilePulse(name, kind, ms) {
+    if (!name) {
+      this.phoneTilePulse = null;
+      return;
+    }
+    const now = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now();
+    this.phoneTilePulse = {
+      name,
+      kind: kind === 'confirm' ? 'confirm' : 'select',
+      start: now,
+      until: now + Math.max(1, Number(ms) || 0),
+    };
+  }
+
+  phoneTilePulseActive(now = (typeof performance !== 'undefined' && performance.now)
+    ? performance.now()
+    : Date.now()) {
+    const pulse = this.phoneTilePulse;
+    if (!pulse) return false;
+    if (now >= pulse.until) {
+      this.phoneTilePulse = null;
+      return false;
+    }
+    return true;
+  }
+
   renderPhoneLegalHighlights(ctx, zoom = 1) {
     if (!this.phoneLegalNames.size) return;
 
     // First paint of Place Capital / Initial Deploy — do not wait for peek.
-    // Civ gold-hex: dashed gold + gold fill-lite on owned land only.
-    // Cream/ivory is universal map chrome — never use it as the legal edge.
+    // Per-owned-tile edge (not a continent hull). Cream/ivory is map chrome.
     const outline = phoneLegalOutlineWidth(zoom);
 
     ctx.save();
@@ -131,12 +162,10 @@ export class TerritoryRenderer {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       for (const t of this.territories) {
-        if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
-        if (t.polygons?.length === 1) {
-          this._strokePoly(ctx, t.polygons[0]);
-        } else if (t.polygons?.length > 1) {
-          const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
-          this._strokeEdges(ctx, externalEdges);
+        if (!this.phoneLegalNames.has(t.name)) continue;
+        for (const poly of t.polygons || []) {
+          if (!poly || poly.length < 3) continue;
+          this._strokePoly(ctx, poly);
         }
       }
     };
@@ -153,6 +182,51 @@ export class TerritoryRenderer {
     if (typeof document !== 'undefined') {
       document.documentElement.dataset.phoneLegal = String(this.phoneLegalNames.size);
     }
+  }
+
+  renderPhoneTilePulse(ctx, zoom = 1) {
+    if (!this.phoneTilePulseActive()) return;
+    const pulse = this.phoneTilePulse;
+    const t = this.territoryByName[pulse.name];
+    if (!t) return;
+    const now = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now();
+    const span = Math.max(1, pulse.until - pulse.start);
+    const u = Math.max(0, Math.min(1, (now - pulse.start) / span));
+    const fade = 1 - u;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    const width = Math.max(2, 4 / Math.max(Number(zoom) || 1, 0.15));
+    if (pulse.kind === 'confirm') {
+      ctx.strokeStyle = `rgba(74, 222, 128, ${0.85 * fade})`;
+      ctx.fillStyle = `rgba(74, 222, 128, ${0.18 * fade})`;
+    } else {
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.9 * fade})`;
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.08 * fade})`;
+    }
+    ctx.lineWidth = width;
+    ctx.setLineDash([]);
+    for (const poly of t.polygons || []) {
+      if (!poly || poly.length < 3) continue;
+      this._fillPoly(ctx, poly);
+      this._strokePoly(ctx, poly);
+    }
+    if (pulse.kind === 'confirm') {
+      const [cx, cy] = this._getTerritoryCenter(t);
+      if (cx != null) {
+        const s = Math.max(10, 16 / Math.max(Number(zoom) || 1, 0.2));
+        ctx.strokeStyle = `rgba(255, 255, 255, ${fade})`;
+        ctx.lineWidth = Math.max(2, s * 0.18);
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.45, cy);
+        ctx.lineTo(cx - s * 0.1, cy + s * 0.4);
+        ctx.lineTo(cx + s * 0.5, cy - s * 0.4);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
   }
 
   /** Set territories to highlight from action log hover */
@@ -566,37 +640,36 @@ export class TerritoryRenderer {
   }
 
   /** Draw territory outlines */
-  renderTerritoryOutlines(ctx) {
-    // Land territory borders
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.lineWidth = 1;
+  renderTerritoryOutlines(ctx, zoom = 1) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // Land territory borders — stable CSS-px at world Fit, 1 world-px zoomed in.
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.lineWidth = phoneCountryOutlineWidth(zoom);
 
     for (const t of this.territories) {
       if (t.isWater) continue;
-
-      if (t.polygons.length === 1) {
-        // Single polygon - draw normally
-        this._strokePoly(ctx, t.polygons[0]);
-      } else {
-        // Multiple polygons - draw only external edges (hide internal shared borders)
-        const externalEdges = this._getExternalEdgesWithTolerance(t.polygons, t.name);
-        this._strokeEdges(ctx, externalEdges);
-      }
-    }
-
-    // Sea zone borders - lighter, dashed
-    ctx.strokeStyle = 'rgba(80, 140, 200, 0.35)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([6, 4]);
-
-    for (const t of this.territories) {
-      if (!t.isWater) continue;
-      for (const poly of t.polygons) {
+      for (const poly of t.polygons || []) {
+        if (!poly || poly.length < 3) continue;
         this._strokePoly(ctx, poly);
       }
     }
 
-    ctx.setLineDash([]);
+    // Sea zone dashes alias at world Fit. Skip them when zoomed out.
+    if (Number(zoom) >= 0.4) {
+      ctx.strokeStyle = 'rgba(80, 140, 200, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      for (const t of this.territories) {
+        if (!t.isWater) continue;
+        for (const poly of t.polygons) {
+          this._strokePoly(ctx, poly);
+        }
+      }
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
   }
 
   /**
@@ -947,7 +1020,7 @@ export class TerritoryRenderer {
 
     for (const t of this.territories) {
       if (t.isWater) continue;
-      if (!this.gameState.isCapital(t.name)) continue;
+      if (!shouldDrawPhoneCapitalStar(t.name, this.gameState)) continue;
 
       // Calculate center from all polygons for proper placement on merged territories
       let [cx, cy] = this._getTerritoryCenter(t);
@@ -967,8 +1040,9 @@ export class TerritoryRenderer {
       const { capitalDy } = phoneMapStackOffsets(zoom, { mobile: isMobileShell() });
       const y = cy + (isMobileShell() ? capitalDy : (isZoomedOut ? -20 : -35));
 
-      // ALWAYS draw glow for visibility - larger when zoomed out
-      this._drawCapitalGlow(ctx, cx, y, color, zoom);
+      if (shouldDrawPhoneCapitalGlow(this.gameState)) {
+        this._drawCapitalGlow(ctx, cx, y, color, zoom);
+      }
 
       // Draw "CAPITAL" label when zoomed out for extra visibility
       if (isZoomedOut && zoom < 0.3) {
@@ -1490,6 +1564,7 @@ export class TerritoryRenderer {
         mobile: isMobileShell(),
         name: t.name,
         peekedName: this.peekedLabelName,
+        zoom,
       })) continue;
 
       // Calculate center from all polygons for proper centering of merged territories
