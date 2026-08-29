@@ -652,15 +652,18 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
 }
 
 // Opening Place Capital / Initial Deploy: owned lands must read BEFORE
-// the first tap. A 2 CSS-px dark hairline sat on the default brown
-// borders and vanished (V2.81.21 James FAIL). Poly dashed gold +
-// fill-lite on owned land only — not a second world wash, not peek-only.
+// the first tap AND look different from unowned. Cream/ivory is the
+// baked map chrome (India and East Indies already wear it) — a cream
+// hex-edge is not a legal mark (V2.81.23 James FAIL). Civ gold-hex
+// class: dashed gold + gold fill-lite on owned land only.
 export const PHONE_LEGAL_FILL_ALPHA = 0.2;
-export const PHONE_LEGAL_OUTLINE_CSS_PX = 6;
-export const PHONE_LEGAL_DASH_CSS_PX = 14;
-export const PHONE_LEGAL_GAP_CSS_PX = 7;
-export const PHONE_LEGAL_EDGE_INK = '#1a1206';
-export const PHONE_LEGAL_EDGE_COLOR = '#fff3b0';
+export const PHONE_LEGAL_OUTLINE_CSS_PX = 5;
+export const PHONE_LEGAL_DASH_CSS_PX = 16;
+export const PHONE_LEGAL_GAP_CSS_PX = 8;
+export const PHONE_LEGAL_EDGE_INK = '#3d2800';
+export const PHONE_LEGAL_EDGE_COLOR = '#f5c518';
+export const PHONE_LEGAL_FILL_RGB = '255, 208, 32';
+export const PHONE_LEGAL_CHROME_CREAM = '#fff3b0';
 
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);

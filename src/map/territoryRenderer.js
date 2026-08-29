@@ -9,6 +9,7 @@ import {
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
+  PHONE_LEGAL_FILL_RGB,
 } from '../ui/mobileShell.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
@@ -105,7 +106,8 @@ export class TerritoryRenderer {
     if (!this.phoneLegalNames.size) return;
 
     // First paint of Place Capital / Initial Deploy — do not wait for peek.
-    // Dashed gold + fill-lite on owned land only. No glow, no world wash.
+    // Civ gold-hex: dashed gold + gold fill-lite on owned land only.
+    // Cream/ivory is universal map chrome — never use it as the legal edge.
     const outline = phoneLegalOutlineWidth(zoom);
 
     ctx.save();
@@ -113,7 +115,7 @@ export class TerritoryRenderer {
     ctx.lineCap = 'round';
 
     if (PHONE_LEGAL_FILL_ALPHA > 0) {
-      ctx.fillStyle = `rgba(255, 248, 210, ${PHONE_LEGAL_FILL_ALPHA})`;
+      ctx.fillStyle = `rgba(${PHONE_LEGAL_FILL_RGB}, ${PHONE_LEGAL_FILL_ALPHA})`;
       for (const t of this.territories) {
         if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
         for (const poly of t.polygons || []) {
@@ -137,13 +139,10 @@ export class TerritoryRenderer {
       }
     };
 
-    // Civ hex-edge: dark ring stays ≥2.5 CSS px outside the cream inner
-    // stroke. A thinner-gold-on-wider-ink pair collapsed to a 1px halo
-    // at Fit zoom and read as the default border (V2.81.21 opening FAIL).
     const z = Number(zoom);
     const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-    const inner = Math.max(outline * 0.4, outline - 2.5 / safeZ);
-    ctx.setLineDash([]);
+    const inner = Math.max(outline * 0.45, outline - 2 / safeZ);
+    ctx.setLineDash(phoneLegalDashPattern(zoom));
     strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
     strokeOwned(PHONE_LEGAL_EDGE_COLOR, inner);
 

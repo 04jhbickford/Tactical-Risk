@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.24 gold legal marks; pan ≠ peek
+
+James unique play of V2.81.23 at 500×632: setup spine / named Confirm HOLD. FAIL Rule 5: Place Capital opening painted a solid cream hex-edge that matched the baked map chrome on India and East Indies. Owned Russian land stayed continent green 136,163,70 until peek. A drag that started on a land also peeked that land on pointerup.
+
+Fix: first paint of Place Capital / Initial Deploy draws a dashed Civ gold-hex edge (#f5c518) plus gold fill-lite on owned land only — not cream chrome, not peek-only. Peek commits on pointerup when the gesture moved < 12px; a drag pans without selecting. Confirm row and setup spine unchanged. SCHEMA 11. GAME_VERSION V2.81.24. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.23 legal marks on opening paint
 
 James unique play of V2.81.21 at 500×632: setup spine / 4/8 / named Confirm / camera / land-then-unit HOLD. FAIL Rule 5: Place Capital opening (and Initial Deploy opening) had no owned-land edge. Marks only appeared after tap (white outline + pale fill = peek select). The paint loop already collected owned names; the stroke was a 2 CSS-px dark hairline on the default brown borders, so the opening looked unmarked V2.80.

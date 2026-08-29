@@ -22,6 +22,8 @@ const {
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
   shouldApplyPhoneSetupTapOnPointerDown,
+  shouldCommitPhoneSetupPeekAfterGesture,
+  PHONE_SETUP_PAN_SLOP_PX,
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
@@ -82,6 +84,8 @@ const {
   PHONE_LEGAL_OUTLINE_CSS_PX,
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
+  PHONE_LEGAL_FILL_RGB,
+  PHONE_LEGAL_CHROME_CREAM,
   collectPhoneFitFocusNames,
   expandPhoneFitRegionNames,
   resolvePhoneFitRegionNames,
@@ -131,7 +135,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.23', GAME_VERSION === 'V2.81.23');
+check('GAME_VERSION is V2.81.24', GAME_VERSION === 'V2.81.24');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -519,13 +523,15 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
   check('owned-land fill is fill-lite, not a 55% flood',
     PHONE_LEGAL_FILL_ALPHA > 0
     && PHONE_LEGAL_FILL_ALPHA <= 0.22);
-  check('owned edge is ink + gold, not faction color alone',
-    PHONE_LEGAL_EDGE_INK === '#1a1206'
-    && PHONE_LEGAL_EDGE_COLOR === '#fff3b0'
-    && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_EDGE_INK);
+  check('owned edge is Civ gold, not cream map chrome',
+    PHONE_LEGAL_EDGE_INK === '#3d2800'
+    && PHONE_LEGAL_EDGE_COLOR === '#f5c518'
+    && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_CHROME_CREAM
+    && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_EDGE_INK
+    && PHONE_LEGAL_FILL_RGB === '255, 208, 32');
   check('legal dash is a Poly edge, not a solid hairline',
     phoneLegalDashPattern(0.11)[0] > phoneLegalDashPattern(0.11)[1]
-    && phoneLegalDashPattern(0.11)[0] >= 14 / 0.11 - 0.01);
+    && phoneLegalDashPattern(0.11)[0] >= 16 / 0.11 - 0.01);
   check('desktop/tablet outline helper stays unused at their default zoom',
     phoneLegalOutlineWidth(0.5) === PHONE_LEGAL_OUTLINE_CSS_PX / 0.5);
 }
@@ -572,10 +578,12 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     !!highlight
     && !/0\.55/.test(highlight[0])
     && !/shadowBlur/.test(highlight[0]));
-  check('phone legal highlight is a Civ hex-edge on first paint, not peek-only',
+  check('phone legal highlight is a dashed Civ gold-hex on first paint, not peek-only',
     !!highlight
     && /phoneLegalNames\.size/.test(highlight[0])
-    && /2\.5 \/ safeZ/.test(highlight[0])
+    && /phoneLegalDashPattern/.test(highlight[0])
+    && /PHONE_LEGAL_FILL_RGB/.test(highlight[0])
+    && !/#fff3b0/.test(highlight[0])
     && !/selectedTerritory/.test(highlight[0]));
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
@@ -594,7 +602,8 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     })) === JSON.stringify(['Germany', 'Poland']));
   check('phone legal highlight uses ink + gold edge colors',
     /PHONE_LEGAL_EDGE_INK/.test(rendererSrc)
-    && /PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc));
+    && /PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
+    && /PHONE_LEGAL_FILL_RGB/.test(rendererSrc));
 }
 
 console.log('=== V2.67 phone peek tray (map-first; no persistent unit sheet) ===');
@@ -1201,15 +1210,31 @@ check('Confirm names the pair',
     && /isPhoneHudChromeTarget\(e\.target\)/.test(mainSrc)
     && /if \(!isMobileShell\(\)\) return;/.test(hudSrc));
 }
-check('phone setup peek applies on this pointer, not the leftover mouseup',
+check('phone setup peek does not apply on pointerdown (pan ≠ inspect)',
   shouldApplyPhoneSetupTapOnPointerDown({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
-  }) === true
+  }) === false
   && shouldApplyPhoneSetupTapOnPointerDown({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
-  }) === true
+  }) === false
   && shouldApplyPhoneSetupTapOnPointerDown({
     mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === false);
+check('phone setup peek commits on tap-up, not on a drag',
+  shouldCommitPhoneSetupPeekAfterGesture({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, movedPx: 0,
+  }) === true
+  && shouldCommitPhoneSetupPeekAfterGesture({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, movedPx: 4,
+  }) === true
+  && shouldCommitPhoneSetupPeekAfterGesture({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, movedPx: PHONE_SETUP_PAN_SLOP_PX,
+  }) === false
+  && shouldCommitPhoneSetupPeekAfterGesture({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, movedPx: 40,
+  }) === false
+  && shouldCommitPhoneSetupPeekAfterGesture({
+    mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT, movedPx: 0,
   }) === false);
 check('first setup miss refits the camera on this pointer',
   shouldRefitPhoneSetupHit({
@@ -1321,6 +1346,12 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     /setPhoneLegalTerritories\(collectPhoneLegalTerritoryNames/.test(mainSrc)
     && /renderPhoneLegalHighlights\(ctx, camera\.zoom\)/.test(mainSrc)
     && !/if \(selectedTerritory\)[\s\S]{0,80}renderPhoneLegalHighlights/.test(mainSrc));
+  check('setup peek finishes on pointerup after a tap, not pointerdown',
+    /finishPhoneSetupGesture/.test(mainSrc)
+    && /beginPhoneSetupGesture/.test(mainSrc)
+    && /shouldCommitPhoneSetupPeekAfterGesture/.test(mainSrc)
+    && /addEventListener\('pointerup'/.test(mainSrc)
+    && !/addEventListener\('pointerdown'[\s\S]{0,220}applyPhoneSetupPeekFromPointer/.test(mainSrc));
   check('capital Confirm does not auto-Fit',
     /placeCapital\(data\.territory\)/.test(placeCapital)
     && !/fitPhoneCamera/.test(placeCapital));

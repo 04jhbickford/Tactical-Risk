@@ -62,10 +62,18 @@ export function shouldCommitPhoneSetupTap({ mobile, phase, inspected } = {}) {
   return !inspected;
 }
 
-// After setup enter / Place Capital enter / a tray re-render, mouseup is
-// often wasDrag or hits a stale camera. Apply the peek on this pointer.
+// V2.81.24: peek is a tap (pointerup, no drag). Pointerdown used to
+// select the land, so a pan that started on Ukraine peeked Ukraine.
 export function shouldApplyPhoneSetupTapOnPointerDown({ mobile, phase } = {}) {
-  return !!mobile && isPhoneSetupPlacementPhase(phase);
+  return false;
+}
+
+export const PHONE_SETUP_PAN_SLOP_PX = 12;
+
+// Inspect ≠ pan. A drag pans without committing a peek. A tap peeks.
+export function shouldCommitPhoneSetupPeekAfterGesture({ mobile, phase, movedPx } = {}) {
+  if (!mobile || !isPhoneSetupPlacementPhase(phase)) return false;
+  return Number(movedPx) < PHONE_SETUP_PAN_SLOP_PX;
 }
 
 const PHONE_CAPITAL_CTA_ACTIONS = new Set(['place-capital', 'undo-capital']);

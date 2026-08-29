@@ -61,7 +61,8 @@ import {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
-  shouldApplyPhoneSetupTapOnPointerDown,
+  shouldCommitPhoneSetupPeekAfterGesture,
+  isPhoneSetupPlacementPhase,
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
@@ -184,6 +185,7 @@ async function init() {
     requestAnimationFrame(() => { camera.dirty = true; });
   };
   let phoneSetupPeekThisGesture = false;
+  let phoneSetupGestureStart = null;
   const mapRenderer = new MapRenderer();
   const territoryRenderer = new TerritoryRenderer(territories, continents);
   const territoryMap = new TerritoryMap(territories);
@@ -1900,11 +1902,36 @@ async function init() {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
-  const applyPhoneSetupPeekFromPointer = (e) => {
-    if (!gameState || !shouldApplyPhoneSetupTapOnPointerDown({
+  const beginPhoneSetupGesture = (e) => {
+    if (phoneSetupGestureStart) return;
+    if (!gameState || !isMobileShell() || !isPhoneSetupPlacementPhase(gameState.phase)) return;
+    if (isPhoneHudChromeTarget(e.target)
+      || isPhoneTrayChromeTarget(e.target)
+      || isPhoneCapitalCtaTarget(e.target)) return;
+    phoneSetupGestureStart = { x: e.clientX, y: e.clientY };
+    phoneSetupPeekThisGesture = false;
+  };
+
+  const finishPhoneSetupGesture = (e) => {
+    const start = phoneSetupGestureStart;
+    phoneSetupGestureStart = null;
+    if (!start || !e) return false;
+    const movedPx = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    if (!shouldCommitPhoneSetupPeekAfterGesture({
       mobile: isMobileShell(),
-      phase: gameState.phase,
+      phase: gameState?.phase,
+      movedPx,
     })) return false;
+    if (applyPhoneSetupPeekFromPointer(e)) {
+      phoneSetupPeekThisGesture = true;
+      kickPaint();
+      return true;
+    }
+    return false;
+  };
+
+  const applyPhoneSetupPeekFromPointer = (e) => {
+    if (!gameState || !isMobileShell() || !isPhoneSetupPlacementPhase(gameState.phase)) return false;
     if (isPhoneHudChromeTarget(e.target)
       || isPhoneTrayChromeTarget(e.target)
       || isPhoneCapitalCtaTarget(e.target)) return false;
@@ -2042,35 +2069,31 @@ async function init() {
       }
     }
 
-    if (phoneSetupPeekThisGesture || applyPhoneSetupPeekFromPointer(e)) {
-      phoneSetupPeekThisGesture = true;
-      kickPaint();
-      // Peek selects. The same finger must still be able to pan.
-      camera.onMouseDown(e);
-      canvas.classList.add('panning');
-      return;
-    }
-
+    beginPhoneSetupGesture(e);
     camera.onMouseDown(e);
     canvas.classList.add('panning');
   });
 
   canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (applyPhoneSetupPeekFromPointer(e)) {
-      phoneSetupPeekThisGesture = true;
-      kickPaint();
-    }
+    beginPhoneSetupGesture(e);
   });
 
   // Capture on document so a leftover-tall peek sidebar over a named land
-  // still assigns. Confirm / Undo are skipped inside the peek helper.
+  // still records the gesture. Peek commits on pointerup if it was a tap.
   document.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (applyPhoneSetupPeekFromPointer(e)) {
-      phoneSetupPeekThisGesture = true;
-      kickPaint();
-    }
+    beginPhoneSetupGesture(e);
+  }, true);
+
+  document.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    finishPhoneSetupGesture(e);
+  }, true);
+
+  document.addEventListener('pointercancel', () => {
+    phoneSetupGestureStart = null;
+    phoneSetupPeekThisGesture = false;
   }, true);
 
   canvas.addEventListener('mousemove', (e) => {
