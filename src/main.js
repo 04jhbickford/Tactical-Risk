@@ -2693,6 +2693,8 @@ async function init() {
           territoryRenderer.clearAirMovementVisualization();
         }
 
+        // Opening Place Capital / Initial Deploy: owned/legal edge on this
+        // paint, before any land tap. Peek is not a prerequisite.
         if (isMobileShell() && gameState) {
           territoryRenderer.setPhoneLegalTerritories(collectPhoneLegalTerritoryNames({
             mobile: true,

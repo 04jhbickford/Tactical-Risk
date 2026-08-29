@@ -651,18 +651,27 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
   );
 }
 
-// Screen-space owned *edge* — Polytopia/Civ border ink, not a wash.
-// 2.5 world-px was 0.3 CSS px at ~0.11 (invisible). 8 CSS px + 55% fill shouted.
-// Ink + muted gold so faction fill is never the only owned cue.
-export const PHONE_LEGAL_FILL_ALPHA = 0;
-export const PHONE_LEGAL_OUTLINE_CSS_PX = 2;
-export const PHONE_LEGAL_EDGE_INK = '#2a1f08';
-export const PHONE_LEGAL_EDGE_COLOR = '#c9a227';
+// Opening Place Capital / Initial Deploy: owned lands must read BEFORE
+// the first tap. A 2 CSS-px dark hairline sat on the default brown
+// borders and vanished (V2.81.21 James FAIL). Poly dashed gold +
+// fill-lite on owned land only — not a second world wash, not peek-only.
+export const PHONE_LEGAL_FILL_ALPHA = 0.16;
+export const PHONE_LEGAL_OUTLINE_CSS_PX = 3.5;
+export const PHONE_LEGAL_DASH_CSS_PX = 10;
+export const PHONE_LEGAL_GAP_CSS_PX = 6;
+export const PHONE_LEGAL_EDGE_INK = '#3d2a08';
+export const PHONE_LEGAL_EDGE_COLOR = '#e8c04a';
 
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;
   return Math.max(PHONE_LEGAL_OUTLINE_CSS_PX, PHONE_LEGAL_OUTLINE_CSS_PX / z);
+}
+
+export function phoneLegalDashPattern(zoom) {
+  const z = Number(zoom);
+  const safe = Number.isFinite(z) && z > 0 ? z : 1;
+  return [PHONE_LEGAL_DASH_CSS_PX / safe, PHONE_LEGAL_GAP_CSS_PX / safe];
 }
 
 export function collectPhoneLegalTerritoryNames({

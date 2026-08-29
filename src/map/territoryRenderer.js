@@ -3,6 +3,7 @@
 import {
   isMobileShell,
   phoneLegalOutlineWidth,
+  phoneLegalDashPattern,
   phoneMapStackOffsets,
   shouldHidePhoneMapLabel,
   PHONE_LEGAL_FILL_ALPHA,
@@ -103,14 +104,24 @@ export class TerritoryRenderer {
   renderPhoneLegalHighlights(ctx, zoom = 1) {
     if (!this.phoneLegalNames.size) return;
 
-    // Owned *edge* only — dark ink + muted gold hairline. No wash, no glow.
-    // Faction fill stays on the ownership overlay; this edge is a second cue.
+    // First paint of Place Capital / Initial Deploy — do not wait for peek.
+    // Dashed gold + fill-lite on owned land only. No glow, no world wash.
     const outline = phoneLegalOutlineWidth(zoom);
+    const dash = phoneLegalDashPattern(zoom);
 
     ctx.save();
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
     if (PHONE_LEGAL_FILL_ALPHA > 0) {
-      ctx.fillStyle = `rgba(255, 214, 32, ${PHONE_LEGAL_FILL_ALPHA})`;
+      ctx.fillStyle = `rgba(232, 192, 74, ${PHONE_LEGAL_FILL_ALPHA})`;
+      for (const t of this.territories) {
+        if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
+        for (const poly of t.polygons || []) {
+          if (!poly || poly.length < 3) continue;
+          this._fillPoly(ctx, poly);
+        }
+      }
     }
 
     const strokeOwned = (color, width) => {
@@ -118,12 +129,6 @@ export class TerritoryRenderer {
       ctx.lineWidth = width;
       for (const t of this.territories) {
         if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
-        if (PHONE_LEGAL_FILL_ALPHA > 0) {
-          for (const poly of t.polygons || []) {
-            if (!poly || poly.length < 3) continue;
-            this._fillPoly(ctx, poly);
-          }
-        }
         if (t.polygons?.length === 1) {
           this._strokePoly(ctx, t.polygons[0]);
         } else if (t.polygons?.length > 1) {
@@ -133,8 +138,10 @@ export class TerritoryRenderer {
       }
     };
 
+    ctx.setLineDash(dash);
     strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
-    strokeOwned(PHONE_LEGAL_EDGE_COLOR, Math.max(outline * 0.45, outline - 8));
+    strokeOwned(PHONE_LEGAL_EDGE_COLOR, Math.max(outline * 0.72, outline - 3));
+    ctx.setLineDash([]);
 
     ctx.restore();
   }

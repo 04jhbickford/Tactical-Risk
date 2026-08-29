@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.22 legal marks on opening paint
+
+James unique play of V2.81.21 at 500×632: setup spine / 4/8 / named Confirm / camera / land-then-unit HOLD. FAIL Rule 5: Place Capital opening (and Initial Deploy opening) had no owned-land edge. Marks only appeared after tap (white outline + pale fill = peek select). The paint loop already collected owned names; the stroke was a 2 CSS-px dark hairline on the default brown borders, so the opening looked unmarked V2.80.
+
+Fix: first paint of Place Capital and Initial Deploy draws dashed gold (Poly edge) plus fill-lite on owned land only — not a world wash, not peek-only. Unowned peek stays inspect-only. Setup spine and Confirm row unchanged. SCHEMA 11. GAME_VERSION V2.81.22. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.21 eight P0 visual rules
 
 Living brief: setup spine (mark → name → occupant/meta, one column at 500), 4/8 rhythm, every data row, type, legal marks before tap, named Confirm only primary, three motion beats, labels vs stacks. Occupant is on the same 44pt row; color is a 10pt pip. HUD is flag → power → one phase word. Deploy copy is "to <land>". Peeked tile hides its map name. No bounce. SCHEMA 11. GAME_VERSION V2.81.21. No production deploy.

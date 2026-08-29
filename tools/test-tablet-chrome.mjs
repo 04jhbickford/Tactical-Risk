@@ -77,6 +77,7 @@ const {
   shouldHighlightPhoneLegalTerritories,
   collectPhoneLegalTerritoryNames,
   phoneLegalOutlineWidth,
+  phoneLegalDashPattern,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_OUTLINE_CSS_PX,
   PHONE_LEGAL_EDGE_INK,
@@ -130,7 +131,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.21', GAME_VERSION === 'V2.81.21');
+check('GAME_VERSION is V2.81.22', GAME_VERSION === 'V2.81.22');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -510,19 +511,23 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     shouldToggleOffPhoneTooltip({
       mobile: true, visibleName: 'Germany', tappedName: 'Germany',
     }) === true);
-  check('gold outline is a 2 CSS px ink edge at Fit (not 0.3 CSS px, not 8px glow)',
-    PHONE_LEGAL_OUTLINE_CSS_PX === 2
-    && phoneLegalOutlineWidth(0.11) >= 2 / 0.11 - 0.01
-    && phoneLegalOutlineWidth(0.11) < 30
+  check('gold outline is a ≥3 CSS px dashed edge at Fit (not a 2px hairline on the default border)',
+    PHONE_LEGAL_OUTLINE_CSS_PX >= 3
+    && phoneLegalOutlineWidth(0.11) >= PHONE_LEGAL_OUTLINE_CSS_PX / 0.11 - 0.01
+    && phoneLegalOutlineWidth(0.11) < 40
     && phoneLegalOutlineWidth(0.11) > 2.5);
-  check('owned-land fill is an edge, not a 55% flood',
-    PHONE_LEGAL_FILL_ALPHA === 0);
+  check('owned-land fill is fill-lite, not a 55% flood',
+    PHONE_LEGAL_FILL_ALPHA > 0
+    && PHONE_LEGAL_FILL_ALPHA <= 0.22);
   check('owned edge is ink + gold, not faction color alone',
-    PHONE_LEGAL_EDGE_INK === '#2a1f08'
-    && PHONE_LEGAL_EDGE_COLOR === '#c9a227'
+    PHONE_LEGAL_EDGE_INK === '#3d2a08'
+    && PHONE_LEGAL_EDGE_COLOR === '#e8c04a'
     && PHONE_LEGAL_EDGE_COLOR !== PHONE_LEGAL_EDGE_INK);
+  check('legal dash is a Poly edge, not a solid hairline',
+    phoneLegalDashPattern(0.11)[0] > phoneLegalDashPattern(0.11)[1]
+    && phoneLegalDashPattern(0.11)[0] >= 10 / 0.11 - 0.01);
   check('desktop/tablet outline helper stays unused at their default zoom',
-    phoneLegalOutlineWidth(0.5) === 2 / 0.5);
+    phoneLegalOutlineWidth(0.5) === PHONE_LEGAL_OUTLINE_CSS_PX / 0.5);
 }
 
 console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
@@ -567,6 +572,11 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     !!highlight
     && !/0\.55/.test(highlight[0])
     && !/shadowBlur/.test(highlight[0]));
+  check('phone legal highlight is dashed gold on first paint, not peek-only',
+    !!highlight
+    && /setLineDash/.test(highlight[0])
+    && /phoneLegalNames\.size/.test(highlight[0])
+    && !/selectedTerritory/.test(highlight[0]));
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
   check('tablet 481–900 rail is still 280px after V2.68',
@@ -1307,6 +1317,10 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     mainSrc.indexOf("case 'place-capital'"),
     mainSrc.indexOf("case 'open-purchase'"),
   );
+  check('opening legal marks paint without a selected land',
+    /setPhoneLegalTerritories\(collectPhoneLegalTerritoryNames/.test(mainSrc)
+    && /renderPhoneLegalHighlights\(ctx, camera\.zoom\)/.test(mainSrc)
+    && !/if \(selectedTerritory\)[\s\S]{0,80}renderPhoneLegalHighlights/.test(mainSrc));
   check('capital Confirm does not auto-Fit',
     /placeCapital\(data\.territory\)/.test(placeCapital)
     && !/fitPhoneCamera/.test(placeCapital));
