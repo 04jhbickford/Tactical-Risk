@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.18 Max must not eat Confirm
+
+James unique-deploy play of 7ba5026 / V2.81.17 at 500×632: camera PASS, land-then-unit PASS, Max does not auto-commit PASS. FAIL: Max inherited `pp-confirm-btn` `width:100%` and painted 396×128. Confirm hung off the right edge (~4px, label unreadable).
+
+Fix: Max is a compact 44pt secondary (not the green primary). Confirm stays the wide thumb verb and stays fully on screen at 390 and 500. Place Capital stays Undo + Confirm only. Camera / land-then-unit / Max-does-not-commit unchanged. SCHEMA 11. GAME_VERSION V2.81.18. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.17 James lock: one land+unit grammar
 
 James unique-deploy play of e398ee6 / V2.81.16: (1) Place Capital Confirm yanked the camera (auto-Fit). (2) Land-then-unit still failed on iPhone touch — mouse kept the named land, his device did not. (3) No Max. Sweep: reinforce / attack / fortify still used first-tap-commits or a type-count shop.

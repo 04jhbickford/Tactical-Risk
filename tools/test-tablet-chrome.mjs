@@ -128,7 +128,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.17', GAME_VERSION === 'V2.81.17');
+check('GAME_VERSION is V2.81.18', GAME_VERSION === 'V2.81.18');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -1292,6 +1292,18 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     && !/_applyPhonePairMax[\s\S]{0,200}_commitStagedPlacement/.test(
       panelSrc.slice(panelSrc.indexOf('_applyPhonePairMax')),
     ));
+  {
+    const maxRule = phoneBlock.match(/\.pp-peek-max \{[\s\S]*?\}/)?.[0] || '';
+    const confirmRule = phoneBlock.match(/\.pp-peek-primary-slot \.pp-confirm-btn \{[\s\S]*?\}/)?.[0] || '';
+    check('Max is a compact secondary; Confirm stays the wide primary',
+      /class="pp-peek-max"/.test(panelSrc)
+      && !/class="pp-confirm-btn pp-peek-max"/.test(panelSrc)
+      && /max-width:\s*56px/.test(maxRule)
+      && /flex:\s*0 0 44px/.test(maxRule)
+      && /flex:\s*1 1 auto/.test(confirmRule)
+      && /width:\s*auto/.test(confirmRule)
+      && !/(?<!max-)width:\s*100%/.test(confirmRule));
+  }
   check('pair grammar covers deploy / mobilize / attack / fortify',
     shouldUsePhonePairGrammar({
       mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,

@@ -1541,7 +1541,7 @@ export class PlayerPanel {
         hasUnitType: !!this.selectedUnitType,
       })) {
         html += `
-        <button type="button" class="pp-confirm-btn pp-peek-max" data-action="phone-pair-max" data-unit="${this.selectedUnitType}">
+        <button type="button" class="pp-peek-max" data-action="phone-pair-max" data-unit="${this.selectedUnitType}">
           Max
         </button>`;
       }
