@@ -1345,6 +1345,9 @@ async function init() {
       });
       aiController.setOnStatusUpdate((message) => {
         console.log('[AI Status]', message);
+        if (/places capital|placed capital|deployed in/i.test(message)) {
+          hud.setTableEvent(String(message).replace('places capital in', 'placed capital in'));
+        }
       });
       // Authority gate: in multiplayer only the host (or the offline-host
       // failover client) runs AI turns. Bug 2: additionally, unless the game is

@@ -301,6 +301,7 @@ export class AIController {
       const result = this.gameState.placeInitialUnit(territory, unitType, this.unitDefs);
       if (result.success) {
         placedThisRound++;
+        this._updateStatus(`${player.name} deployed in ${territory}`);
         await this._delay(150); // Small delay for visual feedback
         this._notifyAction('placeUnit', { unitType, territory });
       } else {

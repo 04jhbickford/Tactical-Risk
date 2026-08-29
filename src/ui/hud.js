@@ -4,7 +4,8 @@ import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '..
 import { possessivePhrase } from '../utils/possessive.js';
 import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor } from './mobileShell.js';
 import { resolveHudClarity } from './hudClarity.js';
-import { isBoardSkin } from './boardSkin.js';
+import { isBoardSkin, isNarrowBoardChrome } from './boardSkin.js';
+import { setBoardAudioMuted, isBoardAudioMuted, unlockBoardAudio } from '../audio/boardAudio.js';
 
 export class HUD {
   constructor() {
@@ -32,6 +33,7 @@ export class HUD {
     }
     this.actionLog = null;
     this.lastClick = null;
+    this.tableEvent = '';
     this.clarityCtx = {
       localUserId: null,
       gameCode: null,
@@ -85,6 +87,11 @@ export class HUD {
   setLastClick(lastClick) {
     this.lastClick = lastClick || null;
     this._renderClarity();
+  }
+
+  setTableEvent(message) {
+    this.tableEvent = String(message || '').trim();
+    this._render();
   }
 
   setClarityContext(partial = {}) {
@@ -228,8 +235,13 @@ export class HUD {
       ? '<span class="rail-budget" title="Placed this wave">' + placed + '/' + limit + '</span>'
       : '';
     const phone = isMobileShell();
-    const slip = (!phone && c)
+    const narrow = phone || isNarrowBoardChrome();
+    const slip = (!narrow && c)
       ? '<span class="rail-slip">' + (c.lastAction || '') + (c.click ? ' · ' + c.click : '') + '</span>'
+      : '';
+    const soundLabel = isBoardAudioMuted() ? 'Sound off' : 'Sound on';
+    const eventLine = this.tableEvent
+      ? `<div class="rail-event" aria-live="polite">${this.tableEvent}</div>`
       : '';
 
     const seat = inGame
@@ -237,7 +249,7 @@ export class HUD {
         '<div class="rail-seat" style="--nation:' + player.color + '">'
         + (player.flag ? '<img src="assets/flags/' + player.flag + '" alt="">' : '')
         + '<span class="rail-seat-name">' + player.name + '</span>'
-        + (phone ? '' : '<span class="rail-phase">' + phaseName + '</span>')
+        + (narrow ? '' : '<span class="rail-phase">' + phaseName + '</span>')
         + budget
         + '</div>'
         + slip
@@ -252,10 +264,12 @@ export class HUD {
         <button class="hud-menu-btn rail-stamp" data-action="toggle-menu" title="Menu">☰</button>
         <div class="hud-menu-dropdown ${this.menuOpen ? 'open' : ''}">
           <button class="hud-menu-item" data-action="rules">Rules</button>
+          <button class="hud-menu-item" data-action="toggle-sound">${soundLabel}</button>
           <button class="hud-menu-item" data-action="exit-lobby">Box the game</button>
         </div>
       </div>
       ${seat}
+      ${eventLine}
     `;
     this._bindEvents();
     this._renderClarity();
@@ -456,6 +470,14 @@ export class HUD {
         this.menuTab = btn.dataset.tab;
         this._render();
       });
+    });
+
+    this.el.querySelector('[data-action="toggle-sound"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      unlockBoardAudio();
+      setBoardAudioMuted(!isBoardAudioMuted());
+      this.menuOpen = false;
+      this._render();
     });
 
     // Rules menu item

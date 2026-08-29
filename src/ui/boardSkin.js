@@ -14,6 +14,14 @@ export function isBoardSkin() {
   return document.documentElement.classList.contains('board-skin');
 }
 
+// Chrome box play is often ~500 CSS px, not a true 390. Keep the 480
+// mobile-shell breakpoint frozen; this only tucks overlapping rail chrome.
+export const NARROW_BOARD_CHROME_MAX = 560;
+
+export function isNarrowBoardChrome() {
+  return typeof window !== 'undefined' && window.innerWidth <= NARROW_BOARD_CHROME_MAX;
+}
+
 export function hexToRgba(hex, alpha) {
   const raw = String(hex || '#888').replace('#', '');
   const n = raw.length === 3

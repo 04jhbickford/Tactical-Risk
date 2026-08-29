@@ -810,8 +810,7 @@ check('place-tap inspects first (V3.00-exp phone)',
     && /display:\s*none !important/.test(css));
   check('390px board-skin rail is one 44px strip',
     /html\.board-skin\.mobile-shell #hud\.table-rail \{[\s\S]*?height:\s*44px !important/.test(css)
-    && /html\.board-skin\.mobile-shell \.exp-audio-toggle \{[\s\S]*?min-height:\s*44px !important/.test(css)
-    && /padding-right:\s*168px !important/.test(css));
+    && /html\.board-skin\.mobile-shell #exp-banner,[\s\S]*?display:\s*none !important/.test(css));
   check('board-skin Fit uses the whole poster, not a cluster',
     readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8').includes('camera.fitWorld({ ...insets, fillFrame: true })'));
 }

@@ -28,7 +28,7 @@ import {
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
 import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
 import { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } from '../state/undoPolicy.js';
-import { isBoardSkin } from './boardSkin.js';
+import { isBoardSkin, isNarrowBoardChrome } from './boardSkin.js';
 import {
   capturePanelPointerLock,
   resolveLockedPanelClick,
@@ -972,7 +972,7 @@ export class PlayerPanel {
       if (owner === player.id) {
         buttons.push({
           action: 'place-capital',
-          label: (isBoardSkin() && isMobileShell())
+          label: (isBoardSkin() && (isMobileShell() || isNarrowBoardChrome()))
             ? 'Confirm'
             : `Place Capital: ${this.selectedTerritory.name}`,
           disabled: false,
@@ -2551,25 +2551,12 @@ export class PlayerPanel {
         }
       }
     } else {
-      // Stage from any remaining row. Deploy still needs a legal tile (B29).
       if (ux.needSeaHint && ux.hint) {
         html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
       } else if (ux.stuckWithNaval && ux.hint) {
         html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
       } else {
-        html += `<div class="pp-hint">Stage units, then click a territory you own to Deploy</div>`;
-      }
-      if (landUnits.length > 0) {
-        html += `<div class="pp-unit-category-label">Land</div>`;
-        html += landUnits.map(renderPlacementRow).join('');
-      }
-      if (airUnits.length > 0) {
-        html += `<div class="pp-unit-category-label">Air</div>`;
-        html += airUnits.map(renderPlacementRow).join('');
-      }
-      if (navalUnits.length > 0) {
-        html += `<div class="pp-unit-category-label">Naval</div>`;
-        html += navalUnits.map(renderPlacementRow).join('');
+        html += `<div class="pp-hint">Pick a land first</div>`;
       }
     }
 
