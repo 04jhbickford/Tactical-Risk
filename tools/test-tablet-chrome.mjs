@@ -86,6 +86,7 @@ const {
   shouldAutoCommitPhoneCapital,
   shouldIgnorePhoneSetupCtaAfterPeek,
   PHONE_SETUP_PEEK_CTA_GUARD_MS,
+  resolvePhoneCapitalCta,
   shouldShowPhoneSetupUndo,
   shouldShowSelectUnitsCta,
   PHASE_HINTS,
@@ -115,7 +116,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.4', GAME_VERSION === 'V2.81.4');
+check('GAME_VERSION is V2.81.5', GAME_VERSION === 'V2.81.5');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -899,6 +900,58 @@ check('leftover click after peek cannot commit Place Capital',
   && shouldIgnorePhoneSetupCtaAfterPeek({
     peekedAt: 1000, now: 1100, action: 'undo-capital',
   }) === false);
+{
+  const land = { name: 'Novosibirsk', isWater: false };
+  const cta = resolvePhoneCapitalCta({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    territory: land,
+    playerId: 'russians',
+    getOwner: (name) => (name === 'Novosibirsk' ? 'russians' : null),
+  });
+  const fromPeekOnly = resolvePhoneCapitalCta({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    territory: null,
+    peekTerritory: land,
+    playerId: 'russians',
+    getOwner: (name) => (name === 'Novosibirsk' ? 'russians' : null),
+  });
+  check('owned-land peek resolves Place Capital Confirm',
+    cta?.action === 'place-capital'
+    && cta?.label === 'Place Capital: Novosibirsk'
+    && cta?.territory === 'Novosibirsk'
+    && cta?.disabled === false);
+  check('Confirm still resolves from peek land if selection dropped',
+    fromPeekOnly?.action === 'place-capital'
+    && fromPeekOnly?.territory === 'Novosibirsk');
+  check('unowned or water peek does not mount Confirm',
+    resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: { name: 'Germany', isWater: false },
+      playerId: 'russians',
+      getOwner: () => 'germans',
+    }) === null
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: { name: 'SZ 5', isWater: true },
+      playerId: 'russians',
+      getOwner: () => 'russians',
+    }) === null);
+  check('Confirm CTA hides the Place Capital hint',
+    shouldShowPhoneSetupPeekHint({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT, hasPrimaryCta: true,
+    }) === false
+    && shouldShowPhoneSetupPeekHint({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT, hasPrimaryCta: false,
+    }) === true);
+}
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  check('peek flush-renders Confirm — leftover ignore does not omit the button',
+    /_phoneSetupPeekTerritory = hit/.test(mainSrc)
+    && /setSelectedTerritory\(hit\)/.test(mainSrc)
+    && /flushRender\(\)/.test(mainSrc)
+    && !/setSelectedTerritory\(hit, \{ immediate: false \}\)/.test(mainSrc));
+}
 check('phone setup peek applies on this pointer, not the leftover mouseup',
   shouldApplyPhoneSetupTapOnPointerDown({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,

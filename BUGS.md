@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.5 Confirm mounts after Place Capital peek
+
+James play of sha f028a45 / V2.81.4 at ~500 CSS px: hold 1 PASS (sibling occupant band). Hold 4 peek PARTIAL, Confirm FAIL: first owned-land tap peeked (yellow outline, no star, phase stayed PLACE CAPITAL) but the tray never mounted Confirm — hint + lone Undo only; DOM had no Place Capital button. Re-tap / scroll still stuck.
+
+Cause: V2.81.4 scheduled Confirm on the next frame so a leftover click could not hit it. That rAF never painted the button (or a later flush cancelled it). Leftover-click ignore is a dispatch guard, not a reason to omit Confirm.
+
+Fix: pointerdown on owned land peeks and flush-renders Confirm immediately. `_phoneSetupPeekTerritory` keeps the CTA if `selectedTerritory` drops. place-capital is still ignored for 450ms after that peek. Thumb Confirm is the only commit. Undo stays the 62px ghost beside Confirm. Holds 1–3 unchanged. SCHEMA 11. GAME_VERSION V2.81.5. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.4 peek ≠ commit; seat check on this pointer
 
 James play of sha 30ba311 / V2.81.3 at ~500 CSS px: hold 1 PASS (two seated 48px occupant rows). Hold 4 FAIL: first owned-land tap instantly committed the capital (no Confirm); German AI placed in the same beat. Seat checks painted late (Germans then British appeared together). DEPLOYED THIS ROUND 0/6 was clipped by the Units hint.

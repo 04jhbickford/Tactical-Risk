@@ -305,8 +305,8 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
   return false;
 }
 
-// Peek paints Confirm on the next frame. A leftover click from the same
-// pointer must not hit that new button and commit.
+// Leftover click of the peek pointer must not commit. Confirm still
+// mounts on this peek — ignore the click, do not omit the button.
 export const PHONE_SETUP_PEEK_CTA_GUARD_MS = 450;
 
 export function shouldIgnorePhoneSetupCtaAfterPeek({
@@ -316,6 +316,29 @@ export function shouldIgnorePhoneSetupCtaAfterPeek({
   const at = Number(peekedAt) || 0;
   if (!at) return false;
   return Number(now) - at < PHONE_SETUP_PEEK_CTA_GUARD_MS;
+}
+
+// Place Capital Confirm after a peek. Live selection wins; peekTerritory
+// keeps the button if a later render dropped selectedTerritory.
+export function resolvePhoneCapitalCta({
+  phase,
+  territory = null,
+  peekTerritory = null,
+  playerId = null,
+  getOwner = null,
+} = {}) {
+  if (phase !== GAME_PHASES.CAPITAL_PLACEMENT || !playerId) return null;
+  const land = [territory, peekTerritory].find((t) => t && !t.isWater);
+  if (!land) return null;
+  const owner = typeof getOwner === 'function' ? getOwner(land.name) : land.owner;
+  if (owner !== playerId) return null;
+  return {
+    action: 'place-capital',
+    label: `Place Capital: ${land.name}`,
+    disabled: false,
+    primary: true,
+    territory: land.name,
+  };
 }
 
 export function shouldShowPhoneSetupUndo({
@@ -426,6 +449,7 @@ export class PlayerPanel {
     this._queueLockType = null;
     this._queueGestureApplied = false;
     this._phoneSetupPeekAt = 0;
+    this._phoneSetupPeekTerritory = null;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -959,17 +983,16 @@ export class PlayerPanel {
       });
     }
     // Capital placement — Confirm is the only verb. Own-land tap selects.
-    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT && this.selectedTerritory && !this.selectedTerritory.isWater) {
-      const owner = this.gameState.getOwner(this.selectedTerritory.name);
-      if (owner === player.id) {
-        buttons.push({
-          action: 'place-capital',
-          label: `Place Capital: ${this.selectedTerritory.name}`,
-          disabled: false,
-          primary: true,
-          territory: this.selectedTerritory.name
-        });
-      }
+    // Peek land keeps Confirm in the DOM if selectedTerritory was dropped.
+    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      const capitalCta = resolvePhoneCapitalCta({
+        phase,
+        territory: this.selectedTerritory,
+        peekTerritory: this._phoneSetupPeekTerritory,
+        playerId: player.id,
+        getOwner: (name) => this.gameState.getOwner(name),
+      });
+      if (capitalCta) buttons.push(capitalCta);
     }
     // Initial unit placement — Deploy stays on the peek CTA (not clipped
     // in the tray body). Done only after the queue is empty.

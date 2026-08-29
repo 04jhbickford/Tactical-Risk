@@ -356,6 +356,7 @@ async function init() {
           unitTooltip.hide();
           hidePhoneTooltips('commit');
           selectedTerritory = null;
+          playerPanel._phoneSetupPeekTerritory = null;
           playerPanel.setSelectedTerritory(null);
           playerPanel.flushRender();
           hud._render();
@@ -1935,9 +1936,11 @@ async function init() {
     })) return false;
     selectedTerritory = hit;
     playerPanel._phoneSetupPeekAt = Date.now();
-    // Schedule Confirm on the next frame so this pointer's leftover click
-    // cannot hit the new button and auto-commit (inspect≠commit).
-    playerPanel.setSelectedTerritory(hit, { immediate: false });
+    playerPanel._phoneSetupPeekTerritory = hit;
+    // Mount Confirm now. Leftover click of this pointer is ignored in
+    // _dispatchAction — do not omit the button (V2.81.4 next-frame skip).
+    playerPanel.setSelectedTerritory(hit);
+    playerPanel.flushRender();
     hud.setLastClick({ landed: true, label: hit.name });
     hud._render();
     kickPaint();
