@@ -222,7 +222,7 @@ export class Lobby {
       <div class="lobby-phone-seat${isSelected ? ' selected' : ''}" data-player="${faction.id}">
         <div class="player-card modern lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
           <div class="lobby-phone-faction-main">
-            <div class="player-avatar" style="border-color: ${currentColor?.color || faction.color}">
+            <div class="player-avatar lobby-phone-faction-logo" style="border-color: ${currentColor?.color || faction.color}">
               <img src="assets/flags/${faction.flag}" alt="${faction.name}">
             </div>
             <div class="lobby-phone-faction-copy">

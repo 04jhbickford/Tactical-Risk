@@ -17992,6 +17992,8 @@ iframe[title="Vercel Live Feedback"] {
   .player-card.modern.lobby-phone-faction,
   .lobby-phone-faction.selected,
   .player-card.modern.lobby-phone-faction.selected {
+    display: flex;
+    flex-direction: column;
     flex: 0 0 auto;
     flex-shrink: 0;
     height: auto;
@@ -18003,6 +18005,7 @@ iframe[title="Vercel Live Feedback"] {
     background: transparent;
     overflow: hidden;
     box-shadow: none;
+    align-items: stretch;
   }
 
   .lobby-phone-faction:hover,
@@ -18017,19 +18020,43 @@ iframe[title="Vercel Live Feedback"] {
     background: transparent;
   }
 
+  /* One row for every seat: logo | name + status | check.
+     Logos share a left gutter. Seated vs unseated must not
+     re-center the roundel in its own cell. */
   .lobby-phone-faction-main {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
+    justify-content: flex-start;
     gap: 12px;
     min-height: 44px;
     min-width: 0;
+    width: 100%;
+  }
+
+  .lobby-phone-faction-main .player-avatar,
+  .lobby-phone-faction-logo,
+  .lobby-phone-faction.selected .lobby-phone-faction-logo,
+  .player-card.modern.lobby-phone-faction .player-avatar,
+  .player-card.modern.lobby-phone-faction.selected .player-avatar,
+  .player-card.modern.lobby-phone-faction:hover .player-avatar {
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    margin: 0;
+    align-self: center;
+    transform: none;
   }
 
   .lobby-phone-faction-copy {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    gap: 8px;
   }
 
   .lobby-phone-faction-name {
@@ -18062,8 +18089,10 @@ iframe[title="Vercel Live Feedback"] {
 
   .lobby-phone-faction-on,
   .lobby-phone-faction-off {
+    flex: 0 0 auto;
     font-size: 12px;
     color: #94a3b8;
+    white-space: nowrap;
   }
 
   .lobby-phone-faction-tools {

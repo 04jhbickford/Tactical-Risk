@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.19 setup logos share one left gutter
+
+James play of V2.81.18 at ~500: seated Russians/Germans put the roundel optically centered above the name. Unseated British sat left of "Tap to add". Logos did not share a vertical axis.
+
+Fix: every phone faction card is one row — logo left (42px gutter), name + Selected/Tap to add on the same baseline, check at the end. Seated vs unseated does not re-center the roundel. Occupant Human/AI, Teams, Start Game, and in-game HOLDs (camera / land-then-unit / Max / Confirm) unchanged. SCHEMA 11. GAME_VERSION V2.81.19. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.18 Max must not eat Confirm
 
 James unique-deploy play of 7ba5026 / V2.81.17 at 500×632: camera PASS, land-then-unit PASS, Max does not auto-commit PASS. FAIL: Max inherited `pp-confirm-btn` `width:100%` and painted 396×128. Confirm hung off the right edge (~4px, label unreadable).
