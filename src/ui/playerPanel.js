@@ -20,6 +20,7 @@ import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
   applyPlaceQueueDelta,
   applyPlaceQueueMax,
+  canAddToPlaceQueue,
   canStagePlaceQueue,
   quantityAvailableForType,
   expandPlaceQueue,
@@ -252,9 +253,8 @@ export function resolvePhaseHint(phase, turnPhase) {
 // (purchase / mobilize / tech stay empty there).
 export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-    return selectedUnitType
-      ? 'Select a territory, then Deploy'
-      : 'Tap a territory to select';
+    void selectedUnitType;
+    return 'Tap your land, then Deploy';
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land, then Confirm';
   const base = resolvePhaseHint(phase, turnPhase);
@@ -269,7 +269,8 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
 
 // Place Capital Confirm is the verb. Do not also show a hint line.
 export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
-  if (phase === GAME_PHASES.CAPITAL_PLACEMENT && hasPrimaryCta) return false;
+  if (hasPrimaryCta && (phase === GAME_PHASES.CAPITAL_PLACEMENT
+    || phase === GAME_PHASES.UNIT_PLACEMENT)) return false;
   return true;
 }
 
@@ -280,10 +281,12 @@ export function shouldShowSelectUnitsCta({
   totalQueued = 0,
   showDone = false,
 } = {}) {
-  return !!mobile
-    && phase === GAME_PHASES.UNIT_PLACEMENT
-    && Number(totalQueued) === 0
-    && !showDone;
+  void mobile;
+  void phase;
+  void totalQueued;
+  void showDone;
+  // Peek verb is Deploy. Do not mount a grey "Select units" no-op.
+  return false;
 }
 
 // After a place, keep the type. If it is exhausted (or never set), peek
@@ -859,7 +862,7 @@ export class PlayerPanel {
     // Desktop keeps the full sheet + tabs.
     const mobile = isMobileShell();
     if (mobile && (this._peekPhase !== phase || this._peekTurnPhase !== turnPhase)) {
-      this.trayExpanded = phase === GAME_PHASES.UNIT_PLACEMENT;
+      this.trayExpanded = false;
       this.phoneDetentTab = 'actions';
       this._peekPhase = phase;
       this._peekTurnPhase = turnPhase;
@@ -1014,6 +1017,13 @@ export class PlayerPanel {
         }
       } else if (ux.needSeaHint && ux.hint) {
         warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
+      } else if (isMobileShell()) {
+        buttons.push({
+          action: 'confirm-placement',
+          label: 'Deploy',
+          disabled: true,
+          primary: true,
+        });
       }
     }
 
@@ -1045,32 +1055,21 @@ export class PlayerPanel {
     // illegal/disabled actions stay hidden (not greyed over another green).
     // Peek stack: phase hint (own row) + unit/action chips + thumb-zone CTA.
     const mobile = isMobileShell();
-    if (mobile && phase === GAME_PHASES.UNIT_PLACEMENT && buttons.length === 0) {
-      const placeUX = this._getInitialPlacementUX(player);
-      if (shouldShowSelectUnitsCta({
-        mobile: true,
-        phase,
-        totalQueued: placeUX.totalQueued || 0,
-        showDone: !!placeUX.ux?.showDone,
-      })) {
-        buttons.push({
-          action: 'confirm-placement',
-          label: 'Select units',
-          disabled: true,
-          primary: true,
-          selectUnits: true,
-        });
-      }
-    }
     let peekHint = '';
     let peekRow = '';
     if (mobile) {
-      const pendingSelect = buttons.find(b => b.selectUnits);
-      buttons = pickMobilePrimaryButtons(buttons.filter(b => !b.selectUnits));
-      if (pendingSelect && buttons.length === 0) buttons = [pendingSelect];
+      const pendingGhost = buttons.find(b => b.selectUnits
+        || (b.action === 'confirm-placement' && b.disabled));
+      buttons = pickMobilePrimaryButtons(buttons.filter(b => !b.selectUnits
+        && !(b.action === 'confirm-placement' && b.disabled)));
+      if (pendingGhost && buttons.length === 0) buttons = [pendingGhost];
       const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
-      const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
-      peekHint = shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta: buttons.length > 0 })
+      const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase })
+        && !buttons.some(b => b && !b.disabled);
+      peekHint = shouldShowPhoneSetupPeekHint({
+        phase,
+        hasPrimaryCta: buttons.some(b => b && !b.disabled),
+      })
         ? (trayOwnsHint
           ? resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType)
           : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType) || ''))
@@ -2295,6 +2294,7 @@ export class PlayerPanel {
   _renderPhonePeekRow(player, phase, turnPhase) {
     if (!shouldShowPhonePeekUnitRow({ mobile: true, phase, turnPhase })) return '';
     let chips = '';
+    let qty = '';
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
       const units = knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs);
@@ -2306,6 +2306,24 @@ export class PlayerPanel {
             ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
             <span class="phone-peek-count">${unit.quantity}</span>
           </button>`;
+      }
+      if (this.selectedUnitType) {
+        const queued = Number(this.placementQueue?.[this.selectedUnitType]) || 0;
+        const available = quantityAvailableForType(units, this.selectedUnitType);
+        const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+        const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+        const canAdd = canAddToPlaceQueue({
+          queue: this.placementQueue || {},
+          unitType: this.selectedUnitType,
+          available,
+          slotsRemaining: limit - placedThisRound,
+        });
+        qty = `<div class="phone-peek-qty">
+          <button type="button" class="phone-peek-qty-btn" data-action="place-queue" data-unit="${this.selectedUnitType}" data-delta="-1" ${queued < 1 ? 'disabled' : ''} aria-label="Remove unit">−</button>
+          <span class="phone-peek-qty-count">${queued}</span>
+          <button type="button" class="phone-peek-qty-btn" data-action="place-queue" data-unit="${this.selectedUnitType}" data-delta="1" ${canAdd ? '' : 'disabled'} aria-label="Add unit">+</button>
+          <button type="button" class="phone-peek-qty-btn phone-peek-qty-max" data-action="place-queue-max" data-unit="${this.selectedUnitType}" ${canAdd ? '' : 'disabled'} aria-label="Max">Max</button>
+        </div>`;
       }
     } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.PURCHASE) {
       const pending = this.gameState.getPendingPurchases?.() || [];
@@ -2344,7 +2362,10 @@ export class PlayerPanel {
       chips += `<button type="button" class="phone-peek-chip phone-peek-chip-wide" data-action="roll-tech" aria-label="Roll tech">Roll</button>`;
     }
 
-    if (!chips) return '';
+    if (!chips && !qty) return '';
+    if (qty) {
+      return `<div class="phone-peek-tools"><div class="phone-peek-row">${chips}</div>${qty}</div>`;
+    }
     return `<div class="phone-peek-row">${chips}</div>`;
   }
 

@@ -157,7 +157,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.9', GAME_VERSION === 'V2.81.9');
+check('GAME_VERSION is V2.81.10', GAME_VERSION === 'V2.81.10');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1347,8 +1347,8 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
   check('B38: boot path calls shouldAutoResumeLastMatch',
     mainSrc.includes('shouldAutoResumeLastMatch')
     && mainSrc.includes('startMultiplayerGame(lastAtBoot.gameId'));
-  check('B38: initial deploy does not peek-hide + / Max / Deploy',
-    shouldPeekPhoneTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
+  check('B38: initial deploy peeks chips + Deploy (not a covering sheet)',
+    shouldPeekPhoneTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
   check('B38: sidebar z-index beats zoom-controls',
     /#sidebar \{[\s\S]*?z-index:\s*60/.test(readFileSync(join(root, 'style.css'), 'utf8')));
   const panelSrcB38 = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');

@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.10 Initial Deployment peeks like Place Capital
+
+James unique-deploy play of 3761692 / V2.81.9 at ~500×640: holds 1–4. After Confirm on Mongolia the board was gone — opaque 4-tab Units/Players/Territory/Log sheet, grey Select units, Map/⋯ and a list puck on the art. He could not pan. Menus stacked.
+
+Cause: `shouldPeekPhoneTray` forced UNIT_PLACEMENT open (`trayExpanded = true`). Peek hid +/−/MAX/Deploy in `.phone-tray-body`, so deploy stayed a covering sheet. Setup pointerdown peeked and returned without starting the camera, so a land press could not pan.
+
+Fix: Initial Deployment peeks (chips that scroll + pinned +/−/MAX + one thumb Deploy). Players/Territory/Log stay in the ⋯ sheet. No detent tabs or ▾ list. Owned-land tap peeks; Deploy commits. Same finger can pan after peek. Zoom/Fit/minimap stay off the art until Map. Holds 1–4 unchanged. SCHEMA 11. GAME_VERSION V2.81.10. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.9 Place Capital peek assigns on a 500×640 named-land tap
 
 James unique-deploy play of 6894df7 / V2.81.8 at ~500×640 (not 844): hold 1 PASS. Hold 4 FAIL. One tap on Ukrainian S.S.R. (named land): yellow outline, no star, phase stayed PLACE CAPITAL. Thumb tray empty — hint only, no Confirm, no Undo. Scrolling the tray cleared the highlight.

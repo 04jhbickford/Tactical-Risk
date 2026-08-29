@@ -362,6 +362,7 @@ async function init() {
           playerPanel.setSelectedTerritory(null);
           playerPanel.flushRender();
           hud._render();
+          if (isMobileShell()) fitPhoneCamera();
           kickPaint();
           notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
@@ -2031,6 +2032,9 @@ async function init() {
     if (phoneSetupPeekThisGesture || applyPhoneSetupPeekFromPointer(e)) {
       phoneSetupPeekThisGesture = true;
       kickPaint();
+      // Peek selects. The same finger must still be able to pan.
+      camera.onMouseDown(e);
+      canvas.classList.add('panning');
       return;
     }
 

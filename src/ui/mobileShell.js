@@ -110,17 +110,20 @@ export function shouldShowPhoneChromeTabs({ mobile } = {}) {
   return !mobile;
 }
 
-// Place Capital expand was an empty Units tab bar that ate the map.
+// Place Capital / Initial Deployment expand was a 4-tab sheet that ate
+// the map. Players / Territory / Log live in the ⋯ sheet only.
 export function shouldShowPhoneDetentTabs({ mobile, expanded, phase } = {}) {
   if (!mobile || !expanded) return false;
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return false;
   return true;
 }
 
-// Capital peek is hint + Confirm. Players / Log stay behind ⋯.
+// Setup peek is hint + chips + one thumb verb. No ▾ covering list.
 export function shouldShowPhoneTrayToggle({ mobile, phase } = {}) {
   if (!mobile) return false;
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return false;
   return true;
 }
 
@@ -178,6 +181,8 @@ export function shouldShowPhonePeekUnitRow({ mobile, phase, turnPhase } = {}) {
 
 // Default phone chrome is map + thin peek. Expand is opt-in.
 // Air-landing / move-confirm keep the body up so those flows stay visible.
+// Initial Deployment peeks the same way Place Capital does — chips +
+// thumb Deploy, not a covering Units / Players / Territory / Log sheet.
 export function shouldPeekPhoneTray({
   mobile,
   expanded,
@@ -185,12 +190,10 @@ export function shouldPeekPhoneTray({
   movePending,
   phase,
 } = {}) {
+  void phase;
   if (!mobile) return false;
   if (expanded) return false;
   if (airLanding || movePending) return false;
-  // B38/B39: peek hides .phone-tray-body (the + / Max / Undo / Deploy
-  // sheet). Initial deployment must stay open at default zoom.
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) return false;
   return true;
 }
 

@@ -116,7 +116,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.9', GAME_VERSION === 'V2.81.9');
+check('GAME_VERSION is V2.81.10', GAME_VERSION === 'V2.81.10');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -365,10 +365,13 @@ check('desktop Place Capital does not collapse the sheet',
   shouldCollapseMobileTray({ mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === false);
 check('phone Place Capital collapses to peek (one hint)',
   shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT }) === true);
-check('phone unit-placement stays open so + / Max / Deploy are visible',
-  shouldPeekPhoneTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
-  && shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
-  && shouldUsePhonePlacementTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
+check('phone unit-placement peeks like Place Capital (chips + Deploy)',
+  shouldPeekPhoneTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
+  && shouldCollapseMobileTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
+  && shouldUsePhonePlacementTray({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
+  && shouldPeekPhoneTray({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, expanded: true,
+  }) === false);
 check('desktop unit-placement does not use the phone tray',
   shouldUsePhonePlacementTray({ mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT }) === false);
 check('phone purchase keeps a body region (no permanent tabs)',
@@ -614,8 +617,8 @@ check('inspect hold does not commit a setup tap',
   && shouldCommitPhoneSetupTap({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
   }) === true);
-check('phone deploy hint is Tap a territory to select',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a territory to select');
+check('phone deploy hint is Tap your land, then Deploy',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap your land, then Deploy');
 check('phone capital hint is Tap your land, then Confirm',
   resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land, then Confirm'
   && shouldShowPhoneSetupPeekHint({
@@ -806,9 +809,9 @@ check('phone setup undo is required for place and last capital',
   && shouldShowPhoneSetupUndo({
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
   }) === false);
-check('selected type changes the deploy hint to select then Deploy',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Select a territory, then Deploy'
-  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a territory to select');
+check('deploy peek hint is Tap your land, then Deploy',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap your land, then Deploy'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap your land, then Deploy');
 check('place-tap still does not inspect (V2.69 split stays)',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
   && shouldInspectPhoneHold({
@@ -835,7 +838,10 @@ check('Place Capital does not expand an empty Units tab bar',
   }) === false
   && shouldShowPhoneDetentTabs({
     mobile: true, expanded: true, phase: GAME_PHASES.UNIT_PLACEMENT,
-  }) === true);
+  }) === false
+  && shouldShowPhoneTrayToggle({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+  }) === false);
 check('desktop still has no phone detent tabs',
   shouldShowPhoneDetentTabs({
     mobile: false, expanded: true, phase: GAME_PHASES.UNIT_PLACEMENT,
@@ -886,6 +892,9 @@ check('phone placement hints say Tap, desktop stay Click',
   check('phone zoom/minimap stay off the art until Map is open',
     /#zoom-controls,\s*#minimap \{\s*display:\s*none/.test(phoneBlock)
     && /html\.mobile-shell\.map-tools-open #zoom-controls/.test(phoneBlock));
+  check('deploy peek keeps +/−/Max beside chips, not a covering sheet',
+    /\.phone-peek-qty-btn \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock)
+    && /html\.mobile-shell #sidebarClose \{[\s\S]*?display:\s*none/.test(phoneBlock));
   check('phone body Deploy is hidden so the peek CTA is the on-screen verb',
     /html\.mobile-shell \.pp-placement-actions \{\s*display:\s*none/.test(phoneBlock));
   check('Deploy at 0 is a visible ghost Select units, not a live blue',
@@ -938,6 +947,7 @@ check('inspect≠commit still holds — tap never auto-places capital',
     && /landName: this\._phoneCapitalLandName/.test(panelSrc)
     && /shouldIgnorePanelBoxForPhoneCapitalPeek/.test(mainSrc)
     && /document\.addEventListener\('pointerdown'/.test(mainSrc)
+    && /camera\.onMouseDown\(e\)/.test(mainSrc)
     && !/_capitalCtaArmed/.test(panelSrc)
     && !/shouldIgnorePhoneSetupCtaAfterPeek/.test(panelSrc));
 }
@@ -947,7 +957,7 @@ check('Place Capital peek ignores the leftover-tall panel box',
   }) === true
   && shouldIgnorePanelBoxForPhoneCapitalPeek({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
-  }) === false
+  }) === true
   && shouldIgnorePanelBoxForPhoneCapitalPeek({
     mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT,
   }) === false);
@@ -995,6 +1005,20 @@ check('own-land Place Capital tap applies (peek + Confirm), miss does not clear'
     inspected: false,
     tappedIsOwnedLand: false,
     hasHit: false,
+  }) === false
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    inspected: false,
+    tappedIsOwnedLand: true,
+    hasHit: true,
+  }) === true
+  && shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.UNIT_PLACEMENT,
+    inspected: false,
+    tappedIsOwnedLand: false,
+    hasHit: true,
   }) === false);
 check('turn summary never covers local Place Capital',
   shouldShowTurnSummary({
@@ -1012,15 +1036,12 @@ check('turn summary never covers local Place Capital',
     phase: GAME_PHASES.PLAYING,
     isMultiplayer: true,
   }) === true);
-check('Select units CTA only when phone deploy queue is empty',
+check('Select units ghost is not the peek Deploy verb',
   shouldShowSelectUnitsCta({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 0, showDone: false,
-  }) === true
-  && shouldShowSelectUnitsCta({
-    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 2, showDone: false,
   }) === false
   && shouldShowSelectUnitsCta({
-    mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 0, showDone: false,
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 2, showDone: false,
   }) === false);
 check('phone tooltip hides on capital commit',
   shouldHidePhoneTooltipOn({ mobile: true, reason: 'commit' }) === true);

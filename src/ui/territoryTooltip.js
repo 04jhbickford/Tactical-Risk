@@ -78,7 +78,7 @@ export function isPhoneCapitalCtaTarget(target) {
 // Place Capital map taps must assign even when a leftover-tall peek
 // sidebar covers the land. Only Confirm / Undo are panel hits.
 export function shouldIgnorePanelBoxForPhoneCapitalPeek({ mobile, phase } = {}) {
-  return !!mobile && phase === GAME_PHASES.CAPITAL_PLACEMENT;
+  return !!mobile && isPhoneSetupPlacementPhase(phase);
 }
 
 // First tap after Start / handoff / a chrome reflow often misses because
@@ -103,7 +103,8 @@ export function shouldApplyPhoneSetupLandTap({
   if (inspected) return false;
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
     void selectedUnitType;
-    return !!hasHit;
+    void hasHit;
+    return !!tappedIsOwnedLand;
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
     return !!tappedIsOwnedLand;

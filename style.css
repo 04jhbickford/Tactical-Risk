@@ -16969,6 +16969,10 @@ html, body {
     z-index: 70;
   }
 
+  html.mobile-shell #sidebarClose {
+    display: none;
+  }
+
   /* One phase chip in #hud. Kill the ticker triple-repeat + stale last action. */
   html.mobile-shell #hud-clarity {
     display: none !important;
@@ -17432,6 +17436,59 @@ html, body {
     font-size: 13px;
     line-height: 1.35;
     color: #e2e8f0;
+  }
+
+  .phone-peek-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
+  .phone-peek-tools .phone-peek-row {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .phone-peek-qty {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .phone-peek-qty-btn {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f8fafc;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .phone-peek-qty-btn:disabled {
+    opacity: 0.4;
+  }
+
+  .phone-peek-qty-max {
+    width: auto;
+    min-width: 44px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .phone-peek-qty-count {
+    min-width: 16px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 800;
+    color: #fde68a;
   }
 
   .phone-peek-row {
