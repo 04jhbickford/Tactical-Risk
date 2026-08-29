@@ -1643,6 +1643,11 @@ html.board-skin .felt-nation-card.ai-seated .felt-occupant-chevron {
 }
 
 html.board-skin .felt-deal {
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 html.board-skin .felt-deal-rail {
   display: flex;
