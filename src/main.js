@@ -2739,7 +2739,13 @@ async function init() {
           territoryRenderer.renderDragDestination(ctx);
         }
 
-        // Labels
+        // Labels — hide the peeked/owned stack tile so the flag is the read.
+        territoryRenderer.peekedLabelName = isMobileShell()
+          ? (playerPanel?._phoneDeployLandName
+            || playerPanel?._phoneCapitalLandName
+            || selectedTerritory?.name
+            || null)
+          : null;
         territoryRenderer.renderLabels(ctx, camera.zoom);
 
         // Ownership flags (small flags on each territory)

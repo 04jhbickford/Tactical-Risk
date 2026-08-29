@@ -44,6 +44,8 @@ const {
   shouldHideAllGameChrome,
   shouldHideTurnActionChrome,
   formatMobilePhaseLabel,
+  formatMobilePhaseWord,
+  shouldHidePhoneMapLabel,
   formatMobilePlayerMeta,
   shouldCollapseMobileTray,
   shouldPeekPhoneTray,
@@ -128,7 +130,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.20', GAME_VERSION === 'V2.81.20');
+check('GAME_VERSION is V2.81.21', GAME_VERSION === 'V2.81.21');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -245,6 +247,13 @@ check('iPad landscape 1024×768 not phone', shouldUseMobileShell(1024, 768) === 
 console.log('=== V2.63 phase identity (not the tablet 9px / hidden-dots path) ===');
 check('3/7 Combat Movement',
   formatMobilePhaseLabel(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === '3/7 Combat Movement');
+check('HUD phase is one word',
+  formatMobilePhaseWord(GAME_PHASES.UNIT_PLACEMENT, null) === 'Deploy'
+  && formatMobilePhaseWord(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Attack');
+check('peeked tile hides its map label',
+  shouldHidePhoneMapLabel({ mobile: true, name: 'Novosibirsk', peekedName: 'Novosibirsk' }) === true
+  && shouldHidePhoneMapLabel({ mobile: true, name: 'China', peekedName: 'Novosibirsk' }) === false
+  && shouldHidePhoneMapLabel({ mobile: false, name: 'Novosibirsk', peekedName: 'Novosibirsk' }) === false);
 check('1/7 Develop Tech',
   formatMobilePhaseLabel(GAME_PHASES.PLAYING, TURN_PHASES.DEVELOP_TECH) === '1/7 Develop Tech');
 check('7/7 Collect Income',
@@ -355,6 +364,14 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     /phone-menu-sheet/.test(phoneBlock) && /phone-menu-row/.test(phoneBlock));
   check('phone menu rows are ≥44px',
     /\.phone-menu-row[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  {
+    const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
+    check('⋯ rows are mark → label → trailing meta, not emoji posters',
+      /phone-menu-mark/.test(hudSrc)
+      && /phone-menu-label/.test(hudSrc)
+      && /phone-menu-meta/.test(hudSrc)
+      && !/📊|🗺|📜|📖|💾/.test(hudSrc.slice(hudSrc.indexOf('_renderMobile() {'), hudSrc.indexOf('_clarityModel() {'))));
+  }
   check('phone placement tray rows are ≥44px',
     /\.phone-place-row \{[\s\S]*?min-height:\s*44px/.test(phoneBlock));
   check('phone lobby is a full-width tree, not the 50% desktop column',
@@ -878,24 +895,21 @@ check('phone placement hints say Tap, desktop stay Click',
   const { phoneBlock } = phoneCssParts(css);
 {
   const lobbySrc = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
-  check('occupant row is a sibling band outside the clipped player-card',
-    /lobby-phone-seat/.test(lobbySrc)
-    && /<\/div>\s*\$\{isSelected \? `[\s\S]*lobby-phone-faction-tools/.test(lobbySrc));
+  check('occupant sits on the same roster row',
+    /lobby-phone-occupant/.test(lobbySrc)
+    && /lobby-phone-faction-meta/.test(lobbySrc)
+    && /lobby-phone-pip/.test(lobbySrc));
 }
-  check('occupant color chip is 44–48px on the seated card',
-    /\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?(width|min-width):\s*48px[\s\S]*?(height|min-height):\s*48px/.test(phoneBlock));
-  check('occupant Human/AI select is 44–48px on the seated card',
-    /\.lobby-phone-faction-tools \.ai-select\.modern \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
+  check('occupant Human/AI select is 44pt on the seated row',
+    /\.lobby-phone-occupant \.ai-select\.modern \{[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('color is an 8–12pt pip, not a 28pt square',
+    /\.lobby-phone-pip \{[\s\S]*?width:\s*10px/.test(phoneBlock));
   check('DEPLOYED chip is not covered by the Units hint',
     /html\.mobile-shell \.phone-tray-body \.pp-budget-bar/.test(phoneBlock)
     && /display:\s*none/.test(phoneBlock.match(/html\.mobile-shell \.phone-tray-body \.pp-budget-bar[\s\S]*?\}/)?.[0] || ''));
-  check('seated cards keep the 48px occupant band inside the seat box',
+  check('seated cards keep the 44pt occupant on the same row',
     /\.lobby-phone-seat \{[\s\S]*?flex-shrink:\s*0/.test(phoneBlock)
-    && /\.lobby-phone-seat \{[\s\S]*?overflow:\s*hidden/.test(phoneBlock)
-    && /\.lobby-phone-faction-tools \{[\s\S]*?flex-shrink:\s*0;[\s\S]*?overflow:\s*hidden;/.test(phoneBlock)
-    && /min-width:\s*48px;[\s\S]*?min-height:\s*48px;/.test(
-      phoneBlock.match(/\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?\}/)?.[0] || ''
-    ));
+    && /\.lobby-phone-occupant \{[\s\S]*?min-height:\s*44px/.test(phoneBlock));
   check('hidden turn-summary overlay cannot steal phone taps',
     /\.turn-summary-overlay\.hidden[\s\S]*?display:\s*none !important[\s\S]*?pointer-events:\s*none !important/.test(phoneBlock)
     || /\.turn-summary-overlay\.hidden[\s\S]*?pointer-events:\s*none !important/.test(css));
@@ -910,37 +924,34 @@ check('phone placement hints say Tap, desktop stay Click',
     && /max-width:\s*44px/.test(
       phoneBlock.match(/\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?\}/)?.[0] || ''
     ));
-  check('seat check is in the row, not on the faction name',
-    /\.lobby-phone-check \{[\s\S]*?position:\s*static/.test(phoneBlock)
-    && /\.lobby-phone-check:empty/.test(phoneBlock));
   {
     const lobbySrc = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
     const mobileCard = lobbySrc.slice(
-      lobbySrc.indexOf('_renderMobileFactionCard'),
-      lobbySrc.indexOf('_renderMainMenu()'),
+      lobbySrc.indexOf('_renderMobileFactionCard(faction'),
+      lobbySrc.indexOf('_renderMainMenu() {'),
     );
     const mainRule = phoneBlock.match(/\.lobby-phone-faction-main \{[\s\S]*?\}/)?.[0] || '';
-    const copyRule = phoneBlock.match(/\.lobby-phone-faction-copy \{[\s\S]*?\}/)?.[0] || '';
     const logoRule = phoneBlock.match(/\.lobby-phone-faction-logo \{[\s\S]*?\}/)?.[0] || '';
     check('phone seats drop desktop player-card.modern',
       /lobby-phone-faction/.test(mobileCard)
       && !/player-card modern/.test(mobileCard)
       && !/player-avatar/.test(mobileCard)
       && /querySelectorAll\('\.player-card\.modern, \.lobby-phone-faction'\)/.test(lobbySrc));
-    check('phone faction logos share one left-aligned row',
+    check('setup spine is mark → name → occupant/meta on one row',
       /lobby-phone-faction-logo/.test(lobbySrc)
+      && /lobby-phone-occupant/.test(mobileCard)
       && /flex-direction:\s*row/.test(mainRule)
       && /flex-wrap:\s*nowrap/.test(mainRule)
       && /justify-content:\s*flex-start/.test(mainRule)
-      && /flex-direction:\s*row/.test(copyRule)
-      && /align-items:\s*baseline/.test(copyRule)
       && /flex:\s*0 0 var\(--phone-mark/.test(logoRule)
       && /margin:\s*0/.test(logoRule));
-    check('phone row grammar tokens exist',
-      /--phone-mark:\s*42px/.test(phoneBlock)
-      && /--phone-type-title:\s*17px/.test(phoneBlock)
-      && /--phone-type-meta:\s*12px/.test(phoneBlock)
-      && /--phone-row-gap:\s*12px/.test(phoneBlock));
+    check('4/8 rhythm tokens',
+      /--phone-mark:\s*44px/.test(phoneBlock)
+      && /--phone-inset:\s*16px/.test(phoneBlock)
+      && /--phone-row-gap:\s*8px/.test(phoneBlock)
+      && /--phone-type-meta:\s*13px/.test(phoneBlock));
+    check('390 home verbs have a leading mark',
+      /lobby-phone-card-mark/.test(lobbySrc));
   }
   check('Teams label stays off the checkbox',
     /\.lobby-phone-teams \{[\s\S]*?gap:\s*10px/.test(phoneBlock)
@@ -1131,7 +1142,7 @@ check('staged land name survives without a queue',
 check('Confirm names the pair',
   resolvePhoneDeployCtaLabel({
     count: 1, unitType: 'infantry', landName: 'Ukraine S.S.R.',
-  }) === 'Deploy 1 infantry · Ukraine S.S.R.');
+  }) === 'Deploy 1 infantry to Ukraine S.S.R.');
 {
   const { formatUnitName } = await import(pathToFileURL(join(root, 'src/utils/unitNames.js')));
   check('unit ids are human words, never camelCase',

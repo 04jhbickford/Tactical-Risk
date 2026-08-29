@@ -131,14 +131,24 @@ export class Lobby {
 
         <div class="lobby-phone-actions">
           <button class="lobby-phone-card" data-action="local-play">
-            <span class="lobby-phone-card-kicker">This device</span>
-            <span class="lobby-phone-card-title">Local Play</span>
-            <span class="lobby-phone-card-desc">Friends or AI on this phone</span>
+            <span class="lobby-phone-card-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </span>
+            <span class="lobby-phone-card-copy">
+              <span class="lobby-phone-card-kicker">This device</span>
+              <span class="lobby-phone-card-title">Local Play</span>
+              <span class="lobby-phone-card-desc">Friends or AI on this phone</span>
+            </span>
           </button>
           <button class="lobby-phone-card lobby-phone-card-online" data-action="online-play">
-            <span class="lobby-phone-card-kicker">Multiplayer</span>
-            <span class="lobby-phone-card-title">Play Online</span>
-            <span class="lobby-phone-card-desc">Create or join a game</span>
+            <span class="lobby-phone-card-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            </span>
+            <span class="lobby-phone-card-copy">
+              <span class="lobby-phone-card-kicker">Multiplayer</span>
+              <span class="lobby-phone-card-title">Play Online</span>
+              <span class="lobby-phone-card-desc">Create or join a game</span>
+            </span>
           </button>
         </div>
 
@@ -218,44 +228,47 @@ export class Lobby {
     const currentAI = this.playerAI[faction.id] || 'human';
     const currentTeam = this.playerTeams[faction.id] || null;
 
+    const occupantName = (AI_DIFFICULTIES.find(d => d.id === currentAI) || AI_DIFFICULTIES[0]).name;
+    const meta = isSelected
+      ? (currentAI === 'human' ? 'You' : occupantName)
+      : 'Tap to add';
+
     return `
       <div class="lobby-phone-seat${isSelected ? ' selected' : ''}" data-player="${faction.id}">
         <div class="lobby-phone-faction${isSelected ? ' selected' : ''}" data-player="${faction.id}">
           <div class="lobby-phone-faction-main">
             <div class="lobby-phone-faction-logo" style="border-color: ${currentColor?.color || faction.color}">
               <img src="assets/flags/${faction.flag}" alt="${faction.name}">
+              ${isSelected ? `
+                <div class="color-picker lobby-phone-pip-wrap" data-player="${faction.id}">
+                  <button type="button" class="lobby-phone-pip" style="background:${currentColor?.color || faction.color}" aria-label="Color"></button>
+                  <div class="color-dropdown hidden">
+                    ${FACTION_COLORS.map(c => `
+                      <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
+                    `).join('')}
+                  </div>
+                </div>
+              ` : ''}
             </div>
-            <div class="lobby-phone-faction-copy">
-              <span class="lobby-phone-faction-name">${faction.name}</span>
-              ${isSelected ? `<span class="lobby-phone-faction-on">Selected</span>` : `<span class="lobby-phone-faction-off">Tap to add</span>`}
-            </div>
-            <div class="lobby-phone-check" aria-hidden="${isSelected ? 'false' : 'true'}">${isSelected ? '✓' : ''}</div>
+            <span class="lobby-phone-faction-name">${faction.name}</span>
+            ${isSelected ? `
+              <div class="lobby-phone-occupant">
+                <select class="ai-select modern" data-player="${faction.id}" aria-label="Occupant">
+                  ${AI_DIFFICULTIES.map(d => `
+                    <option value="${d.id}" ${currentAI === d.id ? 'selected' : ''}>${d.name}</option>
+                  `).join('')}
+                </select>
+                ${this.teamsEnabled ? `
+                  <div class="team-selector">
+                    <button class="team-btn ${currentTeam === 1 ? 'active' : ''}" data-player="${faction.id}" data-team="1" style="--team-color: ${TEAM_COLORS[1].color}">1</button>
+                    <button class="team-btn ${currentTeam === 2 ? 'active' : ''}" data-player="${faction.id}" data-team="2" style="--team-color: ${TEAM_COLORS[2].color}">2</button>
+                    <button class="team-btn neutral ${!currentTeam ? 'active' : ''}" data-player="${faction.id}" data-team="0">-</button>
+                  </div>
+                ` : ''}
+              </div>
+            ` : `<span class="lobby-phone-faction-meta">${meta}</span>`}
           </div>
         </div>
-        ${isSelected ? `
-          <div class="lobby-phone-faction-tools">
-            <div class="color-picker" data-player="${faction.id}">
-              <div class="color-swatch" style="background:${currentColor?.color || faction.color}"></div>
-              <div class="color-dropdown hidden">
-                ${FACTION_COLORS.map(c => `
-                  <div class="color-option" data-color-id="${c.id}" style="background:${c.color}" title="${c.name}"></div>
-                `).join('')}
-              </div>
-            </div>
-            <select class="ai-select modern" data-player="${faction.id}">
-              ${AI_DIFFICULTIES.map(d => `
-                <option value="${d.id}" ${currentAI === d.id ? 'selected' : ''}>${d.name}</option>
-              `).join('')}
-            </select>
-            ${this.teamsEnabled ? `
-              <div class="team-selector">
-                <button class="team-btn ${currentTeam === 1 ? 'active' : ''}" data-player="${faction.id}" data-team="1" style="--team-color: ${TEAM_COLORS[1].color}">1</button>
-                <button class="team-btn ${currentTeam === 2 ? 'active' : ''}" data-player="${faction.id}" data-team="2" style="--team-color: ${TEAM_COLORS[2].color}">2</button>
-                <button class="team-btn neutral ${!currentTeam ? 'active' : ''}" data-player="${faction.id}" data-team="0">-</button>
-              </div>
-            ` : ''}
-          </div>
-        ` : ''}
       </div>
     `;
   }
@@ -554,6 +567,8 @@ export class Lobby {
         if (e.target.closest('.color-picker')) return;
         if (e.target.closest('.team-btn')) return;
         if (e.target.closest('.lobby-phone-faction-tools')) return;
+        if (e.target.closest('.lobby-phone-occupant')) return;
+        if (e.target.closest('.lobby-phone-pip-wrap')) return;
         if (shouldIgnoreFactionCardToggle({
           now: Date.now(),
           ignoreUntil: this._ignoreCardToggleUntil,
@@ -580,7 +595,7 @@ export class Lobby {
     // Color pickers
     this.el.querySelectorAll('.color-picker').forEach(picker => {
       const playerId = picker.dataset.player;
-      const swatch = picker.querySelector('.color-swatch');
+      const swatch = picker.querySelector('.color-swatch, .lobby-phone-pip');
       const dropdown = picker.querySelector('.color-dropdown');
 
       swatch?.addEventListener('click', (e) => {
@@ -716,16 +731,8 @@ export class Lobby {
     const card = this.el.querySelector(`.lobby-phone-faction[data-player="${playerId}"]`);
     seat?.classList.toggle('selected', selected);
     card?.classList.toggle('selected', selected);
-    const copy = card?.querySelector('.lobby-phone-faction-on, .lobby-phone-faction-off');
-    if (copy) {
-      copy.className = selected ? 'lobby-phone-faction-on' : 'lobby-phone-faction-off';
-      copy.textContent = selected ? 'Selected' : 'Tap to add';
-    }
-    const check = card?.querySelector('.lobby-phone-check, .player-select-indicator');
-    if (check) {
-      check.textContent = selected ? '✓' : '';
-      check.setAttribute('aria-hidden', selected ? 'false' : 'true');
-    }
+    const meta = card?.querySelector('.lobby-phone-faction-meta');
+    if (meta) meta.textContent = selected ? 'You' : 'Tap to add';
   }
 
   _startGame() {

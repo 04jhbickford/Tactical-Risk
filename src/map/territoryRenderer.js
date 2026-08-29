@@ -4,6 +4,7 @@ import {
   isMobileShell,
   phoneLegalOutlineWidth,
   phoneMapStackOffsets,
+  shouldHidePhoneMapLabel,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
@@ -79,6 +80,7 @@ export class TerritoryRenderer {
 
     // Phone setup: current player's legal (owned) land. Desktop unused.
     this.phoneLegalNames = new Set();
+    this.peekedLabelName = null;
 
     // Movement arrow for action log hover
     this.movementArrowFrom = null;
@@ -1468,6 +1470,11 @@ export class TerritoryRenderer {
 
     for (const t of this.territories) {
       if (t.isWater) continue;
+      if (shouldHidePhoneMapLabel({
+        mobile: isMobileShell(),
+        name: t.name,
+        peekedName: this.peekedLabelName,
+      })) continue;
 
       // Calculate center from all polygons for proper centering of merged territories
       let [cx, cy] = this._getTerritoryCenter(t);

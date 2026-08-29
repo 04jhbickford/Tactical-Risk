@@ -96,6 +96,27 @@ export function formatMobilePhaseLabel(gamePhase, turnPhase) {
   return 'Setup';
 }
 
+// HUD chip: ONE phase word. The numbered line stays for logs / desktop.
+export function formatMobilePhaseWord(gamePhase, turnPhase) {
+  if (gamePhase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Capital';
+  if (gamePhase === GAME_PHASES.UNIT_PLACEMENT) return 'Deploy';
+  if (gamePhase === GAME_PHASES.PLAYING) {
+    if (turnPhase === TURN_PHASES.DEVELOP_TECH) return 'Tech';
+    if (turnPhase === TURN_PHASES.PURCHASE) return 'Buy';
+    if (turnPhase === TURN_PHASES.COMBAT_MOVE) return 'Attack';
+    if (turnPhase === TURN_PHASES.COMBAT) return 'Combat';
+    if (turnPhase === TURN_PHASES.NON_COMBAT_MOVE) return 'Fortify';
+    if (turnPhase === TURN_PHASES.MOBILIZE) return 'Mobilize';
+    if (turnPhase === TURN_PHASES.COLLECT_INCOME) return 'Income';
+    return 'Play';
+  }
+  return 'Setup';
+}
+
+export function shouldHidePhoneMapLabel({ mobile, name, peekedName } = {}) {
+  return !!mobile && !!name && !!peekedName && name === peekedName;
+}
+
 // Visible chip meta — never title-only IPC / Surrendered.
 export function formatMobilePlayerMeta({ ipcs, surrendered } = {}) {
   const parts = [];

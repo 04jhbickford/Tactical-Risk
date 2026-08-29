@@ -2,8 +2,8 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster } from './mobileShell.js';
-import { resolveHudClarity, shouldShowHudTicker, formatAiTurnLine } from './hudClarity.js';
+import { isMobileShell, formatMobilePhaseWord, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster } from './mobileShell.js';
+import { resolveHudClarity, shouldShowHudTicker } from './hudClarity.js';
 
 export class HUD {
   constructor() {
@@ -214,33 +214,18 @@ export class HUD {
     const player = this.gameState?.currentPlayer;
     const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY && player;
     const phaseName = inGame
-      ? (player.isAI
-        ? formatAiTurnLine({
-          name: player.name,
-          phase: this.gameState.phase,
-          status: this.aiStatus,
-        })
-        : formatMobilePhaseLabel(this.gameState.phase, this.gameState.turnPhase))
+      ? formatMobilePhaseWord(this.gameState.phase, this.gameState.turnPhase)
       : '';
     const flagSrc = inGame && player.flag ? `assets/flags/${player.flag}` : null;
 
     let identity = `<span class="hud-title">Tactical Risk</span>`;
     if (inGame) {
-      identity = player.isAI
-        ? `
-        <div class="hud-mobile-identity">
-          ${flagSrc
-            ? `<img src="${flagSrc}" class="hud-mobile-flag" alt="">`
-            : `<span class="hud-mobile-swatch" style="background:${player.color}"></span>`}
-          <span class="hud-mobile-phase">${phaseName}</span>
-        </div>`
-        : `
+      identity = `
         <div class="hud-mobile-identity">
           ${flagSrc
             ? `<img src="${flagSrc}" class="hud-mobile-flag" alt="">`
             : `<span class="hud-mobile-swatch" style="background:${player.color}"></span>`}
           <span class="hud-mobile-faction" style="color:${readableFactionTextColor(player.color)}">${player.name}</span>
-          <span class="hud-mobile-sep" aria-hidden="true">·</span>
           <span class="hud-mobile-phase">${phaseName}</span>
         </div>`;
     }
@@ -292,24 +277,29 @@ export class HUD {
         ` : `
           <div class="phone-menu-list">
             <button class="phone-menu-row" data-action="menu-tab" data-tab="stats">
-              <span class="hud-menu-item-icon">📊</span>
-              <span>Players</span>
+              <span class="phone-menu-mark" aria-hidden="true"></span>
+              <span class="phone-menu-label">Players</span>
+              <span class="phone-menu-meta">›</span>
             </button>
             <button class="phone-menu-row" data-action="menu-tab" data-tab="territory">
-              <span class="hud-menu-item-icon">🗺</span>
-              <span>Territory</span>
+              <span class="phone-menu-mark" aria-hidden="true"></span>
+              <span class="phone-menu-label">Territory</span>
+              <span class="phone-menu-meta">›</span>
             </button>
             <button class="phone-menu-row" data-action="menu-tab" data-tab="log">
-              <span class="hud-menu-item-icon">📜</span>
-              <span>Log</span>
+              <span class="phone-menu-mark" aria-hidden="true"></span>
+              <span class="phone-menu-label">Log</span>
+              <span class="phone-menu-meta">›</span>
             </button>
             <button class="phone-menu-row" data-action="rules">
-              <span class="hud-menu-item-icon">📖</span>
-              <span>Game Rules</span>
+              <span class="phone-menu-mark" aria-hidden="true"></span>
+              <span class="phone-menu-label">Game Rules</span>
+              <span class="phone-menu-meta">›</span>
             </button>
             <button class="phone-menu-row" data-action="exit-lobby">
-              <span class="hud-menu-item-icon">💾</span>
-              <span>Save & Exit</span>
+              <span class="phone-menu-mark" aria-hidden="true"></span>
+              <span class="phone-menu-label">Save & Exit</span>
+              <span class="phone-menu-meta">›</span>
             </button>
           </div>
           ${shouldShowPhoneMenuPlayerRoster({ mobile: true }) ? playersHtml : ''}

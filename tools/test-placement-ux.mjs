@@ -39,7 +39,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.20', GAME_VERSION === 'V2.81.20');
+check('GAME_VERSION is V2.81.21', GAME_VERSION === 'V2.81.21');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== computeInitialPlacementUX: land selected, only naval remain, valid sea exists ===');

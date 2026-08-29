@@ -2,6 +2,12 @@
 
 ---
 
+## 8.29.26 — V2.81.21 eight P0 visual rules
+
+Living brief: setup spine (mark → name → occupant/meta, one column at 500), 4/8 rhythm, every data row, type, legal marks before tap, named Confirm only primary, three motion beats, labels vs stacks. Occupant is on the same 44pt row; color is a 10pt pip. HUD is flag → power → one phase word. Deploy copy is "to <land>". Peeked tile hides its map name. No bounce. SCHEMA 11. GAME_VERSION V2.81.21. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.20 phone alignment system (not a logo patch)
 
 James HE-CORRECT / LOCK: HOLD so far was interaction grammar. Setup logos independently center-aligned was the instance of a missing row system. Desktop `.player-card.modern` (column + optically centered roundel) was still the phone seat class.

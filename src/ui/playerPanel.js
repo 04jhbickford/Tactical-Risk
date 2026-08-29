@@ -357,7 +357,7 @@ export function resolvePhoneDeployCtaLabel({ count, unitType, landName } = {}) {
   const n = Number(count) || 0;
   if (n <= 0) return '';
   const unit = formatUnitName(unitType).toLowerCase();
-  if (landName && unit) return `Deploy ${n} ${unit} · ${landName}`;
+  if (landName && unit) return `Deploy ${n} ${unit} to ${landName}`;
   return `Deploy ${n}`;
 }
 
