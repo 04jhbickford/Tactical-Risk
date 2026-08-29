@@ -61,6 +61,7 @@ import {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
+  shouldApplyPhoneSetupTapOnPointerDown,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
 } from './ui/territoryTooltip.js';
@@ -177,6 +178,7 @@ async function init() {
     camera.dirty = true;
     requestAnimationFrame(() => { camera.dirty = true; });
   };
+  let phoneSetupPeekThisGesture = false;
   const mapRenderer = new MapRenderer();
   const territoryRenderer = new TerritoryRenderer(territories, continents);
   const territoryMap = new TerritoryMap(territories);
@@ -1887,6 +1889,42 @@ async function init() {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
 
+  const applyPhoneSetupPeekFromPointer = (e) => {
+    if (!gameState || !shouldApplyPhoneSetupTapOnPointerDown({
+      mobile: isMobileShell(),
+      phase: gameState.phase,
+    })) return false;
+    if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+      return false;
+    }
+    const world = camera.screenToWorld(e.clientX, e.clientY);
+    const hit = territoryMap.hitTest(wrapX(world.x), world.y);
+    if (!hit) return false;
+    if (!shouldCommitPhoneSetupTap({
+      mobile: true,
+      phase: gameState.phase,
+      inspected: phoneInspected,
+    })) return false;
+    const tappedIsOwnedLand = !!(
+      !hit.isWater
+      && gameState.getOwner(hit.name) === gameState.currentPlayer?.id
+    );
+    if (!shouldApplyPhoneSetupLandTap({
+      mobile: true,
+      phase: gameState.phase,
+      inspected: phoneInspected,
+      selectedUnitType: playerPanel.selectedUnitType,
+      tappedIsOwnedLand,
+      hasHit: true,
+    })) return false;
+    selectedTerritory = hit;
+    playerPanel.setSelectedTerritory(hit);
+    hud.setLastClick({ landed: true, label: hit.name });
+    hud._render();
+    kickPaint();
+    return true;
+  };
+
   // Mouse events
   canvas.addEventListener('mousedown', (e) => {
     // B31: Max hover can sit over the map / LOG. A click whose coordinates
@@ -1952,6 +1990,10 @@ async function init() {
           }
         }
       }
+    }
+
+    if (applyPhoneSetupPeekFromPointer(e)) {
+      phoneSetupPeekThisGesture = true;
     }
 
     camera.onMouseDown(e);
@@ -2176,6 +2218,13 @@ async function init() {
     dragSourceTerritory = null;
 
     console.log('[MouseUp] wasDrag:', wasDrag, 'Phase:', gameState?.phase);
+
+    const alreadyPeeked = phoneSetupPeekThisGesture;
+    phoneSetupPeekThisGesture = false;
+    if (alreadyPeeked) {
+      kickPaint();
+      return;
+    }
 
     if (!wasDrag) {
       // A panel + / Max / Deploy tap must not select the territory under

@@ -21,6 +21,7 @@ const {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
+  shouldApplyPhoneSetupTapOnPointerDown,
   clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
   PHONE_INSPECT_HOLD_MS,
@@ -90,7 +91,7 @@ const { GAME_PHASES, TURN_PHASES } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { formatAiTurnLine, resolveHudWhoseTurn } =
   await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
-const { shouldIgnoreFactionCardToggle, LOBBY_SELECT_TOGGLE_GUARD_MS } =
+const { shouldIgnoreFactionCardToggle, shouldSeatFactionOnPointerDown, LOBBY_SELECT_TOGGLE_GUARD_MS } =
   await import(pathToFileURL(join(root, 'src/ui/lobby.js')));
 const { shouldShowTurnSummary } =
   await import(pathToFileURL(join(root, 'src/ui/turnSummaryModal.js')));
@@ -111,7 +112,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.1', GAME_VERSION === 'V2.81.1');
+check('GAME_VERSION is V2.81.2', GAME_VERSION === 'V2.81.2');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -839,13 +840,18 @@ check('phone placement hints say Tap, desktop stay Click',
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { phoneBlock } = phoneCssParts(css);
+{
+  const lobbySrc = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
+  check('occupant row is a sibling band outside the clipped player-card',
+    /lobby-phone-seat/.test(lobbySrc)
+    && /<\/div>\s*\$\{isSelected \? `[\s\S]*lobby-phone-faction-tools/.test(lobbySrc));
+}
   check('occupant color chip is 44–48px on the seated card',
     /\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?(width|min-width):\s*48px[\s\S]*?(height|min-height):\s*48px/.test(phoneBlock));
   check('occupant Human/AI select is 44–48px on the seated card',
     /\.lobby-phone-faction-tools \.ai-select\.modern \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
   check('seated cards do not flex-shrink or clip the occupant row',
-    /\.lobby-phone-faction \{\s*flex:\s*0 0 auto;\s*flex-shrink:\s*0;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
-    && /\.lobby-phone-faction\.selected \{\s*min-height:\s*130px;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
+    /\.lobby-phone-seat \{[\s\S]*?flex-shrink:\s*0/.test(phoneBlock)
     && /\.lobby-phone-faction-tools \{[\s\S]*?flex-shrink:\s*0;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
     && /min-width:\s*48px;[\s\S]*?min-height:\s*48px;/.test(
       phoneBlock.match(/\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?\}/)?.[0] || ''
@@ -875,6 +881,19 @@ check('inspect≠commit still holds — tap never auto-places capital',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
   }) === false);
+check('phone setup peek applies on this pointer, not the leftover mouseup',
+  shouldApplyPhoneSetupTapOnPointerDown({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === true
+  && shouldApplyPhoneSetupTapOnPointerDown({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+  }) === true
+  && shouldApplyPhoneSetupTapOnPointerDown({
+    mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === false);
+check('phone seats a faction on pointerdown so the leftover click cannot unseat',
+  shouldSeatFactionOnPointerDown({ mobile: true }) === true
+  && shouldSeatFactionOnPointerDown({ mobile: false }) === false);
 check('own-land Place Capital tap applies (peek + Confirm), miss does not clear',
   shouldApplyPhoneSetupLandTap({
     mobile: true,

@@ -62,6 +62,12 @@ export function shouldCommitPhoneSetupTap({ mobile, phase, inspected } = {}) {
   return !inspected;
 }
 
+// After setup enter / Place Capital enter / a tray re-render, mouseup is
+// often wasDrag or hits a stale camera. Apply the peek on this pointer.
+export function shouldApplyPhoneSetupTapOnPointerDown({ mobile, phase } = {}) {
+  return !!mobile && isPhoneSetupPlacementPhase(phase);
+}
+
 // Noun first on phone setup. Same handlers; this only decides whether a
 // land tap may change selection / place. Inspect is long-press, not a tap.
 // Place Capital: only owned land applies — a miss / water / unowned tap

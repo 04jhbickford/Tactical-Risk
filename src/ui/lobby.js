@@ -17,6 +17,12 @@ export function shouldIgnoreFactionCardToggle({ now, ignoreUntil } = {}) {
   return Number(now) < Number(ignoreUntil || 0);
 }
 
+// Phone: seat on pointerdown. The leftover click after _render() would
+// unseat the same card (looks like the first "Tap to add" was swallowed).
+export function shouldSeatFactionOnPointerDown({ mobile } = {}) {
+  return !!mobile;
+}
+
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
   { id: 'human', name: 'Human', desc: 'Local player' },
@@ -60,6 +66,7 @@ export class Lobby {
     this.startingIPCs = 80;
     this.el = null;
     this._ignoreCardToggleUntil = 0;
+    this._docClickBound = false;
     this._create();
   }
 
@@ -207,16 +214,18 @@ export class Lobby {
     const currentTeam = this.playerTeams[faction.id] || null;
 
     return `
-      <div class="player-card modern lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
-        <div class="lobby-phone-faction-main">
-          <div class="player-avatar" style="border-color: ${currentColor?.color || faction.color}">
-            <img src="assets/flags/${faction.flag}" alt="${faction.name}">
+      <div class="lobby-phone-seat${isSelected ? ' selected' : ''}" data-player="${faction.id}">
+        <div class="player-card modern lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
+          <div class="lobby-phone-faction-main">
+            <div class="player-avatar" style="border-color: ${currentColor?.color || faction.color}">
+              <img src="assets/flags/${faction.flag}" alt="${faction.name}">
+            </div>
+            <div class="lobby-phone-faction-copy">
+              <span class="lobby-phone-faction-name">${faction.name}</span>
+              ${isSelected ? `<span class="lobby-phone-faction-on">Selected</span>` : `<span class="lobby-phone-faction-off">Tap to add</span>`}
+            </div>
+            <div class="player-select-indicator">${isSelected ? '✓' : ''}</div>
           </div>
-          <div class="lobby-phone-faction-copy">
-            <span class="lobby-phone-faction-name">${faction.name}</span>
-            ${isSelected ? `<span class="lobby-phone-faction-on">Selected</span>` : `<span class="lobby-phone-faction-off">Tap to add</span>`}
-          </div>
-          <div class="player-select-indicator">${isSelected ? '✓' : ''}</div>
         </div>
         ${isSelected ? `
           <div class="lobby-phone-faction-tools">
@@ -531,18 +540,32 @@ export class Lobby {
       this._render();
     });
 
-    // Player cards
+    // Player cards. Phone seats on pointerdown so a leftover click after
+    // _render() cannot unseat (first "Tap to add" looked swallowed).
     this.el.querySelectorAll('.player-card.modern').forEach(card => {
-      card.addEventListener('click', (e) => {
+      const onToggle = (e) => {
         if (e.target.closest('.player-name-input')) return;
         if (e.target.closest('.ai-select')) return;
         if (e.target.closest('.color-picker')) return;
         if (e.target.closest('.team-btn')) return;
+        if (e.target.closest('.lobby-phone-faction-tools')) return;
         if (shouldIgnoreFactionCardToggle({
           now: Date.now(),
           ignoreUntil: this._ignoreCardToggleUntil,
         })) return;
+        if (shouldSeatFactionOnPointerDown({ mobile: isMobileShell() })) {
+          this._ignoreCardToggleUntil = Date.now() + LOBBY_SELECT_TOGGLE_GUARD_MS;
+        }
         this._togglePlayer(card.dataset.player);
+      };
+      card.addEventListener('pointerdown', (e) => {
+        if (!shouldSeatFactionOnPointerDown({ mobile: isMobileShell() })) return;
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        onToggle(e);
+      });
+      card.addEventListener('click', (e) => {
+        if (shouldSeatFactionOnPointerDown({ mobile: isMobileShell() })) return;
+        onToggle(e);
       });
     });
 
@@ -573,10 +596,13 @@ export class Lobby {
       });
     });
 
-    // Close dropdowns on outside click
-    document.addEventListener('click', () => {
-      this.el.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
-    });
+    // Close dropdowns on outside click (once — _bindEvents runs every render)
+    if (!this._docClickBound) {
+      this._docClickBound = true;
+      document.addEventListener('click', () => {
+        this.el.querySelectorAll('.color-dropdown').forEach(d => d.classList.add('hidden'));
+      });
+    }
 
     // Name inputs
     this.el.querySelectorAll('.player-name-input').forEach(input => {

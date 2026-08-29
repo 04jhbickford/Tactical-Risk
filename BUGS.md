@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.2 occupant band + first-tap peek (22d4b13 correction)
+
+James second play of sha 22d4b13: hold 4 is not totally dead. First tap after a phase/screen change is swallowed; the next tap peeks; thumb Confirm works (Undo 62×48 beside Place Capital 396×48). inspect≠commit holds. Hold 1 still P0: two seated cards clip the 48px occupant row.
+
+Cause: `.player-card { overflow:hidden }` plus flex-shrink hid the occupant row under the next card. First map tap after Start / Place Capital / a tray re-render landed on mouseup as wasDrag or a leftover click after `_render()` unseated the same faction card.
+
+Fix: occupant Human/AI + swatch live in a sibling `.lobby-phone-faction-tools` band outside the card. Phone seats on pointerdown (leftover click ignored). Place Capital / Initial Deployment peek on this pointerdown and paint immediately. Holds 2–3 and the Confirm row unchanged. SCHEMA 11. GAME_VERSION V2.81.2. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.1 seated occupant clip + dead Place Capital taps (500 play of 22d4b13)
 
 James live play of sha 22d4b13 / V2.81 at ~500 CSS px: holds 2 (IPC 44, Teams 44×44) and 3 (one chip, no ticker, Tap, bottom tray) PASS. Hold 1 FAIL: two seated cards clipped the 48px occupant row under the next card (~10px sliver). Hold 4 FAIL: Ukraine / Russia / Karelia taps were dead (no outline, no Confirm); leftover Turn Summary (Germans / ✕ / OK) still in the DOM.
