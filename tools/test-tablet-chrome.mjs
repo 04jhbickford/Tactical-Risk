@@ -52,6 +52,8 @@ const {
   shouldShowPhonePanelBody,
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
+  shouldShowPhoneMenuPlayerRoster,
+  shouldShowPhonePlaceMeta,
   shouldParkPhoneMapTools,
   phonePointerHint,
   PHONE_PEEK_EXPANDED_MAX_DVH,
@@ -116,7 +118,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.10', GAME_VERSION === 'V2.81.10');
+check('GAME_VERSION is V2.81.11', GAME_VERSION === 'V2.81.11');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -629,7 +631,7 @@ check('phone capital hint is Tap your land, then Confirm',
   }) === false
   && shouldShowPhoneSetupPeekHint({
     phase: GAME_PHASES.UNIT_PLACEMENT, hasPrimaryCta: false,
-  }) === true);
+  }) === false);
 check('desktop deploy PHASE_HINTS stay Click to place units',
   resolvePhaseHint(GAME_PHASES.UNIT_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT]);
 check('desktop capital PHASE_HINTS stay Click your territory',
@@ -897,6 +899,16 @@ check('phone placement hints say Tap, desktop stay Click',
     && /html\.mobile-shell #sidebarClose \{[\s\S]*?display:\s*none/.test(phoneBlock));
   check('peek Deploy stays visible while waiting for land',
     /pp-peek-primary-slot \.pp-confirm-btn\.disabled[\s\S]*?display:\s*flex/.test(phoneBlock));
+  check('⋯ is a short sheet, not a second lobby',
+    /phone-menu-sheet\.open \{[\s\S]*?max-height:\s*52dvh/.test(phoneBlock)
+    && /phone-menu-open \.player-panel--peek/.test(phoneBlock)
+    && shouldShowPhoneMenuPlayerRoster({ mobile: true }) === false
+    && shouldShowPhonePlaceMeta({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, peek: true,
+    }) === false
+    && shouldShowPhonePlaceMeta({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, peek: false,
+    }) === true);
   check('phone body Deploy is hidden so the peek CTA is the on-screen verb',
     /html\.mobile-shell \.pp-placement-actions \{\s*display:\s*none/.test(phoneBlock));
   check('Deploy at 0 is a visible ghost Select units, not a live blue',

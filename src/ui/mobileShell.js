@@ -110,6 +110,16 @@ export function shouldShowPhoneChromeTabs({ mobile } = {}) {
   return !mobile;
 }
 
+// ⋯ home is a short list. Do not reprint the lobby player roster under it.
+export function shouldShowPhoneMenuPlayerRoster({ mobile } = {}) {
+  return !mobile;
+}
+
+// Peek deploy is chips + one thumb. The 0/6 line is not a second panel.
+export function shouldShowPhonePlaceMeta({ mobile, phase, peek } = {}) {
+  return !!mobile && phase === GAME_PHASES.UNIT_PLACEMENT && !peek;
+}
+
 // Place Capital / Initial Deployment expand was a 4-tab sheet that ate
 // the map. Players / Territory / Log live in the ⋯ sheet only.
 export function shouldShowPhoneDetentTabs({ mobile, expanded, phase } = {}) {

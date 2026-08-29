@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.11 Polytopia-thin deploy; short ⋯ sheet
+
+Addendum on the same HE-CORRECT: after V2.81.10 peek, the tray still stacked meta + hint + chips + qty + Deploy, and ⋯ was a full-screen second lobby with a player roster. Map/⋯ read as chrome on the art.
+
+Steal (comparison only): stage on the chip + one thumb Deploy. MENU is a short sheet under the HUD (max 52dvh), no roster reprint, no 4-tab bar. Peek hides while ⋯ is open. HUD is opaque. Same-finger pan after capital stays. Holds 1–4 unchanged. SCHEMA 11. GAME_VERSION V2.81.11. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.10 Initial Deployment peeks like Place Capital
 
 James unique-deploy play of 3761692 / V2.81.9 at ~500×640: holds 1–4. After Confirm on Mongolia the board was gone — opaque 4-tab Units/Players/Territory/Log sheet, grey Select units, Map/⋯ and a list puck on the art. He could not pan. Menus stacked.

@@ -16967,6 +16967,8 @@ html, body {
     justify-content: space-between;
     height: var(--mobile-top-bar);
     z-index: 70;
+    background: #0b1020;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   }
 
   html.mobile-shell #sidebarClose {
@@ -17422,10 +17424,16 @@ html, body {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    gap: 6px;
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
     margin-top: auto;
+  }
+
+  html.mobile-shell .player-panel--peek .pp-seat-chip,
+  html.mobile-shell .player-panel--peek .phone-place-meta,
+  html.mobile-shell .player-panel--peek .pp-tray-hint {
+    display: none;
   }
 
   .pp-tray-hint {
@@ -18003,15 +18011,26 @@ html, body {
     padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
-  /* --- Full-screen menu sheet (not a ⋯ dropdown over the HUD) --- */
+  /* Short ⋯ sheet under the HUD — not a second lobby, not a 4-tab bar. */
   html.mobile-shell .phone-menu-sheet.open {
     display: flex;
     flex-direction: column;
     position: fixed;
-    inset: 0;
+    top: var(--mobile-top-bar, 48px);
+    left: 0;
+    right: 0;
+    bottom: auto;
     z-index: 200;
+    max-height: 52dvh;
+    overflow: hidden;
     background: #0b1020;
-    padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0;
+  }
+
+  html.mobile-shell.phone-menu-open .player-panel--peek {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .phone-menu-head {

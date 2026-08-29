@@ -2,7 +2,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag } from './mobileShell.js';
+import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster } from './mobileShell.js';
 import { resolveHudClarity, shouldShowHudTicker, formatAiTurnLine } from './hudClarity.js';
 
 export class HUD {
@@ -203,6 +203,7 @@ export class HUD {
     this.el.innerHTML = html;
     this._bindEvents();
     this._syncMapToolsFlag();
+    this._syncMenuFlag();
     this._renderClarity();
   }
 
@@ -311,12 +312,13 @@ export class HUD {
               <span>Save & Exit</span>
             </button>
           </div>
-          ${playersHtml}
+          ${shouldShowPhoneMenuPlayerRoster({ mobile: true }) ? playersHtml : ''}
         `}
       </div>
     `;
     this._bindEvents();
     this._syncMapToolsFlag();
+    this._syncMenuFlag();
     this._renderClarity();
   }
 
@@ -376,7 +378,12 @@ export class HUD {
     setShellFlag('map-tools-open', open);
   }
 
+  _syncMenuFlag() {
+    setShellFlag('phone-menu-open', isMobileShell() && !!this.menuOpen);
+  }
+
   _updateMenuState() {
+    this._syncMenuFlag();
     const sheet = this.el.querySelector('.phone-menu-sheet');
     if (sheet) {
       sheet.classList.toggle('open', this.menuOpen);
@@ -403,6 +410,7 @@ export class HUD {
         if (this.menuOpen && typeof this.onMenuOpen === 'function') this.onMenuOpen();
         if (isMobileShell()) this._render();
         else this._updateMenuState();
+        this._syncMenuFlag();
       });
     });
 

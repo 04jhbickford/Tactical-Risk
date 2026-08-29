@@ -14,6 +14,7 @@ import {
   shouldUsePhonePlacementTray,
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
+  shouldShowPhonePlaceMeta,
   phonePointerHint,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
@@ -269,8 +270,9 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
 
 // Place Capital Confirm is the verb. Do not also show a hint line.
 export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
-  if (hasPrimaryCta && (phase === GAME_PHASES.CAPITAL_PLACEMENT
-    || phase === GAME_PHASES.UNIT_PLACEMENT)) return false;
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT && hasPrimaryCta) return false;
+  // Chips + Deploy are the Polytopia verb. No second hint stack.
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return false;
   return true;
 }
 
@@ -882,7 +884,7 @@ export class PlayerPanel {
     this.el.classList.toggle('player-panel--place-tray', phoneTray && !peek);
 
     if (mobile) {
-      html += this._renderSeatChip(chrome);
+      html += peek ? '' : this._renderSeatChip(chrome);
       html += this._renderHostReconnectHint();
       html += this._renderPhoneDetentTabs();
       html += `<div class="phone-tray-body">`;
@@ -1082,7 +1084,7 @@ export class PlayerPanel {
     if (buttons.length === 0 && !warningHtml && !peekHint && !mobile) return '';
 
     let html = `<div class="pp-bottom-actions${mobile ? ' pp-tray-peek' : ''}">`;
-    if (mobile && phase === GAME_PHASES.UNIT_PLACEMENT) {
+    if (shouldShowPhonePlaceMeta({ mobile, phase, peek: mobile && this.el.classList.contains('player-panel--peek') })) {
       const placeUX = this._getInitialPlacementUX(player);
       const budget = placementBudgetCopy({
         deployedThisRound: placeUX.placedThisRound,
