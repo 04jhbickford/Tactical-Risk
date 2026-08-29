@@ -68,6 +68,19 @@ export function shouldApplyPhoneSetupTapOnPointerDown({ mobile, phase } = {}) {
   return !!mobile && isPhoneSetupPlacementPhase(phase);
 }
 
+const PHONE_CAPITAL_CTA_ACTIONS = new Set(['place-capital', 'undo-capital']);
+
+export function isPhoneCapitalCtaTarget(target) {
+  const el = target?.closest?.('[data-action]');
+  return !!(el && PHONE_CAPITAL_CTA_ACTIONS.has(el.dataset?.action));
+}
+
+// Place Capital map taps must assign even when a leftover-tall peek
+// sidebar covers the land. Only Confirm / Undo are panel hits.
+export function shouldIgnorePanelBoxForPhoneCapitalPeek({ mobile, phase } = {}) {
+  return !!mobile && phase === GAME_PHASES.CAPITAL_PLACEMENT;
+}
+
 // First tap after Start / handoff / a chrome reflow often misses because
 // the camera still has the previous frame's size. Refit and retry once.
 export function shouldRefitPhoneSetupHit({ mobile, phase, hasHit } = {}) {

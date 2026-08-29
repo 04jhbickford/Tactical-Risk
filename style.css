@@ -17328,11 +17328,19 @@ html, body {
     max-height: none;
     min-height: 0;
     height: auto;
+    overflow: hidden;
     pointer-events: none;
   }
 
+  /* Empty peek tray (hint only) must not eat a named-land tap at 500×640.
+     Confirm / Undo / the seat chip stay the only hits. */
   html.mobile-shell #sidebar.player-panel--peek .pp-bottom-actions,
-  html.mobile-shell .player-panel.player-panel--peek .pp-bottom-actions,
+  html.mobile-shell .player-panel.player-panel--peek .pp-bottom-actions {
+    pointer-events: none;
+  }
+
+  html.mobile-shell #sidebar.player-panel--peek .pp-bottom-actions [data-action],
+  html.mobile-shell .player-panel.player-panel--peek .pp-bottom-actions [data-action],
   html.mobile-shell #sidebar.player-panel--peek .pp-seat-chip,
   html.mobile-shell .player-panel.player-panel--peek .pp-seat-chip {
     pointer-events: auto;

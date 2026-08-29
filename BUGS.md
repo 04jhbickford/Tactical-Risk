@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.9 Place Capital peek assigns on a 500×640 named-land tap
+
+James unique-deploy play of 6894df7 / V2.81.8 at ~500×640 (not 844): hold 1 PASS. Hold 4 FAIL. One tap on Ukrainian S.S.R. (named land): yellow outline, no star, phase stayed PLACE CAPITAL. Thumb tray empty — hint only, no Confirm, no Undo. Scrolling the tray cleared the highlight.
+
+Cause: at 500×640 the leftover-tall peek `#sidebar` still ate the map tap (`shouldBlockMapSelect` / canvas mousedown routed to the panel). Hover painted the gold outline; `_phoneCapitalLandName` never set. Playwright’s 844 / y=90 click missed that overlap.
+
+Fix: Place Capital ignores the panel box for peek. Document-capture pointerdown assigns owned land even when the sidebar is on top. Confirm / Undo stay the only panel hits. Peek sidebar `overflow: hidden`. No leftover-click / 450ms / next-frame gates. Holds 1–3 unchanged. SCHEMA 11. GAME_VERSION V2.81.9. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.8 peek tray chrome is the only map-block; Confirm mounts from peeked land
 
 James unique-deploy play of e4bbd2e / V2.81.5 at ~500 CSS px on a fresh table: hold 1 PASS. Hold 4 peek holds, Confirm FAIL worse than V2.81.4. First Novosibirsk tap: yellow outline, no star, phase stayed PLACE CAPITAL. Thumb tray was an empty ~85px panel — hint “Tap your land, then Confirm”, no Confirm, no Undo. Re-tap still empty. Buttons were not in the UI.

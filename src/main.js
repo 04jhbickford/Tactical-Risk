@@ -63,6 +63,8 @@ import {
   shouldApplyPhoneSetupLandTap,
   shouldApplyPhoneSetupTapOnPointerDown,
   shouldRefitPhoneSetupHit,
+  isPhoneCapitalCtaTarget,
+  shouldIgnorePanelBoxForPhoneCapitalPeek,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
 } from './ui/territoryTooltip.js';
@@ -1901,7 +1903,11 @@ async function init() {
       mobile: isMobileShell(),
       phase: gameState.phase,
     })) return false;
-    if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+    if (isPhoneCapitalCtaTarget(e.target)) return false;
+    if (!shouldIgnorePanelBoxForPhoneCapitalPeek({
+      mobile: isMobileShell(),
+      phase: gameState.phase,
+    }) && playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
       return false;
     }
     let world = camera.screenToWorld(e.clientX, e.clientY);
@@ -1915,6 +1921,12 @@ async function init() {
       fitPhoneCamera();
       world = camera.screenToWorld(e.clientX, e.clientY);
       hit = territoryMap.hitTest(wrapX(world.x), world.y);
+    }
+    // 500×640 leftover tray can steal the canvas target while hover
+    // still painted the named land. Assign that land.
+    if (!hit && gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
+      && hoverTerritory && !hoverTerritory.isWater) {
+      hit = hoverTerritory;
     }
     if (!hit) return false;
     if (!shouldCommitPhoneSetupTap({
@@ -1947,7 +1959,13 @@ async function init() {
   canvas.addEventListener('mousedown', (e) => {
     // B31: Max hover can sit over the map / LOG. A click whose coordinates
     // are inside the deploy panel must never select a territory.
-    if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+    // Place Capital: a leftover-tall peek box must not swallow the land tap.
+    const blockMapAsPanel = playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })
+      && !shouldIgnorePanelBoxForPhoneCapitalPeek({
+        mobile: isMobileShell(),
+        phase: gameState?.phase,
+      });
+    if (blockMapAsPanel) {
       e.preventDefault();
       playerPanel._onPanelPointerDown(e);
       return;
@@ -2027,6 +2045,16 @@ async function init() {
       kickPaint();
     }
   });
+
+  // Capture on document so a leftover-tall peek sidebar over a named land
+  // still assigns. Confirm / Undo are skipped inside the peek helper.
+  document.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (applyPhoneSetupPeekFromPointer(e)) {
+      phoneSetupPeekThisGesture = true;
+      kickPaint();
+    }
+  }, true);
 
   canvas.addEventListener('mousemove', (e) => {
     // Check for unit drag-and-drop
@@ -2258,7 +2286,13 @@ async function init() {
     if (!wasDrag) {
       // A panel + / Max / Deploy tap must not select the territory under
       // the finger (B22 / B31 East US) even when the canvas is the target.
-      if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+      // Place Capital: leftover tray chrome must not block the named-land tap.
+      const blockMapAsPanel = playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })
+        && !shouldIgnorePanelBoxForPhoneCapitalPeek({
+          mobile: isMobileShell(),
+          phase: gameState?.phase,
+        });
+      if (blockMapAsPanel) {
         playerPanel.commitLockedPanelGesture(e);
         camera.dirty = true;
         return;
@@ -2409,6 +2443,9 @@ async function init() {
           return;
         }
         selectedTerritory = hit;
+        if (isMobileShell() && gameState?.phase === GAME_PHASES.CAPITAL_PLACEMENT && !hit.isWater) {
+          playerPanel._phoneCapitalLandName = hit.name;
+        }
         playerPanel.setSelectedTerritory(hit);
         hud.setLastClick({ landed: true, label: hit.name });
         hud._render();

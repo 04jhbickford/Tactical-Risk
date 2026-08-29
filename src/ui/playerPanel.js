@@ -493,8 +493,11 @@ export class PlayerPanel {
   containsPoint(clientX, clientY) {
     if (!this.el || this.el.classList?.contains('hidden')) return false;
     const peek = this.el.classList.contains('player-panel--peek');
+    const capitalPeek = peek && this.gameState?.phase === GAME_PHASES.CAPITAL_PLACEMENT;
     const chromeRects = peek
-      ? [...this.el.querySelectorAll('.pp-bottom-actions, .pp-seat-chip')]
+      ? [...this.el.querySelectorAll(capitalPeek
+        ? '[data-action="place-capital"], [data-action="undo-capital"]'
+        : '.pp-bottom-actions, .pp-seat-chip')]
         .map((node) => node.getBoundingClientRect())
       : [];
     return pointHitsPlayerPanel({

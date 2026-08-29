@@ -23,6 +23,8 @@ const {
   shouldApplyPhoneSetupLandTap,
   shouldApplyPhoneSetupTapOnPointerDown,
   shouldRefitPhoneSetupHit,
+  isPhoneCapitalCtaTarget,
+  shouldIgnorePanelBoxForPhoneCapitalPeek,
   clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
   PHONE_INSPECT_HOLD_MS,
@@ -114,7 +116,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.8', GAME_VERSION === 'V2.81.8');
+check('GAME_VERSION is V2.81.9', GAME_VERSION === 'V2.81.9');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -304,7 +306,8 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     /pp-tray-peek/.test(phoneBlock) && /pp-tray-hint/.test(phoneBlock));
   check('phone peek tray is height:auto, not a 42/50dvh sheet',
     /#sidebar\.player-panel--peek[\s\S]*?max-height:\s*none/.test(phoneBlock)
-    && /#sidebar\.player-panel--peek[\s\S]*?top:\s*auto/.test(phoneBlock));
+    && /#sidebar\.player-panel--peek[\s\S]*?top:\s*auto/.test(phoneBlock)
+    && /#sidebar\.player-panel--peek[\s\S]*?overflow:\s*hidden/.test(phoneBlock));
   check('phone expanded detent is 36dvh, not a 280px column',
     /#sidebar\.player-panel--expanded[\s\S]*?max-height:\s*36dvh/.test(phoneBlock)
     && PHONE_PEEK_EXPANDED_MAX_DVH === 36);
@@ -877,6 +880,9 @@ check('phone placement hints say Tap, desktop stay Click',
   check('phone peek CTA is a row so Confirm is not under Undo',
     /\.pp-tray-peek \.pp-bottom-buttons \{[\s\S]*?flex-direction:\s*row/.test(phoneBlock)
     && /\.pp-undo-ghost/.test(phoneBlock));
+  check('empty peek tray does not eat named-land taps',
+    /player-panel--peek \.pp-bottom-actions[\s\S]*?pointer-events:\s*none/.test(phoneBlock)
+    && /player-panel--peek \.pp-bottom-actions \[data-action\][\s\S]*?pointer-events:\s*auto/.test(phoneBlock));
   check('phone zoom/minimap stay off the art until Map is open',
     /#zoom-controls,\s*#minimap \{\s*display:\s*none/.test(phoneBlock)
     && /html\.mobile-shell\.map-tools-open #zoom-controls/.test(phoneBlock));
@@ -930,8 +936,27 @@ check('inspect≠commit still holds — tap never auto-places capital',
     && /setSelectedTerritory\(selectedTerritory\)/.test(mainSrc)
     && /resolvePhoneCapitalCta\(/.test(panelSrc)
     && /landName: this\._phoneCapitalLandName/.test(panelSrc)
+    && /shouldIgnorePanelBoxForPhoneCapitalPeek/.test(mainSrc)
+    && /document\.addEventListener\('pointerdown'/.test(mainSrc)
     && !/_capitalCtaArmed/.test(panelSrc)
     && !/shouldIgnorePhoneSetupCtaAfterPeek/.test(panelSrc));
+}
+check('Place Capital peek ignores the leftover-tall panel box',
+  shouldIgnorePanelBoxForPhoneCapitalPeek({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === true
+  && shouldIgnorePanelBoxForPhoneCapitalPeek({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+  }) === false
+  && shouldIgnorePanelBoxForPhoneCapitalPeek({
+    mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === false);
+{
+  const cta = { closest: (sel) => (sel === '[data-action]' ? { dataset: { action: 'place-capital' } } : null) };
+  const map = { closest: () => null };
+  check('only Confirm / Undo are Place Capital panel hits',
+    isPhoneCapitalCtaTarget(cta) === true
+    && isPhoneCapitalCtaTarget(map) === false);
 }
 check('phone setup peek applies on this pointer, not the leftover mouseup',
   shouldApplyPhoneSetupTapOnPointerDown({
