@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.27 world-Fit hairline; owned-only legal; sea chips gate
+
+James unique play of V2.81.26 at 500: setup / named Confirm / chip wrap / Europe Fit HOLD. FAIL: world Fit painted thick aliased dark-red country strokes on UK/Spain/Italy (not owned-only ink); Deploy land dest still offered ships; Place Capital opening still showed a Middle East capital star.
+
+Fix: hide country outlines below zoom 0.4 (fills only). Legal marks are fill-lite + one faction hairline on owned land only — no ink underlayer, no sea-zone strokes at Fit. Place Capital draws no capital stars. Land dest hides sea chips; sea dest hides land-only chips. SCHEMA 11. GAME_VERSION V2.81.27. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.26 capital star kill; per-tile legal ink; sea-on-ocean; Fit dest; 4/8 setup
 
 James unique play of V2.81.25 at 500×632: setup spine PASS. FAIL Place Capital opening star+glow on SE Asia; continent-scale dashed red hull (`data-phone-legal=31` collected, not drawn as per-tile ink); Fit framed empty Pacific / world+ocean; Deploy chips overflowed past 500; leftover inspect card into Deploy; setup row gutter 26 and Teams as a 44×44 bare checkbox; sea units could not sit on ocean.

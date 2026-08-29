@@ -19,6 +19,7 @@ import {
   shouldAutoStagePhoneDeployPair,
   shouldUsePhonePairGrammar,
   shouldShowPhonePeekMax,
+  shouldShowPhoneDeployChip,
   phonePointerHint,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
@@ -2720,7 +2721,17 @@ export class PlayerPanel {
       pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
         territoryName: pairLand,
       });
-      const units = knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs);
+      const dest = this._phoneDeployDest();
+      const units = knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs)
+        .filter((unit) => shouldShowPhoneDeployChip({
+          destName: dest?.name || pairLand || '',
+          destIsWater: !!(dest?.isWater),
+          unitDef: this.unitDefs?.[unit.type],
+        }));
+      if (this.selectedUnitType && !units.some((u) => u.type === this.selectedUnitType)) {
+        this.selectedUnitType = null;
+        this.placementQueue = {};
+      }
       for (const unit of units) {
         const imageSrc = getUnitIconPath(unit.type, player.id);
         const selected = this.selectedUnitType === unit.type ? ' selected' : '';

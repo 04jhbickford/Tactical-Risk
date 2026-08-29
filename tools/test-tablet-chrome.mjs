@@ -92,6 +92,7 @@ const {
   phoneLegalDashColor,
   shouldDrawPhoneCapitalStar,
   shouldDrawPhoneCapitalGlow,
+  shouldShowPhoneDeployChip,
   isPhoneLegalSetupSeaDest,
   unwrapFitX,
   PHONE_SELECT_PULSE_MS,
@@ -146,7 +147,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.26', GAME_VERSION === 'V2.81.26');
+check('GAME_VERSION is V2.81.27', GAME_VERSION === 'V2.81.27');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -553,10 +554,13 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneLegalDashPattern(0.5)[0] > phoneLegalDashPattern(0.5)[1]);
   check('desktop/tablet outline helper stays unused at their default zoom',
     phoneLegalOutlineWidth(0.5) === PHONE_LEGAL_OUTLINE_CSS_PX / 0.5);
-  check('country borders stay ~1 CSS px at world Fit, 1 world-px when zoomed in',
-    phoneCountryOutlineWidth(0.11) <= 14
-    && phoneCountryOutlineWidth(0.11) >= 1.25 / 0.11 - 0.05
+  check('world Fit hides country strokes; zoomed-in stays 1 world-px',
+    phoneCountryOutlineWidth(0.11) === 0
+    && phoneCountryOutlineWidth(0.316) === 0
     && phoneCountryOutlineWidth(0.5) === 1);
+  check('world Fit legal edge is a hairline, not a 9px double hull',
+    phoneLegalOutlineWidth(0.11) <= 6
+    && phoneLegalOutlineWidth(0.11) >= 1);
 }
 
 console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
@@ -1497,10 +1501,15 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('opening Place Capital draws no capital star even if isCapital leaked',
     shouldDrawPhoneCapitalStar('French Indo China', openingGs) === false
     && shouldDrawPhoneCapitalGlow(openingGs) === false);
-  check('after Confirm the star is on the confirmed land only',
-    shouldDrawPhoneCapitalStar('Mongolia', confirmedGs) === true
+  check('Place Capital draws no stars (self or enemy) until Deploy',
+    shouldDrawPhoneCapitalStar('Mongolia', confirmedGs) === false
     && shouldDrawPhoneCapitalStar('French Indo China', confirmedGs) === false
     && shouldDrawPhoneCapitalGlow(confirmedGs) === false);
+  check('Deploy may show a confirmed capital star',
+    shouldDrawPhoneCapitalStar('Mongolia', {
+      phase: GAME_PHASES.UNIT_PLACEMENT,
+      isCapital: (n) => n === 'Mongolia',
+    }) === true);
   check('glow may return after both capitals (deploy+)',
     shouldDrawPhoneCapitalGlow({ phase: GAME_PHASES.UNIT_PLACEMENT }) === true);
   check('select / confirm pulses stay on the tile, not chrome bounce',
@@ -1550,6 +1559,27 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [],
     }).includes('Open Sea') === false);
+  check('land dest hides sea chips; sea dest hides land-only chips',
+    shouldShowPhoneDeployChip({
+      destName: 'Ukraine S.S.R.', destIsWater: false,
+      unitDef: { isSea: true },
+    }) === false
+    && shouldShowPhoneDeployChip({
+      destName: 'Ukraine S.S.R.', destIsWater: false,
+      unitDef: { isLand: true },
+    }) === true
+    && shouldShowPhoneDeployChip({
+      destName: 'Black Sea Zone', destIsWater: true,
+      unitDef: { isSea: true },
+    }) === true
+    && shouldShowPhoneDeployChip({
+      destName: 'Black Sea Zone', destIsWater: true,
+      unitDef: { isLand: true },
+    }) === false
+    && shouldShowPhoneDeployChip({
+      destName: '', destIsWater: false,
+      unitDef: { isSea: true },
+    }) === true);
   check('legal sea tap applies on Deploy; unowned land still does not',
     shouldApplyPhoneSetupLandTap({
       mobile: true,

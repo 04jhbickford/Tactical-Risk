@@ -14,6 +14,7 @@ import {
   PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
   phoneLegalDashColor,
+  PHONE_COUNTRY_OUTLINE_MIN_ZOOM,
 } from '../ui/mobileShell.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
@@ -158,11 +159,12 @@ export class TerritoryRenderer {
       }
     }
 
-    const strokeOwned = (color, width) => {
+    const strokeOwned = (color, width, { landsOnly = false } = {}) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = width;
       for (const t of this.territories) {
         if (!this.phoneLegalNames.has(t.name)) continue;
+        if (landsOnly && t.isWater) continue;
         for (const poly of t.polygons || []) {
           if (!poly || poly.length < 3) continue;
           this._strokePoly(ctx, poly);
@@ -172,11 +174,18 @@ export class TerritoryRenderer {
 
     const z = Number(zoom);
     const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-    const inner = Math.max(outline * 0.45, outline - 2 / safeZ);
     const dashColor = phoneLegalDashColor(this.phoneLegalEdgeColor);
+    const worldFit = !Number.isFinite(z) || z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM;
     ctx.setLineDash(phoneLegalDashPattern(zoom));
-    strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
-    strokeOwned(dashColor, inner);
+    // World Fit: one faction hairline on owned land only — no ink underlayer
+    // and no sea-zone strokes (those read as continent outlines).
+    if (worldFit) {
+      strokeOwned(dashColor, outline, { landsOnly: true });
+    } else {
+      const inner = Math.max(outline * 0.45, outline - 2 / safeZ);
+      strokeOwned(PHONE_LEGAL_EDGE_INK, outline, { landsOnly: true });
+      strokeOwned(dashColor, inner, { landsOnly: true });
+    }
 
     ctx.restore();
     if (typeof document !== 'undefined') {
@@ -645,14 +654,16 @@ export class TerritoryRenderer {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     // Land territory borders — stable CSS-px at world Fit, 1 world-px zoomed in.
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.lineWidth = phoneCountryOutlineWidth(zoom);
-
-    for (const t of this.territories) {
-      if (t.isWater) continue;
-      for (const poly of t.polygons || []) {
-        if (!poly || poly.length < 3) continue;
-        this._strokePoly(ctx, poly);
+    const countryW = phoneCountryOutlineWidth(zoom);
+    if (countryW > 0) {
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.lineWidth = countryW;
+      for (const t of this.territories) {
+        if (t.isWater) continue;
+        for (const poly of t.polygons || []) {
+          if (!poly || poly.length < 3) continue;
+          this._strokePoly(ctx, poly);
+        }
       }
     }
 

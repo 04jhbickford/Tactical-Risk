@@ -705,10 +705,11 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
  */
 export function shouldDrawPhoneCapitalStar(territoryName, gameState) {
   if (!territoryName || !gameState?.isCapital?.(territoryName)) return false;
-  if (gameState.phase !== GAME_PHASES.CAPITAL_PLACEMENT) return true;
-  return Object.values(gameState.playerState || {}).some(
-    (p) => p?.capitalTerritory === territoryName,
-  );
+  // Place Capital opening (this seat has not confirmed): ZERO stars.
+  // A confirmed enemy star on opening still reads as inspect=commit
+  // (V2.81.26 Middle East star). Stars return at Initial Deploy.
+  if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+  return true;
 }
 
 /**
@@ -740,6 +741,8 @@ export const PHONE_LEGAL_CHROME_CREAM = '#fff3b0';
 export const PHONE_COUNTRY_OUTLINE_CSS_PX = 1.25;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MIN = 1;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MAX = 14;
+export const PHONE_COUNTRY_OUTLINE_MIN_ZOOM = 0.4;
+export const PHONE_LEGAL_HAIRLINE_CSS_PX = 1.5;
 
 // Poly dashed faction-color. Cream/ivory is map chrome — never return it.
 export function phoneLegalDashColor(factionHex) {
@@ -754,7 +757,11 @@ export function phoneLegalDashColor(factionHex) {
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;
-  // Cap world-px so Fit (~0.11) is a tile edge, not a 45px continent hull.
+  // World Fit: hairline on owned tiles only. A 9–16 world-px double
+  // stroke aliases into continent-scale red (V2.81.26 UK/Spain FAIL).
+  if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) {
+    return Math.min(6, Math.max(1, PHONE_LEGAL_HAIRLINE_CSS_PX / z));
+  }
   return Math.min(
     PHONE_LEGAL_OUTLINE_WORLD_MAX,
     Math.max(PHONE_LEGAL_OUTLINE_CSS_PX, PHONE_LEGAL_OUTLINE_CSS_PX / z),
@@ -776,15 +783,21 @@ export function phoneLegalDashPattern(zoom) {
   ];
 }
 
-// Country borders at world Fit: ~1.25 CSS px, never a sub-pixel hairline
-// and never a 45px hull. Desktop default zoom (≥0.4) stays 1 world-px.
+// World Fit: hide country strokes (fills only). Thick brown outlines
+// aliased on every coast (V2.81.26). Desktop / zoomed-in stays 1 world-px.
 export function phoneCountryOutlineWidth(zoom) {
   const z = Number(zoom);
-  if (!Number.isFinite(z) || z <= 0 || z >= 0.4) return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
-  return Math.min(
-    PHONE_COUNTRY_OUTLINE_WORLD_MAX,
-    Math.max(PHONE_COUNTRY_OUTLINE_WORLD_MIN, PHONE_COUNTRY_OUTLINE_CSS_PX / z),
-  );
+  if (!Number.isFinite(z) || z <= 0) return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+  if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) return 0;
+  return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+}
+
+/** Land dest → land/air only. Sea dest → sea/air only. No dest → all chips. */
+export function shouldShowPhoneDeployChip({ destName, destIsWater, unitDef } = {}) {
+  if (!unitDef) return false;
+  if (!destName) return true;
+  if (destIsWater) return !!(unitDef.isSea || unitDef.isAir);
+  return !!(unitDef.isLand || unitDef.isAir || unitDef.isBuilding);
 }
 
 export function isPhoneLegalSetupSeaDest({
