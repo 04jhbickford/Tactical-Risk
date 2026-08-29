@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.33 inspect-only enemy; Confirm commits to DEPLOY; Fit no minimap
+
+Skeptic unique play of V2.81.32 at 500 (`8nm0s2b3u` / 26191e4): gold hairline / sea-clear / setup spine HOLD. FAIL on one load: (1) enemy China peek minted `Place Capital: China` and stacked `Not yours` toasts; (2) Confirm was painted but not clicked — owner guard could silent-no-op; (3) sea KEEP; (4) opening was Germans CAPITAL / empty footer / grey Pacific star while the human was Russians; (5) Fit+world still showed minimap 120×68 and choppy dark strokes.
+
+Fix: document-capture is the only setup peek (no canvas re-apply, no hover leftover, no toast). Named Confirm mounts only from `_phoneCapitalLandName` after an owned peek. Confirm click resolves the owned land (dataset / peek / selected), calls `placeCapital`, then `checkAI()` so 1-human+AI reaches DEPLOY with a star — owner mismatch clears the CTA. Local 1-human+AI seats the human first. Setup Fit shows +/−/Fit only (minimap parked). Ownership seam is 0 during setup. SCHEMA 11. GAME_VERSION V2.81.33. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.32 illegal peek is inspect; Confirm places star; opening camera
 
 Skeptic unique play of V2.81.31 at 500 (`38x3aj75p`): worldwide gold HOLD. FAIL: Place Capital Confirm minted on German Wake / Japan / Manchuria; Confirm on that land left CAPITAL with no star; sea tap kept stale enemy Confirm; opening was Germans CAPITAL / NW Pacific / no Undo after AI Turkey; Fit missed dest and world zoom still read choppy.

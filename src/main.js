@@ -27,6 +27,7 @@ import {
   resolveWaitingForSyncAfterRemoteSnapshot,
   resolveTurnChrome,
   emitYourTurnEvent,
+  resolvePhoneCapitalCommitLand,
 } from './ui/playerPanel.js';
 import { TerritoryTooltip } from './ui/territoryTooltip.js';
 import { PurchasePopup } from './ui/purchasePopup.js';
@@ -391,28 +392,46 @@ async function init() {
       case 'place-capital':
         // Capture player BEFORE placeCapital (which advances the turn)
         const placingPlayer = gameState.currentPlayer;
-        if (!data?.territory
-          || gameState.getOwner(data.territory) !== placingPlayer?.id) {
+        const capitalLand = resolvePhoneCapitalCommitLand({
+          dataTerritory: data?.territory,
+          peekedLandName: playerPanel._phoneCapitalLandName,
+          selectedName: (playerPanel.selectedTerritory && !playerPanel.selectedTerritory.isWater)
+            ? playerPanel.selectedTerritory.name
+            : selectedTerritory?.name,
+          currentPlayerId: placingPlayer?.id,
+          getOwner: (name) => gameState.getOwner(name),
+        });
+        if (!capitalLand) {
+          // Owner guard must not leave a dead Confirm on screen.
+          selectedTerritory = null;
+          playerPanel._phoneCapitalLandName = null;
+          playerPanel.selectedTerritory = null;
+          playerPanel.flushRender();
+          hud._render();
+          kickPaint();
           break;
         }
-        if (gameState.placeCapital(data.territory)) {
-          actionLog.logCapitalPlacement(data.territory, placingPlayer);
+        if (gameState.placeCapital(capitalLand)) {
+          actionLog.logCapitalPlacement(capitalLand, placingPlayer);
           tooltip.hide();
           unitTooltip.hide();
           hidePhoneTooltips('commit');
           if (isMobileShell()) {
             territoryRenderer.setPhoneTilePulse(
-              data.territory, 'confirm', PHONE_CONFIRM_PULSE_MS,
+              capitalLand, 'confirm', PHONE_CONFIRM_PULSE_MS,
             );
           }
           selectedTerritory = null;
           playerPanel._phoneCapitalLandName = null;
-          playerPanel.setSelectedTerritory(null);
+          playerPanel.selectedTerritory = null;
           playerPanel.flushRender();
           hud._render();
           kickPaint();
           notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
+          // Kick the other seat now so 1-human + AI reaches DEPLOY on
+          // this load. Human Confirm itself must not auto-Fit.
+          checkAI();
         }
         break;
 
@@ -2029,13 +2048,6 @@ async function init() {
       world = camera.screenToWorld(e.clientX, e.clientY);
       hit = territoryMap.hitTest(wrapX(world.x), world.y);
     }
-    // 500×640 leftover tray can steal the canvas target while hover
-    // still painted the named land. Assign that land.
-    if (!hit && gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
-      && hoverTerritory && !hoverTerritory.isWater
-      && gameState.getOwner(hoverTerritory.name) === gameState.currentPlayer?.id) {
-      hit = hoverTerritory;
-    }
     if (!hit) return false;
     if (!shouldCommitPhoneSetupTap({
       mobile: true,
@@ -2086,9 +2098,8 @@ async function init() {
         playerPanel._phoneCapitalLandName = hit.name;
       } else {
         playerPanel._phoneCapitalLandName = null;
-        if (peek === PHONE_CAPITAL_PEEK_INSPECT && tappedIsLand) {
-          showNotification('Not yours', 1600);
-        }
+        // Inspect cue is the tile outline only. A toast here stacked
+        // when canvas mouseup re-applied the same peek (V2.81.32).
       }
     } else {
       selectedTerritory = hit;
@@ -2427,7 +2438,10 @@ async function init() {
 
     const alreadyPeeked = phoneSetupPeekThisGesture;
     phoneSetupPeekThisGesture = false;
-    if (alreadyPeeked) {
+    // Document-capture pointerup is the only Place Capital / Deploy peek.
+    // Canvas mouseup must not re-apply (toast stack / leftover Confirm).
+    if (alreadyPeeked
+      || (isMobileShell() && gameState && isPhoneSetupPlacementPhase(gameState.phase))) {
       if (selectedTerritory) playerPanel.setSelectedTerritory(selectedTerritory);
       kickPaint();
       return;

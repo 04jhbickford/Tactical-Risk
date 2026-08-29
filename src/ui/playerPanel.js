@@ -372,11 +372,14 @@ export function resolvePhoneCapitalCta({
   phase,
   territory = null,
   landName = null,
-  isOwnedLand = true,
+  isOwnedLand = false,
 } = {}) {
   if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
-  if (isOwnedLand === false) return null;
-  const name = (territory && !territory.isWater) ? territory.name : landName;
+  if (isOwnedLand !== true) return null;
+  // Named Confirm mounts only from the owned peek name. An inspect
+  // selection (China / Wake / Germany / Japan) must not win.
+  const name = landName
+    || ((territory && !territory.isWater) ? territory.name : null);
   if (!name) return null;
   return {
     action: 'place-capital',
@@ -385,6 +388,27 @@ export function resolvePhoneCapitalCta({
     primary: true,
     territory: name,
   };
+}
+
+/** Confirm click resolves an owned land and commits. Owner mismatch
+ *  returns null so the handler can clear the CTA instead of no-op. */
+export function resolvePhoneCapitalCommitLand({
+  dataTerritory = null,
+  peekedLandName = null,
+  selectedName = null,
+  currentPlayerId = null,
+  getOwner = null,
+} = {}) {
+  if (!currentPlayerId || typeof getOwner !== 'function') return null;
+  const names = [dataTerritory, peekedLandName, selectedName]
+    .filter((n) => typeof n === 'string' && n);
+  const seen = new Set();
+  for (const name of names) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    if (getOwner(name) === currentPlayerId) return name;
+  }
+  return null;
 }
 
 export function shouldShowPhoneSetupUndo({
@@ -1353,14 +1377,11 @@ export class PlayerPanel {
     // Capital placement — 22d4b13 tray. Own-land tap peeks; Confirm is
     // the only commit. Mount from selected land or the peeked name.
     else if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      const peekName = (this.selectedTerritory && !this.selectedTerritory.isWater)
-        ? this.selectedTerritory.name
-        : this._phoneCapitalLandName;
+      const peekName = this._phoneCapitalLandName;
       const isOwnedLand = !!(peekName && this.gameState.getOwner?.(peekName) === player.id);
       const capitalCta = resolvePhoneCapitalCta({
         phase,
-        territory: this.selectedTerritory,
-        landName: this._phoneCapitalLandName,
+        landName: peekName,
         isOwnedLand,
       });
       if (capitalCta) buttons.push(capitalCta);
@@ -4621,6 +4642,20 @@ export class PlayerPanel {
           if (this.onAction) {
             this.onAction('undo-move', {});
           }
+          return;
+        }
+
+        if (action === 'place-capital') {
+          const land = resolvePhoneCapitalCommitLand({
+            dataTerritory: territory,
+            peekedLandName: this._phoneCapitalLandName,
+            selectedName: (this.selectedTerritory && !this.selectedTerritory.isWater)
+              ? this.selectedTerritory.name
+              : null,
+            currentPlayerId: this.gameState?.currentPlayer?.id,
+            getOwner: (name) => this.gameState?.getOwner?.(name),
+          });
+          if (this.onAction) this.onAction('place-capital', { territory: land });
           return;
         }
 

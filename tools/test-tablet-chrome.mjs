@@ -69,6 +69,7 @@ const {
   shouldShowPhoneMenuPlayerRoster,
   shouldShowPhonePlaceMeta,
   shouldParkPhoneMapTools,
+  shouldHidePhoneSetupMinimap,
   shouldShowPhoneDeployQty,
   shouldAutoStagePhoneDeployPair,
   shouldUsePhonePairGrammar,
@@ -134,11 +135,12 @@ const {
   resolvePhoneStickyUnitType,
   shouldAutoCommitPhoneCapital,
   resolvePhoneCapitalCta,
+  resolvePhoneCapitalCommitLand,
   shouldShowPhoneSetupUndo,
   shouldShowSelectUnitsCta,
   PHASE_HINTS,
 } = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
-const { GAME_PHASES, TURN_PHASES } =
+const { GAME_PHASES, TURN_PHASES, orderRiskSetupSeats } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { formatAiTurnLine, resolveHudWhoseTurn } =
   await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
@@ -163,7 +165,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.32', GAME_VERSION === 'V2.81.32');
+check('GAME_VERSION is V2.81.33', GAME_VERSION === 'V2.81.33');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -584,10 +586,12 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneCountryOutlineWidth(0.9, { mobile: true }) === 1
     && phoneCountryOutlineWidth(0.5, { mobile: false }) === 1
     && PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM === 0.85);
-  check('phone ownership seam is same-color fill bleed, never a zero gap',
-    phoneOwnershipSeamWidth(0.35, { mobile: true }) >= 4
-    && phoneOwnershipSeamWidth(0.11, { mobile: true }) >= 4
-    && phoneOwnershipSeamWidth(0.9, { mobile: true }) >= 4);
+  check('phone ownership seam stays thin so world Fit is not choppy dark strokes',
+    phoneOwnershipSeamWidth(0.35, { mobile: true }) <= 3
+    && phoneOwnershipSeamWidth(0.11, { mobile: true }) <= 3
+    && phoneOwnershipSeamWidth(0.9, { mobile: true }) <= 3
+    && phoneOwnershipSeamWidth(0.11, { mobile: true, setup: true }) === 0
+    && phoneOwnershipSeamWidth(0.5, { mobile: true, setup: true }) === 0);
   check('phone skips baked map art below close zoom so PNG borders cannot show',
     shouldSkipPhoneMapArt(0.11, { mobile: true }) === true
     && shouldSkipPhoneMapArt(0.5, { mobile: true }) === true
@@ -1160,6 +1164,7 @@ check('inspect≠commit still holds — tap never auto-places capital',
   const cta = resolvePhoneCapitalCta({
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     territory: land,
+    isOwnedLand: true,
   });
   check('owned-land peek resolves Place Capital Confirm',
     cta?.action === 'place-capital'
@@ -1170,14 +1175,20 @@ check('inspect≠commit still holds — tap never auto-places capital',
     resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
       landName: 'Novosibirsk',
+      isOwnedLand: true,
     })?.label === 'Place Capital: Novosibirsk');
   check('water or missing land does not mount Confirm',
     resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
       territory: { name: 'SZ 5', isWater: true },
+      isOwnedLand: true,
     }) === null
     && resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    }) === null
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: land,
     }) === null);
   check('enemy / unowned land never mints Place Capital Confirm',
     resolvePhoneCapitalCta({
@@ -1206,7 +1217,7 @@ check('inspect≠commit still holds — tap never auto-places capital',
     && /setSelectedTerritory\(hit\)/.test(mainSrc)
     && /setSelectedTerritory\(selectedTerritory\)/.test(mainSrc)
     && /resolvePhoneCapitalCta\(/.test(panelSrc)
-    && /landName: this\._phoneCapitalLandName/.test(panelSrc)
+    && /landName: peekName/.test(panelSrc)
     && /shouldIgnorePanelBoxForPhoneCapitalPeek/.test(mainSrc)
     && /document\.addEventListener\('pointerdown'/.test(mainSrc)
     && /camera\.onMouseDown\(e\)/.test(mainSrc)
@@ -1474,7 +1485,9 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     && /addEventListener\('pointerup'/.test(mainSrc)
     && !/addEventListener\('pointerdown'[\s\S]{0,220}applyPhoneSetupPeekFromPointer/.test(mainSrc));
   check('capital Confirm does not auto-Fit',
-    /placeCapital\(data\.territory\)/.test(placeCapital)
+    /placeCapital\(capitalLand\)/.test(placeCapital)
+    && /resolvePhoneCapitalCommitLand/.test(placeCapital)
+    && /checkAI\(\)/.test(placeCapital)
     && !/fitPhoneCamera/.test(placeCapital));
   check('unit-chip pointerdown freezes the named land',
     /_selectPhonePairUnit/.test(panelSrc)
@@ -1829,9 +1842,114 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('AI placeCapital refits the current human; Confirm does not auto-Fit',
     /action === 'placeCapital' && isMobileShell/.test(mainSrc)
     && !/fitPhoneCamera/.test(placeCapital)
-    && /Not yours/.test(mainSrc)
     && /applyPhoneSetupPeekHit/.test(mainSrc)
     && /shouldParkPhoneMapTools/.test(readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8')));
+}
+
+console.log('=== V2.81.33 Skeptic HOLD — inspect, commit, opening, Fit ===');
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const { phoneBlock } = phoneCssParts(css);
+  const placeCapital = mainSrc.slice(
+    mainSrc.indexOf("case 'place-capital'"),
+    mainSrc.indexOf("case 'open-purchase'"),
+  );
+  const owner = {
+    Russians: ['Russia', 'Novosibirsk', 'Ukraine S.S.R.'],
+    Germans: ['Germany', 'Poland'],
+  };
+  check('inspect selected land never mints Confirm without an owned peek name',
+    resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: { name: 'China', isWater: false },
+      landName: null,
+      isOwnedLand: false,
+    }) === null
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: { name: 'Wake Island', isWater: false },
+      isOwnedLand: true,
+      landName: null,
+    })?.label === 'Place Capital: Wake Island'
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      landName: null,
+      isOwnedLand: true,
+    }) === null);
+  check('Confirm commit uses peeked/dataset land and never silent-no-ops',
+    resolvePhoneCapitalCommitLand({
+      dataTerritory: null,
+      peekedLandName: 'Novosibirsk',
+      selectedName: 'China',
+      currentPlayerId: 'Russians',
+      getOwner: (n) => (owner.Russians.includes(n) ? 'Russians' : 'Germans'),
+    }) === 'Novosibirsk'
+    && resolvePhoneCapitalCommitLand({
+      dataTerritory: 'China',
+      peekedLandName: 'Novosibirsk',
+      currentPlayerId: 'Russians',
+      getOwner: (n) => (owner.Russians.includes(n) ? 'Russians' : 'Germans'),
+    }) === 'Novosibirsk'
+    && resolvePhoneCapitalCommitLand({
+      dataTerritory: 'Germany',
+      peekedLandName: 'Germany',
+      currentPlayerId: 'Russians',
+      getOwner: (n) => (owner.Russians.includes(n) ? 'Russians' : 'Germans'),
+    }) === null
+    && /resolvePhoneCapitalCommitLand/.test(placeCapital)
+    && /_phoneCapitalLandName = null/.test(placeCapital)
+    && /checkAI\(\)/.test(placeCapital)
+    && !/fitPhoneCamera/.test(placeCapital)
+    && /action === 'place-capital'/.test(panelSrc)
+    && /resolvePhoneCapitalCommitLand/.test(panelSrc));
+  check('enemy / sea inspect does not toast-stack or leftover-hover Confirm',
+    !/Not yours/.test(mainSrc)
+    && !/hoverTerritory && !hoverTerritory.isWater/.test(mainSrc)
+    && /isPhoneSetupPlacementPhase\(gameState\.phase\)/.test(
+      mainSrc.slice(mainSrc.indexOf('alreadyPeeked'), mainSrc.indexOf('alreadyPeeked') + 600),
+    )
+    && /landName: peekName/.test(panelSrc)
+    && /_phoneCapitalLandName = null/.test(mainSrc));
+  check('local 1-human + AI seats the human first; MP still shuffles',
+    orderRiskSetupSeats([
+      { id: 'Germans', isAI: true },
+      { id: 'Russians', isAI: false },
+    ], { isMultiplayer: false, shuffle: (arr) => arr })[0].id === 'Russians'
+    && orderRiskSetupSeats([
+      { id: 'Germans', isAI: true },
+      { id: 'Russians', isAI: false },
+    ], { isMultiplayer: true, shuffle: (arr) => arr })[0].id === 'Germans'
+    && /orderRiskSetupSeats/.test(readFileSync(join(root, 'src/state/gameState.js'), 'utf8')));
+  check('AI capital has no theatrical delay so Confirm reaches DEPLOY',
+    !/_getActionDelay\(\)/.test(
+      readFileSync(join(root, 'src/ai/aiController.js'), 'utf8')
+        .slice(
+          readFileSync(join(root, 'src/ai/aiController.js'), 'utf8').indexOf('_handleCapitalPlacement'),
+          readFileSync(join(root, 'src/ai/aiController.js'), 'utf8').indexOf('_handleInitialPlacement'),
+        ),
+    ));
+  check('setup Fit keeps minimap off the art',
+    shouldHidePhoneSetupMinimap({
+      mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    }) === true
+    && shouldHidePhoneSetupMinimap({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+    }) === true
+    && shouldHidePhoneSetupMinimap({
+      mobile: true, phase: GAME_PHASES.PLAYING,
+    }) === false
+    && /phone-setup\.map-tools-open #minimap/.test(phoneBlock)
+    && /setShellFlag\('phone-setup'/.test(readFileSync(join(root, 'src/ui/hud.js'), 'utf8')));
+  check('CTA only from owned peek name, never selected inspect land',
+    /const peekName = this\._phoneCapitalLandName/.test(panelSrc)
+    && !/selectedTerritory && !this\.selectedTerritory\.isWater/.test(
+      panelSrc.slice(
+        panelSrc.indexOf('else if (phase === GAME_PHASES.CAPITAL_PLACEMENT)'),
+        panelSrc.indexOf('else if (phase === GAME_PHASES.CAPITAL_PLACEMENT)') + 500,
+      ),
+    ));
 }
 
 if (failures) {

@@ -2,7 +2,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, formatMobilePhaseWord, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster } from './mobileShell.js';
+import { isMobileShell, formatMobilePhaseWord, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster, isPhoneSetupPhase } from './mobileShell.js';
 import { resolveHudClarity, shouldShowHudTicker } from './hudClarity.js';
 
 export class HUD {
@@ -366,6 +366,7 @@ export class HUD {
   _syncMapToolsFlag() {
     const open = isMobileShell() && !!this.mapToolsOpen && !this.menuOpen;
     setShellFlag('map-tools-open', open);
+    setShellFlag('phone-setup', isMobileShell() && isPhoneSetupPhase(this.gameState?.phase));
   }
 
   _syncMenuFlag() {

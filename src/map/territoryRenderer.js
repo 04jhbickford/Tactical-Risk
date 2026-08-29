@@ -337,7 +337,8 @@ export class TerritoryRenderer {
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx, zoom = 1) {
     const mobile = isMobileShell();
-    const seam = phoneOwnershipSeamWidth(zoom, { mobile });
+    const setup = isPhoneSetupPhase(this.gameState?.phase);
+    const seam = phoneOwnershipSeamWidth(zoom, { mobile, setup });
 
     for (const t of this.territories) {
       if (t.isWater) continue;

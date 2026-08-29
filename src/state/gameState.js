@@ -153,6 +153,23 @@ export const RISK_STARTING_UNITS = {
   ],
 };
 
+/** Local 1-human + AI: the human sits first so opening HUD/camera match
+ *  the current placer (Skeptic V2.81.32: Germans CAPITAL / Pacific star
+ *  while the human was Russians). Multiplayer keeps a full shuffle. */
+export function orderRiskSetupSeats(selectedPlayers, {
+  isMultiplayer = false,
+  shuffle,
+} = {}) {
+  const list = Array.isArray(selectedPlayers) ? [...selectedPlayers] : [];
+  const mix = typeof shuffle === 'function' ? shuffle : ((arr) => arr);
+  const humans = list.filter((p) => !p?.isAI);
+  if (!isMultiplayer && humans.length === 1 && list.some((p) => p?.isAI)) {
+    const human = humans[0];
+    return [human, ...mix(list.filter((p) => p !== human))];
+  }
+  return mix(list);
+}
+
 export class GameState {
   constructor(setup, territories, continents) {
     this.setup = setup;
@@ -477,8 +494,12 @@ export class GameState {
     // Use custom starting IPCs if provided, otherwise use player count-based defaults
     const startingIPCs = options.startingIPCs || STARTING_IPCS_BY_PLAYER_COUNT[playerCount] || 18;
 
-    // Randomize player order for initial placement
-    const shuffledPlayers = this._shuffleArray([...selectedPlayers]);
+    // Randomize player order for initial placement. Local 1-human + AI
+    // seats the human first so opening Place Capital is that seat.
+    const shuffledPlayers = orderRiskSetupSeats(selectedPlayers, {
+      isMultiplayer: this.isMultiplayer === true,
+      shuffle: (arr) => this._shuffleArray(arr),
+    });
 
     this.players = shuffledPlayers.map((p, i) => ({
       ...p,

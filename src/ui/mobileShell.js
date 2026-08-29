@@ -197,6 +197,12 @@ export function shouldParkPhoneMapTools({ mobile } = {}) {
   return !!mobile;
 }
 
+/** Setup Fit shows +/−/Fit when Map is open, but the minimap stays off
+ *  the art (Skeptic V2.81.32: 120×68 overlay on Fit+world). */
+export function shouldHidePhoneSetupMinimap({ mobile, phase } = {}) {
+  return !!mobile && isPhoneSetupPhase(phase);
+}
+
 // Phone chrome never says Click. Desktop PHASE_HINTS stay Click.
 export function phonePointerHint(text, { mobile = false } = {}) {
   if (!mobile || text == null || text === '') return text || '';
@@ -884,13 +890,14 @@ export function phoneCountryOutlineWidth(zoom, { mobile = false, setup = false }
   return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
 }
 
-export function phoneOwnershipSeamWidth(zoom, { mobile = false } = {}) {
+export function phoneOwnershipSeamWidth(zoom, { mobile = false, setup = false } = {}) {
   const z = Number(zoom);
   const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-  // Same-color fill bleed — not a dark outline. Covers baked PNG borders
-  // and polygon gaps so unowned tiles read as continent fill only.
+  // Same-color fill bleed — not a dark outline. A fat world-zoom seam
+  // aliases as choppy dark country strokes (Skeptic V2.81.32 Fit+world).
+  if (mobile && setup) return 0;
   if (mobile) {
-    return Math.min(22, Math.max(4, 3.25 / safeZ));
+    return Math.min(3, Math.max(1, 1.25 / safeZ));
   }
   return Math.min(3, Math.max(1, 1.25 / safeZ));
 }

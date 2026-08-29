@@ -200,7 +200,8 @@ export class AIController {
   // ============================================
   async _handleCapitalPlacement(aiPlayer, player) {
     this._updateStatus(`${player.name} is choosing capital location...`);
-    await this._delay(this._getActionDelay());
+    // No theatrical delay — human Confirm on this load must reach DEPLOY
+    // when the other seat is AI (Skeptic V2.81.32 left CAPITAL).
 
     // Get owned territories
     const owned = this.gameState.territories

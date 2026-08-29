@@ -17848,6 +17848,12 @@ iframe[title="Vercel Live Feedback"] {
     bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
+  /* Place Capital / Deploy: +/−/Fit may open; minimap stays off the art. */
+  html.mobile-shell.phone-setup.map-tools-open #minimap,
+  html.mobile-shell.phone-setup #minimap {
+    display: none;
+  }
+
   /* Pass-the-device: true full-screen, chrome gone, one dismiss control */
   .handoff-overlay {
     height: 100dvh;
