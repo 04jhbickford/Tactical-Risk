@@ -3,6 +3,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_NAMES, TECHNOLOGIES, shouldShowTechResearch, shouldShowPurchase } from '../state/gameState.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
+import { formatUnitName } from '../utils/unitNames.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import {
   isMobileShell,
@@ -15,7 +16,6 @@ import {
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
   shouldShowPhonePlaceMeta,
-  shouldShowPhoneDeployQty,
   shouldAutoStagePhoneDeployPair,
   phonePointerHint,
 } from './mobileShell.js';
@@ -258,9 +258,9 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
     const land = opts.territoryName || '';
     if (land && selectedUnitType) return `To ${land}`;
-    if (land) return `Tap a unit for ${land}`;
-    if (selectedUnitType) return 'Tap land to stage here';
-    return 'Tap a unit and a territory';
+    if (land) return `Tap a unit · ${land}`;
+    if (selectedUnitType) return 'Tap land, then unit';
+    return 'Tap unit, then land';
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land, then Confirm';
   const base = resolvePhaseHint(phase, turnPhase);
@@ -318,6 +318,20 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
 // 22d4b13 Place Capital Confirm. Peek already gated owned land — mount
 // from the selected / peeked name. Do not owner-check here (a dropped
 // selectedTerritory or id mismatch left James with an empty tray).
+export function resolvePhoneDeployLandName({ stagedLandName, selectedTerritory } = {}) {
+  if (stagedLandName) return stagedLandName;
+  if (selectedTerritory && !selectedTerritory.isWater) return selectedTerritory.name;
+  return '';
+}
+
+export function resolvePhoneDeployCtaLabel({ count, unitType, landName } = {}) {
+  const n = Number(count) || 0;
+  if (n <= 0) return '';
+  const unit = formatUnitName(unitType).toLowerCase();
+  if (landName && unit) return `Deploy ${n} ${unit} · ${landName}`;
+  return `Deploy ${n}`;
+}
+
 export function resolvePhoneCapitalCta({
   phase,
   territory = null,
@@ -520,7 +534,7 @@ export class PlayerPanel {
     const chromeRects = peek
       ? [...this.el.querySelectorAll(capitalPeek
         ? '[data-action="place-capital"], [data-action="undo-capital"]'
-        : '.pp-bottom-actions, .pp-seat-chip, [data-action="confirm-placement"]')]
+        : '[data-action="confirm-placement"], [data-action="phone-select-unit"], [data-action="place-queue"], [data-action="place-queue-max"], [data-action="undo-placement"], [data-action="undo"], [data-action="finish-placement"], .pp-seat-chip')]
         .map((node) => node.getBoundingClientRect())
       : [];
     return pointHitsPlayerPanel({
@@ -726,12 +740,13 @@ export class PlayerPanel {
   }
 
   _maybeStagePhoneDeployPair() {
-    if (!this._phoneUnitFitsTerritory(this.selectedUnitType, this.selectedTerritory)) return;
+    const dest = this._phoneDeployDest();
+    if (!this._phoneUnitFitsTerritory(this.selectedUnitType, dest)) return;
     if (!shouldAutoStagePhoneDeployPair({
       mobile: isMobileShell(),
       phase: this.gameState?.phase,
       unitType: this.selectedUnitType,
-      territory: this.selectedTerritory,
+      territory: dest,
       queuedForType: Number(this.placementQueue?.[this.selectedUnitType]) || 0,
     })) return;
     const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
@@ -745,7 +760,8 @@ export class PlayerPanel {
       available,
       slotsRemaining: limit - placedThisRound,
     });
-    this._phoneDeployLandName = this.selectedTerritory.name;
+    this.selectedTerritory = dest;
+    this._phoneDeployLandName = dest.name;
   }
 
   _phoneDeployDest() {
@@ -894,6 +910,7 @@ export class PlayerPanel {
     }
     if (this._lastRenderedPlayerId && this._lastRenderedPlayerId !== player.id) {
       this.placementQueue = {};
+      this._phoneDeployLandName = null;
     }
     this._lastRenderedPlayerId = player.id;
 
@@ -974,7 +991,7 @@ export class PlayerPanel {
         html += this._renderTerritoryTab(player);
       } else if (this.phoneDetentTab === 'log') {
         html += this._renderLogTab();
-      } else if (phoneTray) {
+      } else if (phoneTray && !peek) {
         html += this._renderInlinePlacement(player);
       } else if (shouldShowPhonePanelBody({ mobile, phase, turnPhase, airLanding, movePending })) {
         html += `<div class="pp-tab-content">`;
@@ -1081,9 +1098,15 @@ export class PlayerPanel {
       const { ux, totalQueued, isValidPlacement } = this._getInitialPlacementUX(player);
 
       if (totalQueued > 0 && isValidPlacement) {
+        const dest = this._phoneDeployDest();
+        const unitType = Object.entries(this.placementQueue || {}).find(([, n]) => Number(n) > 0)?.[0];
         buttons.push({
           action: 'confirm-placement',
-          label: `Deploy ${totalQueued}`,
+          label: resolvePhoneDeployCtaLabel({
+            count: totalQueued,
+            unitType,
+            landName: dest?.name || this._phoneDeployLandName,
+          }),
           disabled: false,
           primary: true
         });
@@ -1147,12 +1170,16 @@ export class PlayerPanel {
       })
         ? (trayOwnsHint
           ? resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
-            territoryName: this.selectedTerritory && !this.selectedTerritory.isWater
-              ? this.selectedTerritory.name : '',
+            territoryName: resolvePhoneDeployLandName({
+              stagedLandName: this._phoneDeployLandName,
+              selectedTerritory: this.selectedTerritory,
+            }),
           })
           : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
-            territoryName: this.selectedTerritory && !this.selectedTerritory.isWater
-              ? this.selectedTerritory.name : '',
+            territoryName: resolvePhoneDeployLandName({
+              stagedLandName: this._phoneDeployLandName,
+              selectedTerritory: this.selectedTerritory,
+            }),
           }) || ''))
         : '';
       warningHtml = '';
@@ -2322,8 +2349,9 @@ export class PlayerPanel {
       return def?.isSea && u.quantity > 0;
     }).reduce((sum, u) => sum + u.quantity, 0);
 
-    const isValidPlacement = !!(this.selectedTerritory && this._isValidPlacementTerritory(this.selectedTerritory, player));
-    const selectedKind = isValidPlacement && this.selectedTerritory.isWater
+    const dest = this._phoneDeployDest();
+    const isValidPlacement = !!(dest && this._isValidPlacementTerritory(dest, player));
+    const selectedKind = isValidPlacement && dest.isWater
       ? 'valid-sea'
       : isValidPlacement ? 'owned-land' : 'other';
 
@@ -2379,11 +2407,10 @@ export class PlayerPanel {
     let pairHint = '';
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      const queued = this.placementQueue
-        && Object.values(this.placementQueue).some((n) => Number(n) > 0);
-      const landName = (queued && this._phoneDeployLandName)
-        || (this.selectedTerritory && !this.selectedTerritory.isWater
-          ? this.selectedTerritory.name : '');
+      const landName = resolvePhoneDeployLandName({
+        stagedLandName: this._phoneDeployLandName,
+        selectedTerritory: this.selectedTerritory,
+      });
       pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
         territoryName: landName,
       });
@@ -2392,33 +2419,10 @@ export class PlayerPanel {
         const imageSrc = getUnitIconPath(unit.type, player.id);
         const selected = this.selectedUnitType === unit.type ? ' selected' : '';
         chips += `
-          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unit.type}" aria-label="${unit.type}">
+          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unit.type}" aria-label="${formatUnitName(unit.type)}">
             ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
             <span class="phone-peek-count">${unit.quantity}</span>
           </button>`;
-      }
-      if (shouldShowPhoneDeployQty({
-        mobile: true,
-        phase,
-        unitType: this.selectedUnitType,
-        territory: this.selectedTerritory,
-      }) && this._phoneUnitFitsTerritory(this.selectedUnitType, this.selectedTerritory)) {
-        const queued = Number(this.placementQueue?.[this.selectedUnitType]) || 0;
-        const available = quantityAvailableForType(units, this.selectedUnitType);
-        const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
-        const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
-        const canAdd = canAddToPlaceQueue({
-          queue: this.placementQueue || {},
-          unitType: this.selectedUnitType,
-          available,
-          slotsRemaining: limit - placedThisRound,
-        });
-        qty = `<div class="phone-peek-qty">
-          <button type="button" class="phone-peek-qty-btn" data-action="place-queue" data-unit="${this.selectedUnitType}" data-delta="-1" ${queued < 1 ? 'disabled' : ''} aria-label="Remove unit">−</button>
-          <span class="phone-peek-qty-count">${queued}</span>
-          <button type="button" class="phone-peek-qty-btn" data-action="place-queue" data-unit="${this.selectedUnitType}" data-delta="1" ${canAdd ? '' : 'disabled'} aria-label="Add unit">+</button>
-          <button type="button" class="phone-peek-qty-btn phone-peek-qty-max" data-action="place-queue-max" data-unit="${this.selectedUnitType}" ${canAdd ? '' : 'disabled'} aria-label="Max">Max</button>
-        </div>`;
       }
     } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.PURCHASE) {
       const pending = this.gameState.getPendingPurchases?.() || [];
@@ -2472,9 +2476,7 @@ export class PlayerPanel {
       this.selectedUnitType = null;
     }
 
-    const selectedName = this.selectedUnitType
-      ? this.selectedUnitType.charAt(0).toUpperCase() + this.selectedUnitType.slice(1)
-      : '';
+    const selectedName = formatUnitName(this.selectedUnitType);
     let hint = 'Tap a territory to select, then Deploy';
     if (this.selectedUnitType) hint = `Select a territory, then Deploy ${selectedName}`;
     if (ux.needSeaHint && ux.hint) hint = ux.hint;
@@ -2622,7 +2624,7 @@ export class PlayerPanel {
         <div class="pp-buy-row ${queued > 0 ? 'has-qty' : ''}" data-unit="${unit.type}" title="${tooltip}">
           <div class="pp-buy-info">
             ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
-            <span class="pp-buy-name">${unit.type}</span>
+            <span class="pp-buy-name">${formatUnitName(unit.type)}</span>
             <span class="pp-buy-cost">${available} left</span>
           </div>
           <div class="pp-buy-controls">
@@ -3441,7 +3443,7 @@ export class PlayerPanel {
           <div class="pp-air-card-icon">
             ${imageSrc ? `<img src="${imageSrc}" alt="${unit.type}">` : ''}
           </div>
-          <div class="pp-air-card-name">${unit.type}</div>
+          <div class="pp-air-card-name">${formatUnitName(unit.type)}</div>
           <div class="pp-air-card-stats">M${def?.movement || 0}</div>
           <div class="pp-air-card-status">
             ${hasNoOptions
@@ -3586,7 +3588,7 @@ export class PlayerPanel {
           <div class="pp-buy-row ${canPlace ? 'can-place' : ''}">
             <div class="pp-buy-info">
               ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
-              <span class="pp-buy-name">${unit.type}</span>
+              <span class="pp-buy-name">${formatUnitName(unit.type)}</span>
               <span class="pp-buy-qty-label">×${unit.quantity}</span>
             </div>
             <div class="pp-buy-controls">
@@ -3607,7 +3609,7 @@ export class PlayerPanel {
           <div class="pp-buy-row ${canPlace ? 'can-place' : ''}">
             <div class="pp-buy-info">
               ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
-              <span class="pp-buy-name">${unit.type}</span>
+              <span class="pp-buy-name">${formatUnitName(unit.type)}</span>
               <span class="pp-buy-qty-label">×${unit.quantity}</span>
             </div>
             <div class="pp-buy-controls">
@@ -3628,7 +3630,7 @@ export class PlayerPanel {
           <div class="pp-buy-row ${canPlace ? 'can-place' : ''}">
             <div class="pp-buy-info">
               ${imageSrc ? `<img src="${imageSrc}" class="pp-buy-icon" alt="${unit.type}">` : ''}
-              <span class="pp-buy-name">${unit.type}</span>
+              <span class="pp-buy-name">${formatUnitName(unit.type)}</span>
               <span class="pp-buy-qty-label">×${unit.quantity}</span>
             </div>
             <div class="pp-buy-controls">
@@ -3853,6 +3855,8 @@ export class PlayerPanel {
         if (action === 'phone-select-unit') {
           const unitType = btn.dataset.unit;
           this.selectedUnitType = unitType || null;
+          const dest = this._phoneDeployDest();
+          if (dest) this.selectedTerritory = dest;
           this._maybeStagePhoneDeployPair();
           this._scheduleRender();
           return;

@@ -1,5 +1,7 @@
 // Unit tooltip that appears on hover over unit icons on the map
 
+import { formatUnitName } from '../utils/unitNames.js';
+
 export class UnitTooltip {
   constructor() {
     this.gameState = null;
@@ -186,21 +188,6 @@ export class UnitTooltip {
   }
 
   _formatUnitName(unitType) {
-    const names = {
-      infantry: 'Infantry',
-      armour: 'Tank',
-      artillery: 'Artillery',
-      fighter: 'Fighter',
-      bomber: 'Bomber',
-      transport: 'Transport',
-      submarine: 'Submarine',
-      destroyer: 'Destroyer',
-      cruiser: 'Cruiser',
-      battleship: 'Battleship',
-      carrier: 'Carrier',
-      factory: 'Factory',
-      aaGun: 'AA Gun'
-    };
-    return names[unitType] || unitType;
+    return formatUnitName(unitType);
   }
 }

@@ -112,13 +112,13 @@ function presentsAsPlaceableSetup(gs) {
     && shouldShowTechResearch(gs.phase, gs.turnPhase) === false
     && formatMobilePhaseLabel(gs.phase, gs.turnPhase) === 'Initial Deployment'
     && resolvePhaseHint(gs.phase, gs.turnPhase) === 'Click to place units'
-    && resolvePhonePeekHint(gs.phase, gs.turnPhase, null) === 'Tap a unit and a territory'
+    && resolvePhonePeekHint(gs.phase, gs.turnPhase, null) === 'Tap unit, then land'
     && shouldShowPhonePanelBody({ mobile: true, phase: gs.phase, turnPhase: gs.turnPhase }) === true
     && shouldShowPhonePeekUnitRow({ mobile: true, phase: gs.phase, turnPhase: gs.turnPhase }) === true;
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.15', GAME_VERSION === 'V2.81.15');
+check('GAME_VERSION is V2.81.16', GAME_VERSION === 'V2.81.16');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== nextTurn() during unit_placement is a no-op ===');

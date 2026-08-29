@@ -1,7 +1,7 @@
 // Renders unit icons at territory centers using sprite images
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
-import { isMobileShell, phoneUnitIconSize, shouldHideUnitsAtZoom } from '../ui/mobileShell.js';
+import { isMobileShell, phoneUnitIconSize, phoneMapStackOffsets, shouldHideUnitsAtZoom } from '../ui/mobileShell.js';
 
 export class UnitRenderer {
   constructor(gameState, territories, unitDefs) {
@@ -193,7 +193,8 @@ export class UnitRenderer {
   // Render units in a flat grid (for land territories)
   _renderUnitGrid(ctx, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, zoom) {
     const numRows = Math.ceil(types.length / maxPerRow);
-    const baseY = cy + 25;
+    const { unitDy } = phoneMapStackOffsets(zoom, { mobile: isMobileShell() });
+    const baseY = cy + unitDy;
 
     let typeIndex = 0;
     for (let row = 0; row < numRows; row++) {
@@ -788,7 +789,7 @@ export class UnitRenderer {
       } else {
         // Land territory: flat grid hit testing
         const maxPerRow = 5;
-        const result = this._hitTestUnitGrid(worldX, worldY, territory, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, hitRadius);
+        const result = this._hitTestUnitGrid(worldX, worldY, territory, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, hitRadius, zoom);
         if (result) return result;
       }
     }
@@ -883,9 +884,10 @@ export class UnitRenderer {
   }
 
   // Hit test for flat grid layout (land territories)
-  _hitTestUnitGrid(worldX, worldY, territory, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, hitRadius) {
+  _hitTestUnitGrid(worldX, worldY, territory, cx, cy, types, grouped, maxPerRow, iconSize, spacingX, spacingY, hitRadius, zoom) {
     const numRows = Math.ceil(types.length / maxPerRow);
-    const baseY = cy + 25;
+    const { unitDy } = phoneMapStackOffsets(zoom, { mobile: isMobileShell() });
+    const baseY = cy + unitDy;
 
     let typeIndex = 0;
     for (let row = 0; row < numRows; row++) {

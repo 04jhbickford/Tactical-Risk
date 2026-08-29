@@ -157,7 +157,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.15', GAME_VERSION === 'V2.81.15');
+check('GAME_VERSION is V2.81.16', GAME_VERSION === 'V2.81.16');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');

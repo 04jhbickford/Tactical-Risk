@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.16 P0 deploy pair; chrome off the board
+
+James unique-deploy play of c27a303 / V2.81.15 at 500×632: land tap outlined Ukraine but the footer stayed "Tap a unit and a territory". Infantry chip then read "Tap land to stage here". Confirm never appeared.
+
+Cause: V2.81.15 treated leftover-tall `.pp-bottom-actions` as a map-block, so a Ukraine tap never wrote `_phoneDeployLandName`. Hint and Confirm both read `selectedTerritory` (empty). Unit chip staged against a null dest.
+
+Fix (P0-1–P0-5): staged land name is the dest. Land-then-unit names the land before the chip; the chip keeps that land and mounts `Deploy 1 infantry · <land>`. Peek hit-test is tray verbs only. Confirm pointerdown still does not retarget the map. One phase chip; labels off the stack; human unit words; 500 keeps the bottom tray; Place Capital Confirm beside Undo; Fit frames the player's owned-land region (capital cluster if worldwide). SCHEMA 11. GAME_VERSION V2.81.16. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.15 Deploy is Deploy; no footer punch-through
 
 James unique-deploy play of 34d4429 / V2.81.14 at 500×632: (a) setup overlap PASS. ⋯ PASS. (b) land-then-unit FAIL. China + infantry staged "To China" + Deploy 1. First thumb Deploy punched through the peek tray, re-selected East Indies, footer became "To East Indies". Second tap deployed to East Indies.

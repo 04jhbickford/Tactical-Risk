@@ -1,7 +1,9 @@
 // Renders territory overlays: ownership colors, outlines, continent borders, hover/selection, labels
 
 import {
+  isMobileShell,
   phoneLegalOutlineWidth,
+  phoneMapStackOffsets,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
@@ -944,8 +946,8 @@ export class TerritoryRenderer {
       const player = this.gameState.getPlayer(owner);
       const color = this.gameState.getPlayerColor(owner);
 
-      // Position above the territory center/label
-      const y = cy - (isZoomedOut ? 20 : 35);
+      const { capitalDy } = phoneMapStackOffsets(zoom, { mobile: isMobileShell() });
+      const y = cy + (isMobileShell() ? capitalDy : (isZoomedOut ? -20 : -35));
 
       // ALWAYS draw glow for visibility - larger when zoomed out
       this._drawCapitalGlow(ctx, cx, y, color, zoom);
@@ -1489,18 +1491,20 @@ export class TerritoryRenderer {
       ctx.strokeStyle = 'rgba(0,0,0,0.8)';
       ctx.lineWidth = 3;
       ctx.lineJoin = 'round';
-      ctx.strokeText(t.name, cx, cy);
+      const { nameDy } = phoneMapStackOffsets(zoom, { mobile: isMobileShell() });
+      const nameY = cy + nameDy;
+      ctx.strokeText(t.name, cx, nameY);
 
       ctx.fillStyle = '#fff';
-      ctx.fillText(t.name, cx, cy);
+      ctx.fillText(t.name, cx, nameY);
 
       // Show IPC value below name when zoomed in
       if (zoom > 0.6 && t.production > 0) {
         const smallSize = fontSize * 0.75;
         ctx.font = `${smallSize}px 'Segoe UI', sans-serif`;
-        ctx.strokeText(`${t.production} IPC`, cx, cy + fontSize + 2);
+        ctx.strokeText(`${t.production} IPC`, cx, nameY + fontSize + 2);
         ctx.fillStyle = '#ffd700';
-        ctx.fillText(`${t.production} IPC`, cx, cy + fontSize + 2);
+        ctx.fillText(`${t.production} IPC`, cx, nameY + fontSize + 2);
         ctx.font = `bold ${fontSize}px 'Segoe UI', sans-serif`;
       }
     }

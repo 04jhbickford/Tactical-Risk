@@ -262,6 +262,20 @@ export function shouldHideUnitsAtZoom(zoom, { mobile } = {}) {
   return !mobile && (Number(zoom) || 0) < 0.35;
 }
 
+// Phone Fit is ~0.3–0.5. A 25-world chip on the centroid sits on the
+// territory name. Lift the word; drop the stack. Hit-test uses the same dy.
+export function phoneMapStackOffsets(zoom, { mobile } = {}) {
+  if (!mobile) {
+    return { nameDy: 0, unitDy: 25, capitalDy: -35 };
+  }
+  const z = Math.max(Number(zoom) || 0.4, 0.15);
+  return {
+    nameDy: -Math.round(18 / z),
+    unitDy: Math.round(28 / z),
+    capitalDy: -Math.round(36 / z),
+  };
+}
+
 export function territoryFitPoint(t) {
   if (!t) return null;
   if (Array.isArray(t.center) && Number.isFinite(t.center[0]) && Number.isFinite(t.center[1])) {
@@ -529,7 +543,9 @@ export function ensurePhoneFitRegionBounds(bounds) {
   };
 }
 
-// Fit the relevant map on phone enter / Fit tap. Desktop camera is untouched.
+// Fit frames the current player's owned-land region (capital cluster when
+// owned land is worldwide), plus neighbors / legal dests. Not a world poster
+// and not a one-tile crop. No owned land (Place Capital) falls back to world.
 export function applyPhoneCameraFit(camera, {
   gameState,
   territories,

@@ -62,6 +62,7 @@ const {
   phonePointerHint,
   PHONE_PEEK_EXPANDED_MAX_DVH,
   phoneUnitIconSize,
+  phoneMapStackOffsets,
   shouldHideUnitsAtZoom,
   boundsFromPoints,
   phoneProblemBounds,
@@ -89,6 +90,8 @@ const { Camera, MAP_WIDTH, MAP_HEIGHT } =
 const {
   resolvePhaseHint,
   resolvePhonePeekHint,
+  resolvePhoneDeployLandName,
+  resolvePhoneDeployCtaLabel,
   shouldShowPhoneSetupPeekHint,
   resolvePhoneStickyUnitType,
   shouldAutoCommitPhoneCapital,
@@ -122,7 +125,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.15', GAME_VERSION === 'V2.81.15');
+check('GAME_VERSION is V2.81.16', GAME_VERSION === 'V2.81.16');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -623,15 +626,15 @@ check('inspect hold does not commit a setup tap',
   && shouldCommitPhoneSetupTap({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
   }) === true);
-check('phone deploy hint is Tap a unit and a territory',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit and a territory');
+check('phone deploy hint is Tap unit, then land',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap unit, then land');
 check('land-then-unit names the territory; unit-then-land asks for land',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, null, { territoryName: 'Yakut S.S.R.' })
-    === 'Tap a unit for Yakut S.S.R.'
+    === 'Tap a unit · Yakut S.S.R.'
   && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'tank', { territoryName: 'Yakut S.S.R.' })
     === 'To Yakut S.S.R.'
   && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'tank')
-    === 'Tap land to stage here');
+    === 'Tap land, then unit');
 check('phone capital hint is Tap your land, then Confirm',
   resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land, then Confirm'
   && shouldShowPhoneSetupPeekHint({
@@ -826,8 +829,8 @@ check('phone setup undo is required for place and last capital',
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
   }) === false);
 check('deploy peek hint is pair-aware',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap land to stage here'
-  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit and a territory');
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap land, then unit'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap unit, then land');
 check('place-tap still does not inspect (V2.69 split stays)',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
   && shouldInspectPhoneHold({
@@ -968,7 +971,7 @@ check('phone placement hints say Tap, desktop stay Click',
       && /x-vercel-skip-toolbar/.test(vercel));
     check('Deploy is the pair-commit thumb, not a type-then-count third step',
       /_maybeStagePhoneDeployPair/.test(panelSrc)
-      && /shouldShowPhoneDeployQty/.test(panelSrc)
+      && /resolvePhoneDeployCtaLabel/.test(panelSrc)
       && /phone-peek-pair-hint/.test(panelSrc)
       && !/label: 'Deploy',\s*disabled: true/.test(panelSrc));
   }
@@ -1079,6 +1082,41 @@ check('Place Capital peek ignores the leftover-tall panel box',
     && /_commitStagedPlacement/.test(panelSrc)
     && /confirm-placement/.test(panelSrc)
     && /player-panel--peek/.test(panelSrc));
+}
+check('staged land name survives without a queue',
+  resolvePhoneDeployLandName({
+    stagedLandName: 'Ukraine S.S.R.',
+    selectedTerritory: null,
+  }) === 'Ukraine S.S.R.'
+  && resolvePhoneDeployLandName({
+    stagedLandName: 'Ukraine S.S.R.',
+    selectedTerritory: { name: 'East Indies', isWater: false },
+  }) === 'Ukraine S.S.R.');
+check('Confirm names the pair',
+  resolvePhoneDeployCtaLabel({
+    count: 1, unitType: 'infantry', landName: 'Ukraine S.S.R.',
+  }) === 'Deploy 1 infantry · Ukraine S.S.R.');
+{
+  const { formatUnitName } = await import(pathToFileURL(join(root, 'src/utils/unitNames.js')));
+  check('unit ids are human words, never camelCase',
+    formatUnitName('tacticalBomber') === 'Tactical bomber'
+    && formatUnitName('aaGun') === 'AA Gun'
+    && formatUnitName('armour') === 'Tank');
+}
+{
+  const phone = phoneMapStackOffsets(0.4, { mobile: true });
+  const desk = phoneMapStackOffsets(0.4, { mobile: false });
+  check('phone map chips sit below the territory name',
+    phone.unitDy > 25
+    && phone.nameDy < 0
+    && desk.unitDy === 25
+    && desk.nameDy === 0);
+}
+{
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('peek hit-test is tray verbs, not the leftover-tall footer box',
+    /\[data-action="confirm-placement"\], \[data-action="phone-select-unit"\]/.test(panelSrc)
+    && !/\.pp-bottom-actions, \.pp-seat-chip/.test(panelSrc));
 }
 {
   const hud = { closest: (sel) => (sel === '#hud' ? {} : null) };

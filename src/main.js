@@ -1952,6 +1952,9 @@ async function init() {
     })) return false;
     selectedTerritory = hit;
     playerPanel._phoneCapitalLandName = hit.name;
+    if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT && !hit.isWater) {
+      playerPanel._phoneDeployLandName = hit.name;
+    }
     playerPanel.setSelectedTerritory(hit);
     hud.setLastClick({ landed: true, label: hit.name });
     hud._render();
