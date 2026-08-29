@@ -87,6 +87,7 @@ const {
   phoneLegalUsesSolidStroke,
   phoneCountryOutlineWidth,
   phoneOwnershipSeamWidth,
+  shouldStrokePhoneLegalHairline,
   shouldSkipPhoneMapArt,
   isPhoneSetupPhase,
   shouldWidenPhoneUserFit,
@@ -156,7 +157,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.30', GAME_VERSION === 'V2.81.30');
+check('GAME_VERSION is V2.81.31', GAME_VERSION === 'V2.81.31');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -596,6 +597,10 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     phoneLegalOutlineWidth(0.11) <= PHONE_LEGAL_OUTLINE_WORLD_MAX
     && phoneLegalOutlineWidth(0.11) >= 2.5
     && phoneLegalOutlineWidth(0.11) * 0.11 >= 1.5);
+  check('legal hairline is off — owned mark is fill-lite, not a worldwide gold grid',
+    shouldStrokePhoneLegalHairline(0.11, { mobile: true }) === false
+    && shouldStrokePhoneLegalHairline(0.5, { mobile: true }) === false
+    && shouldStrokePhoneLegalHairline(0.9, { mobile: true }) === false);
 }
 
 console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
@@ -647,9 +652,10 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     && /PHONE_LEGAL_EDGE_COLOR/.test(highlight[0])
     && !/#fff3b0/.test(highlight[0])
     && !/selectedTerritory/.test(highlight[0]));
-  check('legal marks stroke each owned tile, not a continent hull',
+  check('legal marks fill each owned tile, not a continent hull',
     !!highlight
-    && /_strokePoly/.test(highlight[0])
+    && /_fillPoly/.test(highlight[0])
+    && /phoneLegalNames\.has/.test(highlight[0])
     && !/_getExternalEdgesWithTolerance/.test(highlight[0]));
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
@@ -666,9 +672,9 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     && JSON.stringify(collectPhoneFitFocusNames({
       ownedNames: ['Germany', 'Poland'],
     })) === JSON.stringify(['Germany', 'Poland']));
-  check('phone legal highlight uses gold fill + gold edge, not dark ink',
-    /PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
-    && /PHONE_LEGAL_FILL_RGB/.test(rendererSrc)
+  check('phone legal highlight uses gold fill-lite, not a worldwide gold edge',
+    /PHONE_LEGAL_FILL_RGB/.test(rendererSrc)
+    && /shouldStrokePhoneLegalHairline/.test(rendererSrc)
     && !/PHONE_LEGAL_EDGE_INK/.test(rendererSrc));
 }
 
@@ -1741,12 +1747,11 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('phone Fit skips baked map tiles so PNG country ink cannot show',
     /flatOcean/.test(readFileSync(join(root, 'src/map/mapRenderer.js'), 'utf8'))
     && /shouldSkipPhoneMapArt/.test(mainSrc)
-    && /PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM/.test(rendererSrc)
-    && /worldFit/.test(rendererSrc));
-  check('Fit legal hairline is gold, not faction-red country ink',
-    /strokeOwned\(PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
-    && !/PHONE_LEGAL_EDGE_INK/.test(rendererSrc)
-    && !/phoneLegalDashColor/.test(rendererSrc));
+    && /isPhoneSetupPhase/.test(rendererSrc));
+  check('Fit / opening do not stroke a worldwide gold hairline',
+    /shouldStrokePhoneLegalHairline/.test(rendererSrc)
+    && /PHONE_LEGAL_FILL_RGB/.test(rendererSrc)
+    && !/PHONE_LEGAL_EDGE_INK/.test(rendererSrc));
   check('Start Turn / handoff is chrome, not a Place Capital peek',
     /isPhoneHandoffChromeTarget/.test(readFileSync(join(root, 'src/ui/territoryTooltip.js'), 'utf8'))
     && /pointHitsPhoneHandoffChrome/.test(mainSrc)

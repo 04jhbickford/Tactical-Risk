@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.31 owned-only fill-lite; no worldwide gold hairline
+
+James unique play of V2.81.30 at 500 (`m0atf2x5u`): Place Capital peek/Confirm and dark-red HOLD. FAIL: gold/amber hairline on every continent at opening (and on unowned neighbors at Fit). A 2p deal owns ~31 lands worldwide; stroking those gold outlines every neighbor.
+
+Fix: legal marks are gold fill-lite on this player's owned land only. No gold/amber/red hairline grid at opening or world Fit. Peek still supplies the white tile outline. Sea dest bind untouched. SCHEMA 11. GAME_VERSION V2.81.31. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.30 restore Place Capital peek; no dark-red at dest zoom
 
 James unique play of V2.81.29 at 500 (`qojiw5987`): Fit gold-edge and sea dest HOLD. FAIL: opening already had `Place Capital: United Kingdom` (Start Turn punch-through); peeking Karelia left the UK Confirm stale; dest-cluster zoom ≥ 0.85 brought back baked map-art plus `#3d2800`/faction dashes on Eire/Sweden/Germany.

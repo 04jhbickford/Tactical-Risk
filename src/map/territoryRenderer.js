@@ -10,10 +10,11 @@ import {
   shouldDrawPhoneCapitalStar,
   shouldDrawPhoneCapitalGlow,
   PHONE_LEGAL_FILL_ALPHA,
-  PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
   isPhoneSetupPhase,
-  PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
+  shouldStrokePhoneLegalHairline,
+  phoneLegalDashColor,
+  PHONE_LEGAL_EDGE_COLOR,
 } from '../ui/mobileShell.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
@@ -158,27 +159,22 @@ export class TerritoryRenderer {
       }
     }
 
-    const strokeOwned = (color, width, { landsOnly = false } = {}) => {
+    // Do not stroke. A gold/faction hairline on every owned tile (often
+    // ~31 worldwide in a 2p deal) reads as a country grid on unowned
+    // neighbors (James V2.81.30). Fill-lite is the owned mark. Peek
+    // paints the white tile outline.
+    if (shouldStrokePhoneLegalHairline(zoom, { mobile: isMobileShell() })) {
+      const color = phoneLegalDashColor(this.phoneLegalEdgeColor) || PHONE_LEGAL_EDGE_COLOR;
       ctx.strokeStyle = color;
-      ctx.lineWidth = width;
+      ctx.lineWidth = outline;
+      ctx.setLineDash([]);
       for (const t of this.territories) {
-        if (!this.phoneLegalNames.has(t.name)) continue;
-        if (landsOnly && t.isWater) continue;
+        if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
         for (const poly of t.polygons || []) {
           if (!poly || poly.length < 3) continue;
           this._strokePoly(ctx, poly);
         }
       }
-    };
-
-    const z = Number(zoom);
-    const worldFit = !Number.isFinite(z) || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
-    ctx.setLineDash([]);
-    // Fit: gold hairline. Opening/close zoom: fill-lite only — the
-    // #3d2800 + faction dash at ≥0.85 read as dark-red country strokes
-    // on Eire/Sweden/Germany (James V2.81.29).
-    if (worldFit) {
-      strokeOwned(PHONE_LEGAL_EDGE_COLOR, outline, { landsOnly: true });
     }
 
     ctx.restore();

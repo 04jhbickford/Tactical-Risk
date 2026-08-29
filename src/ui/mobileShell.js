@@ -794,6 +794,15 @@ export function phoneLegalUsesSolidStroke(zoom) {
   return !Number.isFinite(z) || z <= 0 || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
 }
 
+/** Gold/faction hairline on every owned tile is a worldwide grid
+ *  (James V2.81.30 m0atf2x5u). Owned mark is fill-lite only. Peek
+ *  supplies the tile outline. Never stroke unowned land. */
+export function shouldStrokePhoneLegalHairline(_zoom, { mobile = false } = {}) {
+  void _zoom;
+  void mobile;
+  return false;
+}
+
 export function isPhoneSetupPhase(phase) {
   return phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT;
 }
