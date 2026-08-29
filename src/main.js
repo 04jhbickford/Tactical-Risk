@@ -1934,7 +1934,10 @@ async function init() {
       hasHit: true,
     })) return false;
     selectedTerritory = hit;
-    playerPanel.setSelectedTerritory(hit);
+    playerPanel._phoneSetupPeekAt = Date.now();
+    // Schedule Confirm on the next frame so this pointer's leftover click
+    // cannot hit the new button and auto-commit (inspect≠commit).
+    playerPanel.setSelectedTerritory(hit, { immediate: false });
     hud.setLastClick({ landed: true, label: hit.name });
     hud._render();
     kickPaint();

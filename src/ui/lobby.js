@@ -702,7 +702,27 @@ export class Lobby {
       this.playerNames[playerId] = faction?.name || '';
     }
 
+    if (isMobileShell()) {
+      this._paintPhoneFactionSeat(playerId);
+      requestAnimationFrame(() => this._render());
+      return;
+    }
     this._render();
+  }
+
+  _paintPhoneFactionSeat(playerId) {
+    const selected = this.selectedPlayers.includes(playerId);
+    const seat = this.el.querySelector(`.lobby-phone-seat[data-player="${playerId}"]`);
+    const card = this.el.querySelector(`.lobby-phone-faction[data-player="${playerId}"]`);
+    seat?.classList.toggle('selected', selected);
+    card?.classList.toggle('selected', selected);
+    const copy = card?.querySelector('.lobby-phone-faction-on, .lobby-phone-faction-off');
+    if (copy) {
+      copy.className = selected ? 'lobby-phone-faction-on' : 'lobby-phone-faction-off';
+      copy.textContent = selected ? 'Selected' : 'Tap to add';
+    }
+    const check = card?.querySelector('.player-select-indicator');
+    if (check) check.textContent = selected ? '✓' : '';
   }
 
   _startGame() {

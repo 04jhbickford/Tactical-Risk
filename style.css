@@ -18041,9 +18041,18 @@ html, body {
   }
 
   .phone-place-meta {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    color: #94a3b8;
+    line-height: 1.3;
+    min-height: 22px;
+    flex: 0 0 auto;
+    color: #fde68a;
+  }
+
+  /* Sticky hint/CTA must not cover the deployed chip in the Units body. */
+  html.mobile-shell .phone-tray-body .pp-budget-bar,
+  html.mobile-shell .phone-tray-body .pp-placement-remaining {
+    display: none;
   }
 
   .phone-place-pool {

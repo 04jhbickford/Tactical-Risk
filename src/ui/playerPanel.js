@@ -305,6 +305,19 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
   return false;
 }
 
+// Peek paints Confirm on the next frame. A leftover click from the same
+// pointer must not hit that new button and commit.
+export const PHONE_SETUP_PEEK_CTA_GUARD_MS = 450;
+
+export function shouldIgnorePhoneSetupCtaAfterPeek({
+  peekedAt = 0, now = 0, action = '',
+} = {}) {
+  if (action !== 'place-capital') return false;
+  const at = Number(peekedAt) || 0;
+  if (!at) return false;
+  return Number(now) - at < PHONE_SETUP_PEEK_CTA_GUARD_MS;
+}
+
 export function shouldShowPhoneSetupUndo({
   mobile, phase, canUndoPlacement, canUndoCapital,
 } = {}) {
@@ -412,6 +425,7 @@ export class PlayerPanel {
     this._lastQueueUnitType = null;
     this._queueLockType = null;
     this._queueGestureApplied = false;
+    this._phoneSetupPeekAt = 0;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -640,7 +654,7 @@ export class PlayerPanel {
     this.onAction = callback;
   }
 
-  setSelectedTerritory(territory) {
+  setSelectedTerritory(territory, { immediate = true } = {}) {
     // Reset movement state when territory changes. Do NOT clear the
     // placement queue — a spurious retarget (B16) was wiping staged units
     // so the next + looked like it vanished them (B15).
@@ -656,7 +670,8 @@ export class PlayerPanel {
     if (this.gameState && keepPlaced != null) {
       this.gameState.unitsPlacedThisRound = keepPlaced;
     }
-    this.flushRender();
+    if (immediate) this.flushRender();
+    else this._scheduleRender();
   }
 
   _phoneUnitFitsTerritory(unitType, territory) {
@@ -1049,6 +1064,15 @@ export class PlayerPanel {
     if (buttons.length === 0 && !warningHtml && !peekHint && !mobile) return '';
 
     let html = `<div class="pp-bottom-actions${mobile ? ' pp-tray-peek' : ''}">`;
+    if (mobile && phase === GAME_PHASES.UNIT_PLACEMENT) {
+      const placeUX = this._getInitialPlacementUX(player);
+      const budget = placementBudgetCopy({
+        deployedThisRound: placeUX.placedThisRound,
+        limit: placeUX.limit,
+        poolRemaining: placeUX.landAirRemaining + (placeUX.navalRemaining || 0),
+      });
+      html += `<div class="phone-place-meta">${budget.deployedLabel}: ${budget.deployedText}</div>`;
+    }
     if (peekHint) {
       html += `<span class="pp-tray-hint">${peekHint}</span>`;
     }
@@ -3573,6 +3597,11 @@ export class PlayerPanel {
         const action = btn.dataset.action;
         const lockAction = btn.lockAction || null;
         const territory = btn.dataset.territory;
+        if (shouldIgnorePhoneSetupCtaAfterPeek({
+          peekedAt: this._phoneSetupPeekAt,
+          now: Date.now(),
+          action,
+        })) return;
         const setIndex = btn.dataset.set;
         if ((action === 'undo-placement' || action === 'undo-capital')
           && Date.now() < (this._ignoreUndoUntil || 0)) {

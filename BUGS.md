@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.4 peek ≠ commit; seat check on this pointer
+
+James play of sha 30ba311 / V2.81.3 at ~500 CSS px: hold 1 PASS (two seated 48px occupant rows). Hold 4 FAIL: first owned-land tap instantly committed the capital (no Confirm); German AI placed in the same beat. Seat checks painted late (Germans then British appeared together). DEPLOYED THIS ROUND 0/6 was clipped by the Units hint.
+
+Cause: peek flushRendered Confirm under the same pointer, so the leftover click hit Place Capital. Full lobby `_render()` in pointerdown deferred the check paint and shifted the next card under the finger.
+
+Fix: own-land pointerdown peeks only (outline + scheduled Confirm). place-capital is ignored for 450ms after that peek. Confirm is the only commit. Seat check paints on this pointer; occupant tools stay a sibling band. Deployed chip sits in the peek chrome, not under the sticky hint. Holds 1–3 and the Confirm row unchanged. SCHEMA 11. GAME_VERSION V2.81.4. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.3 unclip two seats + first tap after Start peeks
 
 James correction on sha 22d4b13: hold 4 is not totally dead. First tap after a phase/screen change is swallowed; the next tap peeks; thumb Confirm works. Hold 1 still P0 (two seated cards clip the 48px occupant row).

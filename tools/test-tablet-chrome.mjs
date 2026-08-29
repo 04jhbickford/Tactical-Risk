@@ -84,6 +84,8 @@ const {
   shouldShowPhoneSetupPeekHint,
   resolvePhoneStickyUnitType,
   shouldAutoCommitPhoneCapital,
+  shouldIgnorePhoneSetupCtaAfterPeek,
+  PHONE_SETUP_PEEK_CTA_GUARD_MS,
   shouldShowPhoneSetupUndo,
   shouldShowSelectUnitsCta,
   PHASE_HINTS,
@@ -113,7 +115,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.3', GAME_VERSION === 'V2.81.3');
+check('GAME_VERSION is V2.81.4', GAME_VERSION === 'V2.81.4');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -851,6 +853,9 @@ check('phone placement hints say Tap, desktop stay Click',
     /\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?(width|min-width):\s*48px[\s\S]*?(height|min-height):\s*48px/.test(phoneBlock));
   check('occupant Human/AI select is 44–48px on the seated card',
     /\.lobby-phone-faction-tools \.ai-select\.modern \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
+  check('DEPLOYED chip is not covered by the Units hint',
+    /html\.mobile-shell \.phone-tray-body \.pp-budget-bar/.test(phoneBlock)
+    && /display:\s*none/.test(phoneBlock.match(/html\.mobile-shell \.phone-tray-body \.pp-budget-bar[\s\S]*?\}/)?.[0] || ''));
   check('seated cards do not flex-shrink or clip the occupant row',
     /\.lobby-phone-seat \{[\s\S]*?flex-shrink:\s*0/.test(phoneBlock)
     && /\.lobby-phone-seat \{[\s\S]*?overflow:\s*visible/.test(phoneBlock)
@@ -883,6 +888,16 @@ check('phone placement hints say Tap, desktop stay Click',
 check('inspect≠commit still holds — tap never auto-places capital',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
+  }) === false);
+check('leftover click after peek cannot commit Place Capital',
+  shouldIgnorePhoneSetupCtaAfterPeek({
+    peekedAt: 1000, now: 1000 + 100, action: 'place-capital',
+  }) === true
+  && shouldIgnorePhoneSetupCtaAfterPeek({
+    peekedAt: 1000, now: 1000 + PHONE_SETUP_PEEK_CTA_GUARD_MS + 1, action: 'place-capital',
+  }) === false
+  && shouldIgnorePhoneSetupCtaAfterPeek({
+    peekedAt: 1000, now: 1100, action: 'undo-capital',
   }) === false);
 check('phone setup peek applies on this pointer, not the leftover mouseup',
   shouldApplyPhoneSetupTapOnPointerDown({
