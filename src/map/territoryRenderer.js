@@ -107,14 +107,13 @@ export class TerritoryRenderer {
     // First paint of Place Capital / Initial Deploy — do not wait for peek.
     // Dashed gold + fill-lite on owned land only. No glow, no world wash.
     const outline = phoneLegalOutlineWidth(zoom);
-    const dash = phoneLegalDashPattern(zoom);
 
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
     if (PHONE_LEGAL_FILL_ALPHA > 0) {
-      ctx.fillStyle = `rgba(232, 192, 74, ${PHONE_LEGAL_FILL_ALPHA})`;
+      ctx.fillStyle = `rgba(255, 248, 210, ${PHONE_LEGAL_FILL_ALPHA})`;
       for (const t of this.territories) {
         if (!this.phoneLegalNames.has(t.name) || t.isWater) continue;
         for (const poly of t.polygons || []) {
@@ -138,12 +137,20 @@ export class TerritoryRenderer {
       }
     };
 
-    ctx.setLineDash(dash);
-    strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
-    strokeOwned(PHONE_LEGAL_EDGE_COLOR, Math.max(outline * 0.72, outline - 3));
+    // Civ hex-edge: dark ring stays ≥2.5 CSS px outside the cream inner
+    // stroke. A thinner-gold-on-wider-ink pair collapsed to a 1px halo
+    // at Fit zoom and read as the default border (V2.81.21 opening FAIL).
+    const z = Number(zoom);
+    const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
+    const inner = Math.max(outline * 0.4, outline - 2.5 / safeZ);
     ctx.setLineDash([]);
+    strokeOwned(PHONE_LEGAL_EDGE_INK, outline);
+    strokeOwned(PHONE_LEGAL_EDGE_COLOR, inner);
 
     ctx.restore();
+    if (typeof document !== 'undefined') {
+      document.documentElement.dataset.phoneLegal = String(this.phoneLegalNames.size);
+    }
   }
 
   /** Set territories to highlight from action log hover */

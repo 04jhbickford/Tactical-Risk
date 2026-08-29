@@ -655,12 +655,12 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
 // the first tap. A 2 CSS-px dark hairline sat on the default brown
 // borders and vanished (V2.81.21 James FAIL). Poly dashed gold +
 // fill-lite on owned land only — not a second world wash, not peek-only.
-export const PHONE_LEGAL_FILL_ALPHA = 0.16;
-export const PHONE_LEGAL_OUTLINE_CSS_PX = 3.5;
-export const PHONE_LEGAL_DASH_CSS_PX = 10;
-export const PHONE_LEGAL_GAP_CSS_PX = 6;
-export const PHONE_LEGAL_EDGE_INK = '#3d2a08';
-export const PHONE_LEGAL_EDGE_COLOR = '#e8c04a';
+export const PHONE_LEGAL_FILL_ALPHA = 0.2;
+export const PHONE_LEGAL_OUTLINE_CSS_PX = 6;
+export const PHONE_LEGAL_DASH_CSS_PX = 14;
+export const PHONE_LEGAL_GAP_CSS_PX = 7;
+export const PHONE_LEGAL_EDGE_INK = '#1a1206';
+export const PHONE_LEGAL_EDGE_COLOR = '#fff3b0';
 
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
