@@ -76,6 +76,8 @@ import {
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
+  isPhoneHandoffChromeTarget,
+  pointHitsPhoneHandoffChrome,
   pointHitsPhoneMapToolsChrome,
   isPhoneTrayChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
@@ -887,6 +889,12 @@ async function init() {
   const handoffScreen = new HandoffScreen();
   handoffScreen.el.addEventListener('tacticalrisk:handoff-hidden', () => {
     hidePhoneTooltips('handoff');
+    phoneSetupGestureStart = null;
+    phoneSetupPeekThisGesture = false;
+    selectedTerritory = null;
+    playerPanel.selectedTerritory = null;
+    playerPanel._phoneCapitalLandName = null;
+    playerPanel.flushRender();
     resizeCanvas();
     fitPhoneCamera();
     kickPaint();
@@ -1934,9 +1942,11 @@ async function init() {
     if (phoneSetupGestureStart) return;
     if (!gameState || !isMobileShell() || !isPhoneSetupPlacementPhase(gameState.phase)) return;
     if (isPhoneHudChromeTarget(e.target)
+      || isPhoneHandoffChromeTarget(e.target)
       || isPhoneTrayChromeTarget(e.target)
       || isPhoneCapitalCtaTarget(e.target)
-      || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)) return;
+      || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)
+      || pointHitsPhoneHandoffChrome(e.clientX, e.clientY)) return;
     phoneSetupGestureStart = { x: e.clientX, y: e.clientY };
     phoneSetupPeekThisGesture = false;
   };
@@ -1962,9 +1972,11 @@ async function init() {
   const applyPhoneSetupPeekFromPointer = (e) => {
     if (!gameState || !isMobileShell() || !isPhoneSetupPlacementPhase(gameState.phase)) return false;
     if (isPhoneHudChromeTarget(e.target)
+      || isPhoneHandoffChromeTarget(e.target)
       || isPhoneTrayChromeTarget(e.target)
       || isPhoneCapitalCtaTarget(e.target)
-      || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)) return false;
+      || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)
+      || pointHitsPhoneHandoffChrome(e.clientX, e.clientY)) return false;
     // Chip / hint / CTA row are chrome even when the event target is the
     // canvas (iPhone fat-finger / pointer-events gap). Point-in-chrome
     // must win before the map peek can overwrite a named land.
@@ -2020,6 +2032,7 @@ async function init() {
       selectedUnitType: playerPanel.selectedUnitType,
       tappedIsOwnedLand,
       tappedIsLegalSea,
+      tappedIsLand: !hit.isWater,
       hasHit: true,
     })) return false;
     selectedTerritory = hit;
@@ -2526,6 +2539,7 @@ async function init() {
           selectedUnitType: playerPanel.selectedUnitType,
           tappedIsOwnedLand,
           tappedIsLegalSea,
+          tappedIsLand: !hit.isWater,
           hasHit: true,
         })) {
           camera.dirty = true;
@@ -2730,7 +2744,10 @@ async function init() {
 
         // Render layers
         mapRenderer.render(ctx, localViewport, {
-          flatOcean: shouldSkipPhoneMapArt(camera.zoom, { mobile: isMobileShell() }),
+          flatOcean: shouldSkipPhoneMapArt(camera.zoom, {
+            mobile: isMobileShell(),
+            setup: isPhoneSetupPlacementPhase(gameState?.phase),
+          }),
         });
 
         // Mask baked-in rectangular sea-zone artwork with accurate water

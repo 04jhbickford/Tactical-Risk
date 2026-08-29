@@ -126,11 +126,31 @@ export function isPhoneMapToolsChromeTarget(target) {
   return !!(target?.closest?.('#zoom-controls') || target?.closest?.('#minimap'));
 }
 
+export function isPhoneHandoffChromeTarget(target) {
+  return !!(target?.closest?.('#handoffScreen')
+    || target?.closest?.('.handoff-overlay')
+    || target?.closest?.('.handoff-content')
+    || target?.closest?.('.handoff-start-btn'));
+}
+
+export function pointHitsPhoneHandoffChrome(clientX, clientY) {
+  if (typeof document === 'undefined') return false;
+  const el = document.getElementById('handoffScreen');
+  if (!el || el.classList.contains('hidden')) return false;
+  const x = Number(clientX);
+  const y = Number(clientY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const r = el.getBoundingClientRect?.();
+  if (!r || r.width <= 0 || r.height <= 0) return false;
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
 export function isPhoneHudChromeTarget(target) {
   return !!(target?.closest?.('#hud')
     || target?.closest?.('.phone-menu-sheet')
     || target?.closest?.('.hud-menu-btn')
     || target?.closest?.('.hud-menu-container')
+    || isPhoneHandoffChromeTarget(target)
     || isPhoneMapToolsChromeTarget(target));
 }
 
@@ -176,6 +196,7 @@ export function shouldApplyPhoneSetupLandTap({
   selectedUnitType,
   tappedIsOwnedLand,
   tappedIsLegalSea,
+  tappedIsLand,
   hasHit,
 } = {}) {
   if (!mobile) return true;
@@ -186,7 +207,9 @@ export function shouldApplyPhoneSetupLandTap({
     return !!tappedIsOwnedLand || !!tappedIsLegalSea;
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-    return !!tappedIsOwnedLand;
+    // Any land tap names Confirm (owned or not). A miss / sea must
+    // not keep a stale UK from Start Turn punch-through.
+    return !!tappedIsLand;
   }
   return true;
 }

@@ -794,9 +794,15 @@ export function phoneLegalUsesSolidStroke(zoom) {
   return !Number.isFinite(z) || z <= 0 || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
 }
 
-/** Baked smallMap/baseTiles carry dark-red country ink. Skip them at Fit. */
-export function shouldSkipPhoneMapArt(zoom, { mobile = false } = {}) {
+export function isPhoneSetupPhase(phase) {
+  return phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
+/** Baked smallMap/baseTiles carry dark-red country ink. Skip at Fit and
+ *  during phone setup (dest-cluster zoom is often ≥ 0.85). */
+export function shouldSkipPhoneMapArt(zoom, { mobile = false, setup = false } = {}) {
   if (!mobile) return false;
+  if (setup) return true;
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return true;
   return z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
@@ -816,7 +822,8 @@ export function phoneLegalDashPattern(zoom) {
 // dark country strokes on every land (James V2.81.27 gwsbmvlpj). Hide
 // worldwide outlines until the user is clearly zoomed in. Desktop keeps
 // the 0.4 floor.
-export function phoneCountryOutlineWidth(zoom, { mobile = false } = {}) {
+export function phoneCountryOutlineWidth(zoom, { mobile = false, setup = false } = {}) {
+  if (mobile && setup) return 0;
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) {
     return mobile ? 0 : PHONE_COUNTRY_OUTLINE_WORLD_MIN;

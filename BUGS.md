@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.30 restore Place Capital peek; no dark-red at dest zoom
+
+James unique play of V2.81.29 at 500 (`qojiw5987`): Fit gold-edge and sea dest HOLD. FAIL: opening already had `Place Capital: United Kingdom` (Start Turn punch-through); peeking Karelia left the UK Confirm stale; dest-cluster zoom ≥ 0.85 brought back baked map-art plus `#3d2800`/faction dashes on Eire/Sweden/Germany.
+
+Fix: handoff overlay is chrome; Start Turn clears any leaked peek. Any land tap names Place Capital Confirm. Phone setup skips map art and dark country strokes at every zoom. Owned/legal is gold fill-lite; gold hairline only at Fit (`< 0.85`). SCHEMA 11. GAME_VERSION V2.81.30. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.29 skip baked map-art borders; owned fill-lite only
 
 James unique play of V2.81.28 at 500 (`ax9g4l281`): interaction HOLDs (sea dest, land hides ships, Fit moves, no Map punch-through, no opening star). FAIL: every land still had dark-red country strokes at opening and after Fit. V2.81.28 hid the same-color continent seam (and left baked `smallMap`/baseTiles on screen), so the PNG’s dark-red country ink showed through. Legal fill-lite did not read.

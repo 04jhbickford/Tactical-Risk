@@ -3,7 +3,6 @@
 import {
   isMobileShell,
   phoneLegalOutlineWidth,
-  phoneLegalDashPattern,
   phoneCountryOutlineWidth,
   phoneOwnershipSeamWidth,
   phoneMapStackOffsets,
@@ -11,10 +10,9 @@ import {
   shouldDrawPhoneCapitalStar,
   shouldDrawPhoneCapitalGlow,
   PHONE_LEGAL_FILL_ALPHA,
-  PHONE_LEGAL_EDGE_INK,
   PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
-  phoneLegalDashColor,
+  isPhoneSetupPhase,
   PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
 } from '../ui/mobileShell.js';
 
@@ -174,19 +172,13 @@ export class TerritoryRenderer {
     };
 
     const z = Number(zoom);
-    const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-    const dashColor = phoneLegalDashColor(this.phoneLegalEdgeColor);
     const worldFit = !Number.isFinite(z) || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
-    ctx.setLineDash(phoneLegalDashPattern(zoom));
-    // Opening / Fit: gold fill-lite + gold hairline on owned land only.
-    // Faction-red (#B22222) on ~31 scattered owned tiles reads as the
-    // worldwide dark-red country stroke James FAILed on ax9g4l281.
+    ctx.setLineDash([]);
+    // Fit: gold hairline. Opening/close zoom: fill-lite only — the
+    // #3d2800 + faction dash at ≥0.85 read as dark-red country strokes
+    // on Eire/Sweden/Germany (James V2.81.29).
     if (worldFit) {
       strokeOwned(PHONE_LEGAL_EDGE_COLOR, outline, { landsOnly: true });
-    } else {
-      const inner = Math.max(outline * 0.45, outline - 2 / safeZ);
-      strokeOwned(PHONE_LEGAL_EDGE_INK, outline, { landsOnly: true });
-      strokeOwned(dashColor, inner, { landsOnly: true });
     }
 
     ctx.restore();
@@ -663,7 +655,10 @@ export class TerritoryRenderer {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     // Land territory borders — stable CSS-px at world Fit, 1 world-px zoomed in.
-    const countryW = phoneCountryOutlineWidth(zoom, { mobile: isMobileShell() });
+    const countryW = phoneCountryOutlineWidth(zoom, {
+      mobile: isMobileShell(),
+      setup: isPhoneSetupPhase(this.gameState?.phase),
+    });
     if (countryW > 0) {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.lineWidth = countryW;

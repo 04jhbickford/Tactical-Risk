@@ -27,6 +27,8 @@ const {
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
+  isPhoneHandoffChromeTarget,
+  pointHitsPhoneHandoffChrome,
   isPhoneMapToolsChromeTarget,
   pointHitsPhoneMapToolsChrome,
   isPhoneTrayChromeTarget,
@@ -86,6 +88,7 @@ const {
   phoneCountryOutlineWidth,
   phoneOwnershipSeamWidth,
   shouldSkipPhoneMapArt,
+  isPhoneSetupPhase,
   shouldWidenPhoneUserFit,
   PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
   PHONE_LEGAL_FILL_ALPHA,
@@ -153,7 +156,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.29', GAME_VERSION === 'V2.81.29');
+check('GAME_VERSION is V2.81.30', GAME_VERSION === 'V2.81.30');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -584,6 +587,11 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && shouldSkipPhoneMapArt(0.7, { mobile: true }) === true
     && shouldSkipPhoneMapArt(0.9, { mobile: true }) === false
     && shouldSkipPhoneMapArt(0.5, { mobile: false }) === false);
+  check('phone setup skips map art and country strokes at dest-cluster zoom',
+    shouldSkipPhoneMapArt(1.2, { mobile: true, setup: true }) === true
+    && phoneCountryOutlineWidth(1.2, { mobile: true, setup: true }) === 0
+    && isPhoneSetupPhase(GAME_PHASES.CAPITAL_PLACEMENT) === true
+    && isPhoneSetupPhase(GAME_PHASES.UNIT_PLACEMENT) === true);
   check('world Fit legal edge is a visible owned-tile hairline, not a 9px double hull',
     phoneLegalOutlineWidth(0.11) <= PHONE_LEGAL_OUTLINE_WORLD_MAX
     && phoneLegalOutlineWidth(0.11) >= 2.5
@@ -632,12 +640,11 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     !!highlight
     && !/0\.55/.test(highlight[0])
     && !/shadowBlur/.test(highlight[0]));
-  check('phone legal highlight is a dashed Civ gold-hex on first paint, not peek-only',
+  check('phone legal highlight is gold fill-lite on first paint, not peek-only',
     !!highlight
     && /phoneLegalNames\.size/.test(highlight[0])
-    && /phoneLegalDashPattern/.test(highlight[0])
-    && /phoneLegalDashColor/.test(highlight[0])
     && /PHONE_LEGAL_FILL_RGB/.test(highlight[0])
+    && /PHONE_LEGAL_EDGE_COLOR/.test(highlight[0])
     && !/#fff3b0/.test(highlight[0])
     && !/selectedTerritory/.test(highlight[0]));
   check('legal marks stroke each owned tile, not a continent hull',
@@ -659,10 +666,10 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     && JSON.stringify(collectPhoneFitFocusNames({
       ownedNames: ['Germany', 'Poland'],
     })) === JSON.stringify(['Germany', 'Poland']));
-  check('phone legal highlight uses ink + gold edge colors',
-    /PHONE_LEGAL_EDGE_INK/.test(rendererSrc)
-    && /PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
-    && /PHONE_LEGAL_FILL_RGB/.test(rendererSrc));
+  check('phone legal highlight uses gold fill + gold edge, not dark ink',
+    /PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
+    && /PHONE_LEGAL_FILL_RGB/.test(rendererSrc)
+    && !/PHONE_LEGAL_EDGE_INK/.test(rendererSrc));
 }
 
 console.log('=== V2.67 phone peek tray (map-first; no persistent unit sheet) ===');
@@ -768,23 +775,26 @@ check('own-land tap selects even without a peeked unit',
     tappedIsOwnedLand: true,
     hasHit: true,
   }) === true);
-check('place-tap does not clear a pending Place Capital confirm',
+check('Place Capital peek names any tapped land; miss does not clear',
   shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     tappedIsOwnedLand: false,
+    tappedIsLand: true,
     hasHit: true,
-  }) === false
+  }) === true
   && shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     tappedIsOwnedLand: false,
+    tappedIsLand: false,
     hasHit: false,
   }) === false
   && shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     tappedIsOwnedLand: true,
+    tappedIsLand: true,
     hasHit: true,
   }) === true);
 check('desktop setup land tap still applies',
@@ -1265,6 +1275,11 @@ check('Confirm names the pair',
     isPhoneMapToolsChromeTarget(zoomBtn) === true
     && isPhoneHudChromeTarget(zoomBtn) === true
     && pointHitsPhoneMapToolsChrome(NaN, 0) === false);
+  const handoffBtn = { closest: (sel) => (sel === '.handoff-start-btn' || sel === '#handoffScreen' ? {} : null) };
+  check('Start Turn overlay is not a land peek',
+    isPhoneHandoffChromeTarget(handoffBtn) === true
+    && isPhoneHudChromeTarget(handoffBtn) === true
+    && pointHitsPhoneHandoffChrome(NaN, 0) === false);
 }
 {
   const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
@@ -1324,6 +1339,7 @@ check('own-land Place Capital tap applies (peek + Confirm), miss does not clear'
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     inspected: false,
     tappedIsOwnedLand: true,
+    tappedIsLand: true,
     hasHit: true,
   }) === true
   && shouldApplyPhoneSetupLandTap({
@@ -1331,6 +1347,7 @@ check('own-land Place Capital tap applies (peek + Confirm), miss does not clear'
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     inspected: false,
     tappedIsOwnedLand: false,
+    tappedIsLand: false,
     hasHit: false,
   }) === false
   && shouldApplyPhoneSetupLandTap({
@@ -1666,8 +1683,16 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
       tappedIsOwnedLand: false,
       tappedIsLegalSea: true,
+      tappedIsLand: false,
       hasHit: true,
-    }) === false);
+    }) === false
+    && shouldApplyPhoneSetupLandTap({
+      mobile: true,
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      tappedIsOwnedLand: false,
+      tappedIsLand: true,
+      hasHit: true,
+    }) === true);
   check('unwrap pulls the far copy onto the dest seed (no Pacific centroid)',
     Math.abs(unwrapFitX(3000, 200) - (3000 - 3500)) < 0.01
     && Math.abs(unwrapFitX(80, 2800) - (80 + 3500)) < 0.01);
@@ -1720,8 +1745,13 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
     && /worldFit/.test(rendererSrc));
   check('Fit legal hairline is gold, not faction-red country ink',
     /strokeOwned\(PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
-    && !/strokeOwned\(dashColor, outline, \{ landsOnly: true \}\)/.test(
-      rendererSrc.slice(rendererSrc.indexOf('if (worldFit)'), rendererSrc.indexOf('} else {')),
+    && !/PHONE_LEGAL_EDGE_INK/.test(rendererSrc)
+    && !/phoneLegalDashColor/.test(rendererSrc));
+  check('Start Turn / handoff is chrome, not a Place Capital peek',
+    /isPhoneHandoffChromeTarget/.test(readFileSync(join(root, 'src/ui/territoryTooltip.js'), 'utf8'))
+    && /pointHitsPhoneHandoffChrome/.test(mainSrc)
+    && /_phoneCapitalLandName = null/.test(
+      mainSrc.slice(mainSrc.indexOf('handoff-hidden'), mainSrc.indexOf('handoff-hidden') + 800),
     ));
   check('user Fit that does not move the camera widens to world',
     shouldWidenPhoneUserFit({
