@@ -17323,7 +17323,10 @@ html, body {
   .player-panel.player-panel--peek,
   #sidebar.player-panel--peek.player-panel--place-tray,
   .player-panel.player-panel--peek.player-panel--place-tray {
+    top: auto;
+    bottom: 0;
     max-height: none;
+    min-height: 0;
     height: auto;
     pointer-events: none;
   }

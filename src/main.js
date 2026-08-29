@@ -1936,7 +1936,6 @@ async function init() {
     })) return false;
     selectedTerritory = hit;
     playerPanel._phoneCapitalLandName = hit.name;
-    playerPanel._capitalCtaArmed = false;
     playerPanel.setSelectedTerritory(hit);
     hud.setLastClick({ landed: true, label: hit.name });
     hud._render();

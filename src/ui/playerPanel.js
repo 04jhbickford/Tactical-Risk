@@ -42,7 +42,7 @@ import {
   shouldCommitOverlayGesture,
   resolveQueueUnitType,
   pickPanelHitFromStack,
-  isPointInPanelRect,
+  pointHitsPlayerPanel,
   PANEL_QUEUE_GUARD_MS,
 } from './panelClickLock.js';
 
@@ -305,24 +305,23 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
   return false;
 }
 
-// 22d4b13 Place Capital Confirm. Own-land selection mounts the button.
+// 22d4b13 Place Capital Confirm. Peek already gated owned land — mount
+// from the selected / peeked name. Do not owner-check here (a dropped
+// selectedTerritory or id mismatch left James with an empty tray).
 export function resolvePhoneCapitalCta({
   phase,
   territory = null,
-  playerId = null,
-  getOwner = null,
+  landName = null,
 } = {}) {
   if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
-  const land = territory && !territory.isWater ? territory : null;
-  if (!land || playerId == null) return null;
-  const owner = typeof getOwner === 'function' ? getOwner(land.name) : land.owner;
-  if (owner !== playerId) return null;
+  const name = (territory && !territory.isWater) ? territory.name : landName;
+  if (!name) return null;
   return {
     action: 'place-capital',
-    label: `Place Capital: ${land.name}`,
+    label: `Place Capital: ${name}`,
     disabled: false,
     primary: true,
-    territory: land.name,
+    territory: name,
   };
 }
 
@@ -435,7 +434,6 @@ export class PlayerPanel {
     this._queueGestureApplied = false;
     this._phoneSetupPeekAt = 0;
     this._phoneCapitalLandName = null;
-    this._capitalCtaArmed = false;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -484,9 +482,6 @@ export class PlayerPanel {
     }
     this._panelPointerAt = Date.now();
     this._pointerLock = this._readPointerLock(e);
-    if (this._pointerLock?.action === 'place-capital') {
-      this._capitalCtaArmed = true;
-    }
     const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
       || this._pointerLock?.dataset?.unit
       || null;
@@ -497,7 +492,18 @@ export class PlayerPanel {
 
   containsPoint(clientX, clientY) {
     if (!this.el || this.el.classList?.contains('hidden')) return false;
-    return isPointInPanelRect(clientX, clientY, this.el.getBoundingClientRect?.());
+    const peek = this.el.classList.contains('player-panel--peek');
+    const chromeRects = peek
+      ? [...this.el.querySelectorAll('.pp-bottom-actions, .pp-seat-chip')]
+        .map((node) => node.getBoundingClientRect())
+      : [];
+    return pointHitsPlayerPanel({
+      peek,
+      clientX,
+      clientY,
+      panelRect: this.el.getBoundingClientRect?.(),
+      chromeRects,
+    });
   }
 
   shouldBlockMapSelect(now = Date.now(), point = null) {
@@ -971,22 +977,15 @@ export class PlayerPanel {
         undoable: !isAttack  // Non-attack moves can be undone
       });
     }
-    // Capital placement — Confirm is the only verb. Own-land tap selects.
-    // Peek already gated owned land; mount Confirm from that land name even
-    // if selectedTerritory was dropped before this render.
+    // Capital placement — 22d4b13 tray. Own-land tap peeks; Confirm is
+    // the only commit. Mount from selected land or the peeked name.
     else if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      const landName = (this.selectedTerritory && !this.selectedTerritory.isWater)
-        ? this.selectedTerritory.name
-        : this._phoneCapitalLandName;
-      if (landName) {
-        buttons.push({
-          action: 'place-capital',
-          label: `Place Capital: ${landName}`,
-          disabled: false,
-          primary: true,
-          territory: landName
-        });
-      }
+      const capitalCta = resolvePhoneCapitalCta({
+        phase,
+        territory: this.selectedTerritory,
+        landName: this._phoneCapitalLandName,
+      });
+      if (capitalCta) buttons.push(capitalCta);
     }
     // Initial unit placement — Deploy stays on the peek CTA (not clipped
     // in the tray body). Done only after the queue is empty.
@@ -3617,8 +3616,6 @@ export class PlayerPanel {
         const action = btn.dataset.action;
         const lockAction = btn.lockAction || null;
         const territory = btn.dataset.territory;
-        if (action === 'place-capital' && !this._capitalCtaArmed) return;
-        this._capitalCtaArmed = false;
         const setIndex = btn.dataset.set;
         if ((action === 'undo-placement' || action === 'undo-capital')
           && Date.now() < (this._ignoreUndoUntil || 0)) {

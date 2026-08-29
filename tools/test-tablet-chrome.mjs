@@ -114,7 +114,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.7', GAME_VERSION === 'V2.81.7');
+check('GAME_VERSION is V2.81.8', GAME_VERSION === 'V2.81.8');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -303,7 +303,8 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
   check('phone tray peek class is in the 640 block',
     /pp-tray-peek/.test(phoneBlock) && /pp-tray-hint/.test(phoneBlock));
   check('phone peek tray is height:auto, not a 42/50dvh sheet',
-    /#sidebar\.player-panel--peek[\s\S]*?max-height:\s*none/.test(phoneBlock));
+    /#sidebar\.player-panel--peek[\s\S]*?max-height:\s*none/.test(phoneBlock)
+    && /#sidebar\.player-panel--peek[\s\S]*?top:\s*auto/.test(phoneBlock));
   check('phone expanded detent is 36dvh, not a 280px column',
     /#sidebar\.player-panel--expanded[\s\S]*?max-height:\s*36dvh/.test(phoneBlock)
     && PHONE_PEEK_EXPANDED_MAX_DVH === 36);
@@ -893,26 +894,24 @@ check('inspect≠commit still holds — tap never auto-places capital',
   const cta = resolvePhoneCapitalCta({
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     territory: land,
-    playerId: 'russians',
-    getOwner: (name) => (name === 'Novosibirsk' ? 'russians' : null),
   });
   check('owned-land peek resolves Place Capital Confirm',
     cta?.action === 'place-capital'
     && cta?.label === 'Place Capital: Novosibirsk'
     && cta?.territory === 'Novosibirsk'
     && cta?.disabled === false);
-  check('unowned or water peek does not mount Confirm',
+  check('peeked land name mounts Confirm even if selectedTerritory dropped',
     resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
-      territory: { name: 'Germany', isWater: false },
-      playerId: 'russians',
-      getOwner: () => 'germans',
+      landName: 'Novosibirsk',
+    })?.label === 'Place Capital: Novosibirsk');
+  check('water or missing land does not mount Confirm',
+    resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: { name: 'SZ 5', isWater: true },
     }) === null
     && resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
-      territory: { name: 'SZ 5', isWater: true },
-      playerId: 'russians',
-      getOwner: () => 'russians',
     }) === null);
   check('Confirm CTA hides the Place Capital hint',
     shouldShowPhoneSetupPeekHint({
@@ -929,8 +928,9 @@ check('inspect≠commit still holds — tap never auto-places capital',
     /_phoneCapitalLandName = hit\.name/.test(mainSrc)
     && /setSelectedTerritory\(hit\)/.test(mainSrc)
     && /setSelectedTerritory\(selectedTerritory\)/.test(mainSrc)
-    && /Place Capital: \$\{landName\}/.test(panelSrc)
-    && !/setSelectedTerritory\(hit, \{ immediate: false \}\)/.test(mainSrc)
+    && /resolvePhoneCapitalCta\(/.test(panelSrc)
+    && /landName: this\._phoneCapitalLandName/.test(panelSrc)
+    && !/_capitalCtaArmed/.test(panelSrc)
     && !/shouldIgnorePhoneSetupCtaAfterPeek/.test(panelSrc));
 }
 check('phone setup peek applies on this pointer, not the leftover mouseup',

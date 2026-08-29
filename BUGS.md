@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.8 peek tray chrome is the only map-block; Confirm mounts from peeked land
+
+James unique-deploy play of e4bbd2e / V2.81.5 at ~500 CSS px on a fresh table: hold 1 PASS. Hold 4 peek holds, Confirm FAIL worse than V2.81.4. First Novosibirsk tap: yellow outline, no star, phase stayed PLACE CAPITAL. Thumb tray was an empty ~85px panel — hint “Tap your land, then Confirm”, no Confirm, no Undo. Re-tap still empty. Buttons were not in the UI.
+
+Cause: leftover-click / delay / flush swings (30ba311 commit; f028a45 Undo-only; e4bbd2e empty tray). Peek `#sidebar` still computed a tall leftover box, so `containsPoint` treated map taps as in-panel and never assigned the land. Owner-gated Confirm then dropped the button. Last working tray after a peek was sha 22d4b13 (second tap).
+
+Fix: peek hit-test is only `.pp-bottom-actions` / `.pp-seat-chip`. After a valid peek, mount `Place Capital: <land>` Confirm with Undo ghost on one row from selected land or `_phoneCapitalLandName`. No leftover-click arming, no 450ms ignore. Thumb Confirm is the only commit. Holds 1–3 unchanged. SCHEMA 11. GAME_VERSION V2.81.8. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.7 Place Capital Confirm from peeked land name
 
 James unique-deploy play of e4bbd2e and the a65cae0 V2.81.6 unique URL still had no Confirm after a valid peek. Unique-URL replay (jh73v1z7q) showed outline + “Click landed” but an empty tray — mouseup of a peeked gesture did not paint Confirm, and owner-gated render dropped the button.

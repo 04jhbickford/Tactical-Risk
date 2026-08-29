@@ -119,6 +119,8 @@ const {
   resolveQueueUnitType,
   pickPanelHitFromStack,
   isPointInPanelRect,
+  isPointInPeekTrayChrome,
+  pointHitsPlayerPanel,
 } = await import(pathToFileURL(join(root, 'src/ui/panelClickLock.js')));
 const {
   shouldPassPlacementTurn,
@@ -155,7 +157,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.7', GAME_VERSION === 'V2.81.7');
+check('GAME_VERSION is V2.81.8', GAME_VERSION === 'V2.81.8');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1065,6 +1067,18 @@ console.log('=== B31 Max/panel hit-test: not the map, not LOG ===');
   check('B31: panel rect contains the Max click',
     isPointInPanelRect(900, 400, { left: 800, right: 1120, top: 48, bottom: 800 }) === true
     && isPointInPanelRect(100, 400, { left: 800, right: 1120, top: 48, bottom: 800 }) === false);
+
+  const peekChrome = [{ left: 0, right: 500, top: 700, bottom: 800 }];
+  const tallPanel = { left: 0, right: 500, top: 48, bottom: 800 };
+  check('peek tray chrome is only the bottom CTA, not the leftover tall sidebar',
+    isPointInPeekTrayChrome(250, 750, peekChrome) === true
+    && isPointInPeekTrayChrome(250, 200, peekChrome) === false
+    && pointHitsPlayerPanel({
+      peek: true, clientX: 250, clientY: 200, panelRect: tallPanel, chromeRects: peekChrome,
+    }) === false
+    && pointHitsPlayerPanel({
+      peek: false, clientX: 250, clientY: 200, panelRect: tallPanel, chromeRects: peekChrome,
+    }) === true);
 
   const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
   const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');

@@ -39,6 +39,26 @@ export function isPointInPanelRect(clientX, clientY, rect = null) {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
+// Peek #sidebar can still compute a tall leftover box (desktop top:48px
+// + bottom:0). Only the tray chrome is a hit target — a map tap must
+// not look "in panel" or Place Capital never peeks and Confirm never mounts.
+export function isPointInPeekTrayChrome(clientX, clientY, chromeRects = []) {
+  return (Array.isArray(chromeRects) ? chromeRects : []).some(
+    (rect) => isPointInPanelRect(clientX, clientY, rect),
+  );
+}
+
+export function pointHitsPlayerPanel({
+  peek = false,
+  clientX,
+  clientY,
+  panelRect = null,
+  chromeRects = [],
+} = {}) {
+  if (peek) return isPointInPeekTrayChrome(clientX, clientY, chromeRects);
+  return isPointInPanelRect(clientX, clientY, panelRect);
+}
+
 function actionButtonFrom(el) {
   if (!el) return null;
   if (el.dataset?.action) return el;
