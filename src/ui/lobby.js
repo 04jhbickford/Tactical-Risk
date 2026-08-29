@@ -525,6 +525,8 @@ export class Lobby {
 
     // Back button
     this.el.querySelector('[data-action="back"]')?.addEventListener('click', () => {
+      // Keep seated factions + occupant (Human / Easy AI / …). Returning
+      // to setup must not reset a card to Human.
       this.mode = 'main';
       this._render();
     });

@@ -231,6 +231,21 @@ export class Camera {
     this.dirty = true;
   }
 
+  // Button zoom — do not wait for a synthetic wheel or the next pointer.
+  zoomBy(dir, { sx, sy } = {}) {
+    const toward = Number.isFinite(sx) && Number.isFinite(sy);
+    const worldBefore = toward ? this.screenToWorld(sx, sy) : null;
+    const factor = dir === 'in' ? 1.2 : 1 / 1.2;
+    this.zoom = Math.max(this.minZoom, Math.min(MAX_ZOOM, this.zoom * factor));
+    if (worldBefore) {
+      const worldAfter = this.screenToWorld(sx, sy);
+      this.x += worldBefore.x - worldAfter.x;
+      this.y += worldBefore.y - worldAfter.y;
+    }
+    this._clamp();
+    this.dirty = true;
+  }
+
   /** Ensure zoom stays valid after canvas resize */
   onResize() {
     this.zoom = Math.max(this.minZoom, Math.min(MAX_ZOOM, this.zoom));

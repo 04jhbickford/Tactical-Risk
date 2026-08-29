@@ -886,6 +886,17 @@ check('AI seat is not YOUR TURN',
 check('native AI option click does not toggle the seated card',
   shouldIgnoreFactionCardToggle({ now: 1000, ignoreUntil: 1000 + LOBBY_SELECT_TOGGLE_GUARD_MS }) === true
   && shouldIgnoreFactionCardToggle({ now: 2000, ignoreUntil: 1000 }) === false);
+{
+  if (typeof globalThis.devicePixelRatio !== 'number') globalThis.devicePixelRatio = 1;
+  const cam = new Camera({ width: 500, height: 844 });
+  cam.usePhoneMinZoom = true;
+  cam.zoom = 0.5;
+  cam.dirty = false;
+  const before = cam.zoom;
+  cam.zoomBy('out');
+  check('minus-zoom paints on this call, not the next pointer',
+    cam.zoom < before && cam.dirty === true);
+}
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

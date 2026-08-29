@@ -656,7 +656,7 @@ export class PlayerPanel {
     if (this.gameState && keepPlaced != null) {
       this.gameState.unitsPlacedThisRound = keepPlaced;
     }
-    this._scheduleRender();
+    this.flushRender();
   }
 
   _phoneUnitFitsTerritory(unitType, territory) {

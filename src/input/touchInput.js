@@ -123,7 +123,7 @@ export function initTouchInput(canvas, { enablePinch = false } = {}) {
 
 // On-screen zoom buttons (bottom-right). Useful for touch (no wheel) and for
 // desktop trackpads. Purely additive UI; drives the existing wheel handler.
-export function initZoomControls(canvas, { onFit, onZoom } = {}) {
+export function initZoomControls(canvas, { onFit, onZoom, onZoomStep } = {}) {
   if (!canvas || document.getElementById('zoom-controls')) return;
 
   const wrap = document.createElement('div');
@@ -147,13 +147,20 @@ export function initZoomControls(canvas, { onFit, onZoom } = {}) {
     }));
   };
 
+  wrap.addEventListener('pointerdown', (e) => e.stopPropagation());
+  wrap.addEventListener('click', (e) => e.stopPropagation());
+
   wrap.querySelectorAll('.zoom-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
       if (btn.dataset.zoom === 'fit') {
         if (typeof onFit === 'function') onFit();
+        if (typeof onZoom === 'function') onZoom();
         return;
       }
-      zoomStep(btn.dataset.zoom);
+      if (typeof onZoomStep === 'function') onZoomStep(btn.dataset.zoom);
+      else zoomStep(btn.dataset.zoom);
       if (typeof onZoom === 'function') onZoom();
     });
   });

@@ -173,6 +173,10 @@ async function init() {
 
   // Initialize systems
   const camera = new Camera(canvas);
+  const kickPaint = () => {
+    camera.dirty = true;
+    requestAnimationFrame(() => { camera.dirty = true; });
+  };
   const mapRenderer = new MapRenderer();
   const territoryRenderer = new TerritoryRenderer(territories, continents);
   const territoryMap = new TerritoryMap(territories);
@@ -352,7 +356,7 @@ async function init() {
           playerPanel.setSelectedTerritory(null);
           playerPanel.flushRender();
           hud._render();
-          camera.dirty = true;
+          kickPaint();
           notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
         }
@@ -2321,6 +2325,7 @@ async function init() {
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);
         hud.setLastClick({ landed: true, label: hit.name });
+        hud._render();
         // Phone setup: tap places / selects — do not open the inspect sheet.
         // Playing still tap-to-toggles. Long-press inspect is a small edge card.
         // Tablet (fromTouch, not mobile-shell) keeps the V2.64 peek.
@@ -2358,7 +2363,7 @@ async function init() {
         hud.setLastClick({ landed: false, label: 'map' });
         movementUI.cancel();
       }
-      camera.dirty = true;
+      kickPaint();
     }
   });
 
@@ -2369,9 +2374,21 @@ async function init() {
   // handling is untouched. Pinch-zoom enabled on the main map only.
   initTouchInput(canvas, { enablePinch: true });
   initTouchInput(document.getElementById('minimap'));
+
   initZoomControls(canvas, {
-    onFit: fitPhoneCamera,
-    onZoom: () => { camera.dirty = true; },
+    onFit: () => {
+      fitPhoneCamera();
+      kickPaint();
+    },
+    onZoomStep: (dir) => {
+      const dpr = devicePixelRatio || 1;
+      camera.zoomBy(dir, {
+        sx: canvas.width / dpr / 2,
+        sy: canvas.height / dpr / 2,
+      });
+      kickPaint();
+    },
+    onZoom: kickPaint,
   });
 
   canvas.addEventListener('mouseleave', () => {
