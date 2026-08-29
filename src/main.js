@@ -71,6 +71,9 @@ import {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
+  resolvePhoneCapitalPeekAction,
+  PHONE_CAPITAL_PEEK_CONFIRM,
+  PHONE_CAPITAL_PEEK_INSPECT,
   shouldCommitPhoneSetupPeekAfterGesture,
   isPhoneSetupPlacementPhase,
   shouldRefitPhoneSetupHit,
@@ -320,13 +323,21 @@ async function init() {
       dests.push(...(movementUI.getValidDestinations() || []));
     }
     const src = movementUI.getSelectedSource?.();
+    const rawSelected = src?.name
+      || playerPanel._phoneDeployLandName
+      || playerPanel._phoneCapitalLandName
+      || selectedTerritory?.name
+      || capital
+      || null;
+    const owner = rawSelected ? gameState?.getOwner?.(rawSelected) : null;
+    const selectedName = (gameState?.phase === GAME_PHASES.CAPITAL_PLACEMENT
+      && rawSelected
+      && owner
+      && owner !== gameState.currentPlayer?.id)
+      ? (playerPanel._phoneCapitalLandName || capital || null)
+      : rawSelected;
     return {
-      selectedName: src?.name
-        || playerPanel._phoneDeployLandName
-        || playerPanel._phoneCapitalLandName
-        || selectedTerritory?.name
-        || capital
-        || null,
+      selectedName,
       destinationNames: dests,
       capitalName: capital,
     };
@@ -380,6 +391,10 @@ async function init() {
       case 'place-capital':
         // Capture player BEFORE placeCapital (which advances the turn)
         const placingPlayer = gameState.currentPlayer;
+        if (!data?.territory
+          || gameState.getOwner(data.territory) !== placingPlayer?.id) {
+          break;
+        }
         if (gameState.placeCapital(data.territory)) {
           actionLog.logCapitalPlacement(data.territory, placingPlayer);
           tooltip.hide();
@@ -1404,6 +1419,18 @@ async function init() {
           notifyTurnSwap(null, gameState.currentPlayer);
           syncManager?.pushStateNow();
         }
+        // AI leftover camera/phase chrome must not greet the human
+        // (Skeptic: Germans CAPITAL / NW Pacific / missing Undo).
+        if (action === 'placeCapital' && isMobileShell()) {
+          selectedTerritory = null;
+          playerPanel.selectedTerritory = null;
+          playerPanel._phoneCapitalLandName = null;
+          playerPanel.flushRender();
+          hud._render();
+          resizeCanvas();
+          fitPhoneCamera();
+          kickPaint();
+        }
       });
       aiController.setOnStatusUpdate((message) => {
         hud.setAIStatus(message);
@@ -2005,7 +2032,8 @@ async function init() {
     // 500×640 leftover tray can steal the canvas target while hover
     // still painted the named land. Assign that land.
     if (!hit && gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
-      && hoverTerritory && !hoverTerritory.isWater) {
+      && hoverTerritory && !hoverTerritory.isWater
+      && gameState.getOwner(hoverTerritory.name) === gameState.currentPlayer?.id) {
       hit = hoverTerritory;
     }
     if (!hit) return false;
@@ -2014,6 +2042,12 @@ async function init() {
       phase: gameState.phase,
       inspected: phoneInspected,
     })) return false;
+    if (!applyPhoneSetupPeekHit(hit)) return false;
+    return true;
+  };
+
+  const applyPhoneSetupPeekHit = (hit) => {
+    if (!hit || !gameState) return false;
     const tappedIsOwnedLand = !!(
       !hit.isWater
       && gameState.getOwner(hit.name) === gameState.currentPlayer?.id
@@ -2025,6 +2059,8 @@ async function init() {
       getOwner: (name) => gameState.getOwner(name),
       getUnits: (name) => gameState.getUnitsAt?.(name) || [],
     });
+    const tappedIsLand = !hit.isWater;
+    const tappedIsWater = !!hit.isWater;
     if (!shouldApplyPhoneSetupLandTap({
       mobile: true,
       phase: gameState.phase,
@@ -2032,13 +2068,33 @@ async function init() {
       selectedUnitType: playerPanel.selectedUnitType,
       tappedIsOwnedLand,
       tappedIsLegalSea,
-      tappedIsLand: !hit.isWater,
+      tappedIsLand,
+      tappedIsWater,
       hasHit: true,
     })) return false;
-    selectedTerritory = hit;
-    playerPanel._phoneCapitalLandName = hit.isWater ? null : hit.name;
-    if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
-      playerPanel._phoneDeployLandName = hit.name;
+
+    if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      const peek = resolvePhoneCapitalPeekAction({
+        phase: gameState.phase,
+        tappedIsOwnedLand,
+        tappedIsLand,
+        tappedIsWater,
+        hasHit: true,
+      });
+      selectedTerritory = hit;
+      if (peek === PHONE_CAPITAL_PEEK_CONFIRM) {
+        playerPanel._phoneCapitalLandName = hit.name;
+      } else {
+        playerPanel._phoneCapitalLandName = null;
+        if (peek === PHONE_CAPITAL_PEEK_INSPECT && tappedIsLand) {
+          showNotification('Not yours', 1600);
+        }
+      }
+    } else {
+      selectedTerritory = hit;
+      if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+        playerPanel._phoneDeployLandName = hit.name;
+      }
     }
     if (isMobileShell()) {
       territoryRenderer.setPhoneTilePulse(hit.name, 'select', PHONE_SELECT_PULSE_MS);
@@ -2520,41 +2576,13 @@ async function init() {
           camera.dirty = true;
           return;
         }
-        const tappedIsOwnedLand = !!(
-          gameState
-          && !hit.isWater
-          && gameState.getOwner(hit.name) === gameState.currentPlayer?.id
-        );
-        const tappedIsLegalSea = !!(gameState && isPhoneLegalSetupSeaDest({
-          seaName: hit.name,
-          playerId: gameState.currentPlayer?.id,
-          territories,
-          getOwner: (name) => gameState.getOwner(name),
-          getUnits: (name) => gameState.getUnitsAt?.(name) || [],
-        }));
-        if (isMobileShell() && gameState && !shouldApplyPhoneSetupLandTap({
-          mobile: true,
-          phase: gameState.phase,
-          inspected: phoneInspected,
-          selectedUnitType: playerPanel.selectedUnitType,
-          tappedIsOwnedLand,
-          tappedIsLegalSea,
-          tappedIsLand: !hit.isWater,
-          hasHit: true,
-        })) {
-          camera.dirty = true;
+        if (isMobileShell() && gameState && isPhoneSetupPlacementPhase(gameState.phase)) {
+          if (!applyPhoneSetupPeekHit(hit)) {
+            camera.dirty = true;
+          }
           return;
         }
         selectedTerritory = hit;
-        if (isMobileShell() && gameState?.phase === GAME_PHASES.CAPITAL_PLACEMENT && !hit.isWater) {
-          playerPanel._phoneCapitalLandName = hit.name;
-        }
-        if (isMobileShell() && gameState?.phase === GAME_PHASES.UNIT_PLACEMENT) {
-          playerPanel._phoneDeployLandName = hit.name;
-        }
-        if (isMobileShell()) {
-          territoryRenderer.setPhoneTilePulse(hit.name, 'select', PHONE_SELECT_PULSE_MS);
-        }
         playerPanel.setSelectedTerritory(hit);
         hud.setLastClick({ landed: true, label: hit.name });
         hud._render();

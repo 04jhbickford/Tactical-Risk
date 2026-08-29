@@ -337,9 +337,8 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
   return false;
 }
 
-// 22d4b13 Place Capital Confirm. Peek already gated owned land — mount
-// from the selected / peeked name. Do not owner-check here (a dropped
-// selectedTerritory or id mismatch left James with an empty tray).
+// Named Place Capital Confirm is legal ONLY on the current placer's
+// owned land. Enemy / unowned / sea never mint the green CTA.
 export function phonePairAllowWater({ phase, turnPhase } = {}) {
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
   return turnPhase === TURN_PHASES.MOBILIZE
@@ -373,8 +372,10 @@ export function resolvePhoneCapitalCta({
   phase,
   territory = null,
   landName = null,
+  isOwnedLand = true,
 } = {}) {
   if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
+  if (isOwnedLand === false) return null;
   const name = (territory && !territory.isWater) ? territory.name : landName;
   if (!name) return null;
   return {
@@ -390,6 +391,8 @@ export function shouldShowPhoneSetupUndo({
   mobile, phase, canUndoPlacement, canUndoCapital,
 } = {}) {
   if (!mobile) return false;
+  // Opening Place Capital is Undo-only until a legal owned peek.
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return true;
   const resolved = resolveUndoAction({
     phase,
     canUndoPlacement,
@@ -1350,10 +1353,15 @@ export class PlayerPanel {
     // Capital placement — 22d4b13 tray. Own-land tap peeks; Confirm is
     // the only commit. Mount from selected land or the peeked name.
     else if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      const peekName = (this.selectedTerritory && !this.selectedTerritory.isWater)
+        ? this.selectedTerritory.name
+        : this._phoneCapitalLandName;
+      const isOwnedLand = !!(peekName && this.gameState.getOwner?.(peekName) === player.id);
       const capitalCta = resolvePhoneCapitalCta({
         phase,
         territory: this.selectedTerritory,
         landName: this._phoneCapitalLandName,
+        isOwnedLand,
       });
       if (capitalCta) buttons.push(capitalCta);
     }
@@ -1517,8 +1525,7 @@ export class PlayerPanel {
         canUndoPurchase: pendingPurchases.some(p => p.quantity > 0),
         canUndoMobilize: (this.gameState.mobilizationHistory || []).length > 0,
       });
-      const showCapitalUndoGhost = phase === GAME_PHASES.CAPITAL_PLACEMENT
-        && buttons.some(b => b.action === 'place-capital');
+      const showCapitalUndoGhost = phase === GAME_PHASES.CAPITAL_PLACEMENT;
       const showUndo = (undo.show && Date.now() >= (this._ignoreUndoUntil || 0))
         || showCapitalUndoGhost;
       html += `<div class="pp-peek-undo-slot">`;

@@ -21,6 +21,10 @@ const {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
+  resolvePhoneCapitalPeekAction,
+  PHONE_CAPITAL_PEEK_CONFIRM,
+  PHONE_CAPITAL_PEEK_INSPECT,
+  PHONE_CAPITAL_PEEK_IGNORE,
   shouldApplyPhoneSetupTapOnPointerDown,
   shouldCommitPhoneSetupPeekAfterGesture,
   PHONE_SETUP_PAN_SLOP_PX,
@@ -112,6 +116,8 @@ const {
   expandPhoneFitRegionNames,
   resolvePhoneFitRegionNames,
   pickPhoneFitOwnedCluster,
+  phoneHomeTerritoryName,
+  phoneFitSelectedName,
   ensurePhoneFitRegionBounds,
   PHONE_FIT_MIN_REGION_W,
   PHONE_FIT_MIN_REGION_H,
@@ -157,7 +163,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.31', GAME_VERSION === 'V2.81.31');
+check('GAME_VERSION is V2.81.32', GAME_VERSION === 'V2.81.32');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -781,8 +787,15 @@ check('own-land tap selects even without a peeked unit',
     tappedIsOwnedLand: true,
     hasHit: true,
   }) === true);
-check('Place Capital peek names any tapped land; miss does not clear',
+check('Place Capital owned land peeks Confirm; unowned/sea inspect; miss ignores',
   shouldApplyPhoneSetupLandTap({
+    mobile: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    tappedIsOwnedLand: true,
+    tappedIsLand: true,
+    hasHit: true,
+  }) === true
+  && shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     tappedIsOwnedLand: false,
@@ -794,15 +807,16 @@ check('Place Capital peek names any tapped land; miss does not clear',
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
     tappedIsOwnedLand: false,
     tappedIsLand: false,
-    hasHit: false,
-  }) === false
+    tappedIsWater: true,
+    hasHit: true,
+  }) === true
   && shouldApplyPhoneSetupLandTap({
     mobile: true,
     phase: GAME_PHASES.CAPITAL_PLACEMENT,
-    tappedIsOwnedLand: true,
-    tappedIsLand: true,
-    hasHit: true,
-  }) === true);
+    tappedIsOwnedLand: false,
+    tappedIsLand: false,
+    hasHit: false,
+  }) === false);
 check('desktop setup land tap still applies',
   shouldApplyPhoneSetupLandTap({
     mobile: false,
@@ -940,6 +954,9 @@ check('phone setup undo is required for place and last capital',
   }) === true
   && shouldShowPhoneSetupUndo({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, canUndoCapital: true,
+  }) === true
+  && shouldShowPhoneSetupUndo({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, canUndoCapital: false,
   }) === true
   && shouldShowPhoneSetupUndo({
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
@@ -1161,6 +1178,17 @@ check('inspect≠commit still holds — tap never auto-places capital',
     }) === null
     && resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    }) === null);
+  check('enemy / unowned land never mints Place Capital Confirm',
+    resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      territory: { name: 'Wake Island', isWater: false },
+      isOwnedLand: false,
+    }) === null
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      landName: 'Japan',
+      isOwnedLand: false,
     }) === null);
   check('Confirm CTA hides the Place Capital hint',
     shouldShowPhoneSetupPeekHint({
@@ -1556,8 +1584,8 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('opening Place Capital draws no capital star even if isCapital leaked',
     shouldDrawPhoneCapitalStar('French Indo China', openingGs) === false
     && shouldDrawPhoneCapitalGlow(openingGs) === false);
-  check('Place Capital draws no stars (self or enemy) until Deploy',
-    shouldDrawPhoneCapitalStar('Mongolia', confirmedGs) === false
+  check('Place Capital draws the confirmed star and hides leaked flags',
+    shouldDrawPhoneCapitalStar('Mongolia', confirmedGs) === true
     && shouldDrawPhoneCapitalStar('French Indo China', confirmedGs) === false
     && shouldDrawPhoneCapitalGlow(confirmedGs) === false);
   check('Deploy may show a confirmed capital star',
@@ -1690,8 +1718,9 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
       tappedIsOwnedLand: false,
       tappedIsLegalSea: true,
       tappedIsLand: false,
+      tappedIsWater: true,
       hasHit: true,
-    }) === false
+    }) === true
     && shouldApplyPhoneSetupLandTap({
       mobile: true,
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
@@ -1770,6 +1799,39 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('map-tool punch-through is blocked on document-capture peek',
     /pointHitsPhoneMapToolsChrome/.test(mainSrc)
     && /isPhoneMapToolsChromeTarget/.test(readFileSync(join(root, 'src/ui/territoryTooltip.js'), 'utf8')));
+  check('Place Capital peek kinds: owned Confirm, enemy/sea inspect, miss ignore',
+    resolvePhoneCapitalPeekAction({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      tappedIsOwnedLand: true, tappedIsLand: true, hasHit: true,
+    }) === PHONE_CAPITAL_PEEK_CONFIRM
+    && resolvePhoneCapitalPeekAction({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      tappedIsOwnedLand: false, tappedIsLand: true, hasHit: true,
+    }) === PHONE_CAPITAL_PEEK_INSPECT
+    && resolvePhoneCapitalPeekAction({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      tappedIsWater: true, hasHit: true,
+    }) === PHONE_CAPITAL_PEEK_INSPECT
+    && resolvePhoneCapitalPeekAction({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT, hasHit: false,
+    }) === PHONE_CAPITAL_PEEK_IGNORE);
+  check('Fit ignores enemy selected and seeds the faction home land',
+    phoneHomeTerritoryName('Russians', ['Russia', 'Novosibirsk', 'Soviet Far East']) === 'Russia'
+    && phoneFitSelectedName({
+      selectedName: 'Wake Island',
+      ownedNames: ['Russia', 'Ukraine S.S.R.'],
+      capitalName: 'Russia',
+    }) === 'Russia'
+    && phoneFitSelectedName({
+      selectedName: 'Ukraine S.S.R.',
+      ownedNames: ['Russia', 'Ukraine S.S.R.'],
+    }) === 'Ukraine S.S.R.');
+  check('AI placeCapital refits the current human; Confirm does not auto-Fit',
+    /action === 'placeCapital' && isMobileShell/.test(mainSrc)
+    && !/fitPhoneCamera/.test(placeCapital)
+    && /Not yours/.test(mainSrc)
+    && /applyPhoneSetupPeekHit/.test(mainSrc)
+    && /shouldParkPhoneMapTools/.test(readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8')));
 }
 
 if (failures) {

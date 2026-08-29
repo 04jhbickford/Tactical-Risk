@@ -638,9 +638,35 @@ export function ensurePhoneFitRegionBounds(bounds) {
   };
 }
 
-// Fit frames the current player's owned-land region (capital cluster when
-// owned land is worldwide), plus neighbors / legal dests. Not a world poster
-// and not a one-tile crop. No owned land (Place Capital) falls back to world.
+// Home land for Place Capital Fit when this seat has not confirmed.
+// Worldwide owned (Russia+Siberia+Alaska) otherwise windows the Pacific.
+export const PHONE_FACTION_HOME_LAND = {
+  Russians: 'Russia',
+  Germans: 'Germany',
+  British: 'United Kingdom',
+  Japanese: 'Japan',
+  Americans: 'East US',
+};
+
+export function phoneHomeTerritoryName(playerId, ownedNames = []) {
+  const home = PHONE_FACTION_HOME_LAND[playerId];
+  if (home && (!ownedNames.length || ownedNames.includes(home))) return home;
+  return null;
+}
+
+export function phoneFitSelectedName({
+  selectedName,
+  ownedNames = [],
+  capitalName = null,
+} = {}) {
+  if (selectedName && ownedNames.includes(selectedName)) return selectedName;
+  if (capitalName && ownedNames.includes(capitalName)) return capitalName;
+  return null;
+}
+
+// Fit frames the current player's owned-land region (capital / home
+// cluster when owned land is worldwide), plus neighbors / legal dests.
+// Not a world poster, not a one-tile crop, not empty NW Pacific.
 export function applyPhoneCameraFit(camera, {
   gameState,
   territories,
@@ -668,7 +694,14 @@ export function applyPhoneCameraFit(camera, {
       if (gameState.getOwner?.(t.name) === playerId) ownedNames.push(t.name);
     }
   }
-  const capital = capitalName || gameState?.getCapital?.(playerId) || null;
+  const home = phoneHomeTerritoryName(playerId, ownedNames);
+  const capital = capitalName
+    || gameState?.getCapital?.(playerId)
+    || home
+    || null;
+  selectedName = phoneFitSelectedName({
+    selectedName, ownedNames, capitalName: capital,
+  });
   const focus = resolvePhoneFitRegionNames({
     ownedNames,
     selectedName,
@@ -719,12 +752,21 @@ export function shouldHighlightPhoneLegalTerritories({ mobile, phase } = {}) {
  * leaked isCapital flag cannot paint a star+glow on opening (James
  * V2.81.25: star on SE Asia with zero taps).
  */
+export function isConfirmedPhoneCapital(territoryName, gameState) {
+  if (!territoryName || !gameState?.playerState) return false;
+  return Object.values(gameState.playerState).some(
+    (ps) => ps?.capitalTerritory === territoryName,
+  );
+}
+
 export function shouldDrawPhoneCapitalStar(territoryName, gameState) {
   if (!territoryName || !gameState?.isCapital?.(territoryName)) return false;
-  // Place Capital opening (this seat has not confirmed): ZERO stars.
-  // A confirmed enemy star on opening still reads as inspect=commit
-  // (V2.81.26 Middle East star). Stars return at Initial Deploy.
-  if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+  // Opening leaked isCapital with no playerState must not paint a star.
+  // A named Confirm that actually placed must show the star on THAT land
+  // even while the phase is still Place Capital (Skeptic V2.81.31).
+  if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    return isConfirmedPhoneCapital(territoryName, gameState);
+  }
   return true;
 }
 

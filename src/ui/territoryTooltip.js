@@ -185,10 +185,29 @@ export function shouldRefitPhoneSetupHit({ mobile, phase, hasHit } = {}) {
   return !!mobile && isPhoneSetupPlacementPhase(phase) && !hasHit;
 }
 
+// Place Capital peek kinds. Confirm is legal ONLY on owned land.
+// Enemy / unowned / sea = inspect (clear stale Confirm). Miss ignores.
+export const PHONE_CAPITAL_PEEK_CONFIRM = 'confirm';
+export const PHONE_CAPITAL_PEEK_INSPECT = 'inspect';
+export const PHONE_CAPITAL_PEEK_IGNORE = 'ignore';
+
+export function resolvePhoneCapitalPeekAction({
+  phase,
+  tappedIsOwnedLand = false,
+  tappedIsLand = false,
+  tappedIsWater = false,
+  hasHit = false,
+} = {}) {
+  if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
+  if (!hasHit) return PHONE_CAPITAL_PEEK_IGNORE;
+  if (tappedIsOwnedLand) return PHONE_CAPITAL_PEEK_CONFIRM;
+  if (tappedIsLand || tappedIsWater) return PHONE_CAPITAL_PEEK_INSPECT;
+  return PHONE_CAPITAL_PEEK_IGNORE;
+}
+
 // Noun first on phone setup. Same handlers; this only decides whether a
-// land tap may change selection / place. Inspect is long-press, not a tap.
-// Place Capital: only owned land applies — a miss / water / unowned tap
-// must not clear a pending Confirm CTA.
+// tap may change selection / dest. Place Capital: a hit (owned, enemy,
+// or sea) applies so inspect can clear a stale Confirm. A miss does not.
 export function shouldApplyPhoneSetupLandTap({
   mobile,
   phase,
@@ -197,6 +216,7 @@ export function shouldApplyPhoneSetupLandTap({
   tappedIsOwnedLand,
   tappedIsLegalSea,
   tappedIsLand,
+  tappedIsWater,
   hasHit,
 } = {}) {
   if (!mobile) return true;
@@ -207,9 +227,14 @@ export function shouldApplyPhoneSetupLandTap({
     return !!tappedIsOwnedLand || !!tappedIsLegalSea;
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-    // Any land tap names Confirm (owned or not). A miss / sea must
-    // not keep a stale UK from Start Turn punch-through.
-    return !!tappedIsLand;
+    const peek = resolvePhoneCapitalPeekAction({
+      phase,
+      tappedIsOwnedLand,
+      tappedIsLand,
+      tappedIsWater,
+      hasHit,
+    });
+    return peek === PHONE_CAPITAL_PEEK_CONFIRM || peek === PHONE_CAPITAL_PEEK_INSPECT;
   }
   return true;
 }

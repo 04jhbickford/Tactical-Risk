@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.32 illegal peek is inspect; Confirm places star; opening camera
+
+Skeptic unique play of V2.81.31 at 500 (`38x3aj75p`): worldwide gold HOLD. FAIL: Place Capital Confirm minted on German Wake / Japan / Manchuria; Confirm on that land left CAPITAL with no star; sea tap kept stale enemy Confirm; opening was Germans CAPITAL / NW Pacific / no Undo after AI Turkey; Fit missed dest and world zoom still read choppy.
+
+Fix: named Confirm is owned-land only (enemy/unowned/sea = inspect, Confirm absent). Confirm on owned land writes capitalTerritory and draws that star. Sea tap during Place Capital clears the CTA. Opening Undo is always on for the current human; camera/Fit seed the home/owned cluster (not Pacific wrap). SCHEMA 11. GAME_VERSION V2.81.32. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.31 owned-only fill-lite; no worldwide gold hairline
 
 James unique play of V2.81.30 at 500 (`m0atf2x5u`): Place Capital peek/Confirm and dark-red HOLD. FAIL: gold/amber hairline on every continent at opening (and on unowned neighbors at Fit). A 2p deal owns ~31 lands worldwide; stroking those gold outlines every neighbor.
