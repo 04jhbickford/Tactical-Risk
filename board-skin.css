@@ -1805,26 +1805,30 @@ html.board-skin .handoff-start-btn {
 
 @media (max-width: 480px) {
   html.board-skin .felt-table-cloth {
-    padding: 48px 8px 10px;
+    padding: 44px 8px 4px;
     align-items: stretch;
   }
 
   html.board-skin .felt-deal {
     width: 100%;
-    min-height: 100%;
-    gap: 8px;
+    gap: 5px;
   }
 
   html.board-skin .felt-deal-title {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   html.board-skin .felt-deal-note {
-    font-size: 13px;
+    font-size: 12px;
+  }
+
+  html.board-skin .felt-deal-hand {
+    gap: 6px;
   }
 
   html.board-skin .felt-nation-card {
-    padding: 8px;
+    padding: 6px 8px;
+    gap: 6px;
     border-bottom-width: 6px;
     box-shadow: 0 4px 0 #1a1008;
   }
@@ -1833,8 +1837,13 @@ html.board-skin .handoff-start-btn {
     box-shadow: 0 4px 0 #5c1212, inset 0 0 0 2px #8b1e1e;
   }
 
+  html.board-skin .felt-nation-flag {
+    width: 48px;
+    height: 32px;
+  }
+
   html.board-skin .felt-nation-name {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   html.board-skin .felt-seat-btn {
@@ -1842,12 +1851,13 @@ html.board-skin .handoff-start-btn {
     font-size: 10px;
   }
 
+  html.board-skin .felt-deal-stakes {
+    gap: 6px;
+  }
+
   html.board-skin .felt-deal-stamps {
-    position: sticky;
-    bottom: 0;
     flex-direction: column;
-    padding-top: 6px;
-    background: linear-gradient(transparent, rgba(18, 64, 32, 0.92) 18%);
+    gap: 6px;
   }
 
   html.board-skin .felt-stamp {
