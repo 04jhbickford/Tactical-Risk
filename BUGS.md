@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.15 Deploy is Deploy; no footer punch-through
+
+James unique-deploy play of 34d4429 / V2.81.14 at 500×632: (a) setup overlap PASS. ⋯ PASS. (b) land-then-unit FAIL. China + infantry staged "To China" + Deploy 1. First thumb Deploy punched through the peek tray, re-selected East Indies, footer became "To East Indies". Second tap deployed to East Indies.
+
+Cause: document-capture setup peek hit-tested the map under Deploy (`shouldIgnorePanelBox` skipped the tray box for UNIT_PLACEMENT). pointerdown retargeted selectedTerritory and flush-rendered before click.
+
+Fix: Deploy / tray chrome is not a land peek. Peek always honors the visible tray box. UNIT_PLACEMENT does not ignore that box. Pointerdown on Deploy commits the staged land (`_phoneDeployLandName`). Click of that gesture does not place twice. China stays China. (a) and ⋯ kept. No chip-on-name work. SCHEMA 11. GAME_VERSION V2.81.15. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.14 no overlapping labels; land-then-unit dest
 
 James unique-deploy play of 704fe2a / V2.81.12 at ~500×640: seated green check sat on Russians / Germans. Teams sat tight on its label. Land-then-unit was not obvious. ⋯ was a no-op (fixed in 1c2064c, kept here).

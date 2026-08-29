@@ -69,10 +69,38 @@ export function shouldApplyPhoneSetupTapOnPointerDown({ mobile, phase } = {}) {
 }
 
 const PHONE_CAPITAL_CTA_ACTIONS = new Set(['place-capital', 'undo-capital']);
+const PHONE_TRAY_CHROME_ACTIONS = new Set([
+  'place-capital',
+  'undo-capital',
+  'confirm-placement',
+  'finish-placement',
+  'place-queue',
+  'place-queue-max',
+  'phone-select-unit',
+  'undo-placement',
+  'undo',
+]);
 
 export function isPhoneCapitalCtaTarget(target) {
   const el = target?.closest?.('[data-action]');
   return !!(el && PHONE_CAPITAL_CTA_ACTIONS.has(el.dataset?.action));
+}
+
+// Peek-tray verbs (Deploy / chips / stepper) are never a land tap.
+// Document-capture setup peek used to hit-test the map under Deploy
+// and retarget the staged pair (China → East Indies).
+export function isPhoneTrayChromeTarget(target) {
+  const el = target?.closest?.('[data-action]');
+  if (!el) {
+    return !!(target?.closest?.('.pp-bottom-actions')
+      || target?.closest?.('.phone-peek-row')
+      || target?.closest?.('.phone-peek-tools')
+      || target?.closest?.('.pp-peek-cta-row'));
+  }
+  if (PHONE_TRAY_CHROME_ACTIONS.has(el.dataset?.action)) return true;
+  return !!(el.closest('#sidebar')
+    || el.closest('.player-panel')
+    || el.closest('.pp-bottom-actions'));
 }
 
 // Header ⋯ / Map / the short menu sheet are chrome, not a land tap.
@@ -88,7 +116,9 @@ export function isPhoneHudChromeTarget(target) {
 // Place Capital map taps must assign even when a leftover-tall peek
 // sidebar covers the land. Only Confirm / Undo are panel hits.
 export function shouldIgnorePanelBoxForPhoneCapitalPeek({ mobile, phase } = {}) {
-  return !!mobile && isPhoneSetupPlacementPhase(phase);
+  // Place Capital: leftover-tall peek box must not swallow a named-land tap.
+  // Initial Deployment: Deploy / Confirm is a hit — do not ignore that box.
+  return !!mobile && phase === GAME_PHASES.CAPITAL_PLACEMENT;
 }
 
 // First tap after Start / handoff / a chrome reflow often misses because

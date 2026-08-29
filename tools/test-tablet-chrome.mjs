@@ -25,6 +25,7 @@ const {
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
+  isPhoneTrayChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
   clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
@@ -121,7 +122,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.14', GAME_VERSION === 'V2.81.14');
+check('GAME_VERSION is V2.81.15', GAME_VERSION === 'V2.81.15');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -1043,7 +1044,7 @@ check('Place Capital peek ignores the leftover-tall panel box',
   }) === true
   && shouldIgnorePanelBoxForPhoneCapitalPeek({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
-  }) === true
+  }) === false
   && shouldIgnorePanelBoxForPhoneCapitalPeek({
     mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT,
   }) === false);
@@ -1053,6 +1054,31 @@ check('Place Capital peek ignores the leftover-tall panel box',
   check('only Confirm / Undo are Place Capital panel hits',
     isPhoneCapitalCtaTarget(cta) === true
     && isPhoneCapitalCtaTarget(map) === false);
+}
+{
+  const deploy = { closest: (sel) => (sel === '[data-action]' ? { dataset: { action: 'confirm-placement' }, closest: () => ({}) } : null) };
+  const map = { closest: () => null };
+  check('Deploy / tray chrome is not a setup land peek',
+    isPhoneTrayChromeTarget(deploy) === true
+    && isPhoneTrayChromeTarget(map) === false);
+}
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  const peekFn = mainSrc.slice(
+    mainSrc.indexOf('const applyPhoneSetupPeekFromPointer'),
+    mainSrc.indexOf('// Mouse events'),
+  );
+  check('setup peek skips Deploy and honors the tray box',
+    /isPhoneTrayChromeTarget/.test(peekFn)
+    && /shouldBlockMapSelect/.test(peekFn)
+    && !/shouldIgnorePanelBoxForPhoneCapitalPeek/.test(peekFn));
+  check('thumb Deploy commits the staged land on this pointer',
+    /_phoneDeployLandName/.test(panelSrc)
+    && /_phoneDeployCommittedAt/.test(panelSrc)
+    && /_commitStagedPlacement/.test(panelSrc)
+    && /confirm-placement/.test(panelSrc)
+    && /player-panel--peek/.test(panelSrc));
 }
 {
   const hud = { closest: (sel) => (sel === '#hud' ? {} : null) };

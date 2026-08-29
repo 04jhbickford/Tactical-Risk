@@ -65,6 +65,7 @@ import {
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
+  isPhoneTrayChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
@@ -1905,11 +1906,12 @@ async function init() {
       mobile: isMobileShell(),
       phase: gameState.phase,
     })) return false;
-    if (isPhoneHudChromeTarget(e.target) || isPhoneCapitalCtaTarget(e.target)) return false;
-    if (!shouldIgnorePanelBoxForPhoneCapitalPeek({
-      mobile: isMobileShell(),
-      phase: gameState.phase,
-    }) && playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
+    if (isPhoneHudChromeTarget(e.target)
+      || isPhoneTrayChromeTarget(e.target)
+      || isPhoneCapitalCtaTarget(e.target)) return false;
+    // Peek ignores the leftover-tall sidebar box so a named land still
+    // assigns. The visible tray chrome (Deploy / chips) is still a hit.
+    if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
       return false;
     }
     let world = camera.screenToWorld(e.clientX, e.clientY);

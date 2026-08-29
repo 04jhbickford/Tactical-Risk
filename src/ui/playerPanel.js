@@ -444,6 +444,8 @@ export class PlayerPanel {
     this._queueGestureApplied = false;
     this._phoneSetupPeekAt = 0;
     this._phoneCapitalLandName = null;
+    this._phoneDeployLandName = null;
+    this._phoneDeployCommittedAt = 0;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -498,6 +500,17 @@ export class PlayerPanel {
     if (isQueueGestureAction(this._pointerLock?.action) && unit) {
       this._queueLockType = unit;
     }
+    // Document-capture peek used to retarget the land under Deploy before
+    // click. Commit on this pointer so a thumb Deploy is Deploy only.
+    const deployBtn = e.target?.closest?.('[data-action="confirm-placement"]');
+    if (deployBtn
+      && !deployBtn.disabled
+      && isMobileShell()
+      && this.el.classList.contains('player-panel--peek')) {
+      if (this._commitStagedPlacement()) {
+        this._phoneDeployCommittedAt = Date.now();
+      }
+    }
   }
 
   containsPoint(clientX, clientY) {
@@ -507,7 +520,7 @@ export class PlayerPanel {
     const chromeRects = peek
       ? [...this.el.querySelectorAll(capitalPeek
         ? '[data-action="place-capital"], [data-action="undo-capital"]'
-        : '.pp-bottom-actions, .pp-seat-chip')]
+        : '.pp-bottom-actions, .pp-seat-chip, [data-action="confirm-placement"]')]
         .map((node) => node.getBoundingClientRect())
       : [];
     return pointHitsPlayerPanel({
@@ -702,6 +715,11 @@ export class PlayerPanel {
     if (this.gameState && keepPlaced != null) {
       this.gameState.unitsPlacedThisRound = keepPlaced;
     }
+    if (this.gameState?.phase === GAME_PHASES.UNIT_PLACEMENT
+      && territory?.name
+      && !territory.isWater) {
+      this._phoneDeployLandName = territory.name;
+    }
     this._maybeStagePhoneDeployPair();
     if (immediate) this.flushRender();
     else this._scheduleRender();
@@ -727,6 +745,38 @@ export class PlayerPanel {
       available,
       slotsRemaining: limit - placedThisRound,
     });
+    this._phoneDeployLandName = this.selectedTerritory.name;
+  }
+
+  _phoneDeployDest() {
+    const landName = this._phoneDeployLandName || this.selectedTerritory?.name;
+    return (landName && this.territories?.[landName]) || this.selectedTerritory || null;
+  }
+
+  _commitStagedPlacement() {
+    if (!this.onAction || !this.placementQueue) return false;
+    const keepTerritory = this._phoneDeployDest();
+    if (!keepTerritory) return false;
+    const queue = { ...this.placementQueue };
+    const unitTypes = expandPlaceQueue(queue);
+    if (unitTypes.length === 0) return false;
+    this._ignoreUndoUntil = Date.now() + 400;
+    const placedBefore = this.gameState?.unitsPlacedThisRound || 0;
+    const finish = (result) => {
+      const placed = result?.placed
+        ?? Math.max(0, (this.gameState?.unitsPlacedThisRound || 0) - placedBefore);
+      this.placementQueue = queueAfterDeployAttempt({ queueBefore: queue, placed });
+      this.selectedTerritory = keepTerritory;
+      this._phoneDeployLandName = keepTerritory.name;
+      this._scheduleRender();
+    };
+    const ret = this.onAction('place-units-batch', {
+      territory: keepTerritory.name,
+      unitTypes,
+    });
+    if (ret && typeof ret.then === 'function') ret.then(finish);
+    else finish(ret);
+    return true;
   }
 
   _phoneUnitFitsTerritory(unitType, territory) {
@@ -2329,8 +2379,11 @@ export class PlayerPanel {
     let pairHint = '';
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      const landName = this.selectedTerritory && !this.selectedTerritory.isWater
-        ? this.selectedTerritory.name : '';
+      const queued = this.placementQueue
+        && Object.values(this.placementQueue).some((n) => Number(n) > 0);
+      const landName = (queued && this._phoneDeployLandName)
+        || (this.selectedTerritory && !this.selectedTerritory.isWater
+          ? this.selectedTerritory.name : '');
       pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
         territoryName: landName,
       });
@@ -3883,27 +3936,11 @@ export class PlayerPanel {
         // clear selection or pass the turn. Batch so Deploy N places N
         // (a mid-loop re-render used to put Undo under the same tap).
         if (action === 'confirm-placement') {
-          if (this.onAction && this.selectedTerritory && this.placementQueue) {
-            const keepTerritory = this.selectedTerritory;
-            const queue = { ...this.placementQueue };
-            const unitTypes = expandPlaceQueue(queue);
-            if (unitTypes.length === 0) return;
-            this._ignoreUndoUntil = Date.now() + 400;
-            const placedBefore = this.gameState?.unitsPlacedThisRound || 0;
-            const finish = (result) => {
-              const placed = result?.placed
-                ?? Math.max(0, (this.gameState?.unitsPlacedThisRound || 0) - placedBefore);
-              this.placementQueue = queueAfterDeployAttempt({ queueBefore: queue, placed });
-              this.selectedTerritory = keepTerritory;
-              this._scheduleRender();
-            };
-            const ret = this.onAction('place-units-batch', {
-              territory: keepTerritory.name,
-              unitTypes,
-            });
-            if (ret && typeof ret.then === 'function') ret.then(finish);
-            else finish(ret);
+          if (this._phoneDeployCommittedAt && Date.now() - this._phoneDeployCommittedAt < 400) {
+            this._phoneDeployCommittedAt = 0;
+            return;
           }
+          this._commitStagedPlacement();
           return;
         }
 
