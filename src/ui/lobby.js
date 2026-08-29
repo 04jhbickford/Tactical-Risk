@@ -10,12 +10,21 @@ import { GAME_VERSION } from '../version.js';
 import { isMobileShell } from './mobileShell.js';
 export { GAME_VERSION };
 
-// AI Difficulty levels
+// Seat controls on every nation card. `medium` is the live AI id; the
+// button reads Normal because that is the word James used.
 const AI_DIFFICULTIES = [
   { id: 'human', name: 'Human', desc: 'Local player' },
   { id: 'easy', name: 'Easy AI', desc: 'Basic strategy' },
   { id: 'medium', name: 'Medium AI', desc: 'Balanced play' },
   { id: 'hard', name: 'Hard AI', desc: 'Expert strategy' },
+];
+
+const NATION_SEATS = [
+  { id: 'empty', label: 'Empty' },
+  { id: 'human', label: 'Human' },
+  { id: 'easy', label: 'Easy' },
+  { id: 'medium', label: 'Normal' },
+  { id: 'hard', label: 'Hard' },
 ];
 
 // Available colors for faction selection
@@ -221,18 +230,44 @@ export class Lobby {
     return this._renderFeltDeal();
   }
 
+  _nationSeat(factionId) {
+    if (!this.selectedPlayers.includes(factionId)) return 'empty';
+    return this.playerAI[factionId] || 'human';
+  }
+
+  _seatNation(factionId, seat) {
+    const factions = this.setup.risk.factions;
+    const faction = factions.find((p) => p.id === factionId);
+    const idx = this.selectedPlayers.indexOf(factionId);
+
+    if (seat === 'empty') {
+      if (idx >= 0) this.selectedPlayers.splice(idx, 1);
+      this.playerAI[factionId] = 'human';
+      delete this.playerNames[factionId];
+    } else {
+      if (idx < 0) this.selectedPlayers.push(factionId);
+      this.playerAI[factionId] = seat;
+      this.playerNames[factionId] = faction?.name || '';
+    }
+    this._render();
+  }
+
   _renderFeltDeal() {
     const factions = this._initFactionDefaults();
     const savedGames = this._getSavedGames();
     const seated = this.selectedPlayers.length;
     const canDeal = seated >= 2;
+    const phone = isMobileShell();
 
     return `
       <div class="felt-deal">
         <div class="felt-deal-rail">
           <span class="felt-deal-mark">1942</span>
           <span class="lobby-version-badge">${GAME_VERSION}</span>
-          <span class="felt-deal-note">Seat two powers, then deal — or By post for a live table</span>
+          <h2 class="felt-deal-title">Seat the table</h2>
+          <p class="felt-deal-note">${phone
+            ? 'Each power: Human, Easy, Normal, Hard, or Empty. Deal when two sit.'
+            : 'Pick Human, Easy, Normal, Hard, or Empty on every nation. Deal when two sit — or By post for a live table.'}</p>
         </div>
         <div class="felt-deal-hand">
           ${factions.map((p) => this._renderFeltNationCard(p)).join('')}
@@ -245,7 +280,7 @@ export class Lobby {
         </div>
         <div class="felt-deal-stamps">
           <button type="button" class="felt-stamp deal ${canDeal ? '' : 'disabled'}" data-action="deal-local" ${canDeal ? '' : 'disabled'}>
-            ${canDeal ? `Deal this table (${seated})` : 'Seat two powers'}
+            ${canDeal ? `Deal this table (${seated})` : 'Seat two powers to deal'}
           </button>
           <button type="button" class="felt-stamp post" data-action="online-play">By post — live table</button>
           ${savedGames.length ? `<button type="button" class="felt-stamp" data-action="my-games">Saved ${savedGames.length}</button>` : ''}
@@ -255,16 +290,26 @@ export class Lobby {
   }
 
   _renderFeltNationCard(faction) {
-    const seated = this.selectedPlayers.includes(faction.id);
+    const seat = this._nationSeat(faction.id);
+    const seated = seat !== 'empty';
     const color = this.playerColors[faction.id]?.color || faction.color;
-    const ai = this.playerAI[faction.id] || 'human';
     return `
-      <button type="button" class="felt-nation-card ${seated ? 'seated' : ''}" data-player="${faction.id}" style="--nation:${color}">
-        <span class="felt-nation-flag"><img src="assets/flags/${faction.flag}" alt=""></span>
-        <span class="felt-nation-name">${faction.name}</span>
-        <span class="felt-nation-alliance">${faction.alliance || ''}</span>
-        <span class="felt-nation-seat">${seated ? (ai === 'human' ? 'Seated' : ai) : 'Empty'}</span>
-      </button>
+      <article class="felt-nation-card ${seated ? 'seated' : ''} ${seated && seat !== 'human' ? 'ai-seated' : ''}" data-player="${faction.id}" style="--nation:${color}">
+        <div class="felt-nation-head">
+          <span class="felt-nation-flag"><img src="assets/flags/${faction.flag}" alt=""></span>
+          <div class="felt-nation-copy">
+            <span class="felt-nation-name">${faction.name}</span>
+            <span class="felt-nation-alliance">${faction.alliance || ''}</span>
+          </div>
+        </div>
+        <div class="felt-nation-seats" role="group" aria-label="${faction.name} seat">
+          ${NATION_SEATS.map((opt) => `
+            <button type="button" class="felt-seat-btn ${seat === opt.id ? 'active' : ''}"
+              data-action="seat" data-player="${faction.id}" data-seat="${opt.id}"
+              aria-pressed="${seat === opt.id ? 'true' : 'false'}">${opt.label}</button>
+          `).join('')}
+        </div>
+      </article>
     `;
   }
 
@@ -517,8 +562,11 @@ export class Lobby {
       });
     });
 
-    this.el.querySelectorAll('.felt-nation-card').forEach((card) => {
-      card.addEventListener('click', () => this._togglePlayer(card.dataset.player));
+    this.el.querySelectorAll('[data-action="seat"]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._seatNation(btn.dataset.player, btn.dataset.seat);
+      });
     });
 
     // Player cards
