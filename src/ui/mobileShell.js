@@ -120,6 +120,31 @@ export function shouldShowPhonePlaceMeta({ mobile, phase, peek } = {}) {
   return !!mobile && phase === GAME_PHASES.UNIT_PLACEMENT && !peek;
 }
 
+// Polytopia pair: unit + land. The count stepper waits for both.
+export function shouldShowPhoneDeployQty({
+  mobile,
+  phase,
+  unitType,
+  territory,
+} = {}) {
+  return !!mobile
+    && phase === GAME_PHASES.UNIT_PLACEMENT
+    && !!unitType
+    && !!territory
+    && !territory.isWater;
+}
+
+export function shouldAutoStagePhoneDeployPair({
+  mobile,
+  phase,
+  unitType,
+  territory,
+  queuedForType = 0,
+} = {}) {
+  return shouldShowPhoneDeployQty({ mobile, phase, unitType, territory })
+    && Number(queuedForType) === 0;
+}
+
 // Place Capital / Initial Deployment expand was a 4-tab sheet that ate
 // the map. Players / Territory / Log live in the ⋯ sheet only.
 export function shouldShowPhoneDetentTabs({ mobile, expanded, phase } = {}) {

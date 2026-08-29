@@ -312,6 +312,24 @@ html, body {
   z-index: 1;
 }
 
+/* Preview comment / circular list puck — never on setup, map, or ⋯ */
+vercel-live-feedback,
+vercel-live-feedback-container,
+#vercel-live-feedback,
+[data-vercel-live-feedback],
+[data-vercel-toolbar],
+iframe[src*="vercel.live"],
+iframe[src*="vercel-scripts.com"],
+iframe[title="Vercel Toolbar"],
+iframe[title="Vercel Live Feedback"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+}
+
 #sidebarClose:hover {
   color: #fff;
 }
@@ -16971,8 +16989,10 @@ html, body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   }
 
-  html.mobile-shell #sidebarClose {
-    display: none;
+  html.mobile-shell #sidebarClose,
+  html.mobile-shell #sidebar .sidebar-close {
+    display: none !important;
+    pointer-events: none !important;
   }
 
   /* One phase chip in #hud. Kill the ticker triple-repeat + stale last action. */
@@ -17868,30 +17888,45 @@ html, body {
     padding-bottom: 8px;
   }
 
-  /* Occupant row is a sibling band, not inside .player-card overflow:hidden.
-     Two seated cards both show a full 48px Human/AI + swatch. */
+  /* Occupant row is a sibling band inside the seat card. Every control
+     (swatch, Human/AI, team) stays in this box at 44–48px. */
   .lobby-phone-seat {
     flex: 0 0 auto;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    overflow: visible;
+    overflow: hidden;
     position: relative;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 0 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .lobby-phone-seat.selected {
+    border-color: rgba(74, 222, 128, 0.55);
+    background: rgba(22, 163, 74, 0.14);
   }
 
   .lobby-phone-faction,
-  .player-card.modern.lobby-phone-faction {
+  .player-card.modern.lobby-phone-faction,
+  .lobby-phone-faction.selected,
+  .player-card.modern.lobby-phone-faction.selected {
     flex: 0 0 auto;
     flex-shrink: 0;
     height: auto;
     max-height: none;
-    min-height: 64px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.04);
-    overflow: visible;
+    min-height: 44px;
+    padding: 0 12px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    overflow: hidden;
+    box-shadow: none;
   }
 
   .lobby-phone-faction:hover,
@@ -17900,9 +17935,10 @@ html, body {
     transform: none;
   }
 
-  .lobby-phone-faction.selected {
-    border-color: rgba(74, 222, 128, 0.55);
-    background: rgba(22, 163, 74, 0.14);
+  .lobby-phone-faction.selected,
+  .player-card.modern.lobby-phone-faction.selected {
+    border: none;
+    background: transparent;
   }
 
   .lobby-phone-faction-main {
@@ -17933,15 +17969,56 @@ html, body {
   .lobby-phone-faction-tools {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     min-height: 48px;
     padding: 0 12px 2px;
     flex: 0 0 auto;
     flex-shrink: 0;
-    overflow: visible;
+    overflow: hidden;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     position: relative;
     z-index: 3;
     pointer-events: auto;
+  }
+
+  .lobby-phone-faction-tools .color-picker {
+    flex: 0 0 auto;
+  }
+
+  .lobby-phone-faction-tools:has(.color-dropdown:not(.hidden)) .color-picker {
+    flex: 1 1 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .lobby-phone-faction-tools .color-dropdown:not(.hidden) {
+    position: static;
+    transform: none;
+    left: auto;
+    top: auto;
+    margin-top: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .lobby-phone-faction-tools .team-selector {
+    flex: 1 1 100%;
+    display: flex;
+    gap: 8px;
+    margin-top: 0;
+    min-width: 0;
+  }
+
+  .lobby-phone-faction-tools .team-btn {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    height: 44px;
+    box-sizing: border-box;
   }
 
   .lobby-phone-faction-tools .color-swatch {
@@ -17960,7 +18037,9 @@ html, body {
   }
 
   .lobby-phone-faction-tools .ai-select.modern {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
     min-height: 48px;
     height: 48px;
     font-size: 16px;
@@ -17971,8 +18050,17 @@ html, body {
   .lobby-phone-options {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 12px;
     flex-shrink: 0;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    box-sizing: border-box;
   }
 
   .lobby-phone-option {
@@ -17980,6 +18068,7 @@ html, body {
     align-items: center;
     gap: 8px;
     min-height: 44px;
+    min-width: 0;
     font-size: 14px;
   }
 
@@ -17987,21 +18076,45 @@ html, body {
   .lobby-phone-option #starting-ipcs {
     min-height: 44px;
     height: 44px;
-    min-width: 88px;
+    min-width: 0;
+    width: 88px;
+    max-width: 100%;
     font-size: 16px;
     padding: 0 10px;
+    box-sizing: border-box;
   }
 
   .lobby-phone-teams {
+    flex: 0 0 auto;
     min-height: 44px;
+    overflow: hidden;
   }
 
   .lobby-phone-teams input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
     width: 44px;
     height: 44px;
     min-width: 44px;
+    max-width: 44px;
     min-height: 44px;
-    accent-color: #3b82f6;
+    max-height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 8px;
+    background: #0b1020;
+    box-sizing: border-box;
+    flex: 0 0 44px;
+  }
+
+  .lobby-phone-teams input[type="checkbox"]:checked {
+    background: #2563eb;
+    border-color: #60a5fa;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23fff' d='M6.2 11.4 2.8 8l1.1-1.1 2.3 2.3 5.9-5.9L13.2 4z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 22px 22px;
   }
 
   .lobby-phone-start {

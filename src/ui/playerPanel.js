@@ -15,6 +15,8 @@ import {
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
   shouldShowPhonePlaceMeta,
+  shouldShowPhoneDeployQty,
+  shouldAutoStagePhoneDeployPair,
   phonePointerHint,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
@@ -255,7 +257,7 @@ export function resolvePhaseHint(phase, turnPhase) {
 export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
     void selectedUnitType;
-    return 'Tap your land, then Deploy';
+    return 'Tap a unit and a territory';
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land, then Confirm';
   const base = resolvePhaseHint(phase, turnPhase);
@@ -271,8 +273,8 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
 // Place Capital Confirm is the verb. Do not also show a hint line.
 export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT && hasPrimaryCta) return false;
-  // Chips + Deploy are the Polytopia verb. No second hint stack.
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) return false;
+  // Pair peek: hint until unit+land stages Deploy. Then the thumb is the verb.
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return !hasPrimaryCta;
   return true;
 }
 
@@ -697,8 +699,31 @@ export class PlayerPanel {
     if (this.gameState && keepPlaced != null) {
       this.gameState.unitsPlacedThisRound = keepPlaced;
     }
+    this._maybeStagePhoneDeployPair();
     if (immediate) this.flushRender();
     else this._scheduleRender();
+  }
+
+  _maybeStagePhoneDeployPair() {
+    if (!this._phoneUnitFitsTerritory(this.selectedUnitType, this.selectedTerritory)) return;
+    if (!shouldAutoStagePhoneDeployPair({
+      mobile: isMobileShell(),
+      phase: this.gameState?.phase,
+      unitType: this.selectedUnitType,
+      territory: this.selectedTerritory,
+      queuedForType: Number(this.placementQueue?.[this.selectedUnitType]) || 0,
+    })) return;
+    const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
+    const available = quantityAvailableForType(unitsToPlace, this.selectedUnitType);
+    const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+    const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+    this.placementQueue = applyPlaceQueueDelta({
+      queue: {},
+      unitType: this.selectedUnitType,
+      delta: 1,
+      available,
+      slotsRemaining: limit - placedThisRound,
+    });
   }
 
   _phoneUnitFitsTerritory(unitType, territory) {
@@ -822,11 +847,13 @@ export class PlayerPanel {
     const phase = this.gameState.phase;
     const turnPhase = this.gameState.turnPhase;
     if (isMobileShell() && phase === GAME_PHASES.UNIT_PLACEMENT) {
-      this.selectedUnitType = resolvePhoneStickyUnitType(
-        this.selectedUnitType,
+      const remaining = knownUnitsToPlace(
         this.gameState.getUnitsToPlace?.(player.id) || [],
         this.unitDefs,
       );
+      if (this.selectedUnitType && !remaining.some(u => u.type === this.selectedUnitType)) {
+        this.selectedUnitType = null;
+      }
     }
 
     // Check if it's the local player's turn in multiplayer
@@ -1019,13 +1046,6 @@ export class PlayerPanel {
         }
       } else if (ux.needSeaHint && ux.hint) {
         warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
-      } else if (isMobileShell()) {
-        buttons.push({
-          action: 'confirm-placement',
-          label: 'Deploy',
-          disabled: true,
-          primary: true,
-        });
       }
     }
 
@@ -2309,7 +2329,12 @@ export class PlayerPanel {
             <span class="phone-peek-count">${unit.quantity}</span>
           </button>`;
       }
-      if (this.selectedUnitType) {
+      if (shouldShowPhoneDeployQty({
+        mobile: true,
+        phase,
+        unitType: this.selectedUnitType,
+        territory: this.selectedTerritory,
+      }) && this._phoneUnitFitsTerritory(this.selectedUnitType, this.selectedTerritory)) {
         const queued = Number(this.placementQueue?.[this.selectedUnitType]) || 0;
         const available = quantityAvailableForType(units, this.selectedUnitType);
         const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
@@ -2374,7 +2399,9 @@ export class PlayerPanel {
   _renderPhonePlacementTray(player) {
     const { unitsToPlace, ux, placedThisRound, limit } = this._getInitialPlacementUX(player);
     const remaining = knownUnitsToPlace(unitsToPlace, this.unitDefs);
-    this.selectedUnitType = resolvePhoneStickyUnitType(this.selectedUnitType, remaining, this.unitDefs);
+    if (this.selectedUnitType && !remaining.some(u => u.type === this.selectedUnitType)) {
+      this.selectedUnitType = null;
+    }
 
     const selectedName = this.selectedUnitType
       ? this.selectedUnitType.charAt(0).toUpperCase() + this.selectedUnitType.slice(1)
@@ -3756,7 +3783,8 @@ export class PlayerPanel {
 
         if (action === 'phone-select-unit') {
           const unitType = btn.dataset.unit;
-          this.selectedUnitType = this.selectedUnitType === unitType ? null : unitType;
+          this.selectedUnitType = unitType || null;
+          this._maybeStagePhoneDeployPair();
           this._scheduleRender();
           return;
         }

@@ -55,6 +55,8 @@ const {
   shouldShowPhoneMenuPlayerRoster,
   shouldShowPhonePlaceMeta,
   shouldParkPhoneMapTools,
+  shouldShowPhoneDeployQty,
+  shouldAutoStagePhoneDeployPair,
   phonePointerHint,
   PHONE_PEEK_EXPANDED_MAX_DVH,
   phoneUnitIconSize,
@@ -118,7 +120,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.11', GAME_VERSION === 'V2.81.11');
+check('GAME_VERSION is V2.81.12', GAME_VERSION === 'V2.81.12');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -619,8 +621,8 @@ check('inspect hold does not commit a setup tap',
   && shouldCommitPhoneSetupTap({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
   }) === true);
-check('phone deploy hint is Tap your land, then Deploy',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap your land, then Deploy');
+check('phone deploy hint is Tap a unit and a territory',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit and a territory');
 check('phone capital hint is Tap your land, then Confirm',
   resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land, then Confirm'
   && shouldShowPhoneSetupPeekHint({
@@ -631,6 +633,9 @@ check('phone capital hint is Tap your land, then Confirm',
   }) === false
   && shouldShowPhoneSetupPeekHint({
     phase: GAME_PHASES.UNIT_PLACEMENT, hasPrimaryCta: false,
+  }) === true
+  && shouldShowPhoneSetupPeekHint({
+    phase: GAME_PHASES.UNIT_PLACEMENT, hasPrimaryCta: true,
   }) === false);
 check('desktop deploy PHASE_HINTS stay Click to place units',
   resolvePhaseHint(GAME_PHASES.UNIT_PLACEMENT, null) === PHASE_HINTS[GAME_PHASES.UNIT_PLACEMENT]);
@@ -811,9 +816,9 @@ check('phone setup undo is required for place and last capital',
   && shouldShowPhoneSetupUndo({
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
   }) === false);
-check('deploy peek hint is Tap your land, then Deploy',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap your land, then Deploy'
-  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap your land, then Deploy');
+check('deploy peek hint is Tap a unit and a territory',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap a unit and a territory'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit and a territory');
 check('place-tap still does not inspect (V2.69 split stays)',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
   && shouldInspectPhoneHold({
@@ -867,11 +872,10 @@ check('phone placement hints say Tap, desktop stay Click',
   check('DEPLOYED chip is not covered by the Units hint',
     /html\.mobile-shell \.phone-tray-body \.pp-budget-bar/.test(phoneBlock)
     && /display:\s*none/.test(phoneBlock.match(/html\.mobile-shell \.phone-tray-body \.pp-budget-bar[\s\S]*?\}/)?.[0] || ''));
-  check('seated cards do not flex-shrink or clip the occupant row',
+  check('seated cards keep the 48px occupant band inside the seat box',
     /\.lobby-phone-seat \{[\s\S]*?flex-shrink:\s*0/.test(phoneBlock)
-    && /\.lobby-phone-seat \{[\s\S]*?overflow:\s*visible/.test(phoneBlock)
-    && /\.player-card\.modern\.lobby-phone-faction \{[\s\S]*?overflow:\s*visible/.test(phoneBlock)
-    && /\.lobby-phone-faction-tools \{[\s\S]*?flex-shrink:\s*0;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
+    && /\.lobby-phone-seat \{[\s\S]*?overflow:\s*hidden/.test(phoneBlock)
+    && /\.lobby-phone-faction-tools \{[\s\S]*?flex-shrink:\s*0;[\s\S]*?overflow:\s*hidden;/.test(phoneBlock)
     && /min-width:\s*48px;[\s\S]*?min-height:\s*48px;/.test(
       phoneBlock.match(/\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?\}/)?.[0] || ''
     ));
@@ -883,6 +887,12 @@ check('phone placement hints say Tap, desktop stay Click',
     || /\.lobby-phone-option \.modern-select[\s\S]*?min-height:\s*44px/.test(phoneBlock));
   check('Teams checkbox is a 44pt target',
     /\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('Teams checkbox is a styled 44px box, not a native white square',
+    /\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?appearance:\s*none/.test(phoneBlock)
+    && /\.lobby-phone-options \{[\s\S]*?overflow:\s*hidden/.test(phoneBlock)
+    && /max-width:\s*44px/.test(
+      phoneBlock.match(/\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?\}/)?.[0] || ''
+    ));
   check('phone HUD ticker is collapsed',
     /html\.mobile-shell #hud-clarity \{[\s\S]*?display:\s*none/.test(phoneBlock));
   check('phone peek CTA is a row so Confirm is not under Undo',
@@ -896,9 +906,51 @@ check('phone placement hints say Tap, desktop stay Click',
     && /html\.mobile-shell\.map-tools-open #zoom-controls/.test(phoneBlock));
   check('deploy peek keeps +/−/Max beside chips, not a covering sheet',
     /\.phone-peek-qty-btn \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock)
-    && /html\.mobile-shell #sidebarClose \{[\s\S]*?display:\s*none/.test(phoneBlock));
-  check('peek Deploy stays visible while waiting for land',
-    /pp-peek-primary-slot \.pp-confirm-btn\.disabled[\s\S]*?display:\s*flex/.test(phoneBlock));
+    && /html\.mobile-shell #sidebarClose[\s\S]*?display:\s*none/.test(phoneBlock));
+  check('circular list puck is not painted on setup, map, or ⋯',
+    /vercel-live-feedback/.test(css)
+    && /html\.mobile-shell #sidebarClose[\s\S]*?display:\s*none !important/.test(phoneBlock));
+  {
+    const land = { name: 'Yakut S.S.R.', isWater: false };
+    const water = { name: 'SZ 5', isWater: true };
+    check('qty stepper waits for a unit+land pair',
+      shouldShowPhoneDeployQty({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
+      }) === true
+      && shouldShowPhoneDeployQty({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: null,
+      }) === false
+      && shouldShowPhoneDeployQty({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: null, territory: land,
+      }) === false
+      && shouldShowPhoneDeployQty({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: water,
+      }) === false
+      && shouldShowPhoneDeployQty({
+        mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
+      }) === false);
+    check('first pair auto-stages once; a second tap does not restack',
+      shouldAutoStagePhoneDeployPair({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
+        queuedForType: 0,
+      }) === true
+      && shouldAutoStagePhoneDeployPair({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
+        queuedForType: 1,
+      }) === false);
+  }
+  {
+    const html = readFileSync(join(root, 'index.html'), 'utf8');
+    const vercel = readFileSync(join(root, 'vercel.json'), 'utf8');
+    const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+    check('preview toolbar / comment puck is opted out',
+      /name="vercel-toolbar" content="disable"/.test(html)
+      && /x-vercel-skip-toolbar/.test(vercel));
+    check('Deploy is the pair-commit thumb, not a type-then-count third step',
+      /_maybeStagePhoneDeployPair/.test(panelSrc)
+      && /shouldShowPhoneDeployQty/.test(panelSrc)
+      && !/label: 'Deploy',\s*disabled: true/.test(panelSrc));
+  }
   check('⋯ is a short sheet, not a second lobby',
     /phone-menu-sheet\.open \{[\s\S]*?max-height:\s*52dvh/.test(phoneBlock)
     && /phone-menu-open \.player-panel--peek/.test(phoneBlock)

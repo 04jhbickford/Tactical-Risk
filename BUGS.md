@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.12 setup controls in-box; pair then Deploy
+
+James unique-deploy play of 106284b / V2.81.11 at ~500×640 (01-setup.png, 06-deploy-peek.png): Teams was a huge native white square hanging beside Starting IPCs. Occupant/select still felt tight. Circular list puck sat on the German card, the map, and the ⋯ sheet. Deploy was still type → count → Deploy (tank preselected, stepper always up).
+
+Fix: seat is the card — swatch, Human/AI, Teams, IPCs stay inside at 44–48px. Teams is a styled 44×44 box (`appearance: none`), not a native checkbox. Preview comment/list puck opted out (meta + header + CSS). Deploy is unit+territory (either order): first pair peeks/stages 1, stepper appears after, thumb Deploy commits. No covering Units list. Place Capital peek then Confirm, short ⋯, one-finger pan, Zoom/Fit behind Map stay. Holds 1–4 unchanged. SCHEMA 11. GAME_VERSION V2.81.12. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.11 Polytopia-thin deploy; short ⋯ sheet
 
 Addendum on the same HE-CORRECT: after V2.81.10 peek, the tray still stacked meta + hint + chips + qty + Deploy, and ⋯ was a full-screen second lobby with a player roster. Map/⋯ read as chrome on the art.

@@ -198,8 +198,8 @@ export class Lobby {
             </select>
           </label>
           <label class="lobby-phone-option lobby-phone-teams">
-            <input type="checkbox" id="teams-enabled" ${this.teamsEnabled ? 'checked' : ''}>
             <span>Teams</span>
+            <input type="checkbox" id="teams-enabled" class="lobby-phone-teams-check" ${this.teamsEnabled ? 'checked' : ''} aria-label="Teams">
           </label>
         </div>
 
