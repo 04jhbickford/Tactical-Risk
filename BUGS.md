@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.7 Place Capital Confirm from peeked land name
+
+James unique-deploy play of e4bbd2e and the a65cae0 V2.81.6 unique URL still had no Confirm after a valid peek. Unique-URL replay (jh73v1z7q) showed outline + “Click landed” but an empty tray — mouseup of a peeked gesture did not paint Confirm, and owner-gated render dropped the button.
+
+Fix: peek stores `_phoneCapitalLandName` and flush-renders `Place Capital: <land>` from that name (22d4b13 row, Undo ghost beside it). Confirm commits only if the pointer started on that button. SCHEMA 11. GAME_VERSION V2.81.7. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.6 restore 22d4b13 Place Capital Confirm tray
 
 James play of sha e4bbd2e / V2.81.5 at ~500 CSS px: hold 1 PASS. Hold 4 peek holds, Confirm FAIL worse than V2.81.4: first Novosibirsk tap peeked (yellow outline, no star) but the tray was an empty ~85px panel — hint only, no Confirm, no Undo. Re-tap still empty.

@@ -114,7 +114,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.6', GAME_VERSION === 'V2.81.6');
+check('GAME_VERSION is V2.81.7', GAME_VERSION === 'V2.81.7');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -925,10 +925,11 @@ check('inspect≠commit still holds — tap never auto-places capital',
 {
   const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
   const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
-  check('pointerdown peeks without mounting Confirm; mouseup paints the 22d4b13 tray',
-    /playerPanel\.selectedTerritory = hit/.test(mainSrc)
-    && /alreadyPeeked/.test(mainSrc)
+  check('peek stores the land name and paints the 22d4b13 Confirm tray',
+    /_phoneCapitalLandName = hit\.name/.test(mainSrc)
+    && /setSelectedTerritory\(hit\)/.test(mainSrc)
     && /setSelectedTerritory\(selectedTerritory\)/.test(mainSrc)
+    && /Place Capital: \$\{landName\}/.test(panelSrc)
     && !/setSelectedTerritory\(hit, \{ immediate: false \}\)/.test(mainSrc)
     && !/shouldIgnorePhoneSetupCtaAfterPeek/.test(panelSrc));
 }

@@ -434,6 +434,8 @@ export class PlayerPanel {
     this._queueLockType = null;
     this._queueGestureApplied = false;
     this._phoneSetupPeekAt = 0;
+    this._phoneCapitalLandName = null;
+    this._capitalCtaArmed = false;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -482,6 +484,9 @@ export class PlayerPanel {
     }
     this._panelPointerAt = Date.now();
     this._pointerLock = this._readPointerLock(e);
+    if (this._pointerLock?.action === 'place-capital') {
+      this._capitalCtaArmed = true;
+    }
     const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
       || this._pointerLock?.dataset?.unit
       || null;
@@ -967,15 +972,19 @@ export class PlayerPanel {
       });
     }
     // Capital placement — Confirm is the only verb. Own-land tap selects.
-    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT && this.selectedTerritory && !this.selectedTerritory.isWater) {
-      const owner = this.gameState.getOwner(this.selectedTerritory.name);
-      if (owner === player.id) {
+    // Peek already gated owned land; mount Confirm from that land name even
+    // if selectedTerritory was dropped before this render.
+    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      const landName = (this.selectedTerritory && !this.selectedTerritory.isWater)
+        ? this.selectedTerritory.name
+        : this._phoneCapitalLandName;
+      if (landName) {
         buttons.push({
           action: 'place-capital',
-          label: `Place Capital: ${this.selectedTerritory.name}`,
+          label: `Place Capital: ${landName}`,
           disabled: false,
           primary: true,
-          territory: this.selectedTerritory.name
+          territory: landName
         });
       }
     }
@@ -3608,6 +3617,8 @@ export class PlayerPanel {
         const action = btn.dataset.action;
         const lockAction = btn.lockAction || null;
         const territory = btn.dataset.territory;
+        if (action === 'place-capital' && !this._capitalCtaArmed) return;
+        this._capitalCtaArmed = false;
         const setIndex = btn.dataset.set;
         if ((action === 'undo-placement' || action === 'undo-capital')
           && Date.now() < (this._ignoreUndoUntil || 0)) {

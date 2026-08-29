@@ -356,6 +356,7 @@ async function init() {
           unitTooltip.hide();
           hidePhoneTooltips('commit');
           selectedTerritory = null;
+          playerPanel._phoneCapitalLandName = null;
           playerPanel.setSelectedTerritory(null);
           playerPanel.flushRender();
           hud._render();
@@ -1934,9 +1935,9 @@ async function init() {
       hasHit: true,
     })) return false;
     selectedTerritory = hit;
-    // Outline now. Confirm mounts on mouseup — the 22d4b13 tray — so this
-    // pointer's leftover click cannot hit a button that is not in the DOM yet.
-    playerPanel.selectedTerritory = hit;
+    playerPanel._phoneCapitalLandName = hit.name;
+    playerPanel._capitalCtaArmed = false;
+    playerPanel.setSelectedTerritory(hit);
     hud.setLastClick({ landed: true, label: hit.name });
     hud._render();
     kickPaint();
