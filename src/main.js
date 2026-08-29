@@ -59,6 +59,7 @@ import {
   applyPhoneCameraFit,
   collectPhoneLegalTerritoryNames,
   isPhoneLegalSetupSeaDest,
+  shouldSkipPhoneMapArt,
   PHONE_SELECT_PULSE_MS,
   PHONE_CONFIRM_PULSE_MS,
 } from './ui/mobileShell.js';
@@ -2728,7 +2729,9 @@ async function init() {
         };
 
         // Render layers
-        mapRenderer.render(ctx, localViewport);
+        mapRenderer.render(ctx, localViewport, {
+          flatOcean: shouldSkipPhoneMapArt(camera.zoom, { mobile: isMobileShell() }),
+        });
 
         // Mask baked-in rectangular sea-zone artwork with accurate water
         // polygon fills (visual only — click hit-testing is unaffected)

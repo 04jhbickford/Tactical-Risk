@@ -15,7 +15,7 @@ import {
   PHONE_LEGAL_EDGE_COLOR,
   PHONE_LEGAL_FILL_RGB,
   phoneLegalDashColor,
-  PHONE_COUNTRY_OUTLINE_MIN_ZOOM,
+  PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
 } from '../ui/mobileShell.js';
 
 // Cross-water connections that should be drawn as visual lines on the map
@@ -176,7 +176,7 @@ export class TerritoryRenderer {
     const z = Number(zoom);
     const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
     const dashColor = phoneLegalDashColor(this.phoneLegalEdgeColor);
-    const worldFit = !Number.isFinite(z) || z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM;
+    const worldFit = !Number.isFinite(z) || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
     ctx.setLineDash(phoneLegalDashPattern(zoom));
     // World Fit: one faction hairline on owned land only — no ink underlayer
     // and no sea-zone strokes (those read as continent outlines).

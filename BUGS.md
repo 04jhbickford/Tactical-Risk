@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.29 skip baked map-art borders; owned fill-lite only
+
+James unique play of V2.81.28 at 500 (`ax9g4l281`): interaction HOLDs (sea dest, land hides ships, Fit moves, no Map punch-through, no opening star). FAIL: every land still had dark-red country strokes at opening and after Fit. V2.81.28 hid the same-color continent seam (and left baked `smallMap`/baseTiles on screen), so the PNG’s dark-red country ink showed through. Legal fill-lite did not read.
+
+Fix: phone Fit/opening skips baked map art (flat ocean + continent fill). Same-color fill bleed covers polygon gaps — not a dark outline. Dark country strokes stay hidden below zoom 0.85. Owned/legal is gold fill-lite + one faction hairline only (no `#3d2800` underlayer at Fit). Sea dest bind untouched. SCHEMA 11. GAME_VERSION V2.81.29. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.28 worldwide outline kill; sea dest bind; Fit + map-tool chrome
 
 James unique play of V2.81.27 at 500: spine / named Confirm / land-hides-ships / no opening star HOLD. FAIL: every land still had a thin dark-red country stroke (dest-cluster zoom sat above the 0.4 hide); Indian Ocean hit-test did not rename dest (capital lock + adjacency gate); user Fit was a no-op on the Eurasia cluster; Map − punched through to Soviet Far East.

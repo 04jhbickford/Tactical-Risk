@@ -85,6 +85,7 @@ const {
   phoneLegalUsesSolidStroke,
   phoneCountryOutlineWidth,
   phoneOwnershipSeamWidth,
+  shouldSkipPhoneMapArt,
   shouldWidenPhoneUserFit,
   PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
   PHONE_LEGAL_FILL_ALPHA,
@@ -152,7 +153,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.28', GAME_VERSION === 'V2.81.28');
+check('GAME_VERSION is V2.81.29', GAME_VERSION === 'V2.81.29');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -538,8 +539,8 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneLegalOutlineWidth(0.11) >= 2.5
     && phoneLegalOutlineWidth(0.11) < 20);
   check('owned-land fill is fill-lite, not a 55% flood',
-    PHONE_LEGAL_FILL_ALPHA > 0
-    && PHONE_LEGAL_FILL_ALPHA <= 0.22);
+    PHONE_LEGAL_FILL_ALPHA >= 0.26
+    && PHONE_LEGAL_FILL_ALPHA <= 0.4);
   check('owned edge is Civ gold, not cream map chrome',
     PHONE_LEGAL_EDGE_INK === '#3d2800'
     && PHONE_LEGAL_EDGE_COLOR === '#f5c518'
@@ -554,11 +555,17 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
   check('legal dash is solid at world Fit (no sparkle / continent dashes)',
     phoneLegalUsesSolidStroke(0.11) === true
     && phoneLegalDashPattern(0.11).length === 0);
-  check('legal dash returns when zoomed in',
-    phoneLegalUsesSolidStroke(0.5) === false
-    && phoneLegalDashPattern(0.5)[0] > phoneLegalDashPattern(0.5)[1]);
-  check('desktop/tablet outline helper stays unused at their default zoom',
-    phoneLegalOutlineWidth(0.5) === PHONE_LEGAL_OUTLINE_CSS_PX / 0.5);
+  check('legal hairline stays solid through dest-cluster Fit',
+    phoneLegalUsesSolidStroke(0.5) === true
+    && phoneLegalUsesSolidStroke(0.7) === true
+    && phoneLegalDashPattern(0.5).length === 0);
+  check('legal dash returns when zoomed in close',
+    phoneLegalUsesSolidStroke(0.9) === false
+    && phoneLegalDashPattern(0.9)[0] > phoneLegalDashPattern(0.9)[1]);
+  check('dest-cluster legal edge is a hairline; close zoom uses the CSS-px stroke',
+    phoneLegalOutlineWidth(0.5) >= 2.5
+    && phoneLegalOutlineWidth(0.5) <= 5
+    && Math.abs(phoneLegalOutlineWidth(0.9) - PHONE_LEGAL_OUTLINE_CSS_PX / 0.9) < 1e-9);
   check('phone hides country strokes through dest-cluster Fit; desktop keeps 0.4',
     phoneCountryOutlineWidth(0.11, { mobile: true }) === 0
     && phoneCountryOutlineWidth(0.316, { mobile: true }) === 0
@@ -567,9 +574,16 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneCountryOutlineWidth(0.9, { mobile: true }) === 1
     && phoneCountryOutlineWidth(0.5, { mobile: false }) === 1
     && PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM === 0.85);
-  check('phone ownership seam is off at Fit so unowned lands have no edge',
-    phoneOwnershipSeamWidth(0.35, { mobile: true }) === 0
-    && phoneOwnershipSeamWidth(0.9, { mobile: true }) > 0);
+  check('phone ownership seam is same-color fill bleed, never a zero gap',
+    phoneOwnershipSeamWidth(0.35, { mobile: true }) >= 4
+    && phoneOwnershipSeamWidth(0.11, { mobile: true }) >= 4
+    && phoneOwnershipSeamWidth(0.9, { mobile: true }) >= 4);
+  check('phone skips baked map art below close zoom so PNG borders cannot show',
+    shouldSkipPhoneMapArt(0.11, { mobile: true }) === true
+    && shouldSkipPhoneMapArt(0.5, { mobile: true }) === true
+    && shouldSkipPhoneMapArt(0.7, { mobile: true }) === true
+    && shouldSkipPhoneMapArt(0.9, { mobile: true }) === false
+    && shouldSkipPhoneMapArt(0.5, { mobile: false }) === false);
   check('world Fit legal edge is a visible owned-tile hairline, not a 9px double hull',
     phoneLegalOutlineWidth(0.11) <= PHONE_LEGAL_OUTLINE_WORLD_MAX
     && phoneLegalOutlineWidth(0.11) >= 2.5
@@ -1699,6 +1713,11 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
     && /renderOwnershipOverlays\(ctx, camera\.zoom\)/.test(mainSrc)
     && /strokeStyle = color/.test(rendererSrc)
     && /phoneOwnershipSeamWidth/.test(rendererSrc));
+  check('phone Fit skips baked map tiles so PNG country ink cannot show',
+    /flatOcean/.test(readFileSync(join(root, 'src/map/mapRenderer.js'), 'utf8'))
+    && /shouldSkipPhoneMapArt/.test(mainSrc)
+    && /PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM/.test(rendererSrc)
+    && /worldFit/.test(rendererSrc));
   check('user Fit that does not move the camera widens to world',
     shouldWidenPhoneUserFit({
       beforeZoom: 0.32, afterZoom: 0.32, beforeX: 1800, afterX: 1800, beforeY: 900, afterY: 900,

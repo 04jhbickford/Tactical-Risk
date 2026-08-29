@@ -742,7 +742,7 @@ export function shouldDrawPhoneCapitalGlow(gameState) {
 // baked map chrome (India and East Indies already wear it) — a cream
 // hex-edge is not a legal mark (V2.81.23 James FAIL). Civ gold-hex
 // class: dashed gold + gold fill-lite on owned land only.
-export const PHONE_LEGAL_FILL_ALPHA = 0.2;
+export const PHONE_LEGAL_FILL_ALPHA = 0.32;
 export const PHONE_LEGAL_OUTLINE_CSS_PX = 3;
 export const PHONE_LEGAL_OUTLINE_WORLD_MAX = 16;
 export const PHONE_LEGAL_DASH_CSS_PX = 10;
@@ -774,9 +774,9 @@ export function phoneLegalDashColor(factionHex) {
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;
-  // World Fit: ~2 CSS px on owned tiles only. Cap 16 world-px so this
-  // stays a tile edge, not a continent hull (V2.81.26 UK/Spain FAIL).
-  if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) {
+  // Opening / dest-cluster / world Fit: ~2.25 CSS px on owned tiles only.
+  // Cap 16 world-px so this stays a tile edge, not a continent hull.
+  if (z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) {
     return Math.min(
       PHONE_LEGAL_OUTLINE_WORLD_MAX,
       Math.max(2.5, PHONE_LEGAL_HAIRLINE_CSS_PX / z),
@@ -790,7 +790,16 @@ export function phoneLegalOutlineWidth(zoom) {
 
 export function phoneLegalUsesSolidStroke(zoom) {
   const z = Number(zoom);
-  return !Number.isFinite(z) || z <= 0 || z < PHONE_LEGAL_SOLID_MAX_ZOOM;
+  // Dashed sparkle at Fit reads as country strokes. Solid hairline until close.
+  return !Number.isFinite(z) || z <= 0 || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
+}
+
+/** Baked smallMap/baseTiles carry dark-red country ink. Skip them at Fit. */
+export function shouldSkipPhoneMapArt(zoom, { mobile = false } = {}) {
+  if (!mobile) return false;
+  const z = Number(zoom);
+  if (!Number.isFinite(z) || z <= 0) return true;
+  return z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
 }
 
 export function phoneLegalDashPattern(zoom) {
@@ -820,7 +829,11 @@ export function phoneCountryOutlineWidth(zoom, { mobile = false } = {}) {
 export function phoneOwnershipSeamWidth(zoom, { mobile = false } = {}) {
   const z = Number(zoom);
   const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-  if (mobile && safeZ < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) return 0;
+  // Same-color fill bleed — not a dark outline. Covers baked PNG borders
+  // and polygon gaps so unowned tiles read as continent fill only.
+  if (mobile) {
+    return Math.min(22, Math.max(4, 3.25 / safeZ));
+  }
   return Math.min(3, Math.max(1, 1.25 / safeZ));
 }
 

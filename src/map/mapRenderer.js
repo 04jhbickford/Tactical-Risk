@@ -64,7 +64,15 @@ export class MapRenderer {
   }
 
   /** Render visible tiles onto the canvas context (camera transform must be applied). */
-  render(ctx, viewport) {
+  render(ctx, viewport, { flatOcean = false } = {}) {
+    if (flatOcean) {
+      // Phone Fit / opening: baked tiles carry dark-red country ink.
+      // Land identity is continent fill on top of this ocean, not map art.
+      ctx.fillStyle = '#44C5BD';
+      ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+      return;
+    }
+
     if (!this.loaded) return;
 
     // Draw the small map as a base layer so any missing tile gaps show correct ocean
