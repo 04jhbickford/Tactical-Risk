@@ -75,6 +75,16 @@ export function isPhoneCapitalCtaTarget(target) {
   return !!(el && PHONE_CAPITAL_CTA_ACTIONS.has(el.dataset?.action));
 }
 
+// Header ⋯ / Map / the short menu sheet are chrome, not a land tap.
+// Setup peek on document-capture pointerdown must not steal those hits
+// (a HUD _render() before click left ⋯ looking dead).
+export function isPhoneHudChromeTarget(target) {
+  return !!(target?.closest?.('#hud')
+    || target?.closest?.('.phone-menu-sheet')
+    || target?.closest?.('.hud-menu-btn')
+    || target?.closest?.('.hud-menu-container'));
+}
+
 // Place Capital map taps must assign even when a leftover-tall peek
 // sidebar covers the land. Only Confirm / Undo are panel hits.
 export function shouldIgnorePanelBoxForPhoneCapitalPeek({ mobile, phase } = {}) {

@@ -64,6 +64,7 @@ import {
   shouldApplyPhoneSetupTapOnPointerDown,
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
+  isPhoneHudChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
@@ -1904,7 +1905,7 @@ async function init() {
       mobile: isMobileShell(),
       phase: gameState.phase,
     })) return false;
-    if (isPhoneCapitalCtaTarget(e.target)) return false;
+    if (isPhoneHudChromeTarget(e.target) || isPhoneCapitalCtaTarget(e.target)) return false;
     if (!shouldIgnorePanelBoxForPhoneCapitalPeek({
       mobile: isMobileShell(),
       phase: gameState.phase,

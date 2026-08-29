@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.13 header ⋯ opens the short sheet
+
+James unique-deploy play of 704fe2a / V2.81.12 at ~500×632: (a) setup in-box / Teams / puck HOLD. (b) unit+land either order then Deploy HOLD. Leftover: header ⋯ did not open the sheet.
+
+Cause: document-capture Place Capital / deploy peek hit-tested the map under the ⋯ and `hud._render()`'d before click, so the toggle never arrived.
+
+Fix: HUD chrome (⋯ / Map / sheet) is not a land peek. Phone ⋯ opens the short 5-item sheet on this pointer (Players, Territory, Log, Game Rules, Save & Exit). Not a second lobby. Not a 4-tab bar. Peek hides while open. No circular puck. (a)(b) unchanged. SCHEMA 11. GAME_VERSION V2.81.13. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.12 setup controls in-box; pair then Deploy
 
 James unique-deploy play of 106284b / V2.81.11 at ~500×640 (01-setup.png, 06-deploy-peek.png): Teams was a huge native white square hanging beside Starting IPCs. Occupant/select still felt tight. Circular list puck sat on the German card, the map, and the ⋯ sheet. Deploy was still type → count → Deploy (tank preselected, stepper always up).

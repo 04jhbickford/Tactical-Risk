@@ -24,6 +24,7 @@ const {
   shouldApplyPhoneSetupTapOnPointerDown,
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
+  isPhoneHudChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
   clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
@@ -120,7 +121,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.12', GAME_VERSION === 'V2.81.12');
+check('GAME_VERSION is V2.81.13', GAME_VERSION === 'V2.81.13');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -1033,6 +1034,28 @@ check('Place Capital peek ignores the leftover-tall panel box',
   check('only Confirm / Undo are Place Capital panel hits',
     isPhoneCapitalCtaTarget(cta) === true
     && isPhoneCapitalCtaTarget(map) === false);
+}
+{
+  const hud = { closest: (sel) => (sel === '#hud' ? {} : null) };
+  const sheet = { closest: (sel) => (sel === '.phone-menu-sheet' ? {} : null) };
+  const map = { closest: () => null };
+  check('⋯ / Map / HUD chrome are not setup land peeks',
+    isPhoneHudChromeTarget(hud) === true
+    && isPhoneHudChromeTarget(sheet) === true
+    && isPhoneHudChromeTarget(map) === false);
+}
+{
+  const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  check('header ⋯ opens the short sheet on this pointer',
+    /_toggleMenu\(/.test(hudSrc)
+    && /data-action="toggle-menu"/.test(hudSrc)
+    && /Players/.test(hudSrc)
+    && /Territory/.test(hudSrc)
+    && /Game Rules/.test(hudSrc)
+    && /Save & Exit/.test(hudSrc)
+    && /isPhoneHudChromeTarget\(e\.target\)/.test(mainSrc)
+    && /if \(!isMobileShell\(\)\) return;/.test(hudSrc));
 }
 check('phone setup peek applies on this pointer, not the leftover mouseup',
   shouldApplyPhoneSetupTapOnPointerDown({

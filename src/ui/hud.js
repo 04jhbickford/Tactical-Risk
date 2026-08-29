@@ -395,22 +395,31 @@ export class HUD {
     }
   }
 
+  _toggleMenu() {
+    this._ignoreMenuCloseUntil = Date.now() + 400;
+    this.menuOpen = !this.menuOpen;
+    if (!this.menuOpen) this.menuTab = null;
+    if (this.menuOpen) this.mapToolsOpen = false;
+    if (this.menuOpen && typeof this.onMenuOpen === 'function') this.onMenuOpen();
+    if (isMobileShell()) this._render();
+    else this._updateMenuState();
+    this._syncMenuFlag();
+  }
+
   _bindEvents() {
-    // Menu toggle button
+    // Phone: open the short ⋯ sheet on this pointer. A leftover click after
+    // HUD _render() (setup peek used to steal the same tap) never arrives.
     this.el.querySelectorAll('[data-action="toggle-menu"]').forEach((menuBtn) => {
       menuBtn.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
+        if (!isMobileShell()) return;
+        e.preventDefault();
+        this._toggleMenu();
       });
       menuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this._ignoreMenuCloseUntil = Date.now() + 400;
-        this.menuOpen = !this.menuOpen;
-        if (!this.menuOpen) this.menuTab = null;
-        if (this.menuOpen) this.mapToolsOpen = false;
-        if (this.menuOpen && typeof this.onMenuOpen === 'function') this.onMenuOpen();
-        if (isMobileShell()) this._render();
-        else this._updateMenuState();
-        this._syncMenuFlag();
+        if (isMobileShell()) return;
+        this._toggleMenu();
       });
     });
 
