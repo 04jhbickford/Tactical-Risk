@@ -17469,6 +17469,20 @@ iframe[title="Vercel Live Feedback"] {
     color: #e2e8f0;
   }
 
+  .phone-peek-pair-hint {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin: 0 0 4px;
+    font-size: 13px;
+    line-height: 1.3;
+    font-weight: 600;
+    color: #e2e8f0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .phone-peek-tools {
     display: flex;
     align-items: center;
@@ -17949,6 +17963,7 @@ iframe[title="Vercel Live Feedback"] {
     align-items: center;
     gap: 12px;
     min-height: 44px;
+    min-width: 0;
   }
 
   .lobby-phone-faction-copy {
@@ -17961,6 +17976,29 @@ iframe[title="Vercel Live Feedback"] {
   .lobby-phone-faction-name {
     font-size: 17px;
     font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Desktop check is absolute over a centered avatar. On the phone row
+     that lands on the first letters of Russians / Germans. */
+  .lobby-phone-faction-main .player-select-indicator,
+  .lobby-phone-check {
+    position: static;
+    top: auto;
+    right: auto;
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    opacity: 1;
+    transform: none;
+  }
+
+  .lobby-phone-check:empty {
+    visibility: hidden;
   }
 
   .lobby-phone-faction-on,
@@ -18069,6 +18107,7 @@ iframe[title="Vercel Live Feedback"] {
   .lobby-phone-option {
     display: flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 8px;
     min-height: 44px;
     min-width: 0;
@@ -18088,9 +18127,19 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .lobby-phone-teams {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
     flex: 0 0 auto;
     min-height: 44px;
+    gap: 10px;
     overflow: hidden;
+  }
+
+  .lobby-phone-teams span {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding-right: 2px;
   }
 
   .lobby-phone-teams input[type="checkbox"] {
@@ -18173,14 +18222,23 @@ iframe[title="Vercel Live Feedback"] {
   .phone-menu-title {
     font-size: 18px;
     font-weight: 700;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .phone-menu-wordmark {
     margin-left: auto;
+    flex-shrink: 0;
+    max-width: 42%;
     font-size: 11px;
     letter-spacing: 0.8px;
     text-transform: uppercase;
     color: #64748b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .phone-menu-list {
@@ -18363,6 +18421,22 @@ iframe[title="Vercel Live Feedback"] {
   html.mobile-shell .territory-tooltip .tt-type,
   html.mobile-shell .territory-tooltip .tt-player-name {
     color: #f8fafc;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  html.mobile-shell .combat-header {
+    gap: 8px;
+    min-width: 0;
+  }
+
+  html.mobile-shell .combat-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   html.mobile-shell .territory-tooltip .tt-ipc {

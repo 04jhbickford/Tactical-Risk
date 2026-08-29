@@ -229,7 +229,7 @@ export class Lobby {
               <span class="lobby-phone-faction-name">${faction.name}</span>
               ${isSelected ? `<span class="lobby-phone-faction-on">Selected</span>` : `<span class="lobby-phone-faction-off">Tap to add</span>`}
             </div>
-            <div class="player-select-indicator">${isSelected ? '✓' : ''}</div>
+            <div class="player-select-indicator lobby-phone-check" aria-hidden="${isSelected ? 'false' : 'true'}">${isSelected ? '✓' : ''}</div>
           </div>
         </div>
         ${isSelected ? `

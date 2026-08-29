@@ -254,9 +254,12 @@ export function resolvePhaseHint(phase, turnPhase) {
 
 // Phone peek only. Desktop still reads PHASE_HINTS via resolvePhaseHint
 // (purchase / mobilize / tech stay empty there).
-export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType) {
+export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = {}) {
   if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-    void selectedUnitType;
+    const land = opts.territoryName || '';
+    if (land && selectedUnitType) return `To ${land}`;
+    if (land) return `Tap a unit for ${land}`;
+    if (selectedUnitType) return 'Tap land to stage here';
     return 'Tap a unit and a territory';
   }
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land, then Confirm';
@@ -1093,8 +1096,14 @@ export class PlayerPanel {
         hasPrimaryCta: buttons.some(b => b && !b.disabled),
       })
         ? (trayOwnsHint
-          ? resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType)
-          : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType) || ''))
+          ? resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
+            territoryName: this.selectedTerritory && !this.selectedTerritory.isWater
+              ? this.selectedTerritory.name : '',
+          })
+          : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
+            territoryName: this.selectedTerritory && !this.selectedTerritory.isWater
+              ? this.selectedTerritory.name : '',
+          }) || ''))
         : '';
       warningHtml = '';
       peekRow = this._renderPhonePeekRow(player, phase, turnPhase);
@@ -2317,8 +2326,14 @@ export class PlayerPanel {
     if (!shouldShowPhonePeekUnitRow({ mobile: true, phase, turnPhase })) return '';
     let chips = '';
     let qty = '';
+    let pairHint = '';
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+      const landName = this.selectedTerritory && !this.selectedTerritory.isWater
+        ? this.selectedTerritory.name : '';
+      pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
+        territoryName: landName,
+      });
       const units = knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs);
       for (const unit of units) {
         const imageSrc = getUnitIconPath(unit.type, player.id);
@@ -2389,11 +2404,12 @@ export class PlayerPanel {
       chips += `<button type="button" class="phone-peek-chip phone-peek-chip-wide" data-action="roll-tech" aria-label="Roll tech">Roll</button>`;
     }
 
-    if (!chips && !qty) return '';
-    if (qty) {
-      return `<div class="phone-peek-tools"><div class="phone-peek-row">${chips}</div>${qty}</div>`;
-    }
-    return `<div class="phone-peek-row">${chips}</div>`;
+    if (!chips && !qty && !pairHint) return '';
+    const hint = pairHint ? `<div class="phone-peek-pair-hint">${pairHint}</div>` : '';
+    const row = qty
+      ? `<div class="phone-peek-tools"><div class="phone-peek-row">${chips}</div>${qty}</div>`
+      : (chips ? `<div class="phone-peek-row">${chips}</div>` : '');
+    return `${hint}${row}`;
   }
 
   _renderPhonePlacementTray(player) {

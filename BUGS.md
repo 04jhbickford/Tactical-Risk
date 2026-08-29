@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.14 no overlapping labels; land-then-unit dest
+
+James unique-deploy play of 704fe2a / V2.81.12 at ~500×640: seated green check sat on Russians / Germans. Teams sat tight on its label. Land-then-unit was not obvious. ⋯ was a no-op (fixed in 1c2064c, kept here).
+
+Fix: phone seat check is a flex sibling, not the desktop absolute badge. Teams label and checkbox stay on one row with a gap. Inspect / combat / ⋯ titles ellipsize. Deploy pair hint names the land (`Tap a unit for <land>` / `To <land>`) so land-then-unit and unit-then-land both read. ⋯ still opens the short 5-item sheet on this pointer. SCHEMA 11. GAME_VERSION V2.81.14. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.13 header ⋯ opens the short sheet
 
 James unique-deploy play of 704fe2a / V2.81.12 at ~500×632: (a) setup in-box / Teams / puck HOLD. (b) unit+land either order then Deploy HOLD. Leftover: header ⋯ did not open the sheet.

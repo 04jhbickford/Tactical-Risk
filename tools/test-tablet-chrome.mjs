@@ -121,7 +121,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.13', GAME_VERSION === 'V2.81.13');
+check('GAME_VERSION is V2.81.14', GAME_VERSION === 'V2.81.14');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -624,6 +624,13 @@ check('inspect hold does not commit a setup tap',
   }) === true);
 check('phone deploy hint is Tap a unit and a territory',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit and a territory');
+check('land-then-unit names the territory; unit-then-land asks for land',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, null, { territoryName: 'Yakut S.S.R.' })
+    === 'Tap a unit for Yakut S.S.R.'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'tank', { territoryName: 'Yakut S.S.R.' })
+    === 'To Yakut S.S.R.'
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'tank')
+    === 'Tap land to stage here');
 check('phone capital hint is Tap your land, then Confirm',
   resolvePhonePeekHint(GAME_PHASES.CAPITAL_PLACEMENT, null) === 'Tap your land, then Confirm'
   && shouldShowPhoneSetupPeekHint({
@@ -817,8 +824,8 @@ check('phone setup undo is required for place and last capital',
   && shouldShowPhoneSetupUndo({
     mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, canUndoPlacement: true,
   }) === false);
-check('deploy peek hint is Tap a unit and a territory',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap a unit and a territory'
+check('deploy peek hint is pair-aware',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap land to stage here'
   && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap a unit and a territory');
 check('place-tap still does not inspect (V2.69 split stays)',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
@@ -894,6 +901,17 @@ check('phone placement hints say Tap, desktop stay Click',
     && /max-width:\s*44px/.test(
       phoneBlock.match(/\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?\}/)?.[0] || ''
     ));
+  check('seat check is in the row, not on the faction name',
+    /\.lobby-phone-faction-main \.player-select-indicator[\s\S]*?position:\s*static/.test(phoneBlock)
+    && /\.lobby-phone-check:empty/.test(phoneBlock));
+  check('Teams label stays off the checkbox',
+    /\.lobby-phone-teams \{[\s\S]*?gap:\s*10px/.test(phoneBlock)
+    && /\.lobby-phone-teams span \{[\s\S]*?white-space:\s*nowrap/.test(phoneBlock));
+  check('in-game labels ellipsize instead of overlapping',
+    /\.phone-menu-title \{[\s\S]*?text-overflow:\s*ellipsis/.test(phoneBlock)
+    && /\.territory-tooltip \.tt-header[\s\S]*?text-overflow:\s*ellipsis/.test(phoneBlock)
+    && /\.combat-title \{[\s\S]*?text-overflow:\s*ellipsis/.test(phoneBlock)
+    && /\.phone-peek-pair-hint \{[\s\S]*?text-overflow:\s*ellipsis/.test(phoneBlock));
   check('phone HUD ticker is collapsed',
     /html\.mobile-shell #hud-clarity \{[\s\S]*?display:\s*none/.test(phoneBlock));
   check('phone peek CTA is a row so Confirm is not under Undo',
@@ -950,6 +968,7 @@ check('phone placement hints say Tap, desktop stay Click',
     check('Deploy is the pair-commit thumb, not a type-then-count third step',
       /_maybeStagePhoneDeployPair/.test(panelSrc)
       && /shouldShowPhoneDeployQty/.test(panelSrc)
+      && /phone-peek-pair-hint/.test(panelSrc)
       && !/label: 'Deploy',\s*disabled: true/.test(panelSrc));
   }
   check('⋯ is a short sheet, not a second lobby',
