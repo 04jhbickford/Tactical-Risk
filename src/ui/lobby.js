@@ -21,10 +21,10 @@ const AI_DIFFICULTIES = [
 
 const NATION_SEATS = [
   { id: 'empty', label: 'Empty' },
-  { id: 'human', label: 'Human' },
-  { id: 'easy', label: 'Easy' },
-  { id: 'medium', label: 'Normal' },
-  { id: 'hard', label: 'Hard' },
+  { id: 'human', label: 'You' },
+  { id: 'easy', label: 'AI · Easy' },
+  { id: 'medium', label: 'AI · Normal' },
+  { id: 'hard', label: 'AI · Hard' },
 ];
 
 // Available colors for faction selection
@@ -52,7 +52,7 @@ export class Lobby {
     this.setup = setup;
     this.onStart = onStart;
     this.onPlayOnline = onPlayOnline;
-    this.mode = 'main'; // 'main', 'local-setup', 'my-games'
+    this.mode = 'main'; // 'main', 'seat', 'local-setup', 'my-games'
     this.selectedPlayers = [];
     this.playerNames = {};
     this.playerColors = {};
@@ -60,6 +60,7 @@ export class Lobby {
     this.playerTeams = {};
     this.teamsEnabled = false;
     this.startingIPCs = 80;
+    this.seatKind = 'local'; // 'local' | 'computer'
     this.el = null;
     this._create();
   }
@@ -82,7 +83,10 @@ export class Lobby {
 
     switch (this.mode) {
       case 'main':
-        content = phone ? this._renderMobileMainMenu() : this._renderMainMenu();
+        content = this._renderFeltHome();
+        break;
+      case 'seat':
+        content = this._renderFeltSeat();
         break;
       case 'local-setup':
         content = phone ? this._renderMobileLocalSetup() : this._renderLocalSetup();
@@ -91,10 +95,10 @@ export class Lobby {
         content = this._renderMyGames();
         break;
       default:
-        content = phone ? this._renderMobileMainMenu() : this._renderMainMenu();
+        content = this._renderFeltHome();
     }
 
-    if (this.mode === 'main') {
+    if (this.mode === 'main' || this.mode === 'seat') {
       this.el.innerHTML = `
         <div class="felt-table-cloth">
           ${content}
@@ -117,7 +121,52 @@ export class Lobby {
   }
 
   _renderMobileMainMenu() {
-    return this._renderFeltDeal();
+    return this._renderFeltHome();
+  }
+
+  _canStart() {
+    if (this.selectedPlayers.length < 2) return false;
+    return this.selectedPlayers.some((id) => (this.playerAI[id] || 'human') === 'human');
+  }
+
+  _resetSeats() {
+    this.selectedPlayers = [];
+    this.playerAI = {};
+    this.playerColors = {};
+    this.playerTeams = {};
+    this._initFactionDefaults();
+  }
+
+  _openLocalSeat() {
+    this._resetSeats();
+    this.seatKind = 'local';
+    this.mode = 'seat';
+    this._render();
+  }
+
+  _openVsComputerSeat() {
+    this._resetSeats();
+    this.setup.risk.factions.forEach((n) => {
+      this.selectedPlayers.push(n.id);
+      this.playerAI[n.id] = 'medium';
+    });
+    this.seatKind = 'vs-computer';
+    this.mode = 'seat';
+    this._render();
+  }
+
+  _fillEmptyWithAI() {
+    this.setup.risk.factions.forEach((n) => {
+      if (!this.selectedPlayers.includes(n.id)) {
+        this._seatNation(n.id, 'medium', { silent: true });
+      }
+    });
+    this._render();
+  }
+
+  _tapNationCard(factionId) {
+    if (this._nationSeat(factionId) === 'human') return;
+    this._seatNation(factionId, 'human');
   }
 
   _initFactionDefaults() {
@@ -227,7 +276,7 @@ export class Lobby {
   }
 
   _renderMainMenu() {
-    return this._renderFeltDeal();
+    return this._renderFeltHome();
   }
 
   _nationSeat(factionId) {
@@ -235,7 +284,7 @@ export class Lobby {
     return this.playerAI[factionId] || 'human';
   }
 
-  _seatNation(factionId, seat) {
+  _seatNation(factionId, seat, opts = {}) {
     const factions = this.setup.risk.factions;
     const faction = factions.find((p) => p.id === factionId);
     const idx = this.selectedPlayers.indexOf(factionId);
@@ -249,26 +298,43 @@ export class Lobby {
       this.playerAI[factionId] = seat;
       this.playerNames[factionId] = faction?.name || '';
     }
-    this._render();
+    if (!opts.silent) this._render();
   }
 
-  _renderFeltDeal() {
-    const factions = this._initFactionDefaults();
+  _renderFeltHome() {
     const savedGames = this._getSavedGames();
-    const seated = this.selectedPlayers.length;
-    const canDeal = seated >= 2;
-    const phone = isMobileShell();
-
     return `
-      <div class="felt-deal">
-        <div class="felt-deal-rail">
+      <div class="felt-home">
+        <header class="felt-home-mast">
           <span class="felt-deal-mark">1942</span>
           <span class="lobby-version-badge">${GAME_VERSION}</span>
-          <h2 class="felt-deal-title">Seat the table</h2>
-          <p class="felt-deal-note">${phone
-            ? 'Each power: Human, Easy, Normal, Hard, or Empty. Deal when two sit.'
-            : 'Pick Human, Easy, Normal, Hard, or Empty on every nation. Deal when two sit — or By post for a live table.'}</p>
+        </header>
+        <div class="felt-home-art" aria-hidden="true"></div>
+        <div class="felt-home-copy">
+          <h1 class="felt-home-title">Tactical Risk</h1>
+          <p class="felt-home-sub">A game of theaters and supply</p>
         </div>
+        <div class="felt-verbs">
+          <button type="button" class="felt-verb" data-action="local-play">Local</button>
+          <button type="button" class="felt-verb" data-action="vs-computer">vs Computer</button>
+          <button type="button" class="felt-verb felt-verb-post" data-action="online-play">By post</button>
+        </div>
+        ${savedGames.length ? `<button type="button" class="felt-saved-link" data-action="my-games">Saved ${savedGames.length}</button>` : ''}
+      </div>
+    `;
+  }
+
+  _renderFeltSeat() {
+    const factions = this._initFactionDefaults();
+    const canStart = this._canStart();
+    return `
+      <div class="felt-seat">
+        <header class="felt-seat-mast">
+          <button type="button" class="felt-back" data-action="back" aria-label="Back">‹</button>
+          <span class="felt-deal-mark">1942</span>
+          <span class="lobby-version-badge">${GAME_VERSION}</span>
+        </header>
+        <p class="felt-seat-job">Seat the powers</p>
         <div class="felt-deal-hand">
           ${factions.map((p) => this._renderFeltNationCard(p)).join('')}
         </div>
@@ -278,12 +344,9 @@ export class Lobby {
             <button type="button" class="felt-chip ${this.startingIPCs === n ? 'selected' : ''}" data-action="set-ipcs" data-ipcs="${n}">${n}</button>
           `).join('')}
         </div>
+        <button type="button" class="felt-fill-ai" data-action="fill-ai">Fill empty with AI</button>
         <div class="felt-deal-stamps">
-          <button type="button" class="felt-stamp deal ${canDeal ? '' : 'disabled'}" data-action="deal-local" ${canDeal ? '' : 'disabled'}>
-            ${canDeal ? `Deal this table (${seated})` : 'Seat two powers to deal'}
-          </button>
-          <button type="button" class="felt-stamp post" data-action="online-play">By post — live table</button>
-          ${savedGames.length ? `<button type="button" class="felt-stamp" data-action="my-games">Saved ${savedGames.length}</button>` : ''}
+          <button type="button" class="felt-stamp deal ${canStart ? '' : 'disabled'}" data-action="start" ${canStart ? '' : 'disabled'}>Start game</button>
         </div>
       </div>
     `;
@@ -293,8 +356,11 @@ export class Lobby {
     const seat = this._nationSeat(faction.id);
     const seated = seat !== 'empty';
     const color = this.playerColors[faction.id]?.color || faction.color;
+    const options = NATION_SEATS.map((opt) => (
+      `<option value="${opt.id}"${seat === opt.id ? ' selected' : ''}>${opt.label}</option>`
+    )).join('');
     return `
-      <article class="felt-nation-card ${seated ? 'seated' : ''} ${seated && seat !== 'human' ? 'ai-seated' : ''}" data-player="${faction.id}" style="--nation:${color}">
+      <article class="felt-nation-card ${seated ? 'seated' : 'is-empty'} ${seated && seat !== 'human' ? 'ai-seated' : ''}" data-action="tap-nation" data-faction="${faction.id}" style="--nation:${color}">
         <div class="felt-nation-head">
           <span class="felt-nation-flag"><img src="assets/flags/${faction.flag}" alt=""></span>
           <div class="felt-nation-copy">
@@ -302,13 +368,12 @@ export class Lobby {
             <span class="felt-nation-alliance">${faction.alliance || ''}</span>
           </div>
         </div>
-        <div class="felt-nation-seats" role="group" aria-label="${faction.name} seat">
-          ${NATION_SEATS.map((opt) => `
-            <button type="button" class="felt-seat-btn ${seat === opt.id ? 'active' : ''}"
-              data-action="seat" data-player="${faction.id}" data-seat="${opt.id}"
-              aria-pressed="${seat === opt.id ? 'true' : 'false'}">${opt.label}</button>
-          `).join('')}
-        </div>
+        <label class="felt-occupant">
+          <select class="felt-occupant-chip" data-action="set-nation-seat" data-faction="${faction.id}" aria-label="${faction.name} occupant">
+            ${options}
+          </select>
+          <span class="felt-occupant-chevron" aria-hidden="true">▾</span>
+        </label>
       </article>
     `;
   }
@@ -528,8 +593,11 @@ export class Lobby {
   _bindEvents() {
     // Main menu actions
     this.el.querySelector('[data-action="local-play"]')?.addEventListener('click', () => {
-      this.mode = 'local-setup';
-      this._render();
+      this._openLocalSeat();
+    });
+
+    this.el.querySelector('[data-action="vs-computer"]')?.addEventListener('click', () => {
+      this._openVsComputerSeat();
     });
 
     this.el.querySelector('[data-action="online-play"]')?.addEventListener('click', () => {
@@ -550,8 +618,23 @@ export class Lobby {
       this._render();
     });
 
-    this.el.querySelector('[data-action="deal-local"]')?.addEventListener('click', () => {
-      if (this.selectedPlayers.length >= 2) this._startGame();
+    this.el.querySelector('[data-action="fill-ai"]')?.addEventListener('click', () => {
+      this._fillEmptyWithAI();
+    });
+
+    this.el.querySelectorAll('[data-action="tap-nation"]').forEach((card) => {
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.felt-occupant')) return;
+        this._tapNationCard(card.dataset.faction);
+      });
+    });
+
+    this.el.querySelectorAll('[data-action="set-nation-seat"]').forEach((sel) => {
+      sel.addEventListener('change', (e) => {
+        e.stopPropagation();
+        this._seatNation(sel.dataset.faction, sel.value);
+      });
+      sel.addEventListener('click', (e) => e.stopPropagation());
     });
 
     this.el.querySelectorAll('[data-action="set-ipcs"]').forEach((btn) => {
@@ -655,7 +738,7 @@ export class Lobby {
 
     // Start button
     this.el.querySelector('[data-action="start"]')?.addEventListener('click', () => {
-      if (this.selectedPlayers.length >= 2) {
+      if (this._canStart()) {
         this._startGame();
       }
     });
