@@ -742,7 +742,7 @@ export const PHONE_COUNTRY_OUTLINE_CSS_PX = 1.25;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MIN = 1;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MAX = 14;
 export const PHONE_COUNTRY_OUTLINE_MIN_ZOOM = 0.4;
-export const PHONE_LEGAL_HAIRLINE_CSS_PX = 1.5;
+export const PHONE_LEGAL_HAIRLINE_CSS_PX = 2.25;
 
 // Poly dashed faction-color. Cream/ivory is map chrome — never return it.
 export function phoneLegalDashColor(factionHex) {
@@ -757,10 +757,13 @@ export function phoneLegalDashColor(factionHex) {
 export function phoneLegalOutlineWidth(zoom) {
   const z = Number(zoom);
   if (!Number.isFinite(z) || z <= 0) return PHONE_LEGAL_OUTLINE_CSS_PX;
-  // World Fit: hairline on owned tiles only. A 9–16 world-px double
-  // stroke aliases into continent-scale red (V2.81.26 UK/Spain FAIL).
+  // World Fit: ~2 CSS px on owned tiles only. Cap 16 world-px so this
+  // stays a tile edge, not a continent hull (V2.81.26 UK/Spain FAIL).
   if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) {
-    return Math.min(6, Math.max(1, PHONE_LEGAL_HAIRLINE_CSS_PX / z));
+    return Math.min(
+      PHONE_LEGAL_OUTLINE_WORLD_MAX,
+      Math.max(2.5, PHONE_LEGAL_HAIRLINE_CSS_PX / z),
+    );
   }
   return Math.min(
     PHONE_LEGAL_OUTLINE_WORLD_MAX,

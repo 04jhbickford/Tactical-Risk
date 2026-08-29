@@ -558,9 +558,10 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     phoneCountryOutlineWidth(0.11) === 0
     && phoneCountryOutlineWidth(0.316) === 0
     && phoneCountryOutlineWidth(0.5) === 1);
-  check('world Fit legal edge is a hairline, not a 9px double hull',
-    phoneLegalOutlineWidth(0.11) <= 6
-    && phoneLegalOutlineWidth(0.11) >= 1);
+  check('world Fit legal edge is a visible owned-tile hairline, not a 9px double hull',
+    phoneLegalOutlineWidth(0.11) <= PHONE_LEGAL_OUTLINE_WORLD_MAX
+    && phoneLegalOutlineWidth(0.11) >= 2.5
+    && phoneLegalOutlineWidth(0.11) * 0.11 >= 1.5);
 }
 
 console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
@@ -1559,6 +1560,29 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [],
     }).includes('Open Sea') === false);
+  check('legal collect is owned tiles only — not UK/Spain/Italy/Scandinavia',
+    (() => {
+      const names = collectPhoneLegalTerritoryNames({
+        mobile: true,
+        phase: GAME_PHASES.CAPITAL_PLACEMENT,
+        playerId: 'ussr',
+        territories: [
+          { name: 'Ukraine S.S.R.', isWater: false },
+          { name: 'United Kingdom', isWater: false },
+          { name: 'Spain', isWater: false },
+          { name: 'Italy', isWater: false },
+          { name: 'Norway', isWater: false },
+          { name: 'Sweden', isWater: false },
+        ],
+        getOwner: (n) => (n === 'Ukraine S.S.R.' ? 'ussr' : n === 'United Kingdom' ? 'uk' : null),
+      });
+      return names.length === 1
+        && names[0] === 'Ukraine S.S.R.'
+        && !names.includes('United Kingdom')
+        && !names.includes('Spain')
+        && !names.includes('Italy')
+        && !names.includes('Norway');
+    })());
   check('land dest hides sea chips; sea dest hides land-only chips',
     shouldShowPhoneDeployChip({
       destName: 'Ukraine S.S.R.', destIsWater: false,
@@ -1642,6 +1666,10 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('country outlines take zoom so world Fit is not a 1px hairline',
     /renderTerritoryOutlines\(ctx, zoom/.test(rendererSrc)
     && /renderTerritoryOutlines\(ctx, camera\.zoom\)/.test(mainSrc));
+  check('ownership fill seals seams with same-color hairline, not dark Fit strokes',
+    /renderOwnershipOverlays\(ctx, zoom/.test(rendererSrc)
+    && /renderOwnershipOverlays\(ctx, camera\.zoom\)/.test(mainSrc)
+    && /strokeStyle = color/.test(rendererSrc));
 }
 
 if (failures) {

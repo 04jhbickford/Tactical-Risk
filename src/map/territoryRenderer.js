@@ -345,7 +345,13 @@ export class TerritoryRenderer {
   }
 
   /** Fill land territory polygons with continent color (Risk style) */
-  renderOwnershipOverlays(ctx) {
+  renderOwnershipOverlays(ctx, zoom = 1) {
+    const z = Number(zoom);
+    const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
+    // Same-color seam seal so world Fit is fill + hairline, not dark
+    // stair-step country strokes (James V2.81.26 world-zoom FAIL).
+    const seam = Math.min(3, Math.max(1, 1.25 / safeZ));
+
     for (const t of this.territories) {
       if (t.isWater) continue;
 
@@ -354,9 +360,12 @@ export class TerritoryRenderer {
 
       ctx.save();
       ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = seam;
       ctx.globalAlpha = 1.0;
 
-      // Fill each polygon directly
       for (const polygon of t.polygons) {
         if (!polygon || polygon.length < 3) continue;
         ctx.beginPath();
@@ -366,6 +375,7 @@ export class TerritoryRenderer {
         }
         ctx.closePath();
         ctx.fill();
+        ctx.stroke();
       }
 
       ctx.restore();

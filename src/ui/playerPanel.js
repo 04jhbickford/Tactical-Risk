@@ -2818,7 +2818,13 @@ export class PlayerPanel {
 
   _renderPhonePlacementTray(player) {
     const { unitsToPlace, ux, placedThisRound, limit } = this._getInitialPlacementUX(player);
-    const remaining = knownUnitsToPlace(unitsToPlace, this.unitDefs);
+    const dest = this._phoneDeployDest();
+    const remaining = knownUnitsToPlace(unitsToPlace, this.unitDefs)
+      .filter((unit) => shouldShowPhoneDeployChip({
+        destName: dest?.name || this._phoneDeployLandName || '',
+        destIsWater: !!(dest?.isWater),
+        unitDef: this.unitDefs?.[unit.type],
+      }));
     if (this.selectedUnitType && !remaining.some(u => u.type === this.selectedUnitType)) {
       this.selectedUnitType = null;
     }

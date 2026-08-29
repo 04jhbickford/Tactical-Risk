@@ -6,7 +6,7 @@
 
 James unique play of V2.81.26 at 500: setup / named Confirm / chip wrap / Europe Fit HOLD. FAIL: world Fit painted thick aliased dark-red country strokes on UK/Spain/Italy (not owned-only ink); Deploy land dest still offered ships; Place Capital opening still showed a Middle East capital star.
 
-Fix: hide country outlines below zoom 0.4 (fills only). Legal marks are fill-lite + one faction hairline on owned land only — no ink underlayer, no sea-zone strokes at Fit. Place Capital draws no capital stars. Land dest hides sea chips; sea dest hides land-only chips. SCHEMA 11. GAME_VERSION V2.81.27. No production deploy.
+Fix: hide country outlines below zoom 0.4. Continent fill seals seams with a same-color hairline (no dark stair-step strokes). Legal marks are fill-lite + one faction hairline on owned land only — no ink underlayer, no sea-zone strokes at Fit, no UK/Spain/Italy unless owned. Place Capital draws no capital stars. Land dest hides sea chips; sea dest hides land-only chips. SCHEMA 11. GAME_VERSION V2.81.27. No production deploy.
 
 ---
 

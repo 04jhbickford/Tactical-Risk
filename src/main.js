@@ -2733,7 +2733,7 @@ async function init() {
         territoryRenderer.renderContinentIndicators(ctx);
 
         // Territory overlays (colored by continent - Risk style)
-        territoryRenderer.renderOwnershipOverlays(ctx);
+        territoryRenderer.renderOwnershipOverlays(ctx, camera.zoom);
 
         // Subtle terrain texture (rivers, mountains)
         territoryRenderer.renderTerrainTexture(ctx, camera.zoom);
