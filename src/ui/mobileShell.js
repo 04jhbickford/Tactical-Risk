@@ -647,9 +647,13 @@ export function applyPhoneCameraFit(camera, {
   selectedName,
   destinationNames,
   capitalName,
+  userTapped = false,
 } = {}) {
   if (!camera) return;
   camera.usePhoneMinZoom = true;
+  const before = userTapped
+    ? { x: camera.x, y: camera.y, z: camera.zoom }
+    : null;
   const insets = {
     padding: 12,
     padTop: PHONE_FIT_PAD_TOP,
@@ -682,9 +686,21 @@ export function applyPhoneCameraFit(camera, {
   const bounds = ensurePhoneFitRegionBounds(phoneProblemBounds(pts, seedPt?.x));
   if (bounds) {
     camera.fitBounds(bounds, { ...insets, fillFrame: true });
-    return;
+  } else {
+    camera.fitWorld({ ...insets, fillFrame: true });
   }
-  camera.fitWorld({ ...insets, fillFrame: true });
+  // Already on the dest cluster: first user Fit was a no-op (V2.81.27).
+  // Widen to the world so Fit always does something visible.
+  if (before && shouldWidenPhoneUserFit({
+    beforeZoom: before.z,
+    afterZoom: camera.zoom,
+    beforeX: before.x,
+    afterX: camera.x,
+    beforeY: before.y,
+    afterY: camera.y,
+  })) {
+    camera.fitWorld({ ...insets, fillFrame: true });
+  }
 }
 
 export function worldFitBounds() {
@@ -742,6 +758,7 @@ export const PHONE_COUNTRY_OUTLINE_CSS_PX = 1.25;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MIN = 1;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MAX = 14;
 export const PHONE_COUNTRY_OUTLINE_MIN_ZOOM = 0.4;
+export const PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM = 0.85;
 export const PHONE_LEGAL_HAIRLINE_CSS_PX = 2.25;
 
 // Poly dashed faction-color. Cream/ivory is map chrome — never return it.
@@ -786,13 +803,37 @@ export function phoneLegalDashPattern(zoom) {
   ];
 }
 
-// World Fit: hide country strokes (fills only). Thick brown outlines
-// aliased on every coast (V2.81.26). Desktop / zoomed-in stays 1 world-px.
-export function phoneCountryOutlineWidth(zoom) {
+// Phone dest-cluster Fit is often 0.28–0.55. A 0.4 cutoff still painted
+// dark country strokes on every land (James V2.81.27 gwsbmvlpj). Hide
+// worldwide outlines until the user is clearly zoomed in. Desktop keeps
+// the 0.4 floor.
+export function phoneCountryOutlineWidth(zoom, { mobile = false } = {}) {
   const z = Number(zoom);
-  if (!Number.isFinite(z) || z <= 0) return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+  if (!Number.isFinite(z) || z <= 0) {
+    return mobile ? 0 : PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+  }
+  if (mobile && z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) return 0;
   if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) return 0;
   return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+}
+
+export function phoneOwnershipSeamWidth(zoom, { mobile = false } = {}) {
+  const z = Number(zoom);
+  const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
+  if (mobile && safeZ < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) return 0;
+  return Math.min(3, Math.max(1, 1.25 / safeZ));
+}
+
+// User Fit already on the dest cluster is a no-op (V2.81.27). Widen to world.
+export function shouldWidenPhoneUserFit({
+  beforeZoom, afterZoom, beforeX, afterX, beforeY, afterY,
+} = {}) {
+  const dz = Math.abs(Number(afterZoom) - Number(beforeZoom));
+  const pan = Math.hypot(
+    Number(afterX) - Number(beforeX),
+    Number(afterY) - Number(beforeY),
+  );
+  return dz < 0.035 && pan < 60;
 }
 
 /** Land dest → land/air only. Sea dest → sea/air only. No dest → all chips. */
@@ -816,11 +857,10 @@ export function isPhoneLegalSetupSeaDest({
   if (!sea?.isWater) return false;
   const units = getUnits?.(seaName) || [];
   if (units.some((u) => u?.owner && u.owner !== playerId)) return false;
-  for (const conn of sea.connections || []) {
-    const t = byName[conn];
-    if (t && !t.isWater && getOwner?.(conn) === playerId) return true;
-  }
-  return false;
+  // Bind any empty/friendly existing sea — adjacency is a place rule,
+  // not a peek lock. V2.81.27 left dest stuck on the capital when the
+  // tap was a far ocean (Indian Ocean).
+  return true;
 }
 
 export function collectPhoneLegalTerritoryNames({
@@ -837,18 +877,6 @@ export function collectPhoneLegalTerritoryNames({
   for (const t of list) {
     if (!t || t.isWater) continue;
     if (getOwner?.(t.name) === playerId) names.push(t.name);
-  }
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-    for (const t of list) {
-      if (!t?.isWater) continue;
-      if (isPhoneLegalSetupSeaDest({
-        seaName: t.name,
-        playerId,
-        territories: list,
-        getOwner,
-        getUnits,
-      })) names.push(t.name);
-    }
   }
   return names;
 }

@@ -27,6 +27,8 @@ const {
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
+  isPhoneMapToolsChromeTarget,
+  pointHitsPhoneMapToolsChrome,
   isPhoneTrayChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
   clampTooltipToPhoneEdge,
@@ -82,6 +84,9 @@ const {
   phoneLegalDashPattern,
   phoneLegalUsesSolidStroke,
   phoneCountryOutlineWidth,
+  phoneOwnershipSeamWidth,
+  shouldWidenPhoneUserFit,
+  PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_OUTLINE_CSS_PX,
   PHONE_LEGAL_OUTLINE_WORLD_MAX,
@@ -147,7 +152,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.27', GAME_VERSION === 'V2.81.27');
+check('GAME_VERSION is V2.81.28', GAME_VERSION === 'V2.81.28');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -554,10 +559,17 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && phoneLegalDashPattern(0.5)[0] > phoneLegalDashPattern(0.5)[1]);
   check('desktop/tablet outline helper stays unused at their default zoom',
     phoneLegalOutlineWidth(0.5) === PHONE_LEGAL_OUTLINE_CSS_PX / 0.5);
-  check('world Fit hides country strokes; zoomed-in stays 1 world-px',
-    phoneCountryOutlineWidth(0.11) === 0
-    && phoneCountryOutlineWidth(0.316) === 0
-    && phoneCountryOutlineWidth(0.5) === 1);
+  check('phone hides country strokes through dest-cluster Fit; desktop keeps 0.4',
+    phoneCountryOutlineWidth(0.11, { mobile: true }) === 0
+    && phoneCountryOutlineWidth(0.316, { mobile: true }) === 0
+    && phoneCountryOutlineWidth(0.5, { mobile: true }) === 0
+    && phoneCountryOutlineWidth(0.7, { mobile: true }) === 0
+    && phoneCountryOutlineWidth(0.9, { mobile: true }) === 1
+    && phoneCountryOutlineWidth(0.5, { mobile: false }) === 1
+    && PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM === 0.85);
+  check('phone ownership seam is off at Fit so unowned lands have no edge',
+    phoneOwnershipSeamWidth(0.35, { mobile: true }) === 0
+    && phoneOwnershipSeamWidth(0.9, { mobile: true }) > 0);
   check('world Fit legal edge is a visible owned-tile hairline, not a 9px double hull',
     phoneLegalOutlineWidth(0.11) <= PHONE_LEGAL_OUTLINE_WORLD_MAX
     && phoneLegalOutlineWidth(0.11) >= 2.5
@@ -1230,10 +1242,15 @@ check('Confirm names the pair',
   const hud = { closest: (sel) => (sel === '#hud' ? {} : null) };
   const sheet = { closest: (sel) => (sel === '.phone-menu-sheet' ? {} : null) };
   const map = { closest: () => null };
+  const zoomBtn = { closest: (sel) => (sel === '#zoom-controls' ? {} : null) };
   check('⋯ / Map / HUD chrome are not setup land peeks',
     isPhoneHudChromeTarget(hud) === true
     && isPhoneHudChromeTarget(sheet) === true
     && isPhoneHudChromeTarget(map) === false);
+  check('Map +/−/Fit chrome is not a land peek',
+    isPhoneMapToolsChromeTarget(zoomBtn) === true
+    && isPhoneHudChromeTarget(zoomBtn) === true
+    && pointHitsPhoneMapToolsChrome(NaN, 0) === false);
 }
 {
   const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
@@ -1521,45 +1538,56 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
     { name: 'Open Sea', isWater: true, connections: ['Coast'] },
     { name: 'Enemy Sea', isWater: true, connections: ['Coast'] },
   ];
-  check('legal setup sea is adjacent empty/friendly ocean',
+  const farSeas = [
+    ...seas,
+    { name: 'Indian Ocean', isWater: true, connections: [] },
+  ];
+  check('legal setup sea is any empty/friendly existing ocean',
     isPhoneLegalSetupSeaDest({
       seaName: 'Open Sea',
       playerId: 'ussr',
-      territories: seas,
+      territories: farSeas,
+      getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
+      getUnits: () => [],
+    }) === true
+    && isPhoneLegalSetupSeaDest({
+      seaName: 'Indian Ocean',
+      playerId: 'ussr',
+      territories: farSeas,
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [],
     }) === true
     && isPhoneLegalSetupSeaDest({
       seaName: 'Enemy Sea',
       playerId: 'ussr',
-      territories: seas,
+      territories: farSeas,
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [{ owner: 'ger' }],
     }) === false
     && isPhoneLegalSetupSeaDest({
       seaName: 'Coast',
       playerId: 'ussr',
-      territories: seas,
+      territories: farSeas,
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [],
     }) === false);
-  check('deploy collect includes owned land + legal seas',
+  check('legal collect is owned land only — not every sea zone',
     collectPhoneLegalTerritoryNames({
       mobile: true,
       phase: GAME_PHASES.UNIT_PLACEMENT,
       playerId: 'ussr',
-      territories: seas,
+      territories: farSeas,
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [],
-    }).includes('Open Sea')
+    }).join() === 'Coast'
     && collectPhoneLegalTerritoryNames({
       mobile: true,
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
       playerId: 'ussr',
-      territories: seas,
+      territories: farSeas,
       getOwner: (n) => (n === 'Coast' ? 'ussr' : null),
       getUnits: () => [],
-    }).includes('Open Sea') === false);
+    }).includes('Indian Ocean') === false);
   check('legal collect is owned tiles only — not UK/Spain/Italy/Scandinavia',
     (() => {
       const names = collectPhoneLegalTerritoryNames({
@@ -1669,7 +1697,20 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
   check('ownership fill seals seams with same-color hairline, not dark Fit strokes',
     /renderOwnershipOverlays\(ctx, zoom/.test(rendererSrc)
     && /renderOwnershipOverlays\(ctx, camera\.zoom\)/.test(mainSrc)
-    && /strokeStyle = color/.test(rendererSrc));
+    && /strokeStyle = color/.test(rendererSrc)
+    && /phoneOwnershipSeamWidth/.test(rendererSrc));
+  check('user Fit that does not move the camera widens to world',
+    shouldWidenPhoneUserFit({
+      beforeZoom: 0.32, afterZoom: 0.32, beforeX: 1800, afterX: 1800, beforeY: 900, afterY: 900,
+    }) === true
+    && shouldWidenPhoneUserFit({
+      beforeZoom: 0.32, afterZoom: 0.11, beforeX: 1800, afterX: 1750, beforeY: 900, afterY: 1000,
+    }) === false
+    && /userTapped: true/.test(mainSrc)
+    && /userTapped/.test(readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8')));
+  check('map-tool punch-through is blocked on document-capture peek',
+    /pointHitsPhoneMapToolsChrome/.test(mainSrc)
+    && /isPhoneMapToolsChromeTarget/.test(readFileSync(join(root, 'src/ui/territoryTooltip.js'), 'utf8')));
 }
 
 if (failures) {

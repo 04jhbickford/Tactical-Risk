@@ -75,6 +75,7 @@ import {
   shouldRefitPhoneSetupHit,
   isPhoneCapitalCtaTarget,
   isPhoneHudChromeTarget,
+  pointHitsPhoneMapToolsChrome,
   isPhoneTrayChromeTarget,
   shouldIgnorePanelBoxForPhoneCapitalPeek,
   PHONE_INSPECT_HOLD_MS,
@@ -261,11 +262,13 @@ async function init() {
     destinationNames: playerPanel.movePendingDest ? [playerPanel.movePendingDest] : [],
   });
 
-  const fitPhoneCamera = () => {
+  const fitPhoneCamera = ({ userTapped = false } = {}) => {
     if (!isMobileShell() || !camera) return;
     hidePhoneTooltips('fit');
     camera.usePhoneMinZoom = true;
-    applyPhoneCameraFit(camera, { gameState, territories, ...getPhoneFitFocus() });
+    applyPhoneCameraFit(camera, {
+      gameState, territories, ...getPhoneFitFocus(), userTapped,
+    });
   };
 
   onMobileShellChange((active) => {
@@ -1931,7 +1934,8 @@ async function init() {
     if (!gameState || !isMobileShell() || !isPhoneSetupPlacementPhase(gameState.phase)) return;
     if (isPhoneHudChromeTarget(e.target)
       || isPhoneTrayChromeTarget(e.target)
-      || isPhoneCapitalCtaTarget(e.target)) return;
+      || isPhoneCapitalCtaTarget(e.target)
+      || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)) return;
     phoneSetupGestureStart = { x: e.clientX, y: e.clientY };
     phoneSetupPeekThisGesture = false;
   };
@@ -1958,7 +1962,8 @@ async function init() {
     if (!gameState || !isMobileShell() || !isPhoneSetupPlacementPhase(gameState.phase)) return false;
     if (isPhoneHudChromeTarget(e.target)
       || isPhoneTrayChromeTarget(e.target)
-      || isPhoneCapitalCtaTarget(e.target)) return false;
+      || isPhoneCapitalCtaTarget(e.target)
+      || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)) return false;
     // Chip / hint / CTA row are chrome even when the event target is the
     // canvas (iPhone fat-finger / pointer-events gap). Point-in-chrome
     // must win before the map peek can overwrite a named land.
@@ -2589,7 +2594,7 @@ async function init() {
 
   initZoomControls(canvas, {
     onFit: () => {
-      fitPhoneCamera();
+      fitPhoneCamera({ userTapped: true });
       kickPaint();
     },
     onZoomStep: (dir) => {

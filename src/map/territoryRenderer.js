@@ -5,6 +5,7 @@ import {
   phoneLegalOutlineWidth,
   phoneLegalDashPattern,
   phoneCountryOutlineWidth,
+  phoneOwnershipSeamWidth,
   phoneMapStackOffsets,
   shouldHidePhoneMapLabel,
   shouldDrawPhoneCapitalStar,
@@ -346,11 +347,8 @@ export class TerritoryRenderer {
 
   /** Fill land territory polygons with continent color (Risk style) */
   renderOwnershipOverlays(ctx, zoom = 1) {
-    const z = Number(zoom);
-    const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-    // Same-color seam seal so world Fit is fill + hairline, not dark
-    // stair-step country strokes (James V2.81.26 world-zoom FAIL).
-    const seam = Math.min(3, Math.max(1, 1.25 / safeZ));
+    const mobile = isMobileShell();
+    const seam = phoneOwnershipSeamWidth(zoom, { mobile });
 
     for (const t of this.territories) {
       if (t.isWater) continue;
@@ -375,7 +373,7 @@ export class TerritoryRenderer {
         }
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
+        if (seam > 0) ctx.stroke();
       }
 
       ctx.restore();
@@ -664,7 +662,7 @@ export class TerritoryRenderer {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     // Land territory borders — stable CSS-px at world Fit, 1 world-px zoomed in.
-    const countryW = phoneCountryOutlineWidth(zoom);
+    const countryW = phoneCountryOutlineWidth(zoom, { mobile: isMobileShell() });
     if (countryW > 0) {
       ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.lineWidth = countryW;

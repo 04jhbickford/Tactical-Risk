@@ -122,11 +122,33 @@ export function isPhoneTrayChromeTarget(target) {
 // Header ⋯ / Map / the short menu sheet are chrome, not a land tap.
 // Setup peek on document-capture pointerdown must not steal those hits
 // (a HUD _render() before click left ⋯ looking dead).
+export function isPhoneMapToolsChromeTarget(target) {
+  return !!(target?.closest?.('#zoom-controls') || target?.closest?.('#minimap'));
+}
+
 export function isPhoneHudChromeTarget(target) {
   return !!(target?.closest?.('#hud')
     || target?.closest?.('.phone-menu-sheet')
     || target?.closest?.('.hud-menu-btn')
-    || target?.closest?.('.hud-menu-container'));
+    || target?.closest?.('.hud-menu-container')
+    || isPhoneMapToolsChromeTarget(target));
+}
+
+export function pointHitsPhoneMapToolsChrome(clientX, clientY) {
+  if (typeof document === 'undefined') return false;
+  const x = Number(clientX);
+  const y = Number(clientY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  for (const id of ['zoom-controls', 'minimap']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
+    if (style && (style.display === 'none' || style.visibility === 'hidden')) continue;
+    const r = el.getBoundingClientRect?.();
+    if (!r || r.width <= 0 || r.height <= 0) continue;
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+  }
+  return false;
 }
 
 // Place Capital map taps must assign even when a leftover-tall peek

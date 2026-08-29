@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.28 worldwide outline kill; sea dest bind; Fit + map-tool chrome
+
+James unique play of V2.81.27 at 500: spine / named Confirm / land-hides-ships / no opening star HOLD. FAIL: every land still had a thin dark-red country stroke (dest-cluster zoom sat above the 0.4 hide); Indian Ocean hit-test did not rename dest (capital lock + adjacency gate); user Fit was a no-op on the Eurasia cluster; Map − punched through to Soviet Far East.
+
+Fix: phone hides country strokes and ownership-seam ink below zoom 0.85. Legal ink stays owned land only. Any empty/friendly existing sea zone binds dest + sea/air chips. User Fit that does not move the camera widens to world. +/−/Fit / minimap are chrome, not canvas peeks. SCHEMA 11. GAME_VERSION V2.81.28. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.27 world-Fit hairline; owned-only legal; sea chips gate
 
 James unique play of V2.81.26 at 500: setup / named Confirm / chip wrap / Europe Fit HOLD. FAIL: world Fit painted thick aliased dark-red country strokes on UK/Spain/Italy (not owned-only ink); Deploy land dest still offered ships; Place Capital opening still showed a Middle East capital star.
