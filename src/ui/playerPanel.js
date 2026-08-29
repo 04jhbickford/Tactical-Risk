@@ -2556,7 +2556,7 @@ export class PlayerPanel {
       } else if (ux.stuckWithNaval && ux.hint) {
         html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
       } else {
-        html += `<div class="pp-hint">Pick a land first</div>`;
+        html += `<div class="pp-place-first">Pick a land first</div>`;
       }
     }
 

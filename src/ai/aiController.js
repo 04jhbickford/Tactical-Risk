@@ -226,9 +226,9 @@ export class AIController {
       choice = this._findCentralTerritory(owned, player.id);
     }
 
-    this._updateStatus(`${player.name} places capital in ${choice}`);
+    this._updateStatus(`${player.name} placed a capital.`);
+    this._logAction('capital', { message: `${player.name} placed a capital.`, territory: choice }, player);
     this.gameState.placeCapital(choice);
-    this._logAction('capital', { message: `${player.name} placed capital at ${choice}`, territory: choice }, player);
     this._notifyAction('placeCapital', { territory: choice });
   }
 
@@ -302,6 +302,7 @@ export class AIController {
       if (result.success) {
         placedThisRound++;
         this._updateStatus(`${player.name} deployed in ${territory}`);
+        this._logAction('placement', { message: `${player.name} deployed in ${territory}`, territory, unitType }, player);
         await this._delay(150); // Small delay for visual feedback
         this._notifyAction('placeUnit', { unitType, territory });
       } else {

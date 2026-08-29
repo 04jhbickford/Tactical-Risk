@@ -1345,8 +1345,11 @@ async function init() {
       });
       aiController.setOnStatusUpdate((message) => {
         console.log('[AI Status]', message);
-        if (/places capital|placed capital|deployed in/i.test(message)) {
-          hud.setTableEvent(String(message).replace('places capital in', 'placed capital in'));
+        if (/placed a capital|places capital|placed capital|deployed in/i.test(message)) {
+          const text = String(message)
+            .replace('places capital in', 'placed a capital.')
+            .replace(/placed capital in .+$/i, 'placed a capital.');
+          hud.setTableEvent?.(text);
         }
       });
       // Authority gate: in multiplayer only the host (or the offline-host

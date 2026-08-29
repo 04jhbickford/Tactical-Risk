@@ -811,8 +811,38 @@ check('place-tap inspects first (V3.00-exp phone)',
   check('390px board-skin rail is one 44px strip',
     /html\.board-skin\.mobile-shell #hud\.table-rail \{[\s\S]*?height:\s*44px !important/.test(css)
     && /html\.board-skin\.mobile-shell #exp-banner,[\s\S]*?display:\s*none !important/.test(css));
+  check('≤640 tucks EXPERIMENT mark so the rail title can read',
+    /@media \(max-width: 640px\) \{[\s\S]*?\.exp-banner-mark,[\s\S]*?display:\s*none !important/.test(css)
+    && /html\.board-skin\.mobile-shell \.rail-phase \{[\s\S]*?display:\s*inline !important/.test(css)
+    && readFileSync(join(root, 'src/ui/boardSkin.js'), 'utf8').includes('NARROW_BOARD_CHROME_MAX = 640'));
   check('board-skin Fit uses the whole poster, not a cluster',
     readFileSync(join(root, 'src/ui/mobileShell.js'), 'utf8').includes('camera.fitWorld({ ...insets, fillFrame: true })'));
+}
+{
+  const lobby = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
+  check('seat chip is Empty / You / AI · Easy / Normal / Hard',
+    /id: 'empty', label: 'Empty'/.test(lobby)
+    && /id: 'human', label: 'You'/.test(lobby)
+    && /id: 'easy', label: 'AI · Easy'/.test(lobby)
+    && /id: 'medium', label: 'AI · Normal'/.test(lobby)
+    && /id: 'hard', label: 'AI · Hard'/.test(lobby)
+    && /data-action="set-nation-seat"/.test(lobby)
+    && /this\.playerAI\[n\.id\] = 'medium'/.test(lobby)
+    && !/set-occupant-kind/.test(lobby));
+}
+{
+  const panel = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('deploy +/MAX stay hidden until a land is staged',
+    /pp-place-first/.test(panel)
+    && /Pick a land first/.test(panel));
+}
+{
+  const hud = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
+  check('rail always prints nation + phase',
+    /\+ \(phaseName \? '<span class="rail-phase">' \+ phaseName \+ '<\\\/span>' : ''\)/.test(hud)
+    || hud.includes("'<span class=\"rail-phase\">' + phaseName + '</span>'"));
+  check('AI event line auto-clears',
+    /setTableEvent/.test(hud) && /_tableEventTimer/.test(hud) && /4500/.test(hud));
 }
 check('1×1 placeholder tiles are not stretched into 256px washes',
   isRealMapTile({ naturalWidth: 1, naturalHeight: 1 }) === false

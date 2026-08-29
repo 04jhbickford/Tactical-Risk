@@ -160,26 +160,48 @@ html.board-skin #mapCanvas {
   color: #5a4630;
 }
 
-/* ~500 CSS px Chrome box cannot do true 390. Hide the experiment
-   cluster so the rail seat/phase and Confirm read in full. */
-@media (max-width: 560px) {
+/* ≤640: tuck EXPERIMENT / version plate so nation + phase read in full.
+   Sound stays as a compact control if it does not sit on the title.
+   True 390 (mobile-shell ≤480) hides the whole banner — Sound is in ☰. */
+@media (max-width: 640px) {
   #exp-banner,
   html.board-skin #exp-banner {
+    top: 4px !important;
+    right: 8px !important;
+    left: auto !important;
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    z-index: 67 !important;
+    max-width: 76px !important;
+  }
+
+  #exp-banner .exp-banner-mark,
+  #exp-banner .exp-banner-ver,
+  #exp-banner .exp-banner-note,
+  html.board-skin #exp-banner .exp-banner-mark,
+  html.board-skin #exp-banner .exp-banner-ver,
+  html.board-skin #exp-banner .exp-banner-note {
     display: none !important;
+  }
+
+  html.board-skin .exp-audio-toggle {
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+    white-space: nowrap !important;
   }
 
   html.board-skin #hud.table-rail {
-    padding-right: 8px !important;
-  }
-
-  html.board-skin .rail-phase {
-    display: none !important;
+    padding-right: 84px !important;
   }
 
   html.board-skin .pp-rail-actions,
   html.board-skin .table-edge-card .pp-bottom-actions,
   html.board-skin .pp-rail-actions .pp-bottom-actions {
-    right: 8px !important;
+    right: 84px !important;
     max-width: 110px !important;
   }
 }
@@ -778,6 +800,18 @@ html.board-skin .table-ref-card .pp-unit-list {
   box-shadow: none !important;
 }
 
+html.board-skin .table-ref-card .pp-place-first {
+  display: block !important;
+  margin: 2px 0 4px !important;
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: #5a4630 !important;
+  font: 600 12px/1.3 'Source Serif 4', Georgia, serif !important;
+  text-align: left !important;
+}
+
 html.board-skin .table-ref-card .pp-unit-category-label {
   margin: 4px 0 2px !important;
   padding: 0 !important;
@@ -896,22 +930,28 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
   }
 
   html.board-skin.mobile-shell .rail-slip,
-  html.board-skin.mobile-shell .rail-phase,
   html.board-skin.mobile-shell .rail-bank .ipc-chip {
     display: none !important;
+  }
+
+  html.board-skin.mobile-shell .rail-phase {
+    display: inline !important;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   html.board-skin.mobile-shell .rail-seat {
     min-width: 0 !important;
     flex: 1 1 auto !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   html.board-skin.mobile-shell .rail-seat-name {
-    max-width: 9.5em;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: none;
+    overflow: visible;
+    text-overflow: unset;
     white-space: nowrap;
+    flex-shrink: 0;
   }
 
   html.board-skin.mobile-shell .pp-rail-actions,
@@ -1610,22 +1650,9 @@ html.board-skin .felt-seat-job {
   letter-spacing: 0.04em;
 }
 
-html.board-skin .felt-occupant-row {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
-  width: 100%;
-}
-
 html.board-skin .felt-occupant {
   position: relative;
   display: block;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-html.board-skin .felt-occupant-level {
-  flex: 0 0 36%;
 }
 
 html.board-skin .felt-occupant-chip {

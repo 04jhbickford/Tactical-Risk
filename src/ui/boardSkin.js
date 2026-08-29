@@ -16,7 +16,7 @@ export function isBoardSkin() {
 
 // Chrome box play is often ~500 CSS px, not a true 390. Keep the 480
 // mobile-shell breakpoint frozen; this only tucks overlapping rail chrome.
-export const NARROW_BOARD_CHROME_MAX = 560;
+export const NARROW_BOARD_CHROME_MAX = 640;
 
 export function isNarrowBoardChrome() {
   return typeof window !== 'undefined' && window.innerWidth <= NARROW_BOARD_CHROME_MAX;

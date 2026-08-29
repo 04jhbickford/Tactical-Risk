@@ -34,6 +34,7 @@ export class HUD {
     this.actionLog = null;
     this.lastClick = null;
     this.tableEvent = '';
+    this._tableEventTimer = null;
     this.clarityCtx = {
       localUserId: null,
       gameCode: null,
@@ -91,6 +92,17 @@ export class HUD {
 
   setTableEvent(message) {
     this.tableEvent = String(message || '').trim();
+    if (this._tableEventTimer) {
+      clearTimeout(this._tableEventTimer);
+      this._tableEventTimer = null;
+    }
+    if (this.tableEvent) {
+      this._tableEventTimer = setTimeout(() => {
+        this.tableEvent = '';
+        this._tableEventTimer = null;
+        this._render();
+      }, 4500);
+    }
     this._render();
   }
 
@@ -249,7 +261,7 @@ export class HUD {
         '<div class="rail-seat" style="--nation:' + player.color + '">'
         + (player.flag ? '<img src="assets/flags/' + player.flag + '" alt="">' : '')
         + '<span class="rail-seat-name">' + player.name + '</span>'
-        + (narrow ? '' : '<span class="rail-phase">' + phaseName + '</span>')
+        + (phaseName ? '<span class="rail-phase">' + phaseName + '</span>' : '')
         + budget
         + '</div>'
         + slip

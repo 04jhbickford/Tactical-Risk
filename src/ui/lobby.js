@@ -19,16 +19,12 @@ const AI_DIFFICULTIES = [
   { id: 'hard', name: 'Hard AI', desc: 'Expert strategy' },
 ];
 
-const NATION_KINDS = [
+const NATION_SEATS = [
   { id: 'empty', label: 'Empty' },
   { id: 'human', label: 'You' },
-  { id: 'ai', label: 'AI' },
-];
-
-const AI_LEVELS = [
-  { id: 'easy', label: 'Easy' },
-  { id: 'medium', label: 'Normal' },
-  { id: 'hard', label: 'Hard' },
+  { id: 'easy', label: 'AI · Easy' },
+  { id: 'medium', label: 'AI · Normal' },
+  { id: 'hard', label: 'AI · Hard' },
 ];
 
 // Available colors for faction selection
@@ -150,31 +146,13 @@ export class Lobby {
 
   _openVsComputerSeat() {
     this._resetSeats();
-    this.setup.risk.factions.forEach((n, i) => {
+    this.setup.risk.factions.forEach((n) => {
       this.selectedPlayers.push(n.id);
-      this.playerAI[n.id] = i === 0 ? 'human' : 'medium';
+      this.playerAI[n.id] = 'medium';
     });
     this.seatKind = 'vs-computer';
     this.mode = 'seat';
     this._render();
-  }
-
-  _occupantKind(factionId) {
-    const seat = this._nationSeat(factionId);
-    if (seat === 'empty') return 'empty';
-    if (seat === 'human') return 'human';
-    return 'ai';
-  }
-
-  _aiLevel(factionId) {
-    const seat = this.playerAI[factionId];
-    return (seat === 'easy' || seat === 'hard') ? seat : 'medium';
-  }
-
-  _setOccupantKind(factionId, kind) {
-    if (kind === 'empty') this._seatNation(factionId, 'empty');
-    else if (kind === 'human') this._seatNation(factionId, 'human');
-    else this._seatNation(factionId, this._aiLevel(factionId));
   }
 
   _fillEmptyWithAI() {
@@ -376,25 +354,13 @@ export class Lobby {
 
   _renderFeltNationCard(faction) {
     const seat = this._nationSeat(faction.id);
-    const kind = this._occupantKind(faction.id);
     const seated = seat !== 'empty';
     const color = this.playerColors[faction.id]?.color || faction.color;
-    const kindOpts = NATION_KINDS.map((opt) => (
-      `<option value="${opt.id}"${kind === opt.id ? ' selected' : ''}>${opt.label}</option>`
+    const options = NATION_SEATS.map((opt) => (
+      `<option value="${opt.id}"${seat === opt.id ? ' selected' : ''}>${opt.label}</option>`
     )).join('');
-    const level = this._aiLevel(faction.id);
-    const levelOpts = AI_LEVELS.map((opt) => (
-      `<option value="${opt.id}"${level === opt.id ? ' selected' : ''}>${opt.label}</option>`
-    )).join('');
-    const levelChip = kind === 'ai' ? `
-          <label class="felt-occupant felt-occupant-level">
-            <select class="felt-occupant-chip" data-action="set-ai-level" data-faction="${faction.id}" aria-label="${faction.name} AI difficulty">
-              ${levelOpts}
-            </select>
-            <span class="felt-occupant-chevron" aria-hidden="true">▾</span>
-          </label>` : '';
     return `
-      <article class="felt-nation-card ${seated ? 'seated' : 'is-empty'} ${kind === 'ai' ? 'ai-seated' : ''}" data-action="tap-nation" data-faction="${faction.id}" style="--nation:${color}">
+      <article class="felt-nation-card ${seated ? 'seated' : 'is-empty'} ${seated && seat !== 'human' ? 'ai-seated' : ''}" data-action="tap-nation" data-faction="${faction.id}" style="--nation:${color}">
         <div class="felt-nation-head">
           <span class="felt-nation-flag"><img src="assets/flags/${faction.flag}" alt=""></span>
           <div class="felt-nation-copy">
@@ -402,15 +368,12 @@ export class Lobby {
             <span class="felt-nation-alliance">${faction.alliance || ''}</span>
           </div>
         </div>
-        <div class="felt-occupant-row">
-          <label class="felt-occupant">
-            <select class="felt-occupant-chip" data-action="set-occupant-kind" data-faction="${faction.id}" aria-label="${faction.name} occupant">
-              ${kindOpts}
-            </select>
-            <span class="felt-occupant-chevron" aria-hidden="true">▾</span>
-          </label>
-          ${levelChip}
-        </div>
+        <label class="felt-occupant">
+          <select class="felt-occupant-chip" data-action="set-nation-seat" data-faction="${faction.id}" aria-label="${faction.name} occupant">
+            ${options}
+          </select>
+          <span class="felt-occupant-chevron" aria-hidden="true">▾</span>
+        </label>
       </article>
     `;
   }
@@ -666,15 +629,7 @@ export class Lobby {
       });
     });
 
-    this.el.querySelectorAll('[data-action="set-occupant-kind"]').forEach((sel) => {
-      sel.addEventListener('change', (e) => {
-        e.stopPropagation();
-        this._setOccupantKind(sel.dataset.faction, sel.value);
-      });
-      sel.addEventListener('click', (e) => e.stopPropagation());
-    });
-
-    this.el.querySelectorAll('[data-action="set-ai-level"]').forEach((sel) => {
+    this.el.querySelectorAll('[data-action="set-nation-seat"]').forEach((sel) => {
       sel.addEventListener('change', (e) => {
         e.stopPropagation();
         this._seatNation(sel.dataset.faction, sel.value);
