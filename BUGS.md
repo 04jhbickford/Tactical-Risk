@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.34 Fit fills-only; China inspect even if dealt
+
+Skeptic remaining after V2.81.33 (`4nqw8gbfh` / 25dbd6c): owned Confirm → star + DEPLOY HOLD. FAIL: Fit + world still read as jagged dark country strokes (water-mask stroke + fat/zero seam AA). China peek still minted `Place Capital: China` when the 2p deal assigned China.
+
+Fix: phone setup skips the water-mask stroke (flat ocean) and sea-zone dashes; land-bridge gold lanes stay. Ownership seam is a 3 world-px same-color seal (not a fat aliased rim). China / Wake / Germany / Japan are inspect-only unless that land is this seat's home. SCHEMA 11. GAME_VERSION V2.81.34. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.33 inspect-only enemy; Confirm commits to DEPLOY; Fit no minimap
 
 Skeptic unique play of V2.81.32 at 500 (`8nm0s2b3u` / 26191e4): gold hairline / sea-clear / setup spine HOLD. FAIL on one load: (1) enemy China peek minted `Place Capital: China` and stacked `Not yours` toasts; (2) Confirm was painted but not clicked — owner guard could silent-no-op; (3) sea KEEP; (4) opening was Germans CAPITAL / empty footer / grey Pacific star while the human was Russians; (5) Fit+world still showed minimap 120×68 and choppy dark strokes.

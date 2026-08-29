@@ -61,6 +61,8 @@ import {
   collectPhoneLegalTerritoryNames,
   isPhoneLegalSetupSeaDest,
   shouldSkipPhoneMapArt,
+  shouldSkipPhoneWaterMask,
+  isPhoneCapitalInspectOnlyLand,
   PHONE_SELECT_PULSE_MS,
   PHONE_CONFIRM_PULSE_MS,
 } from './ui/mobileShell.js';
@@ -2083,6 +2085,8 @@ async function init() {
       tappedIsLand,
       tappedIsWater,
       hasHit: true,
+      landName: hit.name,
+      currentPlayerId: gameState.currentPlayer?.id,
     })) return false;
 
     if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
@@ -2092,6 +2096,11 @@ async function init() {
         tappedIsLand,
         tappedIsWater,
         hasHit: true,
+        landName: hit.name,
+        currentPlayerId: gameState.currentPlayer?.id,
+        inspectOnly: isPhoneCapitalInspectOnlyLand(
+          hit.name, gameState.currentPlayer?.id,
+        ),
       });
       selectedTerritory = hit;
       if (peek === PHONE_CAPITAL_PEEK_CONFIRM) {
@@ -2793,8 +2802,15 @@ async function init() {
         });
 
         // Mask baked-in rectangular sea-zone artwork with accurate water
-        // polygon fills (visual only — click hit-testing is unaffected)
-        territoryRenderer.renderWaterMask(ctx);
+        // polygon fills (visual only — click hit-testing is unaffected).
+        // Phone setup uses flat ocean — the mask stroke aliases as jagged
+        // dark coasts (Skeptic V2.81.33 Fit+world).
+        if (!shouldSkipPhoneWaterMask({
+          mobile: isMobileShell(),
+          setup: isPhoneSetupPlacementPhase(gameState?.phase),
+        })) {
+          territoryRenderer.renderWaterMask(ctx);
+        }
 
         // Continent indicators FIRST (underneath ownership)
         territoryRenderer.renderContinentIndicators(ctx);

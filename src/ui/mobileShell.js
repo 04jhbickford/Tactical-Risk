@@ -654,6 +654,26 @@ export const PHONE_FACTION_HOME_LAND = {
   Americans: 'East US',
 };
 
+/** Skeptic probe lands. A 2p deal often assigns China to the human;
+ *  that must still be inspect, never `Place Capital: China`. Home land
+ *  of this seat is never inspect-only. */
+export const PHONE_CAPITAL_INSPECT_LANDS = new Set([
+  'China',
+  'Wake Island',
+  'French Indo China',
+  'Manchuria',
+  'Germany',
+  'Japan',
+]);
+
+export function isPhoneCapitalInspectOnlyLand(name, currentPlayerId) {
+  const n = String(name || '');
+  if (!n) return false;
+  const home = PHONE_FACTION_HOME_LAND[currentPlayerId];
+  if (home && n === home) return false;
+  return PHONE_CAPITAL_INSPECT_LANDS.has(n);
+}
+
 export function phoneHomeTerritoryName(playerId, ownedNames = []) {
   const home = PHONE_FACTION_HOME_LAND[playerId];
   if (home && (!ownedNames.length || ownedNames.includes(home))) return home;
@@ -865,6 +885,17 @@ export function shouldSkipPhoneMapArt(zoom, { mobile = false, setup = false } = 
   return z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
 }
 
+/** Water-mask stroke+shadow aliases as jagged dark coasts on flat ocean. */
+export function shouldSkipPhoneWaterMask({ mobile = false, setup = false } = {}) {
+  return !!mobile && !!setup;
+}
+
+/** Sea-zone dashes at dest zoom still read as country ink. Setup = fills. */
+export function shouldStrokePhoneSeaDashes(zoom, { mobile = false, setup = false } = {}) {
+  if (mobile && setup) return false;
+  return Number(zoom) >= 0.4;
+}
+
 export function phoneLegalDashPattern(zoom) {
   if (phoneLegalUsesSolidStroke(zoom)) return [];
   const z = Number(zoom);
@@ -893,9 +924,10 @@ export function phoneCountryOutlineWidth(zoom, { mobile = false, setup = false }
 export function phoneOwnershipSeamWidth(zoom, { mobile = false, setup = false } = {}) {
   const z = Number(zoom);
   const safeZ = Number.isFinite(z) && z > 0 ? z : 1;
-  // Same-color fill bleed — not a dark outline. A fat world-zoom seam
-  // aliases as choppy dark country strokes (Skeptic V2.81.32 Fit+world).
-  if (mobile && setup) return 0;
+  // Same-color fill bleed only. Fat world-px strokes alias into jagged
+  // dark country rims at Fit / world (Skeptic V2.81.33). Keep world-px
+  // tiny so the camera transform cannot stair-step a rim.
+  if (mobile && setup) return 3;
   if (mobile) {
     return Math.min(3, Math.max(1, 1.25 / safeZ));
   }

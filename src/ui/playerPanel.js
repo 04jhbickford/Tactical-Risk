@@ -21,6 +21,7 @@ import {
   shouldShowPhonePeekMax,
   shouldShowPhoneDeployChip,
   phonePointerHint,
+  isPhoneCapitalInspectOnlyLand,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
@@ -373,6 +374,7 @@ export function resolvePhoneCapitalCta({
   territory = null,
   landName = null,
   isOwnedLand = false,
+  currentPlayerId = null,
 } = {}) {
   if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
   if (isOwnedLand !== true) return null;
@@ -381,6 +383,7 @@ export function resolvePhoneCapitalCta({
   const name = landName
     || ((territory && !territory.isWater) ? territory.name : null);
   if (!name) return null;
+  if (isPhoneCapitalInspectOnlyLand(name, currentPlayerId)) return null;
   return {
     action: 'place-capital',
     label: `Place Capital: ${name}`,
@@ -406,6 +409,7 @@ export function resolvePhoneCapitalCommitLand({
   for (const name of names) {
     if (seen.has(name)) continue;
     seen.add(name);
+    if (isPhoneCapitalInspectOnlyLand(name, currentPlayerId)) continue;
     if (getOwner(name) === currentPlayerId) return name;
   }
   return null;
@@ -1383,6 +1387,7 @@ export class PlayerPanel {
         phase,
         landName: peekName,
         isOwnedLand,
+        currentPlayerId: player.id,
       });
       if (capitalCta) buttons.push(capitalCta);
     }

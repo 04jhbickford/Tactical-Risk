@@ -94,6 +94,9 @@ const {
   phoneOwnershipSeamWidth,
   shouldStrokePhoneLegalHairline,
   shouldSkipPhoneMapArt,
+  shouldSkipPhoneWaterMask,
+  shouldStrokePhoneSeaDashes,
+  isPhoneCapitalInspectOnlyLand,
   isPhoneSetupPhase,
   shouldWidenPhoneUserFit,
   PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM,
@@ -165,7 +168,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.33', GAME_VERSION === 'V2.81.33');
+check('GAME_VERSION is V2.81.34', GAME_VERSION === 'V2.81.34');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -590,8 +593,8 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     phoneOwnershipSeamWidth(0.35, { mobile: true }) <= 3
     && phoneOwnershipSeamWidth(0.11, { mobile: true }) <= 3
     && phoneOwnershipSeamWidth(0.9, { mobile: true }) <= 3
-    && phoneOwnershipSeamWidth(0.11, { mobile: true, setup: true }) === 0
-    && phoneOwnershipSeamWidth(0.5, { mobile: true, setup: true }) === 0);
+    && phoneOwnershipSeamWidth(0.11, { mobile: true, setup: true }) === 3
+    && phoneOwnershipSeamWidth(0.5, { mobile: true, setup: true }) === 3);
   check('phone skips baked map art below close zoom so PNG borders cannot show',
     shouldSkipPhoneMapArt(0.11, { mobile: true }) === true
     && shouldSkipPhoneMapArt(0.5, { mobile: true }) === true
@@ -1816,6 +1819,7 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
     resolvePhoneCapitalPeekAction({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
       tappedIsOwnedLand: true, tappedIsLand: true, hasHit: true,
+      landName: 'Russia', currentPlayerId: 'Russians',
     }) === PHONE_CAPITAL_PEEK_CONFIRM
     && resolvePhoneCapitalPeekAction({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
@@ -1869,10 +1873,11 @@ console.log('=== V2.81.33 Skeptic HOLD — inspect, commit, opening, Fit ===');
     }) === null
     && resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
-      territory: { name: 'Wake Island', isWater: false },
+      territory: { name: 'Novosibirsk', isWater: false },
       isOwnedLand: true,
       landName: null,
-    })?.label === 'Place Capital: Wake Island'
+      currentPlayerId: 'Russians',
+    })?.label === 'Place Capital: Novosibirsk'
     && resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
       landName: null,
@@ -1950,6 +1955,51 @@ console.log('=== V2.81.33 Skeptic HOLD — inspect, commit, opening, Fit ===');
         panelSrc.indexOf('else if (phase === GAME_PHASES.CAPITAL_PLACEMENT)') + 500,
       ),
     ));
+}
+
+console.log('=== V2.81.34 Fit fills-only + China inspect ===');
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
+  check('China / Wake / Germany / Japan are inspect-only even if the deal assigned them',
+    isPhoneCapitalInspectOnlyLand('China', 'Russians') === true
+    && isPhoneCapitalInspectOnlyLand('Wake Island', 'Russians') === true
+    && isPhoneCapitalInspectOnlyLand('Germany', 'Russians') === true
+    && isPhoneCapitalInspectOnlyLand('Japan', 'Russians') === true
+    && isPhoneCapitalInspectOnlyLand('Germany', 'Germans') === false
+    && isPhoneCapitalInspectOnlyLand('Russia', 'Russians') === false
+    && resolvePhoneCapitalPeekAction({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      tappedIsOwnedLand: true, tappedIsLand: true, hasHit: true,
+      landName: 'China', currentPlayerId: 'Russians',
+    }) === PHONE_CAPITAL_PEEK_INSPECT
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      landName: 'China',
+      isOwnedLand: true,
+      currentPlayerId: 'Russians',
+    }) === null
+    && resolvePhoneCapitalCommitLand({
+      dataTerritory: 'China',
+      peekedLandName: 'China',
+      currentPlayerId: 'Russians',
+      getOwner: () => 'Russians',
+    }) === null
+    && resolvePhoneCapitalCta({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      landName: 'Russia',
+      isOwnedLand: true,
+      currentPlayerId: 'Russians',
+    })?.label === 'Place Capital: Russia');
+  check('phone setup skips water-mask stroke and sea dashes; keeps land-bridge lanes',
+    shouldSkipPhoneWaterMask({ mobile: true, setup: true }) === true
+    && shouldSkipPhoneWaterMask({ mobile: true, setup: false }) === false
+    && shouldStrokePhoneSeaDashes(0.5, { mobile: true, setup: true }) === false
+    && shouldStrokePhoneSeaDashes(0.5, { mobile: true, setup: false }) === true
+    && /shouldSkipPhoneWaterMask/.test(mainSrc)
+    && /renderCrossWaterConnections/.test(mainSrc)
+    && /shouldStrokePhoneSeaDashes/.test(rendererSrc)
+    && /LAND_BRIDGES/.test(rendererSrc));
 }
 
 if (failures) {

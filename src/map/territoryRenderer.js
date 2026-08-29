@@ -12,6 +12,7 @@ import {
   PHONE_LEGAL_FILL_ALPHA,
   PHONE_LEGAL_FILL_RGB,
   isPhoneSetupPhase,
+  shouldStrokePhoneSeaDashes,
   shouldStrokePhoneLegalHairline,
   phoneLegalDashColor,
   PHONE_LEGAL_EDGE_COLOR,
@@ -668,8 +669,12 @@ export class TerritoryRenderer {
       }
     }
 
-    // Sea zone dashes alias at world Fit. Skip them when zoomed out.
-    if (Number(zoom) >= 0.4) {
+    // Sea zone dashes alias at world Fit. Skip them when zoomed out
+    // and during phone setup (fills only — keep yellow land-bridge lanes).
+    if (shouldStrokePhoneSeaDashes(zoom, {
+      mobile: isMobileShell(),
+      setup: isPhoneSetupPhase(this.gameState?.phase),
+    })) {
       ctx.strokeStyle = 'rgba(80, 140, 200, 0.35)';
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 4]);

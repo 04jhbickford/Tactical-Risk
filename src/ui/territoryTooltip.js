@@ -1,7 +1,7 @@
 // Territory tooltip that appears on hover over the map
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
-import { isMobileShell, readableFactionTextColor } from './mobileShell.js';
+import { isMobileShell, readableFactionTextColor, isPhoneCapitalInspectOnlyLand } from './mobileShell.js';
 import { GAME_PHASES } from '../state/gameState.js';
 
 // Phone tooltip sits under #hud (70) so the full-screen menu sheet covers it.
@@ -197,10 +197,15 @@ export function resolvePhoneCapitalPeekAction({
   tappedIsLand = false,
   tappedIsWater = false,
   hasHit = false,
+  landName = null,
+  currentPlayerId = null,
+  inspectOnly = false,
 } = {}) {
   if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
   if (!hasHit) return PHONE_CAPITAL_PEEK_IGNORE;
-  if (tappedIsOwnedLand) return PHONE_CAPITAL_PEEK_CONFIRM;
+  const probe = inspectOnly
+    || isPhoneCapitalInspectOnlyLand(landName, currentPlayerId);
+  if (tappedIsOwnedLand && !probe) return PHONE_CAPITAL_PEEK_CONFIRM;
   if (tappedIsLand || tappedIsWater) return PHONE_CAPITAL_PEEK_INSPECT;
   return PHONE_CAPITAL_PEEK_IGNORE;
 }
@@ -218,6 +223,8 @@ export function shouldApplyPhoneSetupLandTap({
   tappedIsLand,
   tappedIsWater,
   hasHit,
+  landName = null,
+  currentPlayerId = null,
 } = {}) {
   if (!mobile) return true;
   if (inspected) return false;
@@ -233,6 +240,8 @@ export function shouldApplyPhoneSetupLandTap({
       tappedIsLand,
       tappedIsWater,
       hasHit,
+      landName,
+      currentPlayerId,
     });
     return peek === PHONE_CAPITAL_PEEK_CONFIRM || peek === PHONE_CAPITAL_PEEK_INSPECT;
   }
