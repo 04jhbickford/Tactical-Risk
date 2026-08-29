@@ -14,6 +14,7 @@ import {
   shouldUsePhonePlacementTray,
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
+  phonePointerHint,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
@@ -2378,12 +2379,12 @@ export class PlayerPanel {
             <span class="pp-selected-name">${this.selectedTerritory.name}</span>
           </div>`;
       if (ux.hint) {
-        html += `<div class="pp-hint">${ux.hint}</div>`;
+        html += `<div class="pp-hint">${phonePointerHint(ux.hint, { mobile: isMobileShell() })}</div>`;
       }
     } else if (ux.hint) {
-      html += `<div class="pp-hint">${ux.hint}</div>`;
+      html += `<div class="pp-hint">${phonePointerHint(ux.hint, { mobile: isMobileShell() })}</div>`;
     } else if (!showDoneButton) {
-      html += `<div class="pp-hint">Click a territory you own to place units</div>`;
+      html += `<div class="pp-hint">${phonePointerHint('Click a territory you own to place units', { mobile: isMobileShell() })}</div>`;
     }
 
     // Unit list with +/- controls (like buy phase)
@@ -2492,11 +2493,11 @@ export class PlayerPanel {
     } else {
       // Stage from any remaining row. Deploy still needs a legal tile (B29).
       if (ux.needSeaHint && ux.hint) {
-        html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+        html += `<div class="pp-placement-sea-hint">${phonePointerHint(ux.hint, { mobile: isMobileShell() })}</div>`;
       } else if (ux.stuckWithNaval && ux.hint) {
-        html += `<div class="pp-placement-sea-hint">${ux.hint}</div>`;
+        html += `<div class="pp-placement-sea-hint">${phonePointerHint(ux.hint, { mobile: isMobileShell() })}</div>`;
       } else {
-        html += `<div class="pp-hint">Stage units, then click a territory you own to Deploy</div>`;
+        html += `<div class="pp-hint">${phonePointerHint('Stage units, then click a territory you own to Deploy', { mobile: isMobileShell() })}</div>`;
       }
       if (landUnits.length > 0) {
         html += `<div class="pp-unit-category-label">Land</div>`;

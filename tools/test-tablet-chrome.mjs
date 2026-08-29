@@ -49,6 +49,7 @@ const {
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
   shouldParkPhoneMapTools,
+  phonePointerHint,
   PHONE_PEEK_EXPANDED_MAX_DVH,
   phoneUnitIconSize,
   shouldHideUnitsAtZoom,
@@ -805,6 +806,9 @@ check('desktop still has no phone detent tabs',
   shouldShowPhoneDetentTabs({
     mobile: false, expanded: true, phase: GAME_PHASES.UNIT_PLACEMENT,
   }) === false);
+check('phone placement hints say Tap, desktop stay Click',
+  phonePointerHint('Click a territory you own to place units', { mobile: true }) === 'Tap a territory you own to place units'
+  && phonePointerHint('Click a territory you own to place units', { mobile: false }) === 'Click a territory you own to place units');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';

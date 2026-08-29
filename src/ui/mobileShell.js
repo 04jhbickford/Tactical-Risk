@@ -128,6 +128,12 @@ export function shouldParkPhoneMapTools({ mobile } = {}) {
   return !!mobile;
 }
 
+// Phone chrome never says Click. Desktop PHASE_HINTS stay Click.
+export function phonePointerHint(text, { mobile = false } = {}) {
+  if (!mobile || text == null || text === '') return text || '';
+  return String(text).replace(/\bClick\b/g, 'Tap').replace(/\bclick\b/g, 'tap');
+}
+
 // Initial deployment on phone is a tray of remaining units, not the
 // desktop queue/+/-/confirm sheet squeezed into the bottom overlay.
 export function shouldUsePhonePlacementTray({ mobile, phase } = {}) {
