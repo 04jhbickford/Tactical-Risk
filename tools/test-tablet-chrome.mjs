@@ -59,6 +59,8 @@ const {
   shouldParkPhoneMapTools,
   shouldShowPhoneDeployQty,
   shouldAutoStagePhoneDeployPair,
+  shouldUsePhonePairGrammar,
+  shouldShowPhonePeekMax,
   phonePointerHint,
   PHONE_PEEK_EXPANDED_MAX_DVH,
   phoneUnitIconSize,
@@ -92,6 +94,7 @@ const {
   resolvePhonePeekHint,
   resolvePhoneDeployLandName,
   resolvePhoneDeployCtaLabel,
+  shouldKeepPhonePairLand,
   shouldShowPhoneSetupPeekHint,
   resolvePhoneStickyUnitType,
   shouldAutoCommitPhoneCapital,
@@ -125,7 +128,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.16', GAME_VERSION === 'V2.81.16');
+check('GAME_VERSION is V2.81.17', GAME_VERSION === 'V2.81.17');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -576,17 +579,19 @@ check('phone purchase / deploy / mobilize peek unless expanded',
   && shouldPeekPhoneTray({ mobile: true, expanded: true }) === false
   && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === true
   && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.PURCHASE }) === true
-  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.MOBILIZE }) === true);
-check('phone air-landing / move-confirm keep the body up',
+  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.MOBILIZE }) === true
+  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.COMBAT_MOVE }) === true
+  && shouldShowPhonePeekUnitRow({ mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.NON_COMBAT_MOVE }) === true);
+check('phone air-landing keeps the body up; dest-pending combat stays peeked',
   shouldPeekPhoneTray({ mobile: true, airLanding: true }) === false
-  && shouldPeekPhoneTray({ mobile: true, movePending: true }) === false);
+  && shouldPeekPhoneTray({ mobile: true, movePending: true }) === true);
 check('desktop purchase hint stays empty (PHASE_HINTS frozen)',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
-check('phone peek hint is readable for purchase / mobilize',
+check('phone peek hint is the same pair grammar for mobilize / move',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === 'Tap a unit to buy'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap a factory, then a unit');
-check('phone peek still uses PHASE_HINTS when they exist',
-  resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_HINTS[TURN_PHASES.COMBAT_MOVE]);
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap unit, then land'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap unit, then land'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap unit, then land');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
@@ -1074,6 +1079,8 @@ check('Place Capital peek ignores the leftover-tall panel box',
   );
   check('setup peek skips Deploy and honors the tray box',
     /isPhoneTrayChromeTarget/.test(peekFn)
+    && /containsPoint/.test(peekFn)
+    && /_phonePairFrozenAt/.test(peekFn)
     && /shouldBlockMapSelect/.test(peekFn)
     && !/shouldIgnorePanelBoxForPhoneCapitalPeek/.test(peekFn));
   check('thumb Deploy commits the staged land on this pointer',
@@ -1114,8 +1121,12 @@ check('Confirm names the pair',
 }
 {
   const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
-  check('peek hit-test is tray verbs, not the leftover-tall footer box',
-    /\[data-action="confirm-placement"\], \[data-action="phone-select-unit"\]/.test(panelSrc)
+  check('peek hit-test is tray verbs + peek row, not the leftover-tall footer box',
+    /\[data-action="confirm-placement"\]/.test(panelSrc)
+    && /\[data-action="phone-select-unit"\]/.test(panelSrc)
+    && /\.phone-peek-row/.test(panelSrc)
+    && /\.phone-peek-pair-hint/.test(panelSrc)
+    && /\.pp-peek-cta-row/.test(panelSrc)
     && !/\.pp-bottom-actions, \.pp-seat-chip/.test(panelSrc));
 }
 {
@@ -1244,6 +1255,100 @@ check('native AI option click does not toggle the seated card',
   cam.zoomBy('out');
   check('minus-zoom paints on this call, not the next pointer',
     cam.zoom < before && cam.dirty === true);
+}
+
+console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===');
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const { phoneBlock } = phoneCssParts(css);
+  const placeCapital = mainSrc.slice(
+    mainSrc.indexOf("case 'place-capital'"),
+    mainSrc.indexOf("case 'open-purchase'"),
+  );
+  check('capital Confirm does not auto-Fit',
+    /placeCapital\(data\.territory\)/.test(placeCapital)
+    && !/fitPhoneCamera/.test(placeCapital));
+  check('unit-chip pointerdown freezes the named land',
+    /_selectPhonePairUnit/.test(panelSrc)
+    && /_phonePairFrozenAt/.test(panelSrc)
+    && /data-action="phone-select-unit"/.test(panelSrc));
+  check('null territory does not wipe a staged land name',
+    shouldKeepPhonePairLand({
+      incomingTerritory: null, stagedLandName: 'Ukraine S.S.R.',
+    }) === true
+    && shouldKeepPhonePairLand({
+      incomingTerritory: { name: 'Ukraine S.S.R.' }, stagedLandName: 'Ukraine S.S.R.',
+    }) === true
+    && shouldKeepPhonePairLand({
+      incomingTerritory: null, stagedLandName: '',
+    }) === false);
+  check('Max is in the thumb and does not commit',
+    /phone-pair-max/.test(panelSrc)
+    && /_applyPhonePairMax/.test(panelSrc)
+    && /_commitStagedPlacement/.test(panelSrc)
+    && panelSrc.indexOf('_applyPhonePairMax') > 0
+    && !/_applyPhonePairMax[\s\S]{0,200}_commitStagedPlacement/.test(
+      panelSrc.slice(panelSrc.indexOf('_applyPhonePairMax')),
+    ));
+  check('pair grammar covers deploy / mobilize / attack / fortify',
+    shouldUsePhonePairGrammar({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+    }) === true
+    && shouldUsePhonePairGrammar({
+      mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.MOBILIZE,
+    }) === true
+    && shouldUsePhonePairGrammar({
+      mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.COMBAT_MOVE,
+    }) === true
+    && shouldUsePhonePairGrammar({
+      mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.NON_COMBAT_MOVE,
+    }) === true
+    && shouldUsePhonePairGrammar({
+      mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.PURCHASE,
+    }) === false
+    && shouldUsePhonePairGrammar({
+      mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    }) === false);
+  check('Max waits for a named land except purchase',
+    shouldShowPhonePeekMax({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+      hasNamedLand: true, hasUnitType: true,
+    }) === true
+    && shouldShowPhonePeekMax({
+      mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+      hasNamedLand: false, hasUnitType: true,
+    }) === false
+    && shouldShowPhonePeekMax({
+      mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.PURCHASE,
+      hasNamedLand: false, hasUnitType: true,
+    }) === true
+    && shouldShowPhonePeekMax({
+      mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      hasNamedLand: true, hasUnitType: false,
+    }) === false);
+  check('mobilize / move share land-then-unit hint + Confirm',
+    resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE, null, {
+      territoryName: 'Ukraine S.S.R.',
+    }) === 'Tap a unit · Ukraine S.S.R.'
+    && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE, 'infantry', {
+      territoryName: 'Ukraine S.S.R.',
+    }) === 'To Ukraine S.S.R.'
+    && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
+      territoryName: 'Ukraine S.S.R.', destName: 'West Russia',
+    }) === 'Ukraine S.S.R. → West Russia'
+    && /confirm-mobilize/.test(panelSrc)
+    && /_commitStagedMobilize/.test(panelSrc)
+    && /_maybeStagePhoneMobilizePair/.test(panelSrc)
+    && /_maybeStagePhoneMovePair/.test(panelSrc));
+  check('peek row / hint / CTA accept touch without eating named-land taps',
+    /player-panel--peek \.phone-peek-row[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
+    && /player-panel--peek \.phone-peek-pair-hint[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
+    && /player-panel--peek \.pp-peek-cta-row[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
+    && /player-panel--peek \.pp-bottom-actions[\s\S]*?pointer-events:\s*none/.test(phoneBlock));
+  check('SCHEMA_VERSION stays 11 after the grammar sweep',
+    SCHEMA_VERSION === 11);
 }
 
 if (failures) {

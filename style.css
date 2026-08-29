@@ -17371,7 +17371,13 @@ iframe[title="Vercel Live Feedback"] {
   html.mobile-shell #sidebar.player-panel--peek .pp-bottom-actions [data-action],
   html.mobile-shell .player-panel.player-panel--peek .pp-bottom-actions [data-action],
   html.mobile-shell #sidebar.player-panel--peek .pp-seat-chip,
-  html.mobile-shell .player-panel.player-panel--peek .pp-seat-chip {
+  html.mobile-shell .player-panel.player-panel--peek .pp-seat-chip,
+  html.mobile-shell #sidebar.player-panel--peek .phone-peek-row,
+  html.mobile-shell .player-panel.player-panel--peek .phone-peek-row,
+  html.mobile-shell #sidebar.player-panel--peek .phone-peek-pair-hint,
+  html.mobile-shell .player-panel.player-panel--peek .phone-peek-pair-hint,
+  html.mobile-shell #sidebar.player-panel--peek .pp-peek-cta-row,
+  html.mobile-shell .player-panel.player-panel--peek .pp-peek-cta-row {
     pointer-events: auto;
   }
 
@@ -17656,6 +17662,17 @@ iframe[title="Vercel Live Feedback"] {
     flex: 1 1 auto;
     min-width: 120px;
     min-height: 48px;
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .pp-peek-primary-slot .pp-peek-max {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 44px;
+    min-height: 48px;
+    padding: 0 12px;
   }
 
   .pp-peek-cta-row .pp-confirm-btn {
@@ -17667,6 +17684,10 @@ iframe[title="Vercel Live Feedback"] {
   .pp-peek-primary-slot .pp-confirm-btn {
     width: 100%;
     min-height: 48px;
+  }
+
+  .pp-peek-primary-slot .pp-confirm-btn:not(.pp-peek-max) {
+    flex: 1 1 auto;
   }
 
   .pp-bottom-buttons {

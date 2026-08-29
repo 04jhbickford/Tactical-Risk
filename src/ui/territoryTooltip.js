@@ -73,10 +73,15 @@ const PHONE_TRAY_CHROME_ACTIONS = new Set([
   'place-capital',
   'undo-capital',
   'confirm-placement',
+  'confirm-mobilize',
+  'confirm-move',
   'finish-placement',
   'place-queue',
   'place-queue-max',
+  'phone-pair-max',
   'phone-select-unit',
+  'buy-unit',
+  'next-phase',
   'undo-placement',
   'undo',
 ]);
@@ -94,6 +99,7 @@ export function isPhoneTrayChromeTarget(target) {
   if (!el) {
     return !!(target?.closest?.('.pp-bottom-actions')
       || target?.closest?.('.phone-peek-row')
+      || target?.closest?.('.phone-peek-pair-hint')
       || target?.closest?.('.phone-peek-tools')
       || target?.closest?.('.pp-peek-cta-row'));
   }

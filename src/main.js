@@ -364,7 +364,6 @@ async function init() {
           playerPanel.setSelectedTerritory(null);
           playerPanel.flushRender();
           hud._render();
-          if (isMobileShell()) fitPhoneCamera();
           kickPaint();
           notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
@@ -1909,6 +1908,14 @@ async function init() {
     if (isPhoneHudChromeTarget(e.target)
       || isPhoneTrayChromeTarget(e.target)
       || isPhoneCapitalCtaTarget(e.target)) return false;
+    // Chip / hint / CTA row are chrome even when the event target is the
+    // canvas (iPhone fat-finger / pointer-events gap). Point-in-chrome
+    // must win before the map peek can overwrite a named land.
+    if (playerPanel.containsPoint(e.clientX, e.clientY)) return false;
+    if (playerPanel._phonePairFrozenAt
+      && Date.now() - playerPanel._phonePairFrozenAt < 500) {
+      return false;
+    }
     // Peek ignores the leftover-tall sidebar box so a named land still
     // assigns. The visible tray chrome (Deploy / chips) is still a hit.
     if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {

@@ -17,6 +17,8 @@ import {
   shouldShowPhoneTrayToggle,
   shouldShowPhonePlaceMeta,
   shouldAutoStagePhoneDeployPair,
+  shouldUsePhonePairGrammar,
+  shouldShowPhonePeekMax,
   phonePointerHint,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
@@ -255,29 +257,48 @@ export function resolvePhaseHint(phase, turnPhase) {
 // Phone peek only. Desktop still reads PHASE_HINTS via resolvePhaseHint
 // (purchase / mobilize / tech stay empty there).
 export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = {}) {
-  if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-    const land = opts.territoryName || '';
+  const land = opts.territoryName || '';
+  const dest = opts.destName || '';
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land, then Confirm';
+  if (phase === GAME_PHASES.UNIT_PLACEMENT
+    || (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE)) {
     if (land && selectedUnitType) return `To ${land}`;
     if (land) return `Tap a unit · ${land}`;
     if (selectedUnitType) return 'Tap land, then unit';
     return 'Tap unit, then land';
   }
-  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Tap your land, then Confirm';
+  if (phase === GAME_PHASES.PLAYING
+    && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+    if (land && dest && selectedUnitType) return `${land} → ${dest}`;
+    if (land && selectedUnitType) return `To ${land}`;
+    if (land) return `Tap a unit · ${land}`;
+    if (selectedUnitType) return 'Tap land, then unit';
+    return 'Tap unit, then land';
+  }
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
   if (phase === GAME_PHASES.PLAYING) {
-    if (turnPhase === TURN_PHASES.PURCHASE) return 'Tap a unit to buy';
-    if (turnPhase === TURN_PHASES.MOBILIZE) return 'Tap a factory, then a unit';
+    if (turnPhase === TURN_PHASES.PURCHASE) {
+      return selectedUnitType
+        ? `Tap Max or End Phase · ${formatUnitName(selectedUnitType)}`
+        : 'Tap a unit to buy';
+    }
     if (turnPhase === TURN_PHASES.DEVELOP_TECH) return 'Buy research dice';
   }
   return '';
 }
 
 // Place Capital Confirm is the verb. Do not also show a hint line.
-export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
+export function shouldShowPhoneSetupPeekHint({ phase, turnPhase, hasPrimaryCta } = {}) {
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT && hasPrimaryCta) return false;
-  // Pair peek: hint until unit+land stages Deploy. Then the thumb is the verb.
+  // Pair peek: hint until unit+land stages Confirm. Then the thumb is the verb.
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return !hasPrimaryCta;
+  if (phase === GAME_PHASES.PLAYING
+    && (turnPhase === TURN_PHASES.MOBILIZE
+      || turnPhase === TURN_PHASES.COMBAT_MOVE
+      || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+    return !hasPrimaryCta;
+  }
   return true;
 }
 
@@ -318,10 +339,18 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
 // 22d4b13 Place Capital Confirm. Peek already gated owned land — mount
 // from the selected / peeked name. Do not owner-check here (a dropped
 // selectedTerritory or id mismatch left James with an empty tray).
-export function resolvePhoneDeployLandName({ stagedLandName, selectedTerritory } = {}) {
+export function resolvePhoneDeployLandName({ stagedLandName, selectedTerritory, allowWater = false } = {}) {
   if (stagedLandName) return stagedLandName;
-  if (selectedTerritory && !selectedTerritory.isWater) return selectedTerritory.name;
+  if (selectedTerritory && (allowWater || !selectedTerritory.isWater)) return selectedTerritory.name;
   return '';
+}
+
+// A unit-chip tap must never discard a named land. Clearing selection
+// also leaves the staged name so a ghost click / null set is not a wipe.
+export function shouldKeepPhonePairLand({ incomingTerritory, stagedLandName } = {}) {
+  if (!stagedLandName) return false;
+  if (!incomingTerritory) return true;
+  return incomingTerritory.name === stagedLandName;
 }
 
 export function resolvePhoneDeployCtaLabel({ count, unitType, landName } = {}) {
@@ -460,6 +489,9 @@ export class PlayerPanel {
     this._phoneCapitalLandName = null;
     this._phoneDeployLandName = null;
     this._phoneDeployCommittedAt = 0;
+    this._phonePairFrozenAt = 0;
+    this._phonePairMaxAt = 0;
+    this._phoneMobilizeCommittedAt = 0;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -514,15 +546,35 @@ export class PlayerPanel {
     if (isQueueGestureAction(this._pointerLock?.action) && unit) {
       this._queueLockType = unit;
     }
+    if (!isMobileShell() || !this.el.classList.contains('player-panel--peek')) return;
+
+    const unitBtn = e.target?.closest?.('[data-action="phone-select-unit"]');
+    if (unitBtn && !unitBtn.disabled) {
+      this._selectPhonePairUnit(unitBtn.dataset.unit);
+      return;
+    }
+
+    const maxBtn = e.target?.closest?.('[data-action="phone-pair-max"], [data-action="place-queue-max"]');
+    if (maxBtn && !maxBtn.disabled) {
+      this._applyPhonePairMax(maxBtn.dataset.unit);
+      this._phonePairMaxAt = Date.now();
+      return;
+    }
+
     // Document-capture peek used to retarget the land under Deploy before
     // click. Commit on this pointer so a thumb Deploy is Deploy only.
     const deployBtn = e.target?.closest?.('[data-action="confirm-placement"]');
-    if (deployBtn
-      && !deployBtn.disabled
-      && isMobileShell()
-      && this.el.classList.contains('player-panel--peek')) {
+    if (deployBtn && !deployBtn.disabled) {
       if (this._commitStagedPlacement()) {
         this._phoneDeployCommittedAt = Date.now();
+      }
+      return;
+    }
+
+    const mobilizeBtn = e.target?.closest?.('[data-action="confirm-mobilize"]');
+    if (mobilizeBtn && !mobilizeBtn.disabled) {
+      if (this._commitStagedMobilize()) {
+        this._phoneMobilizeCommittedAt = Date.now();
       }
     }
   }
@@ -534,7 +586,24 @@ export class PlayerPanel {
     const chromeRects = peek
       ? [...this.el.querySelectorAll(capitalPeek
         ? '[data-action="place-capital"], [data-action="undo-capital"]'
-        : '[data-action="confirm-placement"], [data-action="phone-select-unit"], [data-action="place-queue"], [data-action="place-queue-max"], [data-action="undo-placement"], [data-action="undo"], [data-action="finish-placement"], .pp-seat-chip')]
+        : [
+          '[data-action="confirm-placement"]',
+          '[data-action="confirm-mobilize"]',
+          '[data-action="confirm-move"]',
+          '[data-action="phone-select-unit"]',
+          '[data-action="phone-pair-max"]',
+          '[data-action="place-queue"]',
+          '[data-action="place-queue-max"]',
+          '[data-action="buy-unit"]',
+          '[data-action="undo-placement"]',
+          '[data-action="undo"]',
+          '[data-action="finish-placement"]',
+          '[data-action="next-phase"]',
+          '.phone-peek-row',
+          '.phone-peek-pair-hint',
+          '.pp-peek-cta-row',
+          '.pp-seat-chip',
+        ].join(', '))]
         .map((node) => node.getBoundingClientRect())
       : [];
     return pointHitsPlayerPanel({
@@ -720,23 +789,59 @@ export class PlayerPanel {
     // Do NOT zero DEPLOYED — selecting another tile after Deploy 1/6
     // must stay 1/6 (B28).
     const keepPlaced = this.gameState?.unitsPlacedThisRound;
-    if (this.selectedTerritory?.name !== territory?.name) {
+    const sameNamedLand = !!(territory?.name && territory.name === this._phoneDeployLandName);
+    if (territory && this.selectedTerritory?.name !== territory.name && !sameNamedLand) {
       this.moveSelectedUnits = {};
       this.movePendingDest = null;
       this.moveUnitTab = 'land';
     }
-    this.selectedTerritory = territory;
+    if (territory) this.selectedTerritory = territory;
     if (this.gameState && keepPlaced != null) {
       this.gameState.unitsPlacedThisRound = keepPlaced;
     }
-    if (this.gameState?.phase === GAME_PHASES.UNIT_PLACEMENT
-      && territory?.name
-      && !territory.isWater) {
+    if (this._shouldStagePhonePairLand(territory)) {
       this._phoneDeployLandName = territory.name;
     }
-    this._maybeStagePhoneDeployPair();
+    this._maybeStagePhonePair();
     if (immediate) this.flushRender();
     else this._scheduleRender();
+  }
+
+  _shouldStagePhonePairLand(territory) {
+    if (!territory?.name) return false;
+    if (!shouldUsePhonePairGrammar({
+      mobile: isMobileShell(),
+      phase: this.gameState?.phase,
+      turnPhase: this.gameState?.turnPhase,
+    })) return false;
+    if (this.gameState?.phase === GAME_PHASES.UNIT_PLACEMENT) return !territory.isWater;
+    return true;
+  }
+
+  _selectPhonePairUnit(unitType) {
+    this._phonePairFrozenAt = Date.now();
+    this.selectedUnitType = unitType || null;
+    const dest = this._phoneDeployDest();
+    if (dest) this.selectedTerritory = dest;
+    this._maybeStagePhonePair();
+    this._scheduleRender();
+  }
+
+  _maybeStagePhonePair() {
+    const phase = this.gameState?.phase;
+    const turnPhase = this.gameState?.turnPhase;
+    if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+      this._maybeStagePhoneDeployPair();
+      return;
+    }
+    if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE) {
+      this._maybeStagePhoneMobilizePair();
+      return;
+    }
+    if (phase === GAME_PHASES.PLAYING
+      && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+      this._maybeStagePhoneMovePair();
+    }
   }
 
   _maybeStagePhoneDeployPair() {
@@ -764,9 +869,160 @@ export class PlayerPanel {
     this._phoneDeployLandName = dest.name;
   }
 
+  _maybeStagePhoneMobilizePair() {
+    if (!isMobileShell() || !this.selectedUnitType) return;
+    const dest = this._phoneDeployDest();
+    const player = this.gameState?.currentPlayer;
+    if (!dest || !this._isValidMobilizeLocation(dest, player)) return;
+    if (!this._phoneMobilizeFitsDest(this.selectedUnitType, dest, player)) return;
+    if ((Number(this.placementQueue?.[this.selectedUnitType]) || 0) > 0) return;
+    const pending = this.gameState.getPendingPurchases?.() || [];
+    const available = quantityAvailableForType(pending, this.selectedUnitType);
+    const slots = this._mobilizeSlotsRemaining(dest, player);
+    this.placementQueue = applyPlaceQueueDelta({
+      queue: {},
+      unitType: this.selectedUnitType,
+      delta: 1,
+      available,
+      slotsRemaining: slots,
+    });
+    this.selectedTerritory = dest;
+    this._phoneDeployLandName = dest.name;
+  }
+
+  _maybeStagePhoneMovePair() {
+    if (!isMobileShell() || !this.selectedUnitType) return;
+    const from = this._phoneDeployDest();
+    const player = this.gameState?.currentPlayer;
+    if (!from || !player) return;
+    const movable = this._getMovableUnits(from, player);
+    const unit = movable.find((u) => {
+      const key = u.isCargo ? u.cargoKey : (u.isIndividual ? `ship:${u.id}` : u.type);
+      return key === this.selectedUnitType || u.type === this.selectedUnitType;
+    });
+    if (!unit) return;
+    const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
+    if ((Number(this.moveSelectedUnits[unitKey]) || 0) > 0) return;
+    this.moveSelectedUnits = { ...this.moveSelectedUnits, [unitKey]: 1 };
+    this.selectedTerritory = from;
+    this._phoneDeployLandName = from.name;
+  }
+
   _phoneDeployDest() {
     const landName = this._phoneDeployLandName || this.selectedTerritory?.name;
     return (landName && this.territories?.[landName]) || this.selectedTerritory || null;
+  }
+
+  _phoneMobilizeFitsDest(unitType, dest, player) {
+    if (!dest || !unitType || !this._isValidMobilizeLocation(dest, player)) return false;
+    const def = this.unitDefs?.[unitType];
+    if (!def) return false;
+    if (dest.isWater) return !!def.isSea;
+    const factories = this._getFactoryTerritories(player.id);
+    const isFactory = factories.includes(dest.name);
+    if (def.isBuilding) return !isFactory;
+    return isFactory && !!(def.isLand || def.isAir);
+  }
+
+  _mobilizeSlotsRemaining(dest, player) {
+    if (!dest || dest.isWater) return 99;
+    const capital = this.gameState?.playerState?.[player.id]?.capitalTerritory;
+    const isCapitalFactory = dest.name === capital;
+    const productionLimit = isCapitalFactory ? 20 : 5;
+    const placedHere = (this.gameState?.mobilizationHistory || [])
+      .filter((h) => h.territory === dest.name && h.owner === player.id)
+      .length;
+    return Math.max(0, productionLimit - placedHere);
+  }
+
+  _applyPhonePairMax(unitTypeHint = null) {
+    const unitType = unitTypeHint || this.selectedUnitType;
+    if (!unitType) return false;
+    const phase = this.gameState?.phase;
+    const turnPhase = this.gameState?.turnPhase;
+    const dest = this._phoneDeployDest();
+    const player = this.gameState?.currentPlayer;
+
+    if (phase === GAME_PHASES.UNIT_PLACEMENT) {
+      if (!dest) return false;
+      const unitsToPlace = this.gameState.getUnitsToPlace?.(player?.id) || [];
+      const available = quantityAvailableForType(unitsToPlace, unitType);
+      const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
+      const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
+      this.placementQueue = applyPlaceQueueMax({
+        queue: this.placementQueue || {},
+        unitType,
+        available,
+        slotsRemaining: limit - placedThisRound,
+      });
+      this.selectedUnitType = unitType;
+      this.selectedTerritory = dest;
+      this._phoneDeployLandName = dest.name;
+      this._scheduleRender();
+      return true;
+    }
+
+    if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE) {
+      if (!dest || !this._phoneMobilizeFitsDest(unitType, dest, player)) return false;
+      const pending = this.gameState.getPendingPurchases?.() || [];
+      const available = quantityAvailableForType(pending, unitType);
+      this.placementQueue = applyPlaceQueueMax({
+        queue: this.placementQueue || {},
+        unitType,
+        available,
+        slotsRemaining: this._mobilizeSlotsRemaining(dest, player),
+      });
+      this.selectedUnitType = unitType;
+      this.selectedTerritory = dest;
+      this._phoneDeployLandName = dest.name;
+      this._scheduleRender();
+      return true;
+    }
+
+    if (phase === GAME_PHASES.PLAYING
+      && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+      if (!dest) return false;
+      const movable = this._getMovableUnits(dest, player);
+      const unit = movable.find((u) => {
+        const key = u.isCargo ? u.cargoKey : (u.isIndividual ? `ship:${u.id}` : u.type);
+        return key === unitType || u.type === unitType;
+      });
+      if (!unit) return false;
+      const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
+      this.moveSelectedUnits = { ...this.moveSelectedUnits, [unitKey]: unit.quantity };
+      this.selectedUnitType = unitKey;
+      this.selectedTerritory = dest;
+      this._phoneDeployLandName = dest.name;
+      this._scheduleRender();
+      return true;
+    }
+
+    if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.PURCHASE) {
+      this.selectedUnitType = unitType;
+      if (this.onAction) this.onAction('buy-max', { unitType });
+      this._scheduleRender();
+      return true;
+    }
+
+    return false;
+  }
+
+  _commitStagedMobilize() {
+    if (!this.onAction) return false;
+    const dest = this._phoneDeployDest();
+    if (!dest) return false;
+    const queue = { ...this.placementQueue };
+    const unitTypes = expandPlaceQueue(queue);
+    if (unitTypes.length === 0) return false;
+    this._ignoreUndoUntil = Date.now() + 400;
+    for (const unitType of unitTypes) {
+      this.onAction('mobilize-unit', { unitType, territory: dest.name });
+    }
+    this.placementQueue = {};
+    this.selectedTerritory = dest;
+    this._phoneDeployLandName = dest.name;
+    this._scheduleRender();
+    return true;
   }
 
   _commitStagedPlacement() {
@@ -965,6 +1221,7 @@ export class PlayerPanel {
       this.phoneDetentTab = 'actions';
       this._peekPhase = phase;
       this._peekTurnPhase = turnPhase;
+      this._phoneDeployLandName = null;
     }
     const airLanding = this.isAirLandingActive();
     const movePending = !!this.movePendingDest;
@@ -1123,6 +1380,24 @@ export class PlayerPanel {
       } else if (ux.needSeaHint && ux.hint) {
         warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
       }
+    } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE
+      && isMobileShell()) {
+      const dest = this._phoneDeployDest();
+      const unitType = this.selectedUnitType
+        || Object.entries(this.placementQueue || {}).find(([, n]) => Number(n) > 0)?.[0];
+      const totalQueued = queuedCount(this.placementQueue || {});
+      if (totalQueued > 0 && dest && this._isValidMobilizeLocation(dest, player)) {
+        buttons.push({
+          action: 'confirm-mobilize',
+          label: resolvePhoneDeployCtaLabel({
+            count: totalQueued,
+            unitType,
+            landName: dest.name,
+          }),
+          disabled: false,
+          primary: true,
+        });
+      }
     }
 
     // End Phase button (always visible during PLAYING phase, unless in special modes)
@@ -1166,6 +1441,7 @@ export class PlayerPanel {
         && !buttons.some(b => b && !b.disabled);
       peekHint = shouldShowPhoneSetupPeekHint({
         phase,
+        turnPhase,
         hasPrimaryCta: buttons.some(b => b && !b.disabled),
       })
         ? (trayOwnsHint
@@ -1173,13 +1449,21 @@ export class PlayerPanel {
             territoryName: resolvePhoneDeployLandName({
               stagedLandName: this._phoneDeployLandName,
               selectedTerritory: this.selectedTerritory,
+              allowWater: turnPhase === TURN_PHASES.MOBILIZE
+                || turnPhase === TURN_PHASES.COMBAT_MOVE
+                || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
             }),
+            destName: this.movePendingDest || '',
           })
           : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
             territoryName: resolvePhoneDeployLandName({
               stagedLandName: this._phoneDeployLandName,
               selectedTerritory: this.selectedTerritory,
+              allowWater: turnPhase === TURN_PHASES.MOBILIZE
+                || turnPhase === TURN_PHASES.COMBAT_MOVE
+                || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
             }),
+            destName: this.movePendingDest || '',
           }) || ''))
         : '';
       warningHtml = '';
@@ -1242,6 +1526,25 @@ export class PlayerPanel {
       }
       html += `</div>`;
       html += `<div class="pp-peek-primary-slot">`;
+      const pairLand = resolvePhoneDeployLandName({
+        stagedLandName: this._phoneDeployLandName,
+        selectedTerritory: this.selectedTerritory,
+        allowWater: turnPhase === TURN_PHASES.MOBILIZE
+          || turnPhase === TURN_PHASES.COMBAT_MOVE
+          || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+      });
+      if (shouldShowPhonePeekMax({
+        mobile: true,
+        phase,
+        turnPhase,
+        hasNamedLand: !!pairLand,
+        hasUnitType: !!this.selectedUnitType,
+      })) {
+        html += `
+        <button type="button" class="pp-confirm-btn pp-peek-max" data-action="phone-pair-max" data-unit="${this.selectedUnitType}">
+          Max
+        </button>`;
+      }
     }
 
     for (const btn of buttons) {
@@ -2406,13 +2709,17 @@ export class PlayerPanel {
     let qty = '';
     let pairHint = '';
 
+    const pairLand = resolvePhoneDeployLandName({
+      stagedLandName: this._phoneDeployLandName,
+      selectedTerritory: this.selectedTerritory,
+      allowWater: turnPhase === TURN_PHASES.MOBILIZE
+        || turnPhase === TURN_PHASES.COMBAT_MOVE
+        || turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+    });
+
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
-      const landName = resolvePhoneDeployLandName({
-        stagedLandName: this._phoneDeployLandName,
-        selectedTerritory: this.selectedTerritory,
-      });
       pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
-        territoryName: landName,
+        territoryName: pairLand,
       });
       const units = knownUnitsToPlace(this.gameState.getUnitsToPlace?.(player.id) || [], this.unitDefs);
       for (const unit of units) {
@@ -2425,6 +2732,9 @@ export class PlayerPanel {
           </button>`;
       }
     } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.PURCHASE) {
+      pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
+        territoryName: pairLand,
+      });
       const pending = this.gameState.getPendingPurchases?.() || [];
       const factoryTerritories = this._getFactoryTerritories(player.id);
       const adjacentSeaZones = this._getAdjacentSeaZones(factoryTerritories);
@@ -2438,22 +2748,49 @@ export class PlayerPanel {
       for (const [unitType] of units) {
         const imageSrc = getUnitIconPath(unitType, player.id);
         const qty = pending.find(p => p.type === unitType)?.quantity || 0;
+        const selected = this.selectedUnitType === unitType ? ' selected' : '';
         chips += `
-          <button type="button" class="phone-peek-chip${qty > 0 ? ' has-qty' : ''}" data-action="buy-unit" data-unit="${unitType}" data-delta="1" aria-label="Buy ${unitType}">
+          <button type="button" class="phone-peek-chip${qty > 0 ? ' has-qty' : ''}${selected}" data-action="buy-unit" data-unit="${unitType}" data-delta="1" aria-label="Buy ${unitType}">
             ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
             ${qty > 0 ? `<span class="phone-peek-count">${qty}</span>` : ''}
           </button>`;
       }
     } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE) {
+      pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
+        territoryName: pairLand,
+      });
       const pending = this.gameState.getPendingPurchases?.() || [];
-      const canPlace = !!this.selectedTerritory && this._isValidMobilizeLocation(this.selectedTerritory, player);
       for (const unit of pending) {
         if (!unit.quantity) continue;
         const imageSrc = getUnitIconPath(unit.type, player.id);
+        const selected = this.selectedUnitType === unit.type ? ' selected' : '';
         chips += `
-          <button type="button" class="phone-peek-chip${canPlace ? ' can-place' : ''}" data-action="mobilize-unit" data-unit="${unit.type}" aria-label="Deploy ${unit.type}" ${canPlace ? '' : 'disabled'}>
+          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unit.type}" aria-label="${formatUnitName(unit.type)}">
             ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
             <span class="phone-peek-count">${unit.quantity}</span>
+          </button>`;
+      }
+    } else if (phase === GAME_PHASES.PLAYING
+      && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+      pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
+        territoryName: pairLand,
+        destName: this.movePendingDest || '',
+      });
+      const from = this._phoneDeployDest();
+      const movable = from ? this._getMovableUnits(from, player) : [];
+      const seen = new Set();
+      for (const unit of movable) {
+        const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
+        if (seen.has(unitKey)) continue;
+        seen.add(unitKey);
+        const imageSrc = getUnitIconPath(unit.type, player.id);
+        const selected = this.selectedUnitType === unitKey || this.selectedUnitType === unit.type
+          ? ' selected' : '';
+        const qty = unit.quantity;
+        chips += `
+          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unitKey}" aria-label="${formatUnitName(unit.type)}">
+            ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
+            <span class="phone-peek-count">${qty}</span>
           </button>`;
       }
     } else if (shouldShowTechResearch(phase, turnPhase)) {
@@ -3817,6 +4154,7 @@ export class PlayerPanel {
 
         // Handle buy-unit action
         if (action === 'buy-unit') {
+          this.selectedUnitType = btn.dataset.unit || this.selectedUnitType;
           const unitType = btn.dataset.unit;
           const delta = parseInt(btn.dataset.delta, 10);
           if (this.onAction && unitType) {
@@ -3853,12 +4191,28 @@ export class PlayerPanel {
         }
 
         if (action === 'phone-select-unit') {
-          const unitType = btn.dataset.unit;
-          this.selectedUnitType = unitType || null;
-          const dest = this._phoneDeployDest();
-          if (dest) this.selectedTerritory = dest;
-          this._maybeStagePhoneDeployPair();
-          this._scheduleRender();
+          if (this._phonePairFrozenAt && Date.now() - this._phonePairFrozenAt < 400) {
+            return;
+          }
+          this._selectPhonePairUnit(btn.dataset.unit);
+          return;
+        }
+
+        if (action === 'phone-pair-max') {
+          if (this._phonePairMaxAt && Date.now() - this._phonePairMaxAt < 400) {
+            this._phonePairMaxAt = 0;
+            return;
+          }
+          this._applyPhonePairMax(btn.dataset.unit);
+          return;
+        }
+
+        if (action === 'confirm-mobilize') {
+          if (this._phoneMobilizeCommittedAt && Date.now() - this._phoneMobilizeCommittedAt < 400) {
+            this._phoneMobilizeCommittedAt = 0;
+            return;
+          }
+          this._commitStagedMobilize();
           return;
         }
 

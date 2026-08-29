@@ -201,23 +201,58 @@ export function shouldShowPhonePanelBody({
   return false;
 }
 
-// One row of unit/action chips on the peek detent so Purchase /
-// Mobilize / Deploy stay one-handed without opening the full list.
+// One row of unit/action chips on the peek detent so every land+unit
+// phase stays one-handed. Combat Confirm is the only stronger verb.
 export function shouldShowPhonePeekUnitRow({ mobile, phase, turnPhase } = {}) {
   if (!mobile) return false;
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
   if (phase === GAME_PHASES.PLAYING) {
     return turnPhase === TURN_PHASES.DEVELOP_TECH
       || turnPhase === TURN_PHASES.PURCHASE
-      || turnPhase === TURN_PHASES.MOBILIZE;
+      || turnPhase === TURN_PHASES.MOBILIZE
+      || turnPhase === TURN_PHASES.COMBAT_MOVE
+      || turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+  }
+  return false;
+}
+
+// Land+unit phases share one grammar. Purchase is unit+Max only
+// (no land pair). Place Capital is land+Confirm (no units).
+export function shouldUsePhonePairGrammar({ mobile, phase, turnPhase } = {}) {
+  if (!mobile) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
+  if (phase === GAME_PHASES.PLAYING) {
+    return turnPhase === TURN_PHASES.MOBILIZE
+      || turnPhase === TURN_PHASES.COMBAT_MOVE
+      || turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+  }
+  return false;
+}
+
+// Max lives in the thumb with Confirm. It never commits.
+// Purchase Max does not need a named land.
+export function shouldShowPhonePeekMax({
+  mobile,
+  phase,
+  turnPhase,
+  hasNamedLand,
+  hasUnitType,
+} = {}) {
+  if (!mobile || !hasUnitType) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return !!hasNamedLand;
+  if (phase !== GAME_PHASES.PLAYING) return false;
+  if (turnPhase === TURN_PHASES.PURCHASE) return true;
+  if (turnPhase === TURN_PHASES.MOBILIZE
+    || turnPhase === TURN_PHASES.COMBAT_MOVE
+    || turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
+    return !!hasNamedLand;
   }
   return false;
 }
 
 // Default phone chrome is map + thin peek. Expand is opt-in.
-// Air-landing / move-confirm keep the body up so those flows stay visible.
-// Initial Deployment peeks the same way Place Capital does — chips +
-// thumb Deploy, not a covering Units / Players / Territory / Log sheet.
+// Air-landing keeps the body up. Dest-pending combat / fortify stay
+// peeked so Confirm lives in the thumb — not a type-count shop.
 export function shouldPeekPhoneTray({
   mobile,
   expanded,
@@ -226,9 +261,10 @@ export function shouldPeekPhoneTray({
   phase,
 } = {}) {
   void phase;
+  void movePending;
   if (!mobile) return false;
   if (expanded) return false;
-  if (airLanding || movePending) return false;
+  if (airLanding) return false;
   return true;
 }
 

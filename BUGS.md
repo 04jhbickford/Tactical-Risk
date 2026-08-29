@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.17 James lock: one land+unit grammar
+
+James unique-deploy play of e398ee6 / V2.81.16: (1) Place Capital Confirm yanked the camera (auto-Fit). (2) Land-then-unit still failed on iPhone touch — mouse kept the named land, his device did not. (3) No Max. Sweep: reinforce / attack / fortify still used first-tap-commits or a type-count shop.
+
+Fix: capital Confirm no longer auto-Fits. Peek chrome is the chip row / hint / CTA (pointer-events auto); leftover-tall footer stays none. Unit chip selects on pointerdown and freezes the named land. Peek skips when the point is in that chrome even if the target is the canvas. Max sits in the thumb with Confirm and does not commit. Mobilize stages then Confirm. Combat / fortify stay peeked with the same land→unit→Max→Confirm grammar; attack Confirm stays the irreversible exception. Purchase is unit+Max+End Phase (no land pair). SCHEMA 11. GAME_VERSION V2.81.17. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.16 P0 deploy pair; chrome off the board
 
 James unique-deploy play of c27a303 / V2.81.15 at 500×632: land tap outlined Ukraine but the footer stayed "Tap a unit and a territory". Infantry chip then read "Tap land to stage here". Confirm never appeared.
