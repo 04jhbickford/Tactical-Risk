@@ -356,7 +356,6 @@ async function init() {
           unitTooltip.hide();
           hidePhoneTooltips('commit');
           selectedTerritory = null;
-          playerPanel._phoneSetupPeekTerritory = null;
           playerPanel.setSelectedTerritory(null);
           playerPanel.flushRender();
           hud._render();
@@ -1935,12 +1934,9 @@ async function init() {
       hasHit: true,
     })) return false;
     selectedTerritory = hit;
-    playerPanel._phoneSetupPeekAt = Date.now();
-    playerPanel._phoneSetupPeekTerritory = hit;
-    // Mount Confirm now. Leftover click of this pointer is ignored in
-    // _dispatchAction — do not omit the button (V2.81.4 next-frame skip).
-    playerPanel.setSelectedTerritory(hit);
-    playerPanel.flushRender();
+    // Outline now. Confirm mounts on mouseup — the 22d4b13 tray — so this
+    // pointer's leftover click cannot hit a button that is not in the DOM yet.
+    playerPanel.selectedTerritory = hit;
     hud.setLastClick({ landed: true, label: hit.name });
     hud._render();
     kickPaint();
@@ -2254,6 +2250,7 @@ async function init() {
     const alreadyPeeked = phoneSetupPeekThisGesture;
     phoneSetupPeekThisGesture = false;
     if (alreadyPeeked) {
+      if (selectedTerritory) playerPanel.setSelectedTerritory(selectedTerritory);
       kickPaint();
       return;
     }

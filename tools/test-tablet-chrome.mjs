@@ -84,8 +84,6 @@ const {
   shouldShowPhoneSetupPeekHint,
   resolvePhoneStickyUnitType,
   shouldAutoCommitPhoneCapital,
-  shouldIgnorePhoneSetupCtaAfterPeek,
-  PHONE_SETUP_PEEK_CTA_GUARD_MS,
   resolvePhoneCapitalCta,
   shouldShowPhoneSetupUndo,
   shouldShowSelectUnitsCta,
@@ -116,7 +114,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.5', GAME_VERSION === 'V2.81.5');
+check('GAME_VERSION is V2.81.6', GAME_VERSION === 'V2.81.6');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -890,16 +888,6 @@ check('inspect≠commit still holds — tap never auto-places capital',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
   }) === false);
-check('leftover click after peek cannot commit Place Capital',
-  shouldIgnorePhoneSetupCtaAfterPeek({
-    peekedAt: 1000, now: 1000 + 100, action: 'place-capital',
-  }) === true
-  && shouldIgnorePhoneSetupCtaAfterPeek({
-    peekedAt: 1000, now: 1000 + PHONE_SETUP_PEEK_CTA_GUARD_MS + 1, action: 'place-capital',
-  }) === false
-  && shouldIgnorePhoneSetupCtaAfterPeek({
-    peekedAt: 1000, now: 1100, action: 'undo-capital',
-  }) === false);
 {
   const land = { name: 'Novosibirsk', isWater: false };
   const cta = resolvePhoneCapitalCta({
@@ -908,21 +896,11 @@ check('leftover click after peek cannot commit Place Capital',
     playerId: 'russians',
     getOwner: (name) => (name === 'Novosibirsk' ? 'russians' : null),
   });
-  const fromPeekOnly = resolvePhoneCapitalCta({
-    phase: GAME_PHASES.CAPITAL_PLACEMENT,
-    territory: null,
-    peekTerritory: land,
-    playerId: 'russians',
-    getOwner: (name) => (name === 'Novosibirsk' ? 'russians' : null),
-  });
   check('owned-land peek resolves Place Capital Confirm',
     cta?.action === 'place-capital'
     && cta?.label === 'Place Capital: Novosibirsk'
     && cta?.territory === 'Novosibirsk'
     && cta?.disabled === false);
-  check('Confirm still resolves from peek land if selection dropped',
-    fromPeekOnly?.action === 'place-capital'
-    && fromPeekOnly?.territory === 'Novosibirsk');
   check('unowned or water peek does not mount Confirm',
     resolvePhoneCapitalCta({
       phase: GAME_PHASES.CAPITAL_PLACEMENT,
@@ -946,11 +924,13 @@ check('leftover click after peek cannot commit Place Capital',
 }
 {
   const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
-  check('peek flush-renders Confirm — leftover ignore does not omit the button',
-    /_phoneSetupPeekTerritory = hit/.test(mainSrc)
-    && /setSelectedTerritory\(hit\)/.test(mainSrc)
-    && /flushRender\(\)/.test(mainSrc)
-    && !/setSelectedTerritory\(hit, \{ immediate: false \}\)/.test(mainSrc));
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('pointerdown peeks without mounting Confirm; mouseup paints the 22d4b13 tray',
+    /playerPanel\.selectedTerritory = hit/.test(mainSrc)
+    && /alreadyPeeked/.test(mainSrc)
+    && /setSelectedTerritory\(selectedTerritory\)/.test(mainSrc)
+    && !/setSelectedTerritory\(hit, \{ immediate: false \}\)/.test(mainSrc)
+    && !/shouldIgnorePhoneSetupCtaAfterPeek/.test(panelSrc));
 }
 check('phone setup peek applies on this pointer, not the leftover mouseup',
   shouldApplyPhoneSetupTapOnPointerDown({

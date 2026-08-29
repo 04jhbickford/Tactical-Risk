@@ -305,31 +305,16 @@ export function shouldAutoCommitPhoneCapital({ mobile, phase, tappedIsOwnedLand 
   return false;
 }
 
-// Leftover click of the peek pointer must not commit. Confirm still
-// mounts on this peek — ignore the click, do not omit the button.
-export const PHONE_SETUP_PEEK_CTA_GUARD_MS = 450;
-
-export function shouldIgnorePhoneSetupCtaAfterPeek({
-  peekedAt = 0, now = 0, action = '',
-} = {}) {
-  if (action !== 'place-capital') return false;
-  const at = Number(peekedAt) || 0;
-  if (!at) return false;
-  return Number(now) - at < PHONE_SETUP_PEEK_CTA_GUARD_MS;
-}
-
-// Place Capital Confirm after a peek. Live selection wins; peekTerritory
-// keeps the button if a later render dropped selectedTerritory.
+// 22d4b13 Place Capital Confirm. Own-land selection mounts the button.
 export function resolvePhoneCapitalCta({
   phase,
   territory = null,
-  peekTerritory = null,
   playerId = null,
   getOwner = null,
 } = {}) {
-  if (phase !== GAME_PHASES.CAPITAL_PLACEMENT || !playerId) return null;
-  const land = [territory, peekTerritory].find((t) => t && !t.isWater);
-  if (!land) return null;
+  if (phase !== GAME_PHASES.CAPITAL_PLACEMENT) return null;
+  const land = territory && !territory.isWater ? territory : null;
+  if (!land || playerId == null) return null;
   const owner = typeof getOwner === 'function' ? getOwner(land.name) : land.owner;
   if (owner !== playerId) return null;
   return {
@@ -449,7 +434,6 @@ export class PlayerPanel {
     this._queueLockType = null;
     this._queueGestureApplied = false;
     this._phoneSetupPeekAt = 0;
-    this._phoneSetupPeekTerritory = null;
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
@@ -983,16 +967,17 @@ export class PlayerPanel {
       });
     }
     // Capital placement — Confirm is the only verb. Own-land tap selects.
-    // Peek land keeps Confirm in the DOM if selectedTerritory was dropped.
-    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      const capitalCta = resolvePhoneCapitalCta({
-        phase,
-        territory: this.selectedTerritory,
-        peekTerritory: this._phoneSetupPeekTerritory,
-        playerId: player.id,
-        getOwner: (name) => this.gameState.getOwner(name),
-      });
-      if (capitalCta) buttons.push(capitalCta);
+    else if (phase === GAME_PHASES.CAPITAL_PLACEMENT && this.selectedTerritory && !this.selectedTerritory.isWater) {
+      const owner = this.gameState.getOwner(this.selectedTerritory.name);
+      if (owner === player.id) {
+        buttons.push({
+          action: 'place-capital',
+          label: `Place Capital: ${this.selectedTerritory.name}`,
+          disabled: false,
+          primary: true,
+          territory: this.selectedTerritory.name
+        });
+      }
     }
     // Initial unit placement — Deploy stays on the peek CTA (not clipped
     // in the tray body). Done only after the queue is empty.
@@ -1126,11 +1111,14 @@ export class PlayerPanel {
         canUndoPurchase: pendingPurchases.some(p => p.quantity > 0),
         canUndoMobilize: (this.gameState.mobilizationHistory || []).length > 0,
       });
-      const showUndo = undo.show && Date.now() >= (this._ignoreUndoUntil || 0);
+      const showCapitalUndoGhost = phase === GAME_PHASES.CAPITAL_PLACEMENT
+        && buttons.some(b => b.action === 'place-capital');
+      const showUndo = (undo.show && Date.now() >= (this._ignoreUndoUntil || 0))
+        || showCapitalUndoGhost;
       html += `<div class="pp-peek-undo-slot">`;
       if (showUndo) {
         html += `
-        <button class="pp-confirm-btn pp-undo-ghost" data-action="${undo.action}">
+        <button class="pp-confirm-btn pp-undo-ghost" data-action="${undo.action || 'undo-capital'}">
           Undo
         </button>`;
       }
@@ -3620,11 +3608,6 @@ export class PlayerPanel {
         const action = btn.dataset.action;
         const lockAction = btn.lockAction || null;
         const territory = btn.dataset.territory;
-        if (shouldIgnorePhoneSetupCtaAfterPeek({
-          peekedAt: this._phoneSetupPeekAt,
-          now: Date.now(),
-          action,
-        })) return;
         const setIndex = btn.dataset.set;
         if ((action === 'undo-placement' || action === 'undo-capital')
           && Date.now() < (this._ignoreUndoUntil || 0)) {

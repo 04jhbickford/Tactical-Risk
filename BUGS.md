@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.6 restore 22d4b13 Place Capital Confirm tray
+
+James play of sha e4bbd2e / V2.81.5 at ~500 CSS px: hold 1 PASS. Hold 4 peek holds, Confirm FAIL worse than V2.81.4: first Novosibirsk tap peeked (yellow outline, no star) but the tray was an empty ~85px panel — hint only, no Confirm, no Undo. Re-tap still empty.
+
+Cause: three swings around leftover-click (30ba311 flush-on-pointerdown committed; f028a45 next-frame omitted Confirm; e4bbd2e flush + 450ms ignore still left an empty tray). mouseup of a peeked gesture returned without painting the 22d4b13 Confirm row.
+
+Fix: pointerdown on owned land peeks only (outline, no Confirm in the DOM). mouseup of that gesture paints `Place Capital: <land>` and the Undo ghost on one row — the last tray that actually existed after a peek (22d4b13). No delay, no leftover-click ignore, no extra flush gate. Thumb Confirm is the only commit. Holds 1–3 unchanged. SCHEMA 11. GAME_VERSION V2.81.6. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.5 Confirm mounts after Place Capital peek
 
 James play of sha f028a45 / V2.81.4 at ~500 CSS px: hold 1 PASS (sibling occupant band). Hold 4 peek PARTIAL, Confirm FAIL: first owned-land tap peeked (yellow outline, no star, phase stayed PLACE CAPITAL) but the tray never mounted Confirm — hint + lone Undo only; DOM had no Place Capital button. Re-tap / scroll still stuck.
