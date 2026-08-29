@@ -1718,6 +1718,11 @@ console.log('=== V2.81.26 capital star / sea dest / Fit dest / pulses ===');
     && /shouldSkipPhoneMapArt/.test(mainSrc)
     && /PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM/.test(rendererSrc)
     && /worldFit/.test(rendererSrc));
+  check('Fit legal hairline is gold, not faction-red country ink',
+    /strokeOwned\(PHONE_LEGAL_EDGE_COLOR/.test(rendererSrc)
+    && !/strokeOwned\(dashColor, outline, \{ landsOnly: true \}\)/.test(
+      rendererSrc.slice(rendererSrc.indexOf('if (worldFit)'), rendererSrc.indexOf('} else {')),
+    ));
   check('user Fit that does not move the camera widens to world',
     shouldWidenPhoneUserFit({
       beforeZoom: 0.32, afterZoom: 0.32, beforeX: 1800, afterX: 1800, beforeY: 900, afterY: 900,

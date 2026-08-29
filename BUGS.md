@@ -6,7 +6,7 @@
 
 James unique play of V2.81.28 at 500 (`ax9g4l281`): interaction HOLDs (sea dest, land hides ships, Fit moves, no Map punch-through, no opening star). FAIL: every land still had dark-red country strokes at opening and after Fit. V2.81.28 hid the same-color continent seam (and left baked `smallMap`/baseTiles on screen), so the PNG’s dark-red country ink showed through. Legal fill-lite did not read.
 
-Fix: phone Fit/opening skips baked map art (flat ocean + continent fill). Same-color fill bleed covers polygon gaps — not a dark outline. Dark country strokes stay hidden below zoom 0.85. Owned/legal is gold fill-lite + one faction hairline only (no `#3d2800` underlayer at Fit). Sea dest bind untouched. SCHEMA 11. GAME_VERSION V2.81.29. No production deploy.
+Fix: phone Fit/opening skips baked map art (flat ocean + continent fill). Same-color fill bleed covers polygon gaps — not a dark outline. Dark country strokes stay hidden below zoom 0.85. Owned/legal is gold fill-lite + gold hairline only (no `#3d2800` underlayer, no faction-red `#B22222` hairline at Fit — that read as worldwide country strokes). Sea dest bind untouched. SCHEMA 11. GAME_VERSION V2.81.29. No production deploy.
 
 ---
 

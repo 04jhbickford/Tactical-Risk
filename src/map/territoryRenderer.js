@@ -178,10 +178,11 @@ export class TerritoryRenderer {
     const dashColor = phoneLegalDashColor(this.phoneLegalEdgeColor);
     const worldFit = !Number.isFinite(z) || z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM;
     ctx.setLineDash(phoneLegalDashPattern(zoom));
-    // World Fit: one faction hairline on owned land only — no ink underlayer
-    // and no sea-zone strokes (those read as continent outlines).
+    // Opening / Fit: gold fill-lite + gold hairline on owned land only.
+    // Faction-red (#B22222) on ~31 scattered owned tiles reads as the
+    // worldwide dark-red country stroke James FAILed on ax9g4l281.
     if (worldFit) {
-      strokeOwned(dashColor, outline, { landsOnly: true });
+      strokeOwned(PHONE_LEGAL_EDGE_COLOR, outline, { landsOnly: true });
     } else {
       const inner = Math.max(outline * 0.45, outline - 2 / safeZ);
       strokeOwned(PHONE_LEGAL_EDGE_INK, outline, { landsOnly: true });
