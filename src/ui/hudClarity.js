@@ -14,11 +14,23 @@ export function resolveHudPhaseLabel({ phase, turnPhase } = {}) {
   return formatMobilePhaseLabel(phase, turnPhase) || 'Setup';
 }
 
+// One live AI beat — never YOUR TURN on an AI seat.
+export function formatAiTurnLine({ name, phase, status } = {}) {
+  if (status) return String(status);
+  const who = name || 'AI';
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return `${who} placing capital…`;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return `${who} deploying…`;
+  return `${who} thinking…`;
+}
+
 export function resolveHudWhoseTurn({
   isMultiplayer = false,
   localUserId = null,
   currentPlayerOderId = null,
   currentPlayerName = null,
+  currentPlayerIsAI = false,
+  aiStatus = null,
+  phase = null,
 } = {}) {
   const chrome = resolveTurnChrome({
     isMultiplayer,
@@ -27,6 +39,13 @@ export function resolveHudWhoseTurn({
     currentPlayerName,
   });
   const name = currentPlayerName || chrome.currentPlayerName;
+  if (currentPlayerIsAI) {
+    return {
+      ownSeat: false,
+      badge: null,
+      line: formatAiTurnLine({ name, phase, status: aiStatus }),
+    };
+  }
   return {
     ownSeat: chrome.ownSeat,
     badge: chrome.badge,
@@ -127,12 +146,17 @@ export function resolveHudClarity({
   hostName = 'Host',
   isHost = false,
   mobile = false,
+  currentPlayerIsAI = false,
+  aiStatus = null,
 } = {}) {
   const whose = resolveHudWhoseTurn({
     isMultiplayer,
     localUserId,
     currentPlayerOderId,
     currentPlayerName,
+    currentPlayerIsAI,
+    aiStatus,
+    phase,
   });
   return {
     whoseTurn: whose.line,

@@ -1,7 +1,7 @@
 // Unit checks for V2.61 tablet chrome (tooltip clamp predicate)
-// plus V2.63 phone-shell predicates. iPhone shell is ≤480px, or landscape
-// phone (min side ≤480 and long side <1024). The 481–900 tablet band
-// (no height) and desktop windows stay on their existing trees.
+// plus V2.63/V2.81 phone-shell predicates. iPhone shell is ≤640px, or
+// landscape phone (min side ≤640 and long side <1024). The 641–900
+// tablet band (no height) and desktop windows stay on their existing trees.
 // Run: node tools/test-tablet-chrome.mjs
 
 import { readFileSync } from 'fs';
@@ -83,10 +83,24 @@ const {
   resolvePhoneStickyUnitType,
   shouldAutoCommitPhoneCapital,
   shouldShowPhoneSetupUndo,
+  shouldShowSelectUnitsCta,
   PHASE_HINTS,
 } = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_PHASES, TURN_PHASES } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
+const { formatAiTurnLine, resolveHudWhoseTurn } =
+  await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
+const { shouldIgnoreFactionCardToggle, LOBBY_SELECT_TOGGLE_GUARD_MS } =
+  await import(pathToFileURL(join(root, 'src/ui/lobby.js')));
+
+const PHONE_CSS_MARKER = 'V2.81 phone chrome tree';
+function phoneCssParts(css) {
+  const idx = css.indexOf(PHONE_CSS_MARKER);
+  return {
+    beforePhone: idx >= 0 ? css.slice(0, idx) : css,
+    phoneBlock: idx >= 0 ? css.slice(idx) : '',
+  };
+}
 
 let failures = 0;
 const check = (label, cond) => {
@@ -150,20 +164,24 @@ console.log('=== clampTooltipToMapArea: map too narrow to fit ===');
   check('returns null so the tooltip is dismissed', pos === null);
 }
 
-console.log('=== V2.63 mobile shell breakpoint (480 iPhone / 481–900 tablet / ≥901 desktop) ===');
-check('breakpoint is 480', MOBILE_SHELL_MAX_WIDTH === 480);
+console.log('=== V2.81 mobile shell breakpoint (640 iPhone+500 / 641–900 tablet / ≥901 desktop) ===');
+check('breakpoint is 640', MOBILE_SHELL_MAX_WIDTH === 640);
 check('tablet band still ends at 900', TABLET_CHROME_MAX_WIDTH === 900);
 check('desktop floor is 901', DESKTOP_MIN_WIDTH === 901);
 check('phone long-side ceiling is below iPad 1024', PHONE_MAX_LONG_SIDE === 1024);
 check('390px iPhone → mobile shell', shouldUseMobileShell(390) === true);
 check('480px → mobile shell', shouldUseMobileShell(480) === true);
-check('481px tablet band → no mobile shell', shouldUseMobileShell(481) === false);
+check('500px Chrome box → mobile shell (no 280px rail)', shouldUseMobileShell(500) === true);
+check('520px floor → mobile shell', shouldUseMobileShell(520) === true);
+check('640px → mobile shell', shouldUseMobileShell(640) === true);
+check('641px tablet band → no mobile shell', shouldUseMobileShell(641) === false);
 check('772px V2.61 tablet → no mobile shell', shouldUseMobileShell(772) === false);
 check('900px tablet ceiling → no mobile shell', shouldUseMobileShell(900) === false);
 check('901px desktop → no mobile shell', shouldUseMobileShell(901) === false);
 check('1280×800 desktop → no mobile shell', shouldUseMobileShell(1280) === false);
 check('390/480 still phone', shouldUseMobileShell(390, 480) === true);
-check('481 with no height still tablet', shouldUseMobileShell(481) === false);
+check('500 with no height is phone, not tablet split', shouldUseMobileShell(500) === true);
+check('641 with no height still tablet', shouldUseMobileShell(641) === false);
 check('772 with no height still tablet', shouldUseMobileShell(772) === false);
 check('900 with no height still tablet', shouldUseMobileShell(900) === false);
 check('iPhone landscape 844×390 → phone', shouldUseMobileShell(844, 390) === true);
@@ -183,6 +201,12 @@ check('iPad landscape 1024×768 not phone', shouldUseMobileShell(1024, 768) === 
   }, contains(name) { return this.on.has(name); } } };
   applyMobileShellClass(390, root);
   check('apply at 390 sets mobile-shell', root.classList.contains('mobile-shell'));
+  applyMobileShellClass(500, root);
+  check('apply at 500 sets mobile-shell (no tablet rail)', root.classList.contains('mobile-shell'));
+  applyMobileShellClass(640, root);
+  check('apply at 640 sets mobile-shell', root.classList.contains('mobile-shell'));
+  applyMobileShellClass(641, root);
+  check('apply at 641 clears mobile-shell (tablet band)', !root.classList.contains('mobile-shell'));
   applyMobileShellClass(772, root);
   check('apply at 772 clears mobile-shell (tablet band)', !root.classList.contains('mobile-shell'));
   applyMobileShellClass(1280, root);
@@ -253,13 +277,13 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const unscopedHud = css.match(/^#hud \{[\s\S]*?^\}/m);
   check('unscoped #hud is still 48px', !!unscopedHud && /height:\s*48px/.test(unscopedHud[0]));
-  check('phone layout is inside max-width: 480px',
-    /@media \(max-width:\s*480px\)/.test(css));
+  check('phone layout is inside max-width: 640px',
+    /@media \(max-width:\s*640px\)/.test(css) && css.includes(PHONE_CSS_MARKER));
   check('no leftover max-width: 767px phone gate',
     !/@media \(max-width:\s*767px\)/.test(css));
   check('unscoped zoom still parks left of the 320px panel',
     /#zoom-controls \{[\s\S]*?right:\s*calc\(320px \+ 12px\)/.test(css));
-  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  const { beforePhone } = phoneCssParts(css);
   check('phone 100dvh is not unscoped on html/body',
     !/html,\s*body \{[^}]*100dvh/.test(beforePhone));
   check('V2.61 tablet 900px block still hides the legend',
@@ -268,10 +292,10 @@ console.log('=== V2.63 CSS is phone-scoped; tablet 481–900 and desktop ≥901 
     /@media \(max-width: 900px\)[\s\S]*\.hud-phase-name \{\s*font-size:\s*9px/.test(beforePhone));
   check('V2.61 tablet 900px block still slims the rail to 280px',
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
-  const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';
+  const { phoneBlock } = phoneCssParts(css);
   check('phone phase identity is ≥11px',
     /\.hud-mobile-phase \{[\s\S]*?font-size:\s*(1[1-9]|[2-9]\d)px/.test(phoneBlock));
-  check('phone tray peek class is in the 480 block',
+  check('phone tray peek class is in the 640 block',
     /pp-tray-peek/.test(phoneBlock) && /pp-tray-hint/.test(phoneBlock));
   check('phone peek tray is height:auto, not a 42/50dvh sheet',
     /#sidebar\.player-panel--peek[\s\S]*?max-height:\s*none/.test(phoneBlock));
@@ -374,11 +398,12 @@ check('territory.center is preferred for fit points',
 console.log('=== V2.65 phone tooltip dismiss + legal-land highlight ===');
 check('phone hides tooltip on menu open',
   shouldHidePhoneTooltipOn({ mobile: true, reason: 'menu-open' }) === true);
-check('phone hides tooltip on tap-away / fit / phase / turn',
+check('phone hides tooltip on tap-away / fit / phase / turn / commit',
   shouldHidePhoneTooltipOn({ mobile: true, reason: 'tap-away' })
   && shouldHidePhoneTooltipOn({ mobile: true, reason: 'fit' })
   && shouldHidePhoneTooltipOn({ mobile: true, reason: 'phase-change' })
-  && shouldHidePhoneTooltipOn({ mobile: true, reason: 'turn-change' }));
+  && shouldHidePhoneTooltipOn({ mobile: true, reason: 'turn-change' })
+  && shouldHidePhoneTooltipOn({ mobile: true, reason: 'commit' }));
 check('desktop does not auto-hide tooltip on menu open',
   shouldHidePhoneTooltipOn({ mobile: false, reason: 'menu-open' }) === false);
 check('phone second tap on the same territory toggles off',
@@ -502,7 +527,7 @@ console.log('=== V2.68 Fit fills the phone frame; gold is an edge ===');
     && !/0\.55/.test(highlight[0])
     && !/shadowBlur/.test(highlight[0]));
   const css = readFileSync(join(root, 'style.css'), 'utf8');
-  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  const { beforePhone } = phoneCssParts(css);
   check('tablet 481–900 rail is still 280px after V2.68',
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
   check('unscoped tooltip z-index stays 100 (V2.66 visibility path untouched)',
@@ -543,7 +568,7 @@ check('phone peek still uses PHASE_HINTS when they exist',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_HINTS[TURN_PHASES.COMBAT_MOVE]);
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
-  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  const { beforePhone } = phoneCssParts(css);
   check('V2.67 peek classes are not in the tablet 900 / desktop tree',
     !/#sidebar\.player-panel--peek/.test(beforePhone)
     && !/\.phone-peek-chip \{/.test(beforePhone)
@@ -643,8 +668,8 @@ check('desktop setup land tap still applies',
   check('inspect chip parks under the HUD, not on the tap',
     edge.top >= 56 && edge.left >= 0 && edge.left + 180 <= 390 + 1);
   const css = readFileSync(join(root, 'style.css'), 'utf8');
-  const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';
-  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  const { phoneBlock } = phoneCssParts(css);
+  const { beforePhone } = phoneCssParts(css);
   check('phone inspect edge card is in the 480 block only',
     /territory-tooltip--edge/.test(phoneBlock)
     && /max-height:\s*88px/.test(phoneBlock)
@@ -722,7 +747,7 @@ console.log('=== V2.70 phone Fit is a regional window (never one chip, never pos
     padded.maxX - padded.minX >= PHONE_FIT_MIN_REGION_W - 0.01
     && padded.maxY - padded.minY >= PHONE_FIT_MIN_REGION_H - 0.01);
   const css = readFileSync(join(root, 'style.css'), 'utf8');
-  const beforePhone = css.split('@media (max-width: 480px)')[0];
+  const { beforePhone } = phoneCssParts(css);
   check('tablet 481–900 rail is still 280px after V2.70',
     /@media \(max-width: 900px\)[\s\S]*\.player-panel \{\s*width:\s*280px/.test(beforePhone));
   check('unscoped tooltip z-index stays 100 after V2.70',
@@ -811,7 +836,7 @@ check('phone placement hints say Tap, desktop stay Click',
   && phonePointerHint('Click a territory you own to place units', { mobile: false }) === 'Click a territory you own to place units');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
-  const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';
+  const { phoneBlock } = phoneCssParts(css);
   check('occupant color chip is 44–48px on the seated card',
     /\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?(width|min-width):\s*48px[\s\S]*?(height|min-height):\s*48px/.test(phoneBlock));
   check('occupant Human/AI select is 44–48px on the seated card',
@@ -831,7 +856,36 @@ check('phone placement hints say Tap, desktop stay Click',
     && /html\.mobile-shell\.map-tools-open #zoom-controls/.test(phoneBlock));
   check('phone body Deploy is hidden so the peek CTA is the on-screen verb',
     /html\.mobile-shell \.pp-placement-actions \{\s*display:\s*none/.test(phoneBlock));
+  check('Deploy at 0 is a visible ghost Select units, not a live blue',
+    /pp-select-units/.test(phoneBlock));
 }
+check('inspect≠commit still holds — tap never auto-places capital',
+  shouldAutoCommitPhoneCapital({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
+  }) === false);
+check('Select units CTA only when phone deploy queue is empty',
+  shouldShowSelectUnitsCta({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 0, showDone: false,
+  }) === true
+  && shouldShowSelectUnitsCta({
+    mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 2, showDone: false,
+  }) === false
+  && shouldShowSelectUnitsCta({
+    mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, totalQueued: 0, showDone: false,
+  }) === false);
+check('phone tooltip hides on capital commit',
+  shouldHidePhoneTooltipOn({ mobile: true, reason: 'commit' }) === true);
+check('AI seat is not YOUR TURN',
+  formatAiTurnLine({ name: 'Germans', phase: GAME_PHASES.CAPITAL_PLACEMENT })
+    === 'Germans placing capital…'
+  && !/YOUR TURN/.test(resolveHudWhoseTurn({
+    currentPlayerName: 'Germans',
+    currentPlayerIsAI: true,
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }).line));
+check('native AI option click does not toggle the seated card',
+  shouldIgnoreFactionCardToggle({ now: 1000, ignoreUntil: 1000 + LOBBY_SELECT_TOGGLE_GUARD_MS }) === true
+  && shouldIgnoreFactionCardToggle({ now: 2000, ignoreUntil: 1000 }) === false);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed`);

@@ -16925,11 +16925,12 @@ html, body {
   }
 }
 
-/* ---------- V2.64 phone chrome tree (≤480px) ----------
+/* ---------- V2.81 phone chrome tree (≤640px) ----------
    Separate phone UX — not the desktop lobby/HUD squeezed. The V2.61
-   tablet band (481–900) and desktop ≥901 stay on their existing trees.
+   tablet band is 641–900; desktop ≥901 stay on their existing trees.
+   500 CSS-px Chrome boxes must keep this bottom tray, not the 280px rail.
    Phone rules live only in this query and/or html.mobile-shell. */
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   html,
   body {
     height: 100dvh;
@@ -17540,6 +17541,21 @@ html, body {
   .pp-confirm-btn.disabled,
   .pp-confirm-btn:disabled {
     display: none;
+  }
+
+  /* Deploy at 0 units must not look like a live blue no-op. */
+  html.mobile-shell .pp-confirm-btn.pp-select-units,
+  html.mobile-shell .pp-confirm-btn.pp-select-units:disabled,
+  html.mobile-shell .pp-confirm-btn.pp-select-units.disabled {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+    background: rgba(80, 80, 80, 0.55);
+    border-color: rgba(140, 140, 140, 0.4);
+    box-shadow: none;
+    pointer-events: none;
+    cursor: default;
   }
 
   /* Max lives with the unit-count row, not next to zoom */

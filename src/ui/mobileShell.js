@@ -1,17 +1,18 @@
-// Phone chrome (V2.63/V2.64). Visual split only.
-// iPhone shell is max-width: 480px so the V2.61 tablet band (481–900)
-// and desktop ≥901px stay on their existing trees. Phone CSS lives in
-// @media (max-width: 480px) and html.mobile-shell.
-// Landscape phones are 667–956 wide × ~375–440 tall — width-only 480px
-// would drop them into the tablet/desktop tree. Use the short side for
-// phone (min ≤480) and keep iPad/desktop out (max <1024). Width-only
-// 481–900 stays tablet; 1280×400 / 1280×800 stay desktop. No rules /
-// combat / schema changes.
+// Phone chrome (V2.63/V2.81). Visual split only.
+// iPhone shell is max-width: 640px so a ~500 CSS-px Chrome box and
+// iPhone-narrow both get the bottom tray — not the 280px tablet rail.
+// The V2.61 tablet band is now 641–900; desktop ≥901 stays on its tree.
+// Phone CSS lives in @media (max-width: 640px) and html.mobile-shell.
+// Landscape phones are 667–956 wide × ~375–440 tall — width-only 640px
+// would drop Plus/Pro Max landscape into the tablet tree. Use the short
+// side for phone (min ≤640) and keep iPad/desktop out (max <1024).
+// Width-only 641–900 stays tablet; 1280×400 / 1280×800 stay desktop.
+// No rules / combat / schema changes.
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { MAP_WIDTH, MAP_HEIGHT } from '../map/camera.js';
 
-export const MOBILE_SHELL_MAX_WIDTH = 480;
+export const MOBILE_SHELL_MAX_WIDTH = 640;
 export const MOBILE_SHELL_QUERY = `(max-width: ${MOBILE_SHELL_MAX_WIDTH}px)`;
 export const TABLET_CHROME_MAX_WIDTH = 900;
 export const DESKTOP_MIN_WIDTH = 901;

@@ -17,6 +17,7 @@ const PHONE_TOOLTIP_HIDE_REASONS = new Set([
   'fit',
   'resize-leave-phone',
   'auto',
+  'commit',
 ]);
 
 export function shouldHidePhoneTooltipOn({ mobile, reason } = {}) {

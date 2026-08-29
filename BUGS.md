@@ -2,11 +2,13 @@
 
 ---
 
-## 8.29.26 — V2.81 iPhone polish (390 play of V2.80)
+## 8.29.26 — V2.81 iPhone polish (390 play of V2.80 + 500px addendum)
 
 James + CoS FACT from live 390 of production V2.80: seated occupant/color chips and Teams / Starting IPCs were below 44pt; Place Capital HUD triple-repeated the phase plus a stale “Last action: Germans' turn begins” and “Click:” on a phone; +/−/Fit sat on the art; Undo was the blue primary and Confirm stacked under it in the home-indicator zone; first-expand Units tabs / body Deploy sat off an 844 viewport.
 
-Phone-only CSS/IA: enlarge the existing Human/AI + color chip and Teams/IPCs to 44–48px; collapse `#hud-clarity` to the one HUD phase chip; Tap copy; hide stale turn-begins last-action; Confirm is the thumb primary, Undo ghost in one row; Map tools on-demand off the board; hide empty capital Units tabs and the body Deploy duplicate. SCHEMA 11. GAME_VERSION V2.81. No rules / map / combat / MP / production deploy.
+Phone-only CSS/IA: enlarge the existing Human/AI + color chip and Teams/IPCs to 44–48px; collapse `#hud-clarity` to the one HUD phase chip; Tap copy; hide stale turn-begins last-action; Confirm is the thumb primary, Undo ghost in one row; Map tools on-demand off the board; hide empty capital Units tabs and the body Deploy duplicate.
+
+8.29 addendum (live V2.80 at ~500 CSS px): the 280px side rail came back because the phone floor was 480. Phone bottom-tray / no-rail is now ≤640 (JS + CSS) so 390 and the 500 Chrome floor both keep a usable map; tablet split is 641–900. Same pass: hide ticker at 500; Tap copy; Deploy at 0 is ghost “Select units”; one Deploy CTA; hide tooltip on commit / HUD pointerdown; ignore faction-card toggle after native `<select>`; one AI beat (“Germans placing capital…”, never YOUR TURN on an AI seat); flush HUD/panel/canvas on commit; Undo undoes a staged queue. inspect≠commit kept. SCHEMA 11. GAME_VERSION V2.81. No rules / map / combat / MP / production deploy.
 
 ---
 

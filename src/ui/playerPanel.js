@@ -273,6 +273,19 @@ export function shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta } = {}) {
   return true;
 }
 
+// Deploy at 0 units is a ghost "Select units" — not a live blue no-op.
+export function shouldShowSelectUnitsCta({
+  mobile = false,
+  phase = null,
+  totalQueued = 0,
+  showDone = false,
+} = {}) {
+  return !!mobile
+    && phase === GAME_PHASES.UNIT_PLACEMENT
+    && Number(totalQueued) === 0
+    && !showDone;
+}
+
 // After a place, keep the type. If it is exhausted (or never set), peek
 // the first remaining unit so the next land tap places with no tray trip.
 export function resolvePhoneStickyUnitType(selectedUnitType, unitsToPlace, unitDefs = null) {
@@ -489,6 +502,14 @@ export class PlayerPanel {
       this._renderRaf = 0;
       this._render();
     });
+  }
+
+  flushRender() {
+    if (this._renderRaf) {
+      cancelAnimationFrame(this._renderRaf);
+      this._renderRaf = 0;
+    }
+    this._render();
   }
 
   _onPanelClick(e) {
@@ -990,10 +1011,29 @@ export class PlayerPanel {
     // illegal/disabled actions stay hidden (not greyed over another green).
     // Peek stack: phase hint (own row) + unit/action chips + thumb-zone CTA.
     const mobile = isMobileShell();
+    if (mobile && phase === GAME_PHASES.UNIT_PLACEMENT && buttons.length === 0) {
+      const placeUX = this._getInitialPlacementUX(player);
+      if (shouldShowSelectUnitsCta({
+        mobile: true,
+        phase,
+        totalQueued: placeUX.totalQueued || 0,
+        showDone: !!placeUX.ux?.showDone,
+      })) {
+        buttons.push({
+          action: 'confirm-placement',
+          label: 'Select units',
+          disabled: true,
+          primary: true,
+          selectUnits: true,
+        });
+      }
+    }
     let peekHint = '';
     let peekRow = '';
     if (mobile) {
-      buttons = pickMobilePrimaryButtons(buttons);
+      const pendingSelect = buttons.find(b => b.selectUnits);
+      buttons = pickMobilePrimaryButtons(buttons.filter(b => !b.selectUnits));
+      if (pendingSelect && buttons.length === 0) buttons = [pendingSelect];
       const warningText = warningHtml ? warningHtml.replace(/<[^>]+>/g, '').trim() : '';
       const trayOwnsHint = shouldUsePhonePlacementTray({ mobile: true, phase }) && buttons.length === 0;
       peekHint = shouldShowPhoneSetupPeekHint({ phase, hasPrimaryCta: buttons.length > 0 })
@@ -1022,7 +1062,8 @@ export class PlayerPanel {
     html += `<div class="pp-bottom-buttons">`;
 
     if (mobile) {
-      const canUndoPlacement = !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
+      const canUndoPlacement = queuedCount(this.placementQueue || {}) > 0
+        || !!(this.gameState.placementHistory || []).some(p => p.owner === player.id);
       const canUndoCapital = !!this.gameState.canUndoLastCapital?.();
       const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
       const undo = resolveUndoAction({
@@ -1054,10 +1095,11 @@ export class PlayerPanel {
       const disabledClass = btn.disabled ? 'disabled' : '';
       const attackClass = btn.isAttack ? 'attack' : '';
       const undoableClass = btn.undoable ? 'undoable' : '';
+      const selectUnitsClass = btn.selectUnits ? 'pp-select-units' : '';
       const dataAttrs = btn.territory ? `data-territory="${btn.territory}"` : '';
 
       html += `
-        <button class="pp-confirm-btn ${disabledClass} ${attackClass} ${undoableClass}"
+        <button class="pp-confirm-btn ${disabledClass} ${attackClass} ${undoableClass} ${selectUnitsClass}"
                 data-action="${btn.action}" ${dataAttrs} ${btn.disabled ? 'disabled' : ''}>
           ${btn.label}
         </button>`;
@@ -1271,7 +1313,7 @@ export class PlayerPanel {
     // Phone peek already owns this line — do not repeat it in the body.
     if (phase === GAME_PHASES.CAPITAL_PLACEMENT) {
       if (!isMobileShell() && (!this.selectedTerritory || this.selectedTerritory.isWater)) {
-        html += `<div class="pp-hint">Click one of your territories to place your capital</div>`;
+        html += `<div class="pp-hint">${phonePointerHint('Click one of your territories to place your capital', { mobile: isMobileShell() })}</div>`;
       }
     }
 
@@ -1882,7 +1924,7 @@ export class PlayerPanel {
   }
 
   _getPhaseHint(phase, turnPhase) {
-    return resolvePhaseHint(phase, turnPhase);
+    return phonePointerHint(resolvePhaseHint(phase, turnPhase), { mobile: isMobileShell() });
   }
 
   _getContrastColor(hexColor) {
@@ -3539,6 +3581,21 @@ export class PlayerPanel {
         if ((action === 'undo-placement' || action === 'undo-capital')
           && !shouldApplyUndoAction({ action, lockAction })) {
           return;
+        }
+        if (action === 'undo-placement' && queuedCount(this.placementQueue || {}) > 0) {
+          const lastType = this._lastQueueUnitType
+            || Object.keys(this.placementQueue).find(k => Number(this.placementQueue[k]) > 0);
+          if (lastType) {
+            this.placementQueue = applyPlaceQueueDelta({
+              queue: this.placementQueue || {},
+              unitType: lastType,
+              delta: -1,
+              available: 999,
+              slotsRemaining: 999,
+            });
+            this._scheduleRender();
+            return;
+          }
         }
 
         if (action === 'finish-placement') {

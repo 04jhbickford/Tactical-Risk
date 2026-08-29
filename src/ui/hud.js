@@ -3,7 +3,7 @@
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag } from './mobileShell.js';
-import { resolveHudClarity, shouldShowHudTicker } from './hudClarity.js';
+import { resolveHudClarity, shouldShowHudTicker, formatAiTurnLine } from './hudClarity.js';
 
 export class HUD {
   constructor() {
@@ -25,6 +25,7 @@ export class HUD {
     }
     this.actionLog = null;
     this.lastClick = null;
+    this.aiStatus = null;
     this.clarityCtx = {
       localUserId: null,
       gameCode: null,
@@ -35,14 +36,22 @@ export class HUD {
     };
     this._render();
 
-    // Close menu when clicking outside
+    // Close menu when clicking outside. Ignore the same tap that opened it
+    // (native option lists / leftover tooltips used to eat the first tap).
     document.addEventListener('click', (e) => {
-      if (this.menuOpen && !e.target.closest('.hud-menu-container') && !e.target.closest('.phone-menu-sheet')) {
-        this.menuOpen = false;
-        this.menuTab = null;
-        this._updateMenuState();
-      }
+      if (!this.menuOpen) return;
+      if (e.target.closest('.hud-menu-container') || e.target.closest('.phone-menu-sheet')) return;
+      if (Date.now() < (this._ignoreMenuCloseUntil || 0)) return;
+      this.menuOpen = false;
+      this.menuTab = null;
+      this._updateMenuState();
     });
+  }
+
+  setAIStatus(message) {
+    this.aiStatus = message || null;
+    if (!this.gameState?.currentPlayer?.isAI) this.aiStatus = null;
+    this._render();
   }
 
   setMenuTabProvider(fn) {
@@ -86,6 +95,9 @@ export class HUD {
   }
 
   _render() {
+    if (this.gameState && !this.gameState.currentPlayer?.isAI) {
+      this.aiStatus = null;
+    }
     if (isMobileShell()) {
       this._renderMobile();
       return;
@@ -201,13 +213,27 @@ export class HUD {
     const player = this.gameState?.currentPlayer;
     const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY && player;
     const phaseName = inGame
-      ? formatMobilePhaseLabel(this.gameState.phase, this.gameState.turnPhase)
+      ? (player.isAI
+        ? formatAiTurnLine({
+          name: player.name,
+          phase: this.gameState.phase,
+          status: this.aiStatus,
+        })
+        : formatMobilePhaseLabel(this.gameState.phase, this.gameState.turnPhase))
       : '';
     const flagSrc = inGame && player.flag ? `assets/flags/${player.flag}` : null;
 
     let identity = `<span class="hud-title">Tactical Risk</span>`;
     if (inGame) {
-      identity = `
+      identity = player.isAI
+        ? `
+        <div class="hud-mobile-identity">
+          ${flagSrc
+            ? `<img src="${flagSrc}" class="hud-mobile-flag" alt="">`
+            : `<span class="hud-mobile-swatch" style="background:${player.color}"></span>`}
+          <span class="hud-mobile-phase">${phaseName}</span>
+        </div>`
+        : `
         <div class="hud-mobile-identity">
           ${flagSrc
             ? `<img src="${flagSrc}" class="hud-mobile-flag" alt="">`
@@ -310,6 +336,8 @@ export class HUD {
       lastActionEntry: last,
       lastClick: this.lastClick,
       mobile: isMobileShell(),
+      currentPlayerIsAI: !!player?.isAI,
+      aiStatus: this.aiStatus,
       deployedThisRound: gs?.unitsPlacedThisRound || 0,
       limit: gs?.getUnitsPerRoundLimit?.() || 6,
       poolRemaining: player ? (gs.getTotalUnitsToPlace?.(player.id) || 0) : 0,
@@ -363,8 +391,12 @@ export class HUD {
   _bindEvents() {
     // Menu toggle button
     this.el.querySelectorAll('[data-action="toggle-menu"]').forEach((menuBtn) => {
+      menuBtn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
       menuBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        this._ignoreMenuCloseUntil = Date.now() + 400;
         this.menuOpen = !this.menuOpen;
         if (!this.menuOpen) this.menuTab = null;
         if (this.menuOpen) this.mapToolsOpen = false;

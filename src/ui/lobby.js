@@ -10,6 +10,13 @@ import { GAME_VERSION } from '../version.js';
 import { isMobileShell } from './mobileShell.js';
 export { GAME_VERSION };
 
+// Native <select> option taps land on the card under the popup.
+export const LOBBY_SELECT_TOGGLE_GUARD_MS = 750;
+
+export function shouldIgnoreFactionCardToggle({ now, ignoreUntil } = {}) {
+  return Number(now) < Number(ignoreUntil || 0);
+}
+
 // AI Difficulty levels
 const AI_DIFFICULTIES = [
   { id: 'human', name: 'Human', desc: 'Local player' },
@@ -52,6 +59,7 @@ export class Lobby {
     this.teamsEnabled = false;
     this.startingIPCs = 80;
     this.el = null;
+    this._ignoreCardToggleUntil = 0;
     this._create();
   }
 
@@ -139,7 +147,7 @@ export class Lobby {
       if (!this.playerColors[p.id]) {
         this.playerColors[p.id] = { color: p.color || defaultColor.color, lightColor: p.lightColor || defaultColor.light };
       }
-      if (!this.playerAI[p.id]) this.playerAI[p.id] = 'human';
+      if (this.playerAI[p.id] == null) this.playerAI[p.id] = 'human';
     });
     return factions;
   }
@@ -528,6 +536,10 @@ export class Lobby {
         if (e.target.closest('.ai-select')) return;
         if (e.target.closest('.color-picker')) return;
         if (e.target.closest('.team-btn')) return;
+        if (shouldIgnoreFactionCardToggle({
+          now: Date.now(),
+          ignoreUntil: this._ignoreCardToggleUntil,
+        })) return;
         this._togglePlayer(card.dataset.player);
       });
     });
@@ -574,8 +586,17 @@ export class Lobby {
 
     // AI selects
     this.el.querySelectorAll('.ai-select').forEach(select => {
+      const lockCard = () => {
+        this._ignoreCardToggleUntil = Date.now() + LOBBY_SELECT_TOGGLE_GUARD_MS;
+      };
+      select.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+        lockCard();
+      });
+      select.addEventListener('mousedown', (e) => e.stopPropagation());
       select.addEventListener('change', (e) => {
         this.playerAI[e.target.dataset.player] = e.target.value;
+        lockCard();
       });
       select.addEventListener('click', (e) => e.stopPropagation());
     });

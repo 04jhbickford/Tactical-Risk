@@ -262,6 +262,10 @@ async function init() {
 
   hud.setMenuTabProvider((tab) => playerPanel.renderMenuTabHTML(tab));
   hud.setOnMenuOpen(() => hidePhoneTooltips('menu-open'));
+  hud.el?.addEventListener('pointerdown', () => {
+    tooltip.hide();
+    unitTooltip.hide();
+  }, true);
 
   document.addEventListener('pointerdown', (e) => {
     if (!isMobileShell() || !tooltip.isVisible) return;
@@ -341,9 +345,14 @@ async function init() {
         const placingPlayer = gameState.currentPlayer;
         if (gameState.placeCapital(data.territory)) {
           actionLog.logCapitalPlacement(data.territory, placingPlayer);
-          camera.dirty = true;
+          tooltip.hide();
+          unitTooltip.hide();
+          hidePhoneTooltips('commit');
           selectedTerritory = null;
           playerPanel.setSelectedTerritory(null);
+          playerPanel.flushRender();
+          hud._render();
+          camera.dirty = true;
           notifyTurnSwap(placingPlayer, gameState.currentPlayer);
           if (syncManager) await syncManager.pushStateNow();
         }
@@ -522,6 +531,11 @@ async function init() {
           }
           selectedTerritory = keep;
           playerPanel.setSelectedTerritory(keep || playerPanel.selectedTerritory);
+          tooltip.hide();
+          unitTooltip.hide();
+          hidePhoneTooltips('commit');
+          playerPanel.flushRender();
+          hud._render();
           camera.dirty = true;
           return result;
         }
@@ -1330,7 +1344,8 @@ async function init() {
         }
       });
       aiController.setOnStatusUpdate((message) => {
-        console.log('[AI Status]', message);
+        hud.setAIStatus(message);
+        camera.dirty = true;
       });
       // Authority gate: in multiplayer only the host (or the offline-host
       // failover client) runs AI turns. Bug 2: additionally, unless the game is
@@ -2354,7 +2369,10 @@ async function init() {
   // handling is untouched. Pinch-zoom enabled on the main map only.
   initTouchInput(canvas, { enablePinch: true });
   initTouchInput(document.getElementById('minimap'));
-  initZoomControls(canvas, { onFit: fitPhoneCamera });
+  initZoomControls(canvas, {
+    onFit: fitPhoneCamera,
+    onZoom: () => { camera.dirty = true; },
+  });
 
   canvas.addEventListener('mouseleave', () => {
     tooltip.hide();

@@ -138,6 +138,8 @@ const {
   resolveHostAwayBanner,
   shouldShowHudTicker,
   shouldShowHudLastAction,
+  formatAiTurnLine,
+  resolveHudWhoseTurn,
 } = await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
 
 let failures = 0;
@@ -663,6 +665,19 @@ console.log('=== James lock HUD: whose turn / last action / click landed ===');
     && formatHudClickLanded({ landed: true, label: 'Ukraine' }, { mobile: true }) === 'Tap landed: Ukraine');
   check('desktop ticker still says Click landed',
     formatHudClickLanded({ landed: true, label: 'East Canada' }) === 'Click landed: East Canada');
+  check('AI capital beat is not YOUR TURN',
+    formatAiTurnLine({ name: 'Germans', phase: GAME_PHASES.CAPITAL_PLACEMENT })
+      === 'Germans placing capital…'
+    && resolveHudWhoseTurn({
+      currentPlayerName: 'Germans',
+      currentPlayerIsAI: true,
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    }).line === 'Germans placing capital…'
+    && resolveHudClarity({
+      currentPlayerName: 'Germans',
+      currentPlayerIsAI: true,
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    }).whoseTurn === 'Germans placing capital…');
 }
 
 console.log('=== Undo / capital / leave row ===');
