@@ -942,7 +942,8 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
 
   html.board-skin.mobile-shell .rail-seat {
     min-width: 0 !important;
-    flex: 1 1 auto !important;
+    flex: 0 1 auto !important;
+    max-width: calc(100vw - 168px) !important;
     overflow: visible !important;
   }
 
@@ -957,7 +958,8 @@ html.board-skin .table-edge-card .pp-bottom-actions .pp-action-btn {
   html.board-skin.mobile-shell .pp-rail-actions,
   html.board-skin.mobile-shell .table-edge-card .pp-bottom-actions {
     top: 0 !important;
-    right: 8px !important;
+    right: 44px !important;
+    z-index: 72 !important;
     left: auto !important;
     height: 44px !important;
     max-height: 44px !important;
@@ -1928,6 +1930,7 @@ html.board-skin .rail-seat {
   border: 1px solid #1a1008;
   color: #f4e6c0;
   font-family: Cinzel, serif;
+  pointer-events: none;
 }
 
 html.board-skin .rail-seat img {
