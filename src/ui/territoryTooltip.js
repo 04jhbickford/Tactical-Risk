@@ -68,6 +68,12 @@ export function shouldApplyPhoneSetupTapOnPointerDown({ mobile, phase } = {}) {
   return !!mobile && isPhoneSetupPlacementPhase(phase);
 }
 
+// First tap after Start / handoff / a chrome reflow often misses because
+// the camera still has the previous frame's size. Refit and retry once.
+export function shouldRefitPhoneSetupHit({ mobile, phase, hasHit } = {}) {
+  return !!mobile && isPhoneSetupPlacementPhase(phase) && !hasHit;
+}
+
 // Noun first on phone setup. Same handlers; this only decides whether a
 // land tap may change selection / place. Inspect is long-press, not a tap.
 // Place Capital: only owned land applies — a miss / water / unowned tap

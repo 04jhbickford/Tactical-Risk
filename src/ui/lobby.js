@@ -13,7 +13,11 @@ export { GAME_VERSION };
 // Native <select> option taps land on the card under the popup.
 export const LOBBY_SELECT_TOGGLE_GUARD_MS = 750;
 
-export function shouldIgnoreFactionCardToggle({ now, ignoreUntil } = {}) {
+export function shouldIgnoreFactionCardToggle({
+  now, ignoreUntil, playerId = null, lockedPlayerId = null,
+} = {}) {
+  if (Number(now) >= Number(ignoreUntil || 0)) return false;
+  if (lockedPlayerId && playerId && lockedPlayerId !== playerId) return false;
   return Number(now) < Number(ignoreUntil || 0);
 }
 
@@ -66,6 +70,7 @@ export class Lobby {
     this.startingIPCs = 80;
     this.el = null;
     this._ignoreCardToggleUntil = 0;
+    this._ignoreCardTogglePlayer = null;
     this._docClickBound = false;
     this._create();
   }
@@ -552,9 +557,12 @@ export class Lobby {
         if (shouldIgnoreFactionCardToggle({
           now: Date.now(),
           ignoreUntil: this._ignoreCardToggleUntil,
+          playerId: card.dataset.player,
+          lockedPlayerId: this._ignoreCardTogglePlayer,
         })) return;
         if (shouldSeatFactionOnPointerDown({ mobile: isMobileShell() })) {
           this._ignoreCardToggleUntil = Date.now() + LOBBY_SELECT_TOGGLE_GUARD_MS;
+          this._ignoreCardTogglePlayer = card.dataset.player;
         }
         this._togglePlayer(card.dataset.player);
       };
@@ -616,6 +624,7 @@ export class Lobby {
     this.el.querySelectorAll('.ai-select').forEach(select => {
       const lockCard = () => {
         this._ignoreCardToggleUntil = Date.now() + LOBBY_SELECT_TOGGLE_GUARD_MS;
+        this._ignoreCardTogglePlayer = select.dataset.player;
       };
       select.addEventListener('pointerdown', (e) => {
         e.stopPropagation();

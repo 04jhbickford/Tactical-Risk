@@ -17798,9 +17798,12 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    overflow: visible;
+    position: relative;
   }
 
-  .lobby-phone-faction {
+  .lobby-phone-faction,
+  .player-card.modern.lobby-phone-faction {
     flex: 0 0 auto;
     flex-shrink: 0;
     height: auto;
@@ -17810,6 +17813,7 @@ html, body {
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(255, 255, 255, 0.04);
+    overflow: visible;
   }
 
   .lobby-phone-faction:hover,

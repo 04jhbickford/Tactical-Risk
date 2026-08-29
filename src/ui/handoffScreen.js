@@ -74,6 +74,7 @@ export class HandoffScreen {
   hide() {
     this.el.classList.add('hidden');
     setShellFlag('handoff-active', false);
+    this.el.dispatchEvent(new CustomEvent('tacticalrisk:handoff-hidden', { bubbles: true }));
   }
 
   get isVisible() {

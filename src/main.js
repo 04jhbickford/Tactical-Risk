@@ -62,6 +62,7 @@ import {
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
   shouldApplyPhoneSetupTapOnPointerDown,
+  shouldRefitPhoneSetupHit,
   PHONE_INSPECT_HOLD_MS,
   PHONE_INSPECT_MOVE_PX,
 } from './ui/territoryTooltip.js';
@@ -850,6 +851,11 @@ async function init() {
 
   // Pass-and-play handoff overlay (hotseat games only)
   const handoffScreen = new HandoffScreen();
+  handoffScreen.el.addEventListener('tacticalrisk:handoff-hidden', () => {
+    resizeCanvas();
+    fitPhoneCamera();
+    kickPaint();
+  });
 
   // Turn summary modal for showing what happened during other players' turns
   const turnSummaryModal = new TurnSummaryModal();
@@ -1897,8 +1903,18 @@ async function init() {
     if (playerPanel.shouldBlockMapSelect(Date.now(), { x: e.clientX, y: e.clientY })) {
       return false;
     }
-    const world = camera.screenToWorld(e.clientX, e.clientY);
-    const hit = territoryMap.hitTest(wrapX(world.x), world.y);
+    let world = camera.screenToWorld(e.clientX, e.clientY);
+    let hit = territoryMap.hitTest(wrapX(world.x), world.y);
+    if (!hit && shouldRefitPhoneSetupHit({
+      mobile: true,
+      phase: gameState.phase,
+      hasHit: false,
+    })) {
+      resizeCanvas();
+      fitPhoneCamera();
+      world = camera.screenToWorld(e.clientX, e.clientY);
+      hit = territoryMap.hitTest(wrapX(world.x), world.y);
+    }
     if (!hit) return false;
     if (!shouldCommitPhoneSetupTap({
       mobile: true,
@@ -1992,12 +2008,22 @@ async function init() {
       }
     }
 
-    if (applyPhoneSetupPeekFromPointer(e)) {
+    if (phoneSetupPeekThisGesture || applyPhoneSetupPeekFromPointer(e)) {
       phoneSetupPeekThisGesture = true;
+      kickPaint();
+      return;
     }
 
     camera.onMouseDown(e);
     canvas.classList.add('panning');
+  });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (applyPhoneSetupPeekFromPointer(e)) {
+      phoneSetupPeekThisGesture = true;
+      kickPaint();
+    }
   });
 
   canvas.addEventListener('mousemove', (e) => {

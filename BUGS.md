@@ -2,6 +2,16 @@
 
 ---
 
+## 8.29.26 — V2.81.3 unclip two seats + first tap after Start peeks
+
+James correction on sha 22d4b13: hold 4 is not totally dead. First tap after a phase/screen change is swallowed; the next tap peeks; thumb Confirm works. Hold 1 still P0 (two seated cards clip the 48px occupant row).
+
+Cause: leftover-click guard after seating Russians also swallowed Germans' pointerdown (second seat never appeared, so the next card still covered the occupant row). First map tap after Start / handoff used a stale camera and/or started a pan (`wasDrag`) so mouseup never painted.
+
+Fix: ignore leftover clicks only for the same faction; a different card seats on this pointer. Occupant tools stay a sibling band with `overflow: visible`. Place Capital peeks on pointerdown, refits the camera once on a miss, and does not start a pan on that gesture. Holds 2–3 and the Confirm row unchanged. SCHEMA 11. GAME_VERSION V2.81.3. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.2 occupant band + first-tap peek (22d4b13 correction)
 
 James second play of sha 22d4b13: hold 4 is not totally dead. First tap after a phase/screen change is swallowed; the next tap peeks; thumb Confirm works (Undo 62×48 beside Place Capital 396×48). inspect≠commit holds. Hold 1 still P0: two seated cards clip the 48px occupant row.

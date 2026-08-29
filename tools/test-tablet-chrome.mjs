@@ -22,6 +22,7 @@ const {
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
   shouldApplyPhoneSetupTapOnPointerDown,
+  shouldRefitPhoneSetupHit,
   clampTooltipToPhoneEdge,
   PHONE_TOOLTIP_Z_INDEX,
   PHONE_INSPECT_HOLD_MS,
@@ -112,7 +113,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.2', GAME_VERSION === 'V2.81.2');
+check('GAME_VERSION is V2.81.3', GAME_VERSION === 'V2.81.3');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -852,6 +853,8 @@ check('phone placement hints say Tap, desktop stay Click',
     /\.lobby-phone-faction-tools \.ai-select\.modern \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
   check('seated cards do not flex-shrink or clip the occupant row',
     /\.lobby-phone-seat \{[\s\S]*?flex-shrink:\s*0/.test(phoneBlock)
+    && /\.lobby-phone-seat \{[\s\S]*?overflow:\s*visible/.test(phoneBlock)
+    && /\.player-card\.modern\.lobby-phone-faction \{[\s\S]*?overflow:\s*visible/.test(phoneBlock)
     && /\.lobby-phone-faction-tools \{[\s\S]*?flex-shrink:\s*0;[\s\S]*?overflow:\s*visible;/.test(phoneBlock)
     && /min-width:\s*48px;[\s\S]*?min-height:\s*48px;/.test(
       phoneBlock.match(/\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?\}/)?.[0] || ''
@@ -890,6 +893,16 @@ check('phone setup peek applies on this pointer, not the leftover mouseup',
   }) === true
   && shouldApplyPhoneSetupTapOnPointerDown({
     mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === false);
+check('first setup miss refits the camera on this pointer',
+  shouldRefitPhoneSetupHit({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, hasHit: false,
+  }) === true
+  && shouldRefitPhoneSetupHit({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, hasHit: true,
+  }) === false
+  && shouldRefitPhoneSetupHit({
+    mobile: false, phase: GAME_PHASES.CAPITAL_PLACEMENT, hasHit: false,
   }) === false);
 check('phone seats a faction on pointerdown so the leftover click cannot unseat',
   shouldSeatFactionOnPointerDown({ mobile: true }) === true
@@ -947,7 +960,13 @@ check('AI seat is not YOUR TURN',
   }).line));
 check('native AI option click does not toggle the seated card',
   shouldIgnoreFactionCardToggle({ now: 1000, ignoreUntil: 1000 + LOBBY_SELECT_TOGGLE_GUARD_MS }) === true
-  && shouldIgnoreFactionCardToggle({ now: 2000, ignoreUntil: 1000 }) === false);
+  && shouldIgnoreFactionCardToggle({ now: 2000, ignoreUntil: 1000 }) === false
+  && shouldIgnoreFactionCardToggle({
+    now: 1000,
+    ignoreUntil: 1000 + LOBBY_SELECT_TOGGLE_GUARD_MS,
+    playerId: 'germans',
+    lockedPlayerId: 'ussr',
+  }) === false);
 {
   if (typeof globalThis.devicePixelRatio !== 'number') globalThis.devicePixelRatio = 1;
   const cam = new Camera({ width: 500, height: 844 });
