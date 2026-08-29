@@ -220,16 +220,16 @@ export class Lobby {
 
     return `
       <div class="lobby-phone-seat${isSelected ? ' selected' : ''}" data-player="${faction.id}">
-        <div class="player-card modern lobby-phone-faction ${isSelected ? 'selected' : ''}" data-player="${faction.id}">
+        <div class="lobby-phone-faction${isSelected ? ' selected' : ''}" data-player="${faction.id}">
           <div class="lobby-phone-faction-main">
-            <div class="player-avatar lobby-phone-faction-logo" style="border-color: ${currentColor?.color || faction.color}">
+            <div class="lobby-phone-faction-logo" style="border-color: ${currentColor?.color || faction.color}">
               <img src="assets/flags/${faction.flag}" alt="${faction.name}">
             </div>
             <div class="lobby-phone-faction-copy">
               <span class="lobby-phone-faction-name">${faction.name}</span>
               ${isSelected ? `<span class="lobby-phone-faction-on">Selected</span>` : `<span class="lobby-phone-faction-off">Tap to add</span>`}
             </div>
-            <div class="player-select-indicator lobby-phone-check" aria-hidden="${isSelected ? 'false' : 'true'}">${isSelected ? '✓' : ''}</div>
+            <div class="lobby-phone-check" aria-hidden="${isSelected ? 'false' : 'true'}">${isSelected ? '✓' : ''}</div>
           </div>
         </div>
         ${isSelected ? `
@@ -547,7 +547,7 @@ export class Lobby {
 
     // Player cards. Phone seats on pointerdown so a leftover click after
     // _render() cannot unseat (first "Tap to add" looked swallowed).
-    this.el.querySelectorAll('.player-card.modern').forEach(card => {
+    this.el.querySelectorAll('.player-card.modern, .lobby-phone-faction').forEach(card => {
       const onToggle = (e) => {
         if (e.target.closest('.player-name-input')) return;
         if (e.target.closest('.ai-select')) return;
@@ -721,8 +721,11 @@ export class Lobby {
       copy.className = selected ? 'lobby-phone-faction-on' : 'lobby-phone-faction-off';
       copy.textContent = selected ? 'Selected' : 'Tap to add';
     }
-    const check = card?.querySelector('.player-select-indicator');
-    if (check) check.textContent = selected ? '✓' : '';
+    const check = card?.querySelector('.lobby-phone-check, .player-select-indicator');
+    if (check) {
+      check.textContent = selected ? '✓' : '';
+      check.setAttribute('aria-hidden', selected ? 'false' : 'true');
+    }
   }
 
   _startGame() {

@@ -16967,6 +16967,21 @@ iframe[title="Vercel Live Feedback"] {
   html.mobile-shell {
     --mobile-top-bar: calc(48px + env(safe-area-inset-top, 0px));
     --mobile-cta: calc(56px + env(safe-area-inset-bottom, 0px));
+    /* One phone row grammar: mark left, copy on the same baseline.
+       Same role = same size. Seated vs unseated does not re-center. */
+    --phone-gutter: 16px;
+    --phone-inset: 12px;
+    --phone-mark: 42px;
+    --phone-mark-sm: 28px;
+    --phone-row-gap: 12px;
+    --phone-row-min: 44px;
+    --phone-type-display: 22px;
+    --phone-type-title: 17px;
+    --phone-type-body: 15px;
+    --phone-type-meta: 12px;
+    --phone-type-kicker: 11px;
+    --phone-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --phone-motion: 160ms;
   }
 
   /* Compact 44–52pt top bar + Dynamic Island inset.
@@ -17043,32 +17058,37 @@ iframe[title="Vercel Live Feedback"] {
 
   .hud-mobile-identity {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: var(--phone-row-gap, 12px);
     min-width: 0;
     flex: 1;
     overflow: hidden;
   }
 
   .hud-mobile-flag {
-    width: 28px;
+    flex: 0 0 var(--phone-mark-sm, 28px);
+    width: var(--phone-mark-sm, 28px);
     height: 20px;
+    margin: 0;
     border-radius: 3px;
     border: 1px solid rgba(255, 255, 255, 0.35);
     object-fit: cover;
-    flex-shrink: 0;
   }
 
   .hud-mobile-swatch {
+    flex: 0 0 16px;
     width: 16px;
     height: 16px;
+    margin: 0;
     border-radius: 50%;
-    flex-shrink: 0;
     border: 1px solid rgba(255, 255, 255, 0.35);
   }
 
   .hud-mobile-faction {
-    font-size: 15px;
+    font-size: var(--phone-type-body, 15px);
     font-weight: 700;
     white-space: nowrap;
     overflow: hidden;
@@ -17082,7 +17102,7 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .hud-mobile-phase {
-    font-size: 12px; /* ≥11pt — not the tablet 9px */
+    font-size: var(--phone-type-meta, 12px); /* ≥11pt — not the tablet 9px */
     font-weight: 700;
     letter-spacing: 0.4px;
     text-transform: uppercase;
@@ -17142,10 +17162,13 @@ iframe[title="Vercel Live Feedback"] {
 
   .hud-mobile-player {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 0 8px;
+    justify-content: flex-start;
+    gap: var(--phone-row-gap, 12px);
+    min-height: var(--phone-row-min, 44px);
+    padding: 0 var(--phone-inset, 12px);
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.04);
   }
@@ -17155,8 +17178,10 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .hud-mobile-player img {
-    width: 24px;
-    height: 18px;
+    flex: 0 0 var(--phone-mark-sm, 28px);
+    width: var(--phone-mark-sm, 28px);
+    height: 20px;
+    margin: 0;
     border-radius: 2px;
     object-fit: cover;
   }
@@ -17166,11 +17191,13 @@ iframe[title="Vercel Live Feedback"] {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: var(--phone-type-body, 15px);
+    font-weight: 600;
   }
 
   .hud-mobile-player-meta {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: var(--phone-type-meta, 12px);
     font-weight: 600;
     color: #cbd5e1;
   }
@@ -17593,8 +17620,8 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .phone-peek-icon {
-    width: 28px;
-    height: 28px;
+    width: var(--phone-mark-sm, 28px);
+    height: var(--phone-mark-sm, 28px);
     object-fit: contain;
   }
 
@@ -17886,9 +17913,10 @@ iframe[title="Vercel Live Feedback"] {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+    justify-content: center;
     gap: 4px;
     min-height: 88px;
-    padding: 16px 18px;
+    padding: 16px var(--phone-gutter, 16px);
     border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.05);
@@ -17903,7 +17931,7 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .lobby-phone-card-kicker {
-    font-size: 11px;
+    font-size: var(--phone-type-kicker, 11px);
     font-weight: 700;
     letter-spacing: 0.8px;
     text-transform: uppercase;
@@ -17911,7 +17939,7 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .lobby-phone-card-title {
-    font-size: 22px;
+    font-size: var(--phone-type-display, 22px);
     font-weight: 700;
   }
 
@@ -17988,67 +18016,76 @@ iframe[title="Vercel Live Feedback"] {
     background: rgba(22, 163, 74, 0.14);
   }
 
+  /* Phone seats are NOT desktop .player-card.modern. That class is a
+     column card that optically centers the roundel in its own cell. */
+  html.mobile-shell .lobby-phone-faction,
+  html.mobile-shell .lobby-phone-faction.selected,
   .lobby-phone-faction,
-  .player-card.modern.lobby-phone-faction,
-  .lobby-phone-faction.selected,
-  .player-card.modern.lobby-phone-faction.selected {
-    display: flex;
-    flex-direction: column;
+  .lobby-phone-faction.selected {
+    display: block;
     flex: 0 0 auto;
     flex-shrink: 0;
     height: auto;
     max-height: none;
-    min-height: 44px;
-    padding: 0 12px;
+    min-height: var(--phone-row-min, 44px);
+    width: 100%;
+    margin: 0;
+    padding: 0 var(--phone-inset, 12px);
     border: none;
     border-radius: 0;
     background: transparent;
     overflow: hidden;
     box-shadow: none;
-    align-items: stretch;
-  }
-
-  .lobby-phone-faction:hover,
-  .player-card.modern.lobby-phone-faction:hover,
-  .player-card:hover {
+    text-align: left;
     transform: none;
   }
 
-  .lobby-phone-faction.selected,
-  .player-card.modern.lobby-phone-faction.selected {
-    border: none;
-    background: transparent;
+  html.mobile-shell .lobby-phone-faction:hover,
+  .lobby-phone-faction:hover {
+    transform: none;
   }
 
   /* One row for every seat: logo | name + status | check.
      Logos share a left gutter. Seated vs unseated must not
      re-center the roundel in its own cell. */
+  html.mobile-shell .lobby-phone-faction-main,
   .lobby-phone-faction-main {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-start;
-    gap: 12px;
-    min-height: 44px;
+    gap: var(--phone-row-gap, 12px);
+    min-height: var(--phone-row-min, 44px);
     min-width: 0;
     width: 100%;
   }
 
-  .lobby-phone-faction-main .player-avatar,
-  .lobby-phone-faction-logo,
-  .lobby-phone-faction.selected .lobby-phone-faction-logo,
-  .player-card.modern.lobby-phone-faction .player-avatar,
-  .player-card.modern.lobby-phone-faction.selected .player-avatar,
-  .player-card.modern.lobby-phone-faction:hover .player-avatar {
-    flex: 0 0 42px;
-    width: 42px;
-    height: 42px;
+  html.mobile-shell .lobby-phone-faction-logo,
+  .lobby-phone-faction-logo {
+    flex: 0 0 var(--phone-mark, 42px);
+    width: var(--phone-mark, 42px);
+    height: var(--phone-mark, 42px);
     margin: 0;
+    padding: 0;
     align-self: center;
     transform: none;
+    border-radius: 50%;
+    border: 2px solid;
+    overflow: hidden;
+    background: rgba(15, 23, 42, 0.8);
+    box-sizing: border-box;
   }
 
+  html.mobile-shell .lobby-phone-faction-logo img,
+  .lobby-phone-faction-logo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  html.mobile-shell .lobby-phone-faction-copy,
   .lobby-phone-faction-copy {
     flex: 1 1 auto;
     min-width: 0;
@@ -18056,21 +18093,22 @@ iframe[title="Vercel Live Feedback"] {
     flex-direction: row;
     flex-wrap: nowrap;
     align-items: baseline;
+    justify-content: flex-start;
     gap: 8px;
+    text-align: left;
   }
 
   .lobby-phone-faction-name {
-    font-size: 17px;
+    font-size: var(--phone-type-title, 17px);
     font-weight: 700;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
   }
 
-  /* Desktop check is absolute over a centered avatar. On the phone row
-     that lands on the first letters of Russians / Germans. */
-  .lobby-phone-faction-main .player-select-indicator,
+  html.mobile-shell .lobby-phone-check,
   .lobby-phone-check {
     position: static;
     top: auto;
@@ -18081,16 +18119,25 @@ iframe[title="Vercel Live Feedback"] {
     margin: 0;
     opacity: 1;
     transform: none;
+    border-radius: 50%;
+    background: #22c55e;
+    color: #052e16;
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .lobby-phone-check:empty {
     visibility: hidden;
+    background: transparent;
   }
 
   .lobby-phone-faction-on,
   .lobby-phone-faction-off {
     flex: 0 0 auto;
-    font-size: 12px;
+    font-size: var(--phone-type-meta, 12px);
     color: #94a3b8;
     white-space: nowrap;
   }
@@ -18101,7 +18148,7 @@ iframe[title="Vercel Live Feedback"] {
     flex-wrap: wrap;
     gap: 8px;
     min-height: 48px;
-    padding: 0 12px 2px;
+    padding: 0 var(--phone-inset, 12px) 2px;
     flex: 0 0 auto;
     flex-shrink: 0;
     overflow: hidden;
@@ -18339,18 +18386,31 @@ iframe[title="Vercel Live Feedback"] {
   .phone-menu-row,
   .phone-menu-sheet .hud-menu-item {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 12px;
-    min-height: 44px;
+    justify-content: flex-start;
+    gap: var(--phone-row-gap, 12px);
+    min-height: var(--phone-row-min, 44px);
     height: 44px;
-    padding: 0 14px;
+    padding: 0 var(--phone-inset, 12px);
     border: none;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.05);
     color: #f1f5f9;
-    font-size: 16px;
+    font-size: var(--phone-type-body, 15px);
+    font-weight: 600;
     text-align: left;
     width: 100%;
+  }
+
+  .phone-menu-row .hud-menu-item-icon,
+  .phone-menu-sheet .hud-menu-item-icon {
+    flex: 0 0 var(--phone-mark-sm, 28px);
+    width: var(--phone-mark-sm, 28px);
+    margin: 0;
+    text-align: center;
+    font-size: 18px;
   }
 
   .phone-menu-panel {
@@ -18436,11 +18496,14 @@ iframe[title="Vercel Live Feedback"] {
 
   .phone-place-row {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
-    gap: 12px;
-    min-height: 44px;
+    justify-content: flex-start;
+    gap: var(--phone-row-gap, 12px);
+    min-height: var(--phone-row-min, 44px);
     height: 44px;
-    padding: 0 12px;
+    padding: 0 var(--phone-inset, 12px);
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.04);
@@ -18455,15 +18518,16 @@ iframe[title="Vercel Live Feedback"] {
   }
 
   .phone-place-icon {
-    width: 28px;
-    height: 28px;
+    flex: 0 0 var(--phone-mark-sm, 28px);
+    width: var(--phone-mark-sm, 28px);
+    height: var(--phone-mark-sm, 28px);
+    margin: 0;
     object-fit: contain;
-    flex-shrink: 0;
   }
 
   .phone-place-name {
     flex: 1;
-    font-size: 16px;
+    font-size: var(--phone-type-body, 15px);
     font-weight: 600;
     text-transform: capitalize;
   }
@@ -18543,6 +18607,46 @@ iframe[title="Vercel Live Feedback"] {
   html.mobile-shell .territory-tooltip.territory-tooltip--edge .tt-indicators,
   html.mobile-shell .territory-tooltip.territory-tooltip--edge .tt-adjacent {
     display: none;
+  }
+
+  /* Short phone-game motion. Never animate the camera. */
+  @media (prefers-reduced-motion: no-preference) {
+    html.mobile-shell .lobby-phone-seat {
+      transition: border-color var(--phone-motion, 160ms) var(--phone-ease),
+                  background var(--phone-motion, 160ms) var(--phone-ease);
+    }
+
+    html.mobile-shell .lobby-phone-card {
+      transition: transform var(--phone-motion, 160ms) var(--phone-ease),
+                  background var(--phone-motion, 160ms) var(--phone-ease),
+                  border-color var(--phone-motion, 160ms) var(--phone-ease);
+    }
+
+    html.mobile-shell .lobby-phone-card:active {
+      transform: scale(0.985);
+    }
+
+    html.mobile-shell .phone-peek-chip {
+      transition: border-color 140ms var(--phone-ease),
+                  background 140ms var(--phone-ease),
+                  transform 140ms var(--phone-ease);
+    }
+
+    html.mobile-shell .phone-peek-chip.selected {
+      transform: translateY(-1px);
+    }
+
+    html.mobile-shell .pp-peek-primary-slot .pp-confirm-btn {
+      transition: transform 120ms var(--phone-ease);
+    }
+
+    html.mobile-shell .pp-peek-primary-slot .pp-confirm-btn:active {
+      transform: scale(0.98);
+    }
+
+    html.mobile-shell .phone-menu-row {
+      transition: background 140ms var(--phone-ease);
+    }
   }
 }
 

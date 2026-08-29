@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81.20 phone alignment system (not a logo patch)
+
+James HE-CORRECT / LOCK: HOLD so far was interaction grammar. Setup logos independently center-aligned was the instance of a missing row system. Desktop `.player-card.modern` (column + optically centered roundel) was still the phone seat class.
+
+Fix: phone seats drop `player-card modern`. One row grammar across setup, lobby home, HUD identity, ⋯ sheet, player roster, and unit/place rows — mark left, copy on the same baseline, shared gutter. Seated vs unseated does not re-center. Short press/select motion only; camera is not animated. Occupant/Teams/Start, Max/Confirm, and land-then-unit HOLDs unchanged. SCHEMA 11. GAME_VERSION V2.81.20. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.19 setup logos share one left gutter
 
 James play of V2.81.18 at ~500: seated Russians/Germans put the roundel optically centered above the name. Unseated British sat left of "Tap to add". Logos did not share a vertical axis.

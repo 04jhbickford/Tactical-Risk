@@ -128,7 +128,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.19', GAME_VERSION === 'V2.81.19');
+check('GAME_VERSION is V2.81.20', GAME_VERSION === 'V2.81.20');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -911,15 +911,22 @@ check('phone placement hints say Tap, desktop stay Click',
       phoneBlock.match(/\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?\}/)?.[0] || ''
     ));
   check('seat check is in the row, not on the faction name',
-    /\.lobby-phone-faction-main \.player-select-indicator[\s\S]*?position:\s*static/.test(phoneBlock)
+    /\.lobby-phone-check \{[\s\S]*?position:\s*static/.test(phoneBlock)
     && /\.lobby-phone-check:empty/.test(phoneBlock));
   {
     const lobbySrc = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
+    const mobileCard = lobbySrc.slice(
+      lobbySrc.indexOf('_renderMobileFactionCard'),
+      lobbySrc.indexOf('_renderMainMenu()'),
+    );
     const mainRule = phoneBlock.match(/\.lobby-phone-faction-main \{[\s\S]*?\}/)?.[0] || '';
     const copyRule = phoneBlock.match(/\.lobby-phone-faction-copy \{[\s\S]*?\}/)?.[0] || '';
-    const logoRule = phoneBlock.match(/\.lobby-phone-faction-logo,[\s\S]*?transform:\s*none;/)?.[0]
-      || phoneBlock.match(/\.lobby-phone-faction-main \.player-avatar,[\s\S]*?transform:\s*none;/)?.[0]
-      || '';
+    const logoRule = phoneBlock.match(/\.lobby-phone-faction-logo \{[\s\S]*?\}/)?.[0] || '';
+    check('phone seats drop desktop player-card.modern',
+      /lobby-phone-faction/.test(mobileCard)
+      && !/player-card modern/.test(mobileCard)
+      && !/player-avatar/.test(mobileCard)
+      && /querySelectorAll\('\.player-card\.modern, \.lobby-phone-faction'\)/.test(lobbySrc));
     check('phone faction logos share one left-aligned row',
       /lobby-phone-faction-logo/.test(lobbySrc)
       && /flex-direction:\s*row/.test(mainRule)
@@ -927,8 +934,13 @@ check('phone placement hints say Tap, desktop stay Click',
       && /justify-content:\s*flex-start/.test(mainRule)
       && /flex-direction:\s*row/.test(copyRule)
       && /align-items:\s*baseline/.test(copyRule)
-      && /flex:\s*0 0 42px/.test(logoRule)
+      && /flex:\s*0 0 var\(--phone-mark/.test(logoRule)
       && /margin:\s*0/.test(logoRule));
+    check('phone row grammar tokens exist',
+      /--phone-mark:\s*42px/.test(phoneBlock)
+      && /--phone-type-title:\s*17px/.test(phoneBlock)
+      && /--phone-type-meta:\s*12px/.test(phoneBlock)
+      && /--phone-row-gap:\s*12px/.test(phoneBlock));
   }
   check('Teams label stays off the checkbox',
     /\.lobby-phone-teams \{[\s\S]*?gap:\s*10px/.test(phoneBlock)
