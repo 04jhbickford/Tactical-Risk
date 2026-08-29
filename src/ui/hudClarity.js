@@ -42,12 +42,32 @@ export function formatHudLastAction(entry) {
   return `Last action: ${msg}`;
 }
 
-export function formatHudClickLanded(lastClick) {
-  if (!lastClick) return 'Click: tap the map — this line updates when it lands';
-  if (lastClick.landed === false) {
-    return `Click missed${lastClick.label ? ` (${lastClick.label})` : ''} — try the territory again`;
+// Phone HUD is one phase chip. Desktop keeps the James-lock ticker.
+export function shouldShowHudTicker({ mobile = false } = {}) {
+  return !mobile;
+}
+
+// "X's turn begins" is the previous seat's banner. Do not keep it as
+// "Last action" while the current seat is placing a capital.
+export function shouldShowHudLastAction({ phase, lastActionEntry } = {}) {
+  const msg = lastActionEntry?.data?.message || lastActionEntry?.type || '';
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT && /turn begins/i.test(String(msg))) {
+    return false;
   }
-  return `Click landed: ${lastClick.label || 'map'}`;
+  return true;
+}
+
+export function formatHudClickLanded(lastClick, { mobile = false } = {}) {
+  const verb = mobile ? 'Tap' : 'Click';
+  if (!lastClick) {
+    return mobile
+      ? 'Tap the map — this line updates when it lands'
+      : 'Click: tap the map — this line updates when it lands';
+  }
+  if (lastClick.landed === false) {
+    return `${verb} missed${lastClick.label ? ` (${lastClick.label})` : ''} — try the territory again`;
+  }
+  return `${verb} landed: ${lastClick.label || 'map'}`;
 }
 
 export function resolveHudDeployBudget({
@@ -106,6 +126,7 @@ export function resolveHudClarity({
   hostPresence = null,
   hostName = 'Host',
   isHost = false,
+  mobile = false,
 } = {}) {
   const whose = resolveHudWhoseTurn({
     isMultiplayer,
@@ -121,8 +142,10 @@ export function resolveHudClarity({
     budget: resolveHudDeployBudget({
       phase, deployedThisRound, limit, poolRemaining,
     }),
-    lastAction: formatHudLastAction(lastActionEntry),
-    click: formatHudClickLanded(lastClick),
+    lastAction: shouldShowHudLastAction({ phase, lastActionEntry })
+      ? formatHudLastAction(lastActionEntry)
+      : '',
+    click: formatHudClickLanded(lastClick, { mobile }),
     match: resolveHudMatchStatus({
       gameCode, justResumed, sessionLost, hostPresence, hostName, isHost,
     }),

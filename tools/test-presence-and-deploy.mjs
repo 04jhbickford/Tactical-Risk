@@ -136,6 +136,8 @@ const {
   resolveHudPhaseLabel,
   formatHudClickLanded,
   resolveHostAwayBanner,
+  shouldShowHudTicker,
+  shouldShowHudLastAction,
 } = await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
 
 let failures = 0;
@@ -151,7 +153,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.80', GAME_VERSION === 'V2.80');
+check('GAME_VERSION is V2.81', GAME_VERSION === 'V2.81');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -639,6 +641,28 @@ console.log('=== James lock HUD: whose turn / last action / click landed ===');
     && resumed.match === 'Still in ZUJMNP — you were away.');
   check('away banner tells the host to rejoin, not that the game died',
     resolveHostAwayBanner({ lobbyCode: 'ZUJMNP' }) === 'You were away — still in ZUJMNP. The other player is still there. Rejoin.');
+  check('phone HUD ticker is collapsed to the phase chip',
+    shouldShowHudTicker({ mobile: true }) === false
+    && shouldShowHudTicker({ mobile: false }) === true);
+  check('stale Germans turn-begins is not Last action during Russians Place Capital',
+    shouldShowHudLastAction({
+      phase: GAME_PHASES.CAPITAL_PLACEMENT,
+      lastActionEntry: { type: 'turn', data: { message: "Round 1 - Germans' turn begins" } },
+    }) === false);
+  const phoneClick = resolveHudClarity({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    currentPlayerName: 'Russians',
+    lastActionEntry: { type: 'turn', data: { message: "Round 1 - Germans' turn begins" } },
+    mobile: true,
+  });
+  check('phone copy is Tap, never Click / Click landed',
+    !/Click/.test(phoneClick.click)
+    && /Tap/.test(phoneClick.click)
+    && phoneClick.lastAction === ''
+    && !/Click/.test(formatHudClickLanded(null, { mobile: true }))
+    && formatHudClickLanded({ landed: true, label: 'Ukraine' }, { mobile: true }) === 'Tap landed: Ukraine');
+  check('desktop ticker still says Click landed',
+    formatHudClickLanded({ landed: true, label: 'East Canada' }) === 'Click landed: East Canada');
 }
 
 console.log('=== Undo / capital / leave row ===');

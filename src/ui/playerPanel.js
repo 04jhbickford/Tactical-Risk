@@ -12,6 +12,8 @@ import {
   shouldShowPhonePanelBody,
   shouldShowPhonePeekUnitRow,
   shouldUsePhonePlacementTray,
+  shouldShowPhoneDetentTabs,
+  shouldShowPhoneTrayToggle,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
@@ -1012,7 +1014,7 @@ export class PlayerPanel {
     html += peekRow;
     html += warningHtml;
     if (mobile) html += `<div class="pp-peek-cta-row">`;
-    if (mobile) {
+    if (mobile && shouldShowPhoneTrayToggle({ mobile: true, phase })) {
       const expanded = !!this.trayExpanded;
       html += `<button type="button" class="phone-tray-toggle" data-action="phone-toggle-tray" aria-expanded="${expanded ? 'true' : 'false'}" aria-label="${expanded ? 'Show map' : 'Show list'}">${expanded ? '▾' : '▴'}</button>`;
     }
@@ -1039,7 +1041,7 @@ export class PlayerPanel {
       html += `<div class="pp-peek-undo-slot">`;
       if (showUndo) {
         html += `
-        <button class="pp-confirm-btn undoable" data-action="${undo.action}">
+        <button class="pp-confirm-btn pp-undo-ghost" data-action="${undo.action}">
           Undo
         </button>`;
       }
@@ -2181,6 +2183,11 @@ export class PlayerPanel {
   }
 
   _renderPhoneDetentTabs() {
+    if (!shouldShowPhoneDetentTabs({
+      mobile: isMobileShell(),
+      expanded: this.trayExpanded,
+      phase: this.gameState?.phase,
+    })) return '';
     const tabs = [
       { id: 'actions', label: 'Units' },
       { id: 'stats', label: 'Players' },

@@ -2,6 +2,14 @@
 
 ---
 
+## 8.29.26 — V2.81 iPhone polish (390 play of V2.80)
+
+James + CoS FACT from live 390 of production V2.80: seated occupant/color chips and Teams / Starting IPCs were below 44pt; Place Capital HUD triple-repeated the phase plus a stale “Last action: Germans' turn begins” and “Click:” on a phone; +/−/Fit sat on the art; Undo was the blue primary and Confirm stacked under it in the home-indicator zone; first-expand Units tabs / body Deploy sat off an 844 viewport.
+
+Phone-only CSS/IA: enlarge the existing Human/AI + color chip and Teams/IPCs to 44–48px; collapse `#hud-clarity` to the one HUD phase chip; Tap copy; hide stale turn-begins last-action; Confirm is the thumb primary, Undo ghost in one row; Map tools on-demand off the board; hide empty capital Units tabs and the body Deploy duplicate. SCHEMA 11. GAME_VERSION V2.81. No rules / map / combat / MP / production deploy.
+
+---
+
 ## 8.26.26 — V2.80 A3/A4 turn-order rewind on refresh
 
 `ensureInitialDeployPools` used the current seat's wave-1 / 0-placed flags to restock every empty pool. After the first human Done, a host refresh restocked finished seats, extra placement waves ran, and `finishPlacementRound` skipped a finished index (2→0). Restore the starting kit only for the current seat. SCHEMA 11. GAME_VERSION V2.80.

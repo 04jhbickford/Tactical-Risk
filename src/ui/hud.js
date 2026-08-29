@@ -2,8 +2,8 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor } from './mobileShell.js';
-import { resolveHudClarity } from './hudClarity.js';
+import { isMobileShell, formatMobilePhaseLabel, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag } from './mobileShell.js';
+import { resolveHudClarity, shouldShowHudTicker } from './hudClarity.js';
 
 export class HUD {
   constructor() {
@@ -12,6 +12,7 @@ export class HUD {
     this.onRulesToggle = null;
     this.onExitToLobby = null;
     this.menuOpen = false;
+    this.mapToolsOpen = false;
     this.menuTab = null;
     this.menuTabProvider = null;
     this.onMenuOpen = null;
@@ -189,6 +190,7 @@ export class HUD {
 
     this.el.innerHTML = html;
     this._bindEvents();
+    this._syncMapToolsFlag();
     this._renderClarity();
   }
 
@@ -245,6 +247,9 @@ export class HUD {
     this.el.innerHTML = `
       ${identity}
       <div class="hud-menu-container hud-mobile-overflow">
+        <button class="hud-menu-btn hud-map-tools-btn${this.mapToolsOpen ? ' open' : ''}" data-action="toggle-map-tools" title="Map tools" aria-label="Map tools">
+          <span class="hud-menu-icon">Map</span>
+        </button>
         <button class="hud-menu-btn" data-action="toggle-menu" title="Menu" aria-label="Menu">
           <span class="hud-menu-icon">⋯</span>
         </button>
@@ -285,6 +290,7 @@ export class HUD {
       </div>
     `;
     this._bindEvents();
+    this._syncMapToolsFlag();
     this._renderClarity();
   }
 
@@ -303,6 +309,7 @@ export class HUD {
       turnPhase: gs?.turnPhase,
       lastActionEntry: last,
       lastClick: this.lastClick,
+      mobile: isMobileShell(),
       deployedThisRound: gs?.unitsPlacedThisRound || 0,
       limit: gs?.getUnitsPerRoundLimit?.() || 6,
       poolRemaining: player ? (gs.getTotalUnitsToPlace?.(player.id) || 0) : 0,
@@ -317,7 +324,8 @@ export class HUD {
   _renderClarity() {
     if (!this.clarityEl) return;
     const inGame = this.gameState && this.gameState.phase !== GAME_PHASES.LOBBY;
-    if (!inGame) {
+    const mobile = isMobileShell();
+    if (!inGame || !shouldShowHudTicker({ mobile })) {
       this.clarityEl.hidden = true;
       this.clarityEl.innerHTML = '';
       return;
@@ -333,6 +341,11 @@ export class HUD {
       <span class="hud-clarity-click" data-clarity="click">${c.click}</span>
       ${c.match ? `<span class="hud-clarity-match" data-clarity="match">${c.match}</span>` : ''}
     `;
+  }
+
+  _syncMapToolsFlag() {
+    const open = isMobileShell() && !!this.mapToolsOpen && !this.menuOpen;
+    setShellFlag('map-tools-open', open);
   }
 
   _updateMenuState() {
@@ -354,10 +367,22 @@ export class HUD {
         e.stopPropagation();
         this.menuOpen = !this.menuOpen;
         if (!this.menuOpen) this.menuTab = null;
+        if (this.menuOpen) this.mapToolsOpen = false;
         if (this.menuOpen && typeof this.onMenuOpen === 'function') this.onMenuOpen();
         if (isMobileShell()) this._render();
         else this._updateMenuState();
       });
+    });
+
+    this.el.querySelector('[data-action="toggle-map-tools"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.mapToolsOpen = !this.mapToolsOpen;
+      if (this.mapToolsOpen) {
+        this.menuOpen = false;
+        this.menuTab = null;
+      }
+      this._syncMapToolsFlag();
+      if (isMobileShell()) this._render();
     });
 
     this.el.querySelector('[data-action="menu-home"]')?.addEventListener('click', (e) => {
@@ -375,8 +400,8 @@ export class HUD {
       });
     });
 
-    // Rules menu item
-    const rulesItem = this.el.querySelector('.hud-menu-item[data-action="rules"]');
+    // Rules menu item (desktop dropdown or phone sheet row)
+    const rulesItem = this.el.querySelector('[data-action="rules"]');
     rulesItem?.addEventListener('click', () => {
       this.menuOpen = false;
       this._updateMenuState();
@@ -386,7 +411,7 @@ export class HUD {
     });
 
     // Exit to lobby menu item
-    const exitItem = this.el.querySelector('.hud-menu-item[data-action="exit-lobby"]');
+    const exitItem = this.el.querySelector('[data-action="exit-lobby"]');
     exitItem?.addEventListener('click', () => {
       this.menuOpen = false;
       this._updateMenuState();

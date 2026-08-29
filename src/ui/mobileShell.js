@@ -109,6 +109,25 @@ export function shouldShowPhoneChromeTabs({ mobile } = {}) {
   return !mobile;
 }
 
+// Place Capital expand was an empty Units tab bar that ate the map.
+export function shouldShowPhoneDetentTabs({ mobile, expanded, phase } = {}) {
+  if (!mobile || !expanded) return false;
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+  return true;
+}
+
+// Capital peek is hint + Confirm. Players / Log stay behind ⋯.
+export function shouldShowPhoneTrayToggle({ mobile, phase } = {}) {
+  if (!mobile) return false;
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+  return true;
+}
+
+// +/−/Fit / minimap stay off the art until Map is tapped in the HUD.
+export function shouldParkPhoneMapTools({ mobile } = {}) {
+  return !!mobile;
+}
+
 // Initial deployment on phone is a tray of remaining units, not the
 // desktop queue/+/-/confirm sheet squeezed into the bottom overlay.
 export function shouldUsePhonePlacementTray({ mobile, phase } = {}) {

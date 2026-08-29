@@ -16959,11 +16959,9 @@ html, body {
     z-index: 70;
   }
 
+  /* One phase chip in #hud. Kill the ticker triple-repeat + stale last action. */
   html.mobile-shell #hud-clarity {
-    top: var(--mobile-top-bar, calc(48px + env(safe-area-inset-top, 0px)));
-    font-size: 11px;
-    padding: 4px 10px 6px;
-    z-index: 69;
+    display: none !important;
   }
 
   /* Kill the 3-row desktop HUD pieces if JS has not swapped the tree yet */
@@ -17063,6 +17061,22 @@ html, body {
   .hud-mobile-overflow {
     margin-left: auto;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .hud-map-tools-btn {
+    width: auto;
+    min-width: 44px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .hud-map-tools-btn.open {
+    background: rgba(59, 130, 246, 0.32);
   }
 
   .hud-mobile-overflow .hud-menu-dropdown {
@@ -17138,6 +17152,12 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+
+  .hud-menu-btn.hud-map-tools-btn {
+    width: auto;
+    min-width: 44px;
+    padding: 0 10px;
   }
 
   .hud-menu-item {
@@ -17292,6 +17312,14 @@ html, body {
   #sidebar.player-panel--expanded.player-panel--place-tray,
   .player-panel.player-panel--expanded.player-panel--place-tray {
     max-height: 36dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  html.mobile-shell .player-panel .pp-content {
+    min-height: 0;
+    overflow: hidden;
   }
 
   .player-panel--peek .phone-tray-body,
@@ -17451,30 +17479,57 @@ html, body {
     flex: 1 1 auto;
     min-width: 44px;
     gap: 8px;
+    flex-direction: row;
+    align-items: stretch;
   }
 
   /* Undo and Deploy keep separate slots so a post-deploy re-render
-     cannot put Undo where Deploy was (B18). */
+     cannot put Undo where Deploy was (B18). Confirm is the thumb
+     primary — never stacked under Undo in the home-indicator zone. */
   .pp-peek-undo-slot {
     flex: 0 0 auto;
     min-width: 72px;
-    min-height: 44px;
+    min-height: 48px;
+    display: flex;
+  }
+
+  .pp-peek-undo-slot .pp-confirm-btn,
+  .pp-undo-ghost {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    box-shadow: none;
+    color: #cbd5e1;
+    text-shadow: none;
+    min-width: 72px;
+    width: auto;
+    min-height: 48px;
+    padding: 0 12px;
   }
 
   .pp-peek-primary-slot {
     flex: 1 1 auto;
-    min-width: 88px;
-    min-height: 44px;
+    min-width: 120px;
+    min-height: 48px;
   }
 
   .pp-peek-cta-row .pp-confirm-btn {
     width: auto;
     min-width: 44px;
-    min-height: 44px;
+    min-height: 48px;
+  }
+
+  .pp-peek-primary-slot .pp-confirm-btn {
+    width: 100%;
+    min-height: 48px;
   }
 
   .pp-bottom-buttons {
     gap: 8px;
+  }
+
+  /* Body Deploy/Undo lived at y≈1525 off an 844 viewport. Peek CTA is the verb. */
+  html.mobile-shell .pp-placement-actions {
+    display: none;
   }
 
   .pp-confirm-btn {
@@ -17511,13 +17566,23 @@ html, body {
     padding: 0 10px;
   }
 
-  /* Zoom is optional (pinch is primary). Park it top-left, away from the CTA. */
-  #zoom-controls {
-    right: auto;
-    left: 8px;
+  /* Zoom / Fit / minimap stay off the art until HUD Map is open. */
+  #zoom-controls,
+  #minimap {
+    display: none;
+  }
+
+  html.mobile-shell.map-tools-open #zoom-controls {
+    display: flex;
+    right: 8px;
+    left: auto;
     bottom: auto;
-    top: calc(52px + env(safe-area-inset-top, 0px) + 8px);
+    top: calc(var(--mobile-top-bar, 48px) + 8px);
     gap: 8px;
+    padding: 6px;
+    border-radius: 12px;
+    background: rgba(12, 16, 28, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.14);
   }
 
   .zoom-btn {
@@ -17527,10 +17592,13 @@ html, body {
     min-height: 44px;
   }
 
-  #minimap {
+  html.mobile-shell.map-tools-open #minimap {
+    display: block;
     width: 120px;
     height: 68px;
-    left: 8px;
+    left: auto;
+    right: 8px;
+    top: auto;
     bottom: calc(72px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -17722,7 +17790,31 @@ html, body {
     align-items: center;
     gap: 8px;
     margin-top: 8px;
+    min-height: 48px;
+  }
+
+  .lobby-phone-faction-tools .color-swatch {
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 10px;
+  }
+
+  .lobby-phone-faction-tools .color-option {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
     min-height: 44px;
+  }
+
+  .lobby-phone-faction-tools .ai-select.modern {
+    flex: 1;
+    min-height: 48px;
+    height: 48px;
+    font-size: 16px;
+    padding: 0 12px;
+    color: #e2e8f0;
   }
 
   .lobby-phone-options {
@@ -17738,6 +17830,27 @@ html, body {
     gap: 8px;
     min-height: 44px;
     font-size: 14px;
+  }
+
+  .lobby-phone-option .modern-select,
+  .lobby-phone-option #starting-ipcs {
+    min-height: 44px;
+    height: 44px;
+    min-width: 88px;
+    font-size: 16px;
+    padding: 0 10px;
+  }
+
+  .lobby-phone-teams {
+    min-height: 44px;
+  }
+
+  .lobby-phone-teams input[type="checkbox"] {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    accent-color: #3b82f6;
   }
 
   .lobby-phone-start {

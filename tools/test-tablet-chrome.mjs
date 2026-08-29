@@ -46,6 +46,9 @@ const {
   shouldShowPhoneChromeTabs,
   shouldUsePhonePlacementTray,
   shouldShowPhonePanelBody,
+  shouldShowPhoneDetentTabs,
+  shouldShowPhoneTrayToggle,
+  shouldParkPhoneMapTools,
   PHONE_PEEK_EXPANDED_MAX_DVH,
   phoneUnitIconSize,
   shouldHideUnitsAtZoom,
@@ -91,7 +94,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.80', GAME_VERSION === 'V2.80');
+check('GAME_VERSION is V2.81', GAME_VERSION === 'V2.81');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -782,6 +785,48 @@ check('place-tap still does not inspect (V2.69 split stays)',
     !/drag-place|peek-drag|chip-drag/.test(src)
     && /shouldAutoCommitPhoneCapital/.test(src)
     && /resolvePhoneStickyUnitType/.test(src));
+}
+
+console.log('=== V2.81 iPhone polish holds ===');
+check('phone ticker is off — HUD is one phase chip',
+  shouldParkPhoneMapTools({ mobile: true }) === true
+  && shouldParkPhoneMapTools({ mobile: false }) === false);
+check('Place Capital does not expand an empty Units tab bar',
+  shouldShowPhoneDetentTabs({
+    mobile: true, expanded: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === false
+  && shouldShowPhoneTrayToggle({
+    mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
+  }) === false
+  && shouldShowPhoneDetentTabs({
+    mobile: true, expanded: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+  }) === true);
+check('desktop still has no phone detent tabs',
+  shouldShowPhoneDetentTabs({
+    mobile: false, expanded: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+  }) === false);
+{
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const phoneBlock = css.split('@media (max-width: 480px)')[1] || '';
+  check('occupant color chip is 44–48px on the seated card',
+    /\.lobby-phone-faction-tools \.color-swatch \{[\s\S]*?(width|min-width):\s*48px[\s\S]*?(height|min-height):\s*48px/.test(phoneBlock));
+  check('occupant Human/AI select is 44–48px on the seated card',
+    /\.lobby-phone-faction-tools \.ai-select\.modern \{[\s\S]*?min-height:\s*48px/.test(phoneBlock));
+  check('Starting IPCs control is a 44pt target',
+    /\.lobby-phone-option #starting-ipcs \{[\s\S]*?min-height:\s*44px/.test(phoneBlock)
+    || /\.lobby-phone-option \.modern-select[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('Teams checkbox is a 44pt target',
+    /\.lobby-phone-teams input\[type="checkbox"\] \{[\s\S]*?min-width:\s*44px[\s\S]*?min-height:\s*44px/.test(phoneBlock));
+  check('phone HUD ticker is collapsed',
+    /html\.mobile-shell #hud-clarity \{[\s\S]*?display:\s*none/.test(phoneBlock));
+  check('phone peek CTA is a row so Confirm is not under Undo',
+    /\.pp-tray-peek \.pp-bottom-buttons \{[\s\S]*?flex-direction:\s*row/.test(phoneBlock)
+    && /\.pp-undo-ghost/.test(phoneBlock));
+  check('phone zoom/minimap stay off the art until Map is open',
+    /#zoom-controls,\s*#minimap \{\s*display:\s*none/.test(phoneBlock)
+    && /html\.mobile-shell\.map-tools-open #zoom-controls/.test(phoneBlock));
+  check('phone body Deploy is hidden so the peek CTA is the on-screen verb',
+    /html\.mobile-shell \.pp-placement-actions \{\s*display:\s*none/.test(phoneBlock));
 }
 
 if (failures) {
