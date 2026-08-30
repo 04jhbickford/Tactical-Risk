@@ -16,7 +16,7 @@ if (typeof globalThis.localStorage === 'undefined') {
   };
 }
 
-const { GameState } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
+const { GameState, RISK_STARTING_UNITS } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { computeInitialPlacementUX, resolvePhoneStickyUnitType } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
@@ -39,7 +39,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.35', GAME_VERSION === 'V2.81.35');
+check('GAME_VERSION is V2.81.36', GAME_VERSION === 'V2.81.36');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== computeInitialPlacementUX: land selected, only naval remain, valid sea exists ===');
@@ -234,6 +234,11 @@ console.log('=== leftover / ghost unit must not block Done or sticky-select ==='
   const liveUnits = JSON.parse(readFileSync(join(root, 'data/units.json'), 'utf8'));
   check('tacticalBomber is a real air unit in units.json',
     liveUnits.tacticalBomber?.isAir === true);
+  check('starting placement pool has no tactical bomber',
+    !RISK_STARTING_UNITS.land.some((u) => u.type === 'tacticalBomber')
+    && !RISK_STARTING_UNITS.naval.some((u) => u.type === 'tacticalBomber')
+    && RISK_STARTING_UNITS.land.some((u) => u.type === 'bomber' && u.quantity === 1)
+    && RISK_STARTING_UNITS.land.some((u) => u.type === 'fighter' && u.quantity === 2));
 
   const ghostPool = [
     { type: 'tacticalBomber', quantity: 1 },

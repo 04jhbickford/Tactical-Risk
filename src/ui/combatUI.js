@@ -1,7 +1,8 @@
 // Enhanced combat resolution UI with dice animation, probability, and casualty selection
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
-import { setShellFlag } from './mobileShell.js';
+import { formatUnitName } from '../utils/unitNames.js';
+import { isMobileShell, setShellFlag } from './mobileShell.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -24,6 +25,44 @@ export function territoryHasEnemyCombatUnits(units, currentPlayerId, areAllies) 
   return getEnemyCombatUnits(units, currentPlayerId, areAllies).length > 0;
 }
 
+export function summarizeCombatForce(units) {
+  const byType = new Map();
+  for (const u of units || []) {
+    const n = Number(u?.quantity) || 0;
+    if (n <= 0 || !u?.type) continue;
+    byType.set(u.type, (byType.get(u.type) || 0) + n);
+  }
+  return [...byType.entries()].map(([type, quantity]) => ({ type, quantity }));
+}
+
+export function formatCombatForceLine(units, formatName = formatUnitName) {
+  return summarizeCombatForce(units)
+    .map(({ type, quantity }) => `${quantity} ${String(formatName(type) || type).toLowerCase()}`)
+    .join(' · ');
+}
+
+export function resolveCombatNextLine(phase, { winner = null } = {}) {
+  if (phase === 'resolved') {
+    return winner === 'attacker' ? 'Attacker wins' : 'Defender holds';
+  }
+  if (phase === 'aaFire') return 'Next: AA fire';
+  if (phase === AA_RESULT_PHASE) return 'AA results — Continue';
+  if (phase === 'bombardment') return 'Next: shore bombardment';
+  if (phase === 'selectCasualties') return 'Assign hits, then Confirm';
+  if (phase === 'selectAACasualties') return 'Assign AA hits, then Confirm';
+  if (phase === 'selectBombardmentCasualties') return 'Assign bombardment hits, then Confirm';
+  if (phase === 'rolling') return 'Rolling…';
+  if (phase === 'ready') return 'Next: roll combat';
+  if (phase === 'airLanding') return 'Land aircraft';
+  if (phase === 'submarineFirstStrike') return 'Next: submarine first strike';
+  if (phase === 'selectRetreat') return 'Choose retreat';
+  return 'Combat';
+}
+
+export function shouldUsePhoneCombatSummary({ mobile = false } = {}) {
+  return !!mobile;
+}
+
 export class CombatUI {
   constructor() {
     this.gameState = null;
@@ -39,6 +78,7 @@ export class CombatUI {
     this.lastRolls = null;
     this.cardAwarded = null;
     this.isMinimized = false;
+    this.phoneCombatDetailSide = null;
 
     this._create();
   }
@@ -129,6 +169,7 @@ export class CombatUI {
     this.combatState = null;
     this.diceAnimation = null;
     this.lastRolls = null;
+    this.phoneCombatDetailSide = null;
   }
 
   _syncCombatChromeFlag() {
@@ -1639,13 +1680,16 @@ export class CombatUI {
     const defenderPlayer = this.gameState.getPlayer(defenderOwner);
 
     const probability = this._calculateProbability();
+    const phoneSummary = shouldUsePhoneCombatSummary({ mobile: isMobileShell() });
+    this.el.classList.toggle('combat-popup--phone', phoneSummary);
 
     let html = `
       <div class="combat-content">
         <div class="combat-header">
           <div class="combat-title">⚔ ${this.currentTerritory}</div>
-          <button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>
+          ${phoneSummary ? '' : `<button class="left-modal-minimize-btn" data-action="toggle-minimize" title="${this.isMinimized ? 'Expand' : 'Minimize'}">${this.isMinimized ? '□' : '—'}</button>`}
         </div>
+        ${phoneSummary ? this._renderPhoneCombatSummary(player, defenderPlayer, phase, winner) : ''}
 
         <!-- Phase Progress Indicator -->
         ${this._renderPhaseIndicator(phase)}
@@ -2168,6 +2212,43 @@ export class CombatUI {
 
     this.el.innerHTML = html;
     this._bindEvents();
+  }
+
+  _renderPhoneCombatSummary(attackerPlayer, defenderPlayer, phase, winner) {
+    const { attackers, defenders } = this.combatState;
+    const atk = formatCombatForceLine(attackers) || 'none';
+    const def = formatCombatForceLine(defenders) || 'none';
+    const next = resolveCombatNextLine(phase, { winner });
+    const detail = this.phoneCombatDetailSide;
+    const detailUnits = detail === 'defender' ? defenders : attackers;
+    const detailName = detail === 'defender'
+      ? (defenderPlayer?.name || 'Defender')
+      : (attackerPlayer?.name || 'Attacker');
+    let detailHtml = '';
+    if (detail) {
+      const rows = summarizeCombatForce(detailUnits);
+      detailHtml = `<div class="phone-combat-detail">
+        <div class="phone-combat-detail-title">${detailName}</div>
+        ${rows.length
+          ? rows.map(({ type, quantity }) =>
+            `<div class="phone-combat-detail-row">${quantity} ${formatUnitName(type)}</div>`).join('')
+          : '<div class="phone-combat-detail-row">None left</div>'}
+      </div>`;
+    }
+    return `
+      <div class="phone-combat-summary">
+        <div class="phone-combat-vs">${attackerPlayer?.name || 'Attacker'} vs ${defenderPlayer?.name || 'Defender'}</div>
+        <button type="button" class="phone-combat-row${detail === 'attacker' ? ' open' : ''}" data-action="phone-combat-detail" data-side="attacker">
+          <span class="phone-combat-row-who">Attack</span>
+          <span class="phone-combat-row-mix">${atk}</span>
+        </button>
+        <button type="button" class="phone-combat-row${detail === 'defender' ? ' open' : ''}" data-action="phone-combat-detail" data-side="defender">
+          <span class="phone-combat-row-who">Defend</span>
+          <span class="phone-combat-row-mix">${def}</span>
+        </button>
+        <div class="phone-combat-next">${next}</div>
+        ${detailHtml}
+      </div>`;
   }
 
   _renderExpandedForces(attackers, defenders, attackerPlayer, defenderPlayer) {
@@ -2833,6 +2914,14 @@ export class CombatUI {
       this.isMinimized = !this.isMinimized;
       this.el.classList.toggle('minimized', this.isMinimized);
       this._render();
+    });
+
+    this.el.querySelectorAll('[data-action="phone-combat-detail"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const side = btn.dataset.side;
+        this.phoneCombatDetailSide = this.phoneCombatDetailSide === side ? null : side;
+        this._render();
+      });
     });
 
     // Action buttons

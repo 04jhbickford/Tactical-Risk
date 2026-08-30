@@ -57,6 +57,10 @@ const {
   AA_RESULT_AUTO_PAUSE_MS,
   territoryHasEnemyCombatUnits,
   getEnemyCombatUnits,
+  summarizeCombatForce,
+  formatCombatForceLine,
+  resolveCombatNextLine,
+  shouldUsePhoneCombatSummary,
 } = await import(pathToFileURL(join(root, 'src/ui/combatUI.js')));
 
 const unitDefs = {
@@ -110,7 +114,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.35', GAME_VERSION === 'V2.81.35');
+check('GAME_VERSION is V2.81.36', GAME_VERSION === 'V2.81.36');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
@@ -276,6 +280,43 @@ console.log('=== showNextCombat / syncFromAuthoritativeState skip empty rematch 
   check('won queue head is dequeued', game.combatQueue.length === 0);
   check('popup hidden after empty rematch skip', ui.el.classList.contains('hidden'));
   check('combat complete fires so the phase can end', completed === 1);
+}
+
+console.log('=== V2.81.36 phone combat summary ===');
+{
+  const mix = [
+    { type: 'infantry', quantity: 4 },
+    { type: 'armour', quantity: 2 },
+    { type: 'fighter', quantity: 1 },
+    { type: 'factory', quantity: 0 },
+  ];
+  check('force line names types and counts',
+    formatCombatForceLine(mix) === '4 infantry · 2 tank · 1 fighter');
+  check('empty force is blank', formatCombatForceLine([]) === '');
+  check('summarize drops zero qty',
+    summarizeCombatForce(mix).every((u) => u.quantity > 0));
+  check('next line is short',
+    resolveCombatNextLine('ready') === 'Next: roll combat'
+    && resolveCombatNextLine('selectCasualties') === 'Assign hits, then Confirm'
+    && resolveCombatNextLine('resolved', { winner: 'attacker' }) === 'Attacker wins');
+  check('phone summary is phone-only',
+    shouldUsePhoneCombatSummary({ mobile: true }) === true
+    && shouldUsePhoneCombatSummary({ mobile: false }) === false);
+  const game = makeGame({
+    attackers: [{ type: 'infantry', owner: 'p1', quantity: 4 }, { type: 'armour', owner: 'p1', quantity: 2 }],
+    defenders: [{ type: 'infantry', owner: 'p2', quantity: 3 }],
+  });
+  game.combatQueue = ['Anglo-Sudan Egypt'];
+  document.documentElement.classList.add('mobile-shell');
+  const ui = makeUI(game);
+  ui.showNextCombat();
+  check('phone opening paints who-vs-who + mix, not only the desktop sheet',
+    /phone-combat-summary/.test(ui.el.innerHTML)
+    && /phone-combat-row/.test(ui.el.innerHTML)
+    && /4 infantry/.test(ui.el.innerHTML)
+    && /2 tank/.test(ui.el.innerHTML)
+    && ui.el.classList.contains('combat-popup--phone'));
+  document.documentElement.classList.remove('mobile-shell');
 }
 
 if (failures) {

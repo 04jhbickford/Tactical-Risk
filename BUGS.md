@@ -2,6 +2,14 @@
 
 ---
 
+## 8.30.26 — V2.81.36 sea hairlines; no start tac bomber; tech + mixed attack + phone combat
+
+James he-correct on live V2.81.35: ocean was flat teal (no sea-zone edges); starting tray had a tactical bomber; tech roll count was unclear; mixed-stack attack was unit-by-unit; battle sheet did not fit iPhone.
+
+Fix: phone strokes a capped ~1 CSS-px sea hairline on every water polygon (`rgba(6,36,42,0.55)` on `#44C5BD`). Water-mask stroke+shadow and fat sea dashes stay off in setup. `RISK_STARTING_UNITS` drops tacticalBomber (defs, not a hide). Tech uses named count + Max + Confirm (tap does not spend). Move/attack chips show selected/available per type and a mixed-stack summary before Confirm. Phone combat is a short who-vs-who + types/counts + next-step card; tap a row for details; Confirm stays the thumb. Land hairlines / yellow lanes / China peek / owned Confirm→star+DEPLOY kept. SCHEMA 11. GAME_VERSION V2.81.36.
+
+---
+
 ## 8.30.26 — V2.81.35 CSS-px territory hairline; Fit ownership readable
 
 James lookpass of V2.81.34 (`fvll56cmt` / 59833dd): he would replace live V2.80 except borders — Fit/world were continent blobs with no tile edges, ownership unreadable. ROOT: `phoneCountryOutlineWidth` returned 0 in mobile setup and below zoom 0.85; seam was same-color bleed; legal hairline off; map art skipped.

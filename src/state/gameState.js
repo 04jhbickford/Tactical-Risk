@@ -137,7 +137,6 @@ export const RISK_STARTING_UNITS = {
   land: [
     { type: 'bomber', quantity: 1 },
     { type: 'fighter', quantity: 2 }, // Both fighters are in land, placed independently
-    { type: 'tacticalBomber', quantity: 1 }, // Must exist in data/units.json or it ghosts the tray
     { type: 'armour', quantity: 3 },
     { type: 'artillery', quantity: 3 },
     { type: 'infantry', quantity: 9 },

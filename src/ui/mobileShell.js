@@ -274,7 +274,11 @@ export function shouldShowPhonePeekMax({
   hasNamedLand,
   hasUnitType,
 } = {}) {
-  if (!mobile || !hasUnitType) return false;
+  if (!mobile) return false;
+  if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.DEVELOP_TECH) {
+    return true;
+  }
+  if (!hasUnitType) return false;
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return !!hasNamedLand;
   if (phase !== GAME_PHASES.PLAYING) return false;
   if (turnPhase === TURN_PHASES.PURCHASE) return true;
@@ -854,6 +858,11 @@ export const PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM = 0.85;
 export const PHONE_COUNTRY_HAIRLINE_CSS_PX = 1;
 export const PHONE_COUNTRY_HAIRLINE_WORLD_MAX = 5;
 export const PHONE_COUNTRY_HAIRLINE_COLOR = 'rgba(0, 0, 0, 0.35)';
+/** Same family as land: ~1 CSS-px on teal #44C5BD. Not the 4px
+ *  water-mask stroke+shadow (jagged dark coasts). */
+export const PHONE_SEA_HAIRLINE_CSS_PX = 1;
+export const PHONE_SEA_HAIRLINE_WORLD_MAX = 5;
+export const PHONE_SEA_HAIRLINE_COLOR = 'rgba(6, 36, 42, 0.55)';
 export const PHONE_LEGAL_HAIRLINE_CSS_PX = 2.25;
 
 // Poly dashed faction-color. Cream/ivory is map chrome — never return it.
@@ -921,6 +930,15 @@ export function shouldSkipPhoneWaterMask({ mobile = false, setup = false } = {})
 export function shouldStrokePhoneSeaDashes(zoom, { mobile = false, setup = false } = {}) {
   if (mobile && setup) return false;
   return Number(zoom) >= 0.4;
+}
+
+// Phone: a stable ~1 CSS-px sea-zone hairline at Fit / world / setup.
+// Desktop keeps dashes (this returns 0). Cap world-px so Fit cannot
+// stair-step a fat ocean rim.
+export function phoneSeaOutlineWidth(zoom, { mobile = false, setup = false } = {}) {
+  void setup;
+  if (!mobile) return 0;
+  return phoneCountryOutlineWidth(zoom, { mobile: true, setup });
 }
 
 export function phoneLegalDashPattern(zoom) {

@@ -91,9 +91,13 @@ const {
   phoneLegalDashPattern,
   phoneLegalUsesSolidStroke,
   phoneCountryOutlineWidth,
+  phoneSeaOutlineWidth,
   PHONE_COUNTRY_HAIRLINE_CSS_PX,
   PHONE_COUNTRY_HAIRLINE_WORLD_MAX,
   PHONE_COUNTRY_HAIRLINE_COLOR,
+  PHONE_SEA_HAIRLINE_CSS_PX,
+  PHONE_SEA_HAIRLINE_WORLD_MAX,
+  PHONE_SEA_HAIRLINE_COLOR,
   shouldDrawPhoneOwnershipFlags,
   phoneOwnershipFlagSize,
   phoneOwnershipSeamWidth,
@@ -138,6 +142,9 @@ const {
   resolvePhonePeekHint,
   resolvePhoneDeployLandName,
   resolvePhoneDeployCtaLabel,
+  formatPhoneMoveSelectionSummary,
+  resolvePhoneTechCta,
+  resolvePhoneMoveCta,
   shouldKeepPhonePairLand,
   shouldShowPhoneSetupPeekHint,
   resolvePhoneStickyUnitType,
@@ -173,7 +180,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.35', GAME_VERSION === 'V2.81.35');
+check('GAME_VERSION is V2.81.36', GAME_VERSION === 'V2.81.36');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -2008,6 +2015,53 @@ console.log('=== V2.81.34 Fit fills-only + China inspect ===');
     && /renderCrossWaterConnections/.test(mainSrc)
     && /shouldStrokePhoneSeaDashes/.test(rendererSrc)
     && /LAND_BRIDGES/.test(rendererSrc));
+}
+
+console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');
+{
+  const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('phone sea hairline is ~1 CSS px, capped, reads on teal',
+    phoneSeaOutlineWidth(0.11, { mobile: true, setup: true }) === PHONE_SEA_HAIRLINE_WORLD_MAX
+    && phoneSeaOutlineWidth(0.11, { mobile: true, setup: true }) * 0.11 < 1.1
+    && Math.abs(phoneSeaOutlineWidth(1, { mobile: true }) - PHONE_SEA_HAIRLINE_CSS_PX) < 1e-9
+    && phoneSeaOutlineWidth(0.5, { mobile: false }) === 0
+    && PHONE_SEA_HAIRLINE_COLOR === 'rgba(6, 36, 42, 0.55)'
+    && /PHONE_SEA_HAIRLINE_COLOR/.test(rendererSrc)
+    && /phoneSeaOutlineWidth/.test(rendererSrc)
+    && shouldSkipPhoneWaterMask({ mobile: true, setup: true }) === true
+    && shouldStrokePhoneSeaDashes(0.11, { mobile: true, setup: true }) === false);
+  check('land hairline from 35 is unchanged',
+    phoneCountryOutlineWidth(0.11, { mobile: true, setup: true }) === PHONE_COUNTRY_HAIRLINE_WORLD_MAX
+    && PHONE_COUNTRY_HAIRLINE_COLOR === 'rgba(0, 0, 0, 0.35)');
+  check('tech Max + named Confirm; tap does not spend',
+    shouldShowPhonePeekMax({
+      mobile: true, phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.DEVELOP_TECH,
+    }) === true
+    && resolvePhoneTechCta({ diceCount: 0 }) === null
+    && resolvePhoneTechCta({ diceCount: 3 })?.label === 'Confirm 3 research dice'
+    && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.DEVELOP_TECH, null, {
+      techDiceCount: 3,
+    }) === 'Research 3 dice'
+    && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.DEVELOP_TECH) === 'Tap + or Max, then Confirm'
+    && /phone-peek-tech-count/.test(panelSrc)
+    && !/phone-peek-chip-wide" data-action="roll-tech"/.test(panelSrc));
+  check('mixed-stack attack shows types + counts before Confirm',
+    formatPhoneMoveSelectionSummary({
+      infantry: 4, armour: 2, fighter: 1,
+    }) === '4 infantry · 2 tank · 1 fighter'
+    && resolvePhoneMoveCta({
+      destName: 'West Russia',
+      isAttack: true,
+      selectedSummary: '4 infantry · 2 tank · 1 fighter',
+    })?.label === 'Confirm attack · 4 infantry · 2 tank · 1 fighter'
+    && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
+      territoryName: 'Ukraine S.S.R.',
+      destName: 'West Russia',
+      selectedSummary: '4 infantry · 2 tank',
+    }) === 'Ukraine S.S.R. → West Russia · 4 infantry · 2 tank'
+    && /pp-move-selected-summary/.test(panelSrc)
+    && /selectedQty/.test(panelSrc));
 }
 
 console.log('=== V2.81.35 CSS-px territory hairline + Fit ownership ===');

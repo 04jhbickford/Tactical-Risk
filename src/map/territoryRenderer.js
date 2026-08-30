@@ -4,7 +4,9 @@ import {
   isMobileShell,
   phoneLegalOutlineWidth,
   phoneCountryOutlineWidth,
+  phoneSeaOutlineWidth,
   PHONE_COUNTRY_HAIRLINE_COLOR,
+  PHONE_SEA_HAIRLINE_COLOR,
   shouldDrawPhoneOwnershipFlags,
   phoneOwnershipFlagSize,
   phoneOwnershipSeamWidth,
@@ -666,6 +668,26 @@ export class TerritoryRenderer {
       ctx.lineWidth = countryW;
       for (const t of this.territories) {
         if (t.isWater) continue;
+        for (const poly of t.polygons || []) {
+          if (!poly || poly.length < 3) continue;
+          this._strokePoly(ctx, poly);
+        }
+      }
+    }
+
+    // Sea-zone hairline — same CSS-px family as land. Water-mask
+    // stroke+shadow stays off (jagged dark coasts). Dashes stay off
+    // in phone setup. Yellow land-bridge lanes are a later pass.
+    const seaW = phoneSeaOutlineWidth(zoom, {
+      mobile: isMobileShell(),
+      setup: isPhoneSetupPhase(this.gameState?.phase),
+    });
+    if (seaW > 0) {
+      ctx.strokeStyle = PHONE_SEA_HAIRLINE_COLOR;
+      ctx.lineWidth = seaW;
+      ctx.setLineDash([]);
+      for (const t of this.territories) {
+        if (!t.isWater) continue;
         for (const poly of t.polygons || []) {
           if (!poly || poly.length < 3) continue;
           this._strokePoly(ctx, poly);

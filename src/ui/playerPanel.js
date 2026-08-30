@@ -271,6 +271,9 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
   }
   if (phase === GAME_PHASES.PLAYING
     && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+    const mix = opts.selectedSummary || '';
+    if (land && dest && mix) return `${land} → ${dest} · ${mix}`;
+    if (land && mix) return `Tap dest · ${mix}`;
     if (land && dest && selectedUnitType) return `${land} → ${dest}`;
     if (land && selectedUnitType) return `To ${land}`;
     if (land) return `Tap a unit · ${land}`;
@@ -285,9 +288,52 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
         ? `Tap Max or End Phase · ${formatUnitName(selectedUnitType)}`
         : 'Tap a unit to buy';
     }
-    if (turnPhase === TURN_PHASES.DEVELOP_TECH) return 'Buy research dice';
+    if (turnPhase === TURN_PHASES.DEVELOP_TECH) {
+      const n = Number(opts.techDiceCount) || 0;
+      if (n > 0) return n === 1 ? 'Research 1 die' : `Research ${n} dice`;
+      return 'Tap + or Max, then Confirm';
+    }
   }
   return '';
+}
+
+export function formatPhoneMoveSelectionSummary(selected, { formatName = formatUnitName } = {}) {
+  const parts = [];
+  for (const [key, qty] of Object.entries(selected || {})) {
+    const n = Number(qty) || 0;
+    if (n <= 0) continue;
+    let type = key;
+    if (key.startsWith('ship:')) type = 'ship';
+    else if (key.startsWith('cargo:')) type = key.split(':')[2] || 'cargo';
+    else if (key.startsWith('aircraft:')) type = key.split(':').pop();
+    const name = String(formatName(type) || type).toLowerCase();
+    parts.push(`${n} ${name}`);
+  }
+  return parts.join(' · ');
+}
+
+export function resolvePhoneTechCta({ diceCount } = {}) {
+  const n = Number(diceCount) || 0;
+  if (n <= 0) return null;
+  return {
+    action: 'roll-tech',
+    label: n === 1 ? 'Confirm 1 research die' : `Confirm ${n} research dice`,
+    disabled: false,
+    primary: true,
+  };
+}
+
+export function resolvePhoneMoveCta({ destName, isAttack = false, selectedSummary = '' } = {}) {
+  if (!destName || !selectedSummary) return null;
+  return {
+    action: 'confirm-move',
+    label: isAttack
+      ? `Confirm attack · ${selectedSummary}`
+      : `Confirm move · ${selectedSummary}`,
+    disabled: false,
+    primary: true,
+    isAttack: !!isAttack,
+  };
 }
 
 // Place Capital Confirm is the verb. Do not also show a hint line.
@@ -975,12 +1021,20 @@ export class PlayerPanel {
   }
 
   _applyPhonePairMax(unitTypeHint = null) {
-    const unitType = unitTypeHint || this.selectedUnitType;
-    if (!unitType) return false;
     const phase = this.gameState?.phase;
     const turnPhase = this.gameState?.turnPhase;
     const dest = this._phoneDeployDest();
     const player = this.gameState?.currentPlayer;
+
+    if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.DEVELOP_TECH) {
+      const ipcs = this.gameState.getIPCs(player?.id);
+      this.techDiceCount = Math.max(0, Math.floor(Number(ipcs) / 5) || 0);
+      this._scheduleRender();
+      return true;
+    }
+
+    const unitType = unitTypeHint || this.selectedUnitType;
+    if (!unitType) return false;
 
     if (phase === GAME_PHASES.UNIT_PLACEMENT) {
       if (!dest) return false;
@@ -1365,17 +1419,22 @@ export class PlayerPanel {
       });
     }
     // Movement confirm button
-    else if (this.movePendingDest && this.activeTab === 'actions') {
+    else if (this.movePendingDest && (this.activeTab === 'actions' || isMobileShell())) {
       const destOwner = this.gameState.getOwner(this.movePendingDest);
       const isAttack = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
-
-      buttons.push({
+      const selectedSummary = formatPhoneMoveSelectionSummary(this.moveSelectedUnits);
+      const named = resolvePhoneMoveCta({
+        destName: this.movePendingDest,
+        isAttack,
+        selectedSummary,
+      });
+      buttons.push(named || {
         action: 'confirm-move',
         label: isAttack ? 'Confirm Attack' : 'Confirm Move',
         disabled: false,
         primary: true,
-        isAttack: isAttack,
-        undoable: !isAttack  // Non-attack moves can be undone
+        isAttack,
+        undoable: !isAttack,
       });
     }
     // Capital placement — 22d4b13 tray. Own-land tap peeks; Confirm is
@@ -1422,6 +1481,10 @@ export class PlayerPanel {
       } else if (ux.needSeaHint && ux.hint) {
         warningHtml = `<div class="pp-bottom-warning">${ux.hint}</div>`;
       }
+    } else if (phase === GAME_PHASES.PLAYING && shouldShowTechResearch(phase, turnPhase)
+      && this.techDiceCount > 0) {
+      const techCta = resolvePhoneTechCta({ diceCount: this.techDiceCount });
+      if (techCta) buttons.push(techCta);
     } else if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE
       && isMobileShell()) {
       const dest = this._phoneDeployDest();
@@ -1494,6 +1557,8 @@ export class PlayerPanel {
               allowWater: phonePairAllowWater({ phase, turnPhase }),
             }),
             destName: this.movePendingDest || '',
+            techDiceCount: this.techDiceCount,
+            selectedSummary: formatPhoneMoveSelectionSummary(this.moveSelectedUnits),
           })
           : (warningText || resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
             territoryName: resolvePhoneDeployLandName({
@@ -1502,6 +1567,8 @@ export class PlayerPanel {
               allowWater: phonePairAllowWater({ phase, turnPhase }),
             }),
             destName: this.movePendingDest || '',
+            techDiceCount: this.techDiceCount,
+            selectedSummary: formatPhoneMoveSelectionSummary(this.moveSelectedUnits),
           }) || ''))
         : '';
       warningHtml = '';
@@ -2596,9 +2663,10 @@ export class PlayerPanel {
         </div>`;
 
     if (this.techDiceCount > 0) {
+      const techCta = resolvePhoneTechCta({ diceCount: this.techDiceCount });
       html += `
         <button class="pp-action-btn primary" data-action="roll-tech">
-          Roll ${this.techDiceCount} Research Dice
+          ${techCta.label}
         </button>`;
     }
 
@@ -2815,9 +2883,11 @@ export class PlayerPanel {
       }
     } else if (phase === GAME_PHASES.PLAYING
       && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
+      const selectedSummary = formatPhoneMoveSelectionSummary(this.moveSelectedUnits);
       pairHint = resolvePhonePeekHint(phase, turnPhase, this.selectedUnitType, {
         territoryName: pairLand,
         destName: this.movePendingDest || '',
+        selectedSummary,
       });
       const from = this._phoneDeployDest();
       const movable = from ? this._getMovableUnits(from, player) : [];
@@ -2827,18 +2897,26 @@ export class PlayerPanel {
         if (seen.has(unitKey)) continue;
         seen.add(unitKey);
         const imageSrc = getUnitIconPath(unit.type, player.id);
-        const selected = this.selectedUnitType === unitKey || this.selectedUnitType === unit.type
+        const selectedQty = Number(this.moveSelectedUnits[unitKey]) || 0;
+        const selected = selectedQty > 0
+          || this.selectedUnitType === unitKey
+          || this.selectedUnitType === unit.type
           ? ' selected' : '';
         const qty = unit.quantity;
         chips += `
-          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unitKey}" aria-label="${formatUnitName(unit.type)}">
+          <button type="button" class="phone-peek-chip${selected}${selectedQty > 0 ? ' has-qty' : ''}" data-action="phone-select-unit" data-unit="${unitKey}" aria-label="${formatUnitName(unit.type)}">
             ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
-            <span class="phone-peek-count">${qty}</span>
+            <span class="phone-peek-count">${selectedQty > 0 ? `${selectedQty}/${qty}` : qty}</span>
           </button>`;
       }
     } else if (shouldShowTechResearch(phase, turnPhase)) {
-      chips += `<button type="button" class="phone-peek-chip" data-action="tech-dice-delta" data-delta="1" aria-label="Add research die">+</button>`;
-      chips += `<button type="button" class="phone-peek-chip phone-peek-chip-wide" data-action="roll-tech" aria-label="Roll tech">Roll</button>`;
+      const n = this.techDiceCount || 0;
+      const ipcs = this.gameState.getIPCs(player.id);
+      const maxDice = Math.floor(ipcs / 5);
+      pairHint = resolvePhonePeekHint(phase, turnPhase, null, { techDiceCount: n });
+      chips += `<button type="button" class="phone-peek-chip" data-action="tech-dice-delta" data-delta="-1" aria-label="Fewer research dice" ${n <= 0 ? 'disabled' : ''}>−</button>`;
+      chips += `<span class="phone-peek-chip phone-peek-tech-count" aria-live="polite">${n}</span>`;
+      chips += `<button type="button" class="phone-peek-chip" data-action="tech-dice-delta" data-delta="1" aria-label="Add research die" ${n >= maxDice ? 'disabled' : ''}>+</button>`;
     }
 
     if (!chips && !qty && !pairHint) return '';
@@ -3612,11 +3690,17 @@ export class PlayerPanel {
       this.moveUnitTab = hasNaval ? 'naval' : (hasAir ? 'air' : 'cargo');
     }
 
+    const selectedSummary = formatPhoneMoveSelectionSummary(this.moveSelectedUnits);
     let html = `
       <div class="pp-inline-movement">
         <div class="pp-move-from">
           <span class="pp-move-label">From:</span>
           <span class="pp-move-territory">${this.selectedTerritory.name}</span>
+        </div>
+        <div class="pp-move-selected-summary" aria-live="polite">
+          ${selectedSummary
+            ? `Selected: ${selectedSummary}`
+            : 'Selected: none — tap a type, then Max'}
         </div>
 
         <div class="pp-move-category-tabs">

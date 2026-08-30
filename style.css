@@ -4840,11 +4840,11 @@ iframe[title="Vercel Live Feedback"] {
 }
 
 .pp-tech-dice-count {
-  min-width: 24px;
+  min-width: 32px;
   text-align: center;
-  font-size: 16px;
-  font-weight: 700;
-  color: #9b59b6;
+  font-size: 22px;
+  font-weight: 800;
+  color: #fde68a;
 }
 
 .pp-tech-cost {
@@ -5299,6 +5299,13 @@ iframe[title="Vercel Live Feedback"] {
 }
 
 /* Inline Movement UI */
+.pp-move-selected-summary {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f5c518;
+  margin: 6px 0 8px;
+}
+
 .pp-inline-movement {
   background: rgba(0,0,0,0.2);
   border-radius: 8px;
@@ -18653,6 +18660,135 @@ iframe[title="Vercel Live Feedback"] {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  html.mobile-shell .combat-popup,
+  html.mobile-shell .combat-popup.combat-popup--phone {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    max-height: 42dvh;
+    border-radius: 14px 14px 0 0;
+    overflow-y: auto;
+  }
+
+  html.mobile-shell .combat-popup--phone .combat-forces-expanded,
+  html.mobile-shell .combat-popup--phone .combat-forces-header,
+  html.mobile-shell .combat-popup--phone .probability-bar-compact,
+  html.mobile-shell .combat-popup--phone .combat-phase-indicator,
+  html.mobile-shell .combat-popup--phone .left-modal-minimize-btn {
+    display: none;
+  }
+
+  html.mobile-shell .phone-combat-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  html.mobile-shell .phone-combat-vs {
+    font-size: 14px;
+    font-weight: 700;
+    color: #f8fafc;
+  }
+
+  html.mobile-shell .phone-combat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+    text-align: left;
+  }
+
+  html.mobile-shell .phone-combat-row.open {
+    border-color: rgba(253, 230, 138, 0.55);
+    background: rgba(253, 230, 138, 0.08);
+  }
+
+  html.mobile-shell .phone-combat-row-who {
+    flex: 0 0 auto;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  html.mobile-shell .phone-combat-row-mix {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  html.mobile-shell .phone-combat-next {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fde68a;
+  }
+
+  html.mobile-shell .phone-combat-detail {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.28);
+  }
+
+  html.mobile-shell .phone-combat-detail-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+
+  html.mobile-shell .phone-combat-detail-row {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f8fafc;
+    line-height: 1.35;
+  }
+
+  html.mobile-shell .combat-popup--phone .combat-actions {
+    position: sticky;
+    bottom: 0;
+    padding-top: 8px;
+    background: rgba(25, 25, 50, 0.98);
+  }
+
+  html.mobile-shell .combat-popup--phone .combat-btn.confirm,
+  html.mobile-shell .combat-popup--phone .combat-btn.roll,
+  html.mobile-shell .combat-popup--phone .combat-btn.next {
+    min-height: 48px;
+    width: 100%;
+  }
+
+  html.mobile-shell .phone-peek-tech-count {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 800;
+    color: #fde68a;
+    pointer-events: none;
+  }
+
+  html.mobile-shell .pp-move-selected-summary {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fde68a;
+    margin: 6px 0 8px;
   }
 
   html.mobile-shell .territory-tooltip .tt-ipc {
