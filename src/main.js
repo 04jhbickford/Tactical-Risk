@@ -98,6 +98,12 @@ import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase
 import { getAuthManager } from './multiplayer/auth.js';
 import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
+import { leaveGame } from './multiplayer/surrender.js';
+import {
+  applySurrenderToState,
+  shouldDeleteGameAfterResign,
+  resolveResignPlayerId,
+} from './multiplayer/surrenderCore.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
@@ -771,8 +777,10 @@ async function init() {
               const logUnits = unloadedUnits.length > 0 ? unloadedUnits : [{ type: 'amphibious', quantity: 1 }];
               actionLog.logMove(data.from, data.to, logUnits, gameState.currentPlayer);
               camera.dirty = true;
-              selectedTerritory = null;
-              playerPanel.setSelectedTerritory(null);
+              if (!data.keepPhonePair) {
+                selectedTerritory = null;
+                playerPanel.setSelectedTerritory(null);
+              }
             }
           } else {
             // Regular move
@@ -785,9 +793,10 @@ async function init() {
             if (result.success) {
               actionLog.logMove(data.from, data.to, unitsToMove, gameState.currentPlayer);
               camera.dirty = true;
-              // Clear selection after successful move
-              selectedTerritory = null;
-              playerPanel.setSelectedTerritory(null);
+              if (!data.keepPhonePair) {
+                selectedTerritory = null;
+                playerPanel.setSelectedTerritory(null);
+              }
             } else {
               console.warn('Move failed:', result.error);
             }
@@ -1512,33 +1521,56 @@ async function init() {
       rulesPanel.toggle();
     });
 
-    hud.setOnExitToLobby(() => {
+    const leaveToLobby = () => {
       document.title = 'Tactical Risk';
       forgetLastMatch();
-      // Stop presence tracking
       if (presenceManager) {
         presenceManager.stop();
       }
-
-      // Stop sync manager if multiplayer
       if (syncManager) {
         syncManager.stopSync();
         syncManager = null;
       }
-
-      // Hide any open multiplayer UI
       if (multiplayerLobby) {
         multiplayerLobby.hide();
       }
       if (gameListUI) {
         gameListUI.hide();
       }
-
-      // Reset game state
       gameState = null;
-
-      // Always go back to main home screen
       lobby.show();
+    };
+
+    hud.setOnExitToLobby(() => {
+      leaveToLobby();
+    });
+
+    hud.setOnResign(async () => {
+      const authUserId = authManager.getUserId?.() || authManager.getUser?.()?.id || null;
+      const resignId = resolveResignPlayerId({
+        players: gameState?.players || [],
+        authUserId,
+        currentPlayerId: gameState?.currentPlayer?.oderId || gameState?.currentPlayer?.id || null,
+      });
+      if (gameState?.isMultiplayer && syncManager?.gameId && authUserId) {
+        const result = await leaveGame(syncManager.gameId, authUserId);
+        if (!result?.success) {
+          alert('Failed to resign: ' + (result?.error || 'unknown error'));
+          return;
+        }
+        leaveToLobby();
+        return;
+      }
+      if (gameState && resignId) {
+        const json = gameState.toJSON();
+        const result = applySurrenderToState(json, resignId);
+        if (result.changed && !shouldDeleteGameAfterResign({ humansRemain: result.humansRemain })) {
+          gameState.loadFromJSON(json);
+          camera.dirty = true;
+          return;
+        }
+      }
+      leaveToLobby();
     });
 
     // Bug tracker

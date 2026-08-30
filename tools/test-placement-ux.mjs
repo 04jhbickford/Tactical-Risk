@@ -39,7 +39,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.37', GAME_VERSION === 'V2.81.37');
+check('GAME_VERSION is V2.81.38', GAME_VERSION === 'V2.81.38');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== computeInitialPlacementUX: land selected, only naval remain, valid sea exists ===');
@@ -248,11 +248,11 @@ console.log('=== leftover / ghost unit must not block Done or sticky-select ==='
   check('unknown types are stripped from the known tray', known.length === 0);
   check('sticky skips an unknown leftover (no ghost default)',
     resolvePhoneStickyUnitType(null, ghostPool, unitDefs) === null);
-  check('sticky still defaults to the first known remaining type',
+  check('sticky does not retarget leftover clicks onto another type',
     resolvePhoneStickyUnitType(null, [
       { type: 'tacticalBomber', quantity: 1 },
       { type: 'infantry', quantity: 2 },
-    ], unitDefs) === 'infantry');
+    ], unitDefs) === null);
 
   check('ghost-only leftover is finishable (nothing known/placeable)',
     canFinishPlacementRound({

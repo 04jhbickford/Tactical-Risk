@@ -19,7 +19,9 @@ export function applySurrenderToState(state, oderId) {
   const result = { changed: false, currentPlayerId: null, gameOver: false, humansRemain: false };
   if (!state?.players) return result;
 
-  const playerIndex = state.players.findIndex(p => p.oderId === oderId);
+  const playerIndex = state.players.findIndex(p =>
+    (oderId && p.oderId === oderId) || (oderId && p.id === oderId)
+  );
   if (playerIndex === -1) return result;
 
   const player = state.players[playerIndex];
@@ -116,7 +118,25 @@ export function applySurrenderToState(state, oderId) {
   }
 
   const currentPlayer = state.players[state.currentPlayerIndex];
-  result.currentPlayerId = currentPlayer?.oderId || null;
+  result.currentPlayerId = currentPlayer?.oderId || currentPlayer?.id || null;
 
   return result;
+}
+
+// Delete the Firestore game when no seated humans remain (all-resign /
+// last human out, including 1-human+AI). SCHEMA 11 — uses surrendered.
+export function shouldDeleteGameAfterResign({ humansRemain = true } = {}) {
+  return humansRemain === false;
+}
+
+export function resolveResignPlayerId({
+  players = [],
+  authUserId = null,
+  currentPlayerId = null,
+} = {}) {
+  if (authUserId && players.some((p) => p?.oderId === authUserId || p?.id === authUserId)) {
+    return authUserId;
+  }
+  const humans = (players || []).filter((p) => p && !p.isAI && !p.surrendered);
+  return humans[0]?.oderId || humans[0]?.id || currentPlayerId || null;
 }

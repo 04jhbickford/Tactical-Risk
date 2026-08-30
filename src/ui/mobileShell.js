@@ -177,14 +177,58 @@ export function shouldAutoStagePhoneDeployPair({
     && !!canAdd;
 }
 
-/** Repeat icon taps add +1 of that type onto the named eligible land.
- *  Land tap only names the dest — it does not increment. */
+/** Named dest + this type still has remaining: the icon tap commits now. */
 export function shouldIncrementPhonePairIcon({
   hasNamedLand = false,
   unitType = null,
   canAdd = false,
 } = {}) {
   return !!hasNamedLand && !!unitType && !!canAdd;
+}
+
+/** Remaining of THIS type only. Never a round-cap stand-in, never other types. */
+export function remainingEligibleOfType({ available = 0 } = {}) {
+  return Math.max(0, Number(available) || 0);
+}
+
+/** Icon tap commits one (or Max dumps remaining) of THAT type after dest is named. */
+export function shouldCommitPhoneIconTap({
+  hasNamedDest = false,
+  unitType = null,
+  remainingOfType = 0,
+} = {}) {
+  return !!hasNamedDest && !!unitType && remainingEligibleOfType({ available: remainingOfType }) > 0;
+}
+
+/** Exhausted type: leftover taps no-op and clear. Do not retarget another type. */
+export function shouldClearPhoneIconAfterExhausted({
+  unitType = null,
+  remainingOfType = 0,
+} = {}) {
+  return !!unitType && remainingEligibleOfType({ available: remainingOfType }) <= 0;
+}
+
+export function phoneIconCommitCount({
+  remainingOfType = 0,
+  dumpRemaining = false,
+  slotsRemaining = Number.POSITIVE_INFINITY,
+} = {}) {
+  const typeLeft = remainingEligibleOfType({ available: remainingOfType });
+  if (typeLeft <= 0) return 0;
+  const slots = Number.isFinite(slotsRemaining)
+    ? Math.max(0, Number(slotsRemaining) || 0)
+    : typeLeft;
+  if (dumpRemaining) return Math.min(typeLeft, slots);
+  return Math.min(1, typeLeft, slots);
+}
+
+/** Phone unit-icon path commits immediately — no Deploy / Confirm-move thumb. */
+export function shouldHidePhonePairConfirm({ mobile = false, pairGrammar = false } = {}) {
+  return !!mobile && !!pairGrammar;
+}
+
+export function canNamePhoneMoveDest({ hasSource = false, destIsLegal = false } = {}) {
+  return !!hasSource && !!destIsLegal;
 }
 
 export function nextStagedCount({ current = 0, available = 0 } = {}) {
@@ -284,27 +328,31 @@ export function shouldUsePhonePairGrammar({ mobile, phase, turnPhase } = {}) {
   return false;
 }
 
-// Max lives in the thumb with Confirm. It never commits.
-// Purchase Max does not need a named land.
+// Pair-path Max dumps remaining of THAT type now (no Confirm).
+// Tech Max still only fills the count; Confirm spends. Purchase Max
+// does not need a named land.
 export function shouldShowPhonePeekMax({
   mobile,
   phase,
   turnPhase,
   hasNamedLand,
   hasUnitType,
+  hasNamedDest = false,
+  remainingOfType = 1,
 } = {}) {
   if (!mobile) return false;
   if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.DEVELOP_TECH) {
     return true;
   }
   if (!hasUnitType) return false;
+  if (remainingEligibleOfType({ available: remainingOfType }) <= 0) return false;
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return !!hasNamedLand;
   if (phase !== GAME_PHASES.PLAYING) return false;
   if (turnPhase === TURN_PHASES.PURCHASE) return true;
-  if (turnPhase === TURN_PHASES.MOBILIZE
-    || turnPhase === TURN_PHASES.COMBAT_MOVE
+  if (turnPhase === TURN_PHASES.MOBILIZE) return !!hasNamedLand;
+  if (turnPhase === TURN_PHASES.COMBAT_MOVE
     || turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
-    return !!hasNamedLand;
+    return !!hasNamedLand && !!hasNamedDest;
   }
   return false;
 }

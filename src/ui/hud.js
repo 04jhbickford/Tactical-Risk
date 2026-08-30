@@ -11,6 +11,7 @@ export class HUD {
     this.onNextPhase = null;
     this.onRulesToggle = null;
     this.onExitToLobby = null;
+    this.onResign = null;
     this.menuOpen = false;
     this.mapToolsOpen = false;
     this.menuTab = null;
@@ -70,6 +71,10 @@ export class HUD {
     this.onExitToLobby = callback;
   }
 
+  setOnResign(callback) {
+    this.onResign = callback;
+  }
+
   setGameState(gameState) {
     this.gameState = gameState;
     gameState.subscribe(() => this._render());
@@ -117,6 +122,10 @@ export class HUD {
           <button class="hud-menu-item" data-action="exit-lobby">
             <span class="hud-menu-item-icon">💾</span>
             <span>Save & Exit</span>
+          </button>
+          <button class="hud-menu-item" data-action="resign">
+            <span class="hud-menu-item-icon">🏳</span>
+            <span>Resign</span>
           </button>
         </div>
       </div>
@@ -301,6 +310,11 @@ export class HUD {
               <span class="phone-menu-label">Save & Exit</span>
               <span class="phone-menu-meta">›</span>
             </button>
+            <button class="phone-menu-row" data-action="resign">
+              <span class="phone-menu-mark" aria-hidden="true"></span>
+              <span class="phone-menu-label">Resign</span>
+              <span class="phone-menu-meta">›</span>
+            </button>
           </div>
           ${shouldShowPhoneMenuPlayerRoster({ mobile: true }) ? playersHtml : ''}
         `}
@@ -463,6 +477,20 @@ export class HUD {
           : 'Exit to lobby? Your game progress will be lost.';
         if (confirm(message)) {
           this.onExitToLobby();
+        }
+      }
+    });
+
+    const resignItem = this.el.querySelector('[data-action="resign"]');
+    resignItem?.addEventListener('click', () => {
+      this.menuOpen = false;
+      this._updateMenuState();
+      if (this.onResign) {
+        const message = this.gameState?.isMultiplayer
+          ? 'Resign from this game? Your territories become neutral and your units are removed. If no seated humans remain, the game is deleted. This cannot be undone.'
+          : 'Resign from this game? Your territories become neutral and your units are removed. If no humans remain, the game ends. This cannot be undone.';
+        if (confirm(message)) {
+          this.onResign();
         }
       }
     });

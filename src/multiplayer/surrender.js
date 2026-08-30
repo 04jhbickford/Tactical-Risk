@@ -13,6 +13,7 @@
 import {
   doc,
   runTransaction,
+  deleteDoc,
   serverTimestamp,
   arrayRemove
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
@@ -20,8 +21,8 @@ import { getFirebaseDb } from './firebase.js';
 // Pure transform lives in surrenderCore.js (no Firebase imports) so the node
 // robustness harness can exercise the exact same logic. Re-exported here for
 // existing importers.
-import { applySurrenderToState } from './surrenderCore.js';
-export { applySurrenderToState };
+import { applySurrenderToState, shouldDeleteGameAfterResign } from './surrenderCore.js';
+export { applySurrenderToState, shouldDeleteGameAfterResign };
 
 // Surrender/leave a game from outside a live session (e.g. the My Games list).
 // Uses a transaction so we never clobber a concurrent state push.
@@ -86,6 +87,21 @@ export async function leaveGame(gameId, userId) {
         }
       }
 
+      const deleteAfter = shouldDeleteGameAfterResign({ humansRemain: result.humansRemain });
+      if (deleteAfter) {
+        // Keep the resigning seat in playerUserIds so a follow-up delete
+        // is authorized (rules: seated player + status finished).
+        transaction.update(gameRef, {
+          state,
+          stateVersion: (data.stateVersion || 0) + 1,
+          currentPlayerId: result.currentPlayerId,
+          status: 'finished',
+          lobbyData,
+          updatedAt: serverTimestamp()
+        });
+        return { success: true, surrendered: true, gameFinished: true, shouldDelete: true };
+      }
+
       transaction.update(gameRef, {
         state,
         stateVersion: (data.stateVersion || 0) + 1,
@@ -96,8 +112,18 @@ export async function leaveGame(gameId, userId) {
         updatedAt: serverTimestamp()
       });
 
-      return { success: true, surrendered: true, gameFinished: status === 'finished' };
+      return { success: true, surrendered: true, gameFinished: status === 'finished', shouldDelete: false };
     });
+
+    if (outcome?.success && outcome.shouldDelete) {
+      try {
+        await deleteDoc(gameRef);
+        return { ...outcome, deleted: true };
+      } catch (deleteError) {
+        console.error('[Surrender] delete after all-resign failed:', deleteError);
+        return { ...outcome, deleted: false, error: deleteError.message };
+      }
+    }
 
     return outcome;
   } catch (error) {

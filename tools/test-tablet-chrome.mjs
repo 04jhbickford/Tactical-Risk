@@ -74,6 +74,12 @@ const {
   shouldAutoStagePhoneDeployPair,
   shouldIncrementPhonePairIcon,
   nextStagedCount,
+  remainingEligibleOfType,
+  shouldCommitPhoneIconTap,
+  shouldClearPhoneIconAfterExhausted,
+  shouldHidePhonePairConfirm,
+  phoneIconCommitCount,
+  canNamePhoneMoveDest,
   shouldUsePhonePairGrammar,
   shouldShowPhonePeekMax,
   phonePointerHint,
@@ -182,7 +188,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.37', GAME_VERSION === 'V2.81.37');
+check('GAME_VERSION is V2.81.38', GAME_VERSION === 'V2.81.38');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -940,28 +946,28 @@ console.log('=== V2.70 phone Fit is a regional window (never one chip, never pos
 }
 
 console.log('=== V2.71 default-first + sticky place; one-tap capital; undo ===');
-check('null selection defaults to the first remaining unit',
+check('null selection does not sticky-pick another type',
   resolvePhoneStickyUnitType(null, [
     { type: 'infantry', quantity: 3 },
     { type: 'tank', quantity: 1 },
-  ]) === 'infantry');
+  ]) === null);
 check('sticky keeps the selected type while it remains',
   resolvePhoneStickyUnitType('tank', [
     { type: 'infantry', quantity: 3 },
     { type: 'tank', quantity: 2 },
   ]) === 'tank');
-check('exhausted type defaults to the first remaining',
+check('exhausted type does not convert leftover taps to another type',
   resolvePhoneStickyUnitType('infantry', [
     { type: 'infantry', quantity: 0 },
     { type: 'artillery', quantity: 1 },
-  ]) === 'artillery');
+  ]) === null);
 check('no remaining units → null',
   resolvePhoneStickyUnitType('infantry', []) === null);
 check('unknown leftover is not sticky-selected when defs are passed',
   resolvePhoneStickyUnitType(null, [
     { type: 'tacticalBomber', quantity: 1 },
     { type: 'infantry', quantity: 2 },
-  ], { infantry: { isLand: true } }) === 'infantry');
+  ], { infantry: { isLand: true } }) === null);
 check('phone capital tap selects only — Confirm is the verb',
   shouldAutoCommitPhoneCapital({
     mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT, tappedIsOwnedLand: true,
@@ -1137,7 +1143,7 @@ check('phone placement hints say Tap, desktop stay Click',
       && shouldShowPhoneDeployQty({
         mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
       }) === false);
-    check('named land + icon tap stages +1 each time until the type is exhausted',
+    check('named land + icon tap commits that type until it is exhausted',
       shouldAutoStagePhoneDeployPair({
         mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
         queuedForType: 0, canAdd: true,
@@ -1156,6 +1162,20 @@ check('phone placement hints say Tap, desktop stay Click',
       && shouldIncrementPhonePairIcon({
         hasNamedLand: false, unitType: 'infantry', canAdd: true,
       }) === false
+      && shouldCommitPhoneIconTap({
+        hasNamedDest: true, unitType: 'bomber', remainingOfType: 1,
+      }) === true
+      && shouldCommitPhoneIconTap({
+        hasNamedDest: true, unitType: 'bomber', remainingOfType: 0,
+      }) === false
+      && shouldClearPhoneIconAfterExhausted({
+        unitType: 'bomber', remainingOfType: 0,
+      }) === true
+      && remainingEligibleOfType({ available: 1 }) === 1
+      && phoneIconCommitCount({ remainingOfType: 1 }) === 1
+      && phoneIconCommitCount({ remainingOfType: 1, dumpRemaining: true, slotsRemaining: 6 }) === 1
+      && phoneIconCommitCount({ remainingOfType: 4, dumpRemaining: true, slotsRemaining: 6 }) === 4
+      && phoneIconCommitCount({ remainingOfType: 0 }) === 0
       && nextStagedCount({ current: 2, available: 5 }) === 3
       && nextStagedCount({ current: 5, available: 5 }) === 5);
   }
@@ -1166,9 +1186,9 @@ check('phone placement hints say Tap, desktop stay Click',
     check('preview toolbar / comment puck is opted out',
       /name="vercel-toolbar" content="disable"/.test(html)
       && /x-vercel-skip-toolbar/.test(vercel));
-    check('Deploy is the pair-commit thumb, not a type-then-count third step',
-      /_maybeStagePhoneDeployPair/.test(panelSrc)
-      && /resolvePhoneDeployCtaLabel/.test(panelSrc)
+    check('Deploy icon path commits immediately; Confirm is not required',
+      /_commitPhoneIconDeploy/.test(panelSrc)
+      && /shouldHidePhonePairConfirm/.test(panelSrc)
       && /phone-peek-pair-hint/.test(panelSrc)
       && !/label: 'Deploy',\s*disabled: true/.test(panelSrc));
   }
@@ -1535,7 +1555,7 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     && shouldKeepPhonePairLand({
       incomingTerritory: null, stagedLandName: '',
     }) === false);
-  check('Max is in the thumb and does not commit',
+  check('Max is in the thumb; pair Max dumps that type now',
     /phone-pair-max/.test(panelSrc)
     && /_applyPhonePairMax/.test(panelSrc)
     && /_commitStagedPlacement/.test(panelSrc)
@@ -1591,7 +1611,7 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
       mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
       hasNamedLand: true, hasUnitType: false,
     }) === false);
-  check('mobilize / move share land-then-unit hint + Confirm',
+  check('mobilize / move share land-then-unit hint; phone icon commits now',
     resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE, null, {
       territoryName: 'Ukraine S.S.R.',
     }) === 'Tap a unit · Ukraine S.S.R.'
@@ -1601,10 +1621,9 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
       territoryName: 'Ukraine S.S.R.', destName: 'West Russia',
     }) === 'Ukraine S.S.R. → West Russia'
-    && /confirm-mobilize/.test(panelSrc)
-    && /_commitStagedMobilize/.test(panelSrc)
-    && /_maybeStagePhoneMobilizePair/.test(panelSrc)
-    && /_maybeStagePhoneMovePair/.test(panelSrc));
+    && /_commitPhoneIconMobilize/.test(panelSrc)
+    && /_commitPhoneIconMove/.test(panelSrc)
+    && /shouldHidePhonePairConfirm/.test(panelSrc));
   check('peek row / hint / CTA accept touch without eating named-land taps',
     /player-panel--peek \.phone-peek-row[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
     && /player-panel--peek \.phone-peek-pair-hint[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
@@ -2031,19 +2050,33 @@ console.log('=== V2.81.34 Fit fills-only + China inspect ===');
     && /LAND_BRIDGES/.test(rendererSrc));
 }
 
-console.log('=== V2.81.37 land then icon +1 each tap ===');
+console.log('=== V2.81.38 auto-place icon + type cap + Resign ===');
 {
   const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
-  check('repeat icon tap increments; land tap does not auto-stage',
-    nextStagedCount({ current: 0, available: 4 }) === 1
-    && nextStagedCount({ current: 1, available: 4 }) === 2
-    && nextStagedCount({ current: 4, available: 4 }) === 4
-    && shouldIncrementPhonePairIcon({
-      hasNamedLand: true, unitType: 'armour', canAdd: true,
+  const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
+  const surrenderSrc = readFileSync(join(root, 'src/multiplayer/surrender.js'), 'utf8');
+  check('icon tap commits one of that type; leftover exhausted taps clear',
+    shouldCommitPhoneIconTap({
+      hasNamedDest: true, unitType: 'bomber', remainingOfType: 1,
     }) === true
+    && shouldClearPhoneIconAfterExhausted({
+      unitType: 'bomber', remainingOfType: 0,
+    }) === true
+    && phoneIconCommitCount({ remainingOfType: 1, dumpRemaining: false, slotsRemaining: 6 }) === 1
+    && phoneIconCommitCount({ remainingOfType: 1, dumpRemaining: true, slotsRemaining: 6 }) === 1
+    && remainingEligibleOfType({ available: 1 }) === 1
+    && canNamePhoneMoveDest({ hasSource: true, destIsLegal: true }) === true
+    && canNamePhoneMoveDest({ hasSource: true, destIsLegal: false }) === false
+    && shouldHidePhonePairConfirm({ mobile: true, pairGrammar: true }) === true
     && /Land tap names the eligible tile only/.test(panelSrc)
-    && /nextStagedCount/.test(panelSrc)
+    && /_commitPhoneIconDeploy/.test(panelSrc)
+    && /keepPhonePair/.test(panelSrc)
     && /movePendingDest/.test(panelSrc));
+  check('Games menu has Resign; all-resign deletes when no humans remain',
+    /data-action="resign"/.test(hudSrc)
+    && /Resign/.test(hudSrc)
+    && /shouldDelete/.test(surrenderSrc)
+    && /deleteDoc/.test(surrenderSrc));
 }
 
 console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');
@@ -2090,7 +2123,9 @@ console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===')
       selectedSummary: '4 infantry · 2 tank',
     }) === 'Ukraine S.S.R. → West Russia · 4 infantry · 2 tank'
     && /pp-move-selected-summary/.test(panelSrc)
-    && /selectedQty/.test(panelSrc));
+    && /remainingEligibleOfType/.test(panelSrc)
+    && shouldHidePhonePairConfirm({ mobile: true, pairGrammar: true }) === true
+    && shouldHidePhonePairConfirm({ mobile: false, pairGrammar: true }) === false);
 }
 
 console.log('=== V2.81.35 CSS-px territory hairline + Fit ownership ===');
