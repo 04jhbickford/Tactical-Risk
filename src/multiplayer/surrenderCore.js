@@ -123,10 +123,11 @@ export function applySurrenderToState(state, oderId) {
   return result;
 }
 
-// Delete the Firestore game when no seated humans remain (all-resign /
-// last human out, including 1-human+AI). SCHEMA 11 — uses surrendered.
+// James declined the wipe. Resign never deletes a game document.
+// All-resign / last human out marks the match finished only.
 export function shouldDeleteGameAfterResign({ humansRemain = true } = {}) {
-  return humansRemain === false;
+  void humansRemain;
+  return false;
 }
 
 export function resolveResignPlayerId({

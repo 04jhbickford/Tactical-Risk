@@ -101,7 +101,6 @@ import { createSyncManager } from './multiplayer/syncManager.js';
 import { leaveGame } from './multiplayer/surrender.js';
 import {
   applySurrenderToState,
-  shouldDeleteGameAfterResign,
   resolveResignPlayerId,
 } from './multiplayer/surrenderCore.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
@@ -1564,8 +1563,12 @@ async function init() {
       if (gameState && resignId) {
         const json = gameState.toJSON();
         const result = applySurrenderToState(json, resignId);
-        if (result.changed && !shouldDeleteGameAfterResign({ humansRemain: result.humansRemain })) {
+        if (result.changed) {
           gameState.loadFromJSON(json);
+          if (!result.humansRemain || result.gameOver) {
+            leaveToLobby();
+            return;
+          }
           camera.dirty = true;
           return;
         }

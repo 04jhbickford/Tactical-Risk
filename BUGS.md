@@ -4,9 +4,9 @@
 
 ## 8.30.26 — V2.81.38 auto-place icon; type-cap leftover; Resign deletes empty games
 
-James he-correct on live V2.81.37: after naming an eligible dest, each unit-icon tap should deploy/move/attack THAT type immediately (same as landing planes). Confirm on that path is gone. One eligible bomber still let him keep clicking ("deploy 6 bombers") then placed infantry/tanks. Games menu needed Resign; all-resign should delete the game.
+James he-correct on live V2.81.37: after naming an eligible dest, each unit-icon tap should deploy/move/attack THAT type immediately (same as landing planes). Confirm on that path is gone. One eligible bomber still let him keep clicking ("deploy 6 bombers") then placed infantry/tanks. Games menu needed Resign. James declined the one-time wipe — do not delete game documents.
 
-Fix: named dest + icon tap commits one of that type now (Max dumps remaining of THAT type). Exhausted type leftover taps no-op and clear — never convert onto another type. Capital still Confirm. Games ⋯ Resign sets `surrendered` (SCHEMA 11) and deletes the Firestore doc when no seated humans remain. No one-time wipe of current games. GAME_VERSION V2.81.38.
+Fix: named dest + icon tap commits one of that type now (Max dumps remaining of THAT type). Exhausted type leftover taps no-op and clear — never convert onto another type. Capital still Confirm. Games ⋯ Resign sets `surrendered` (SCHEMA 11) and finishes the match when no seated humans remain. Game docs are never deleted. GAME_VERSION V2.81.38.
 
 ---
 

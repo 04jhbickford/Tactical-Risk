@@ -2072,11 +2072,11 @@ console.log('=== V2.81.38 auto-place icon + type cap + Resign ===');
     && /_commitPhoneIconDeploy/.test(panelSrc)
     && /keepPhonePair/.test(panelSrc)
     && /movePendingDest/.test(panelSrc));
-  check('Games menu has Resign; all-resign deletes when no humans remain',
+  check('Games menu has Resign; resign never deletes a game document',
     /data-action="resign"/.test(hudSrc)
     && /Resign/.test(hudSrc)
-    && /shouldDelete/.test(surrenderSrc)
-    && /deleteDoc/.test(surrenderSrc));
+    && /shouldDeleteGameAfterResign/.test(surrenderSrc)
+    && !/deleteDoc/.test(surrenderSrc));
 }
 
 console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');

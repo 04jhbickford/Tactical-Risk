@@ -297,8 +297,9 @@ console.log('=== S: surrender in every phase ===');
   const last = composition(1, 1, 6);
   const r4 = applySurrenderToState(last, 'user_0');
   check('S4: last human resign → no seated humans remain', r4.changed && r4.humansRemain === false);
-  check('S4: all-resign deletes the game doc', shouldDeleteGameAfterResign({ humansRemain: false }) === true);
-  check('S4: other humans remaining does not delete', shouldDeleteGameAfterResign({ humansRemain: true }) === false);
+  check('S4: resign never deletes a game document',
+    shouldDeleteGameAfterResign({ humansRemain: false }) === false
+    && shouldDeleteGameAfterResign({ humansRemain: true }) === false);
   check('S4: resign id prefers the seated auth user',
     resolveResignPlayerId({
       players: [{ id: 'Germans', oderId: 'user_0', isAI: false }, { id: 'AI', isAI: true }],

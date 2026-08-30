@@ -487,7 +487,7 @@ export class HUD {
       this._updateMenuState();
       if (this.onResign) {
         const message = this.gameState?.isMultiplayer
-          ? 'Resign from this game? Your territories become neutral and your units are removed. If no seated humans remain, the game is deleted. This cannot be undone.'
+          ? 'Resign from this game? Your territories become neutral and your units are removed. The game is not deleted. This cannot be undone.'
           : 'Resign from this game? Your territories become neutral and your units are removed. If no humans remain, the game ends. This cannot be undone.';
         if (confirm(message)) {
           this.onResign();
