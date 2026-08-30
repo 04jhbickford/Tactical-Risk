@@ -4,6 +4,9 @@ import {
   isMobileShell,
   phoneLegalOutlineWidth,
   phoneCountryOutlineWidth,
+  PHONE_COUNTRY_HAIRLINE_COLOR,
+  shouldDrawPhoneOwnershipFlags,
+  phoneOwnershipFlagSize,
   phoneOwnershipSeamWidth,
   phoneMapStackOffsets,
   shouldHidePhoneMapLabel,
@@ -462,9 +465,10 @@ export class TerritoryRenderer {
 
   /** Draw small flag markers on each territory to show ownership */
   renderOwnershipFlags(ctx, zoom) {
-    if (!this.gameState || zoom < 0.35) return;
+    const mobile = isMobileShell();
+    if (!this.gameState || !shouldDrawPhoneOwnershipFlags(zoom, { mobile })) return;
 
-    const flagWidth = Math.max(16, Math.min(28, 22 * zoom));
+    const flagWidth = phoneOwnershipFlagSize(zoom, { mobile });
     const flagHeight = flagWidth * 0.67;
 
     for (const t of this.territories) {
@@ -658,7 +662,7 @@ export class TerritoryRenderer {
       setup: isPhoneSetupPhase(this.gameState?.phase),
     });
     if (countryW > 0) {
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.strokeStyle = PHONE_COUNTRY_HAIRLINE_COLOR;
       ctx.lineWidth = countryW;
       for (const t of this.territories) {
         if (t.isWater) continue;

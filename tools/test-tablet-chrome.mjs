@@ -91,6 +91,11 @@ const {
   phoneLegalDashPattern,
   phoneLegalUsesSolidStroke,
   phoneCountryOutlineWidth,
+  PHONE_COUNTRY_HAIRLINE_CSS_PX,
+  PHONE_COUNTRY_HAIRLINE_WORLD_MAX,
+  PHONE_COUNTRY_HAIRLINE_COLOR,
+  shouldDrawPhoneOwnershipFlags,
+  phoneOwnershipFlagSize,
   phoneOwnershipSeamWidth,
   shouldStrokePhoneLegalHairline,
   shouldSkipPhoneMapArt,
@@ -168,7 +173,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.34', GAME_VERSION === 'V2.81.34');
+check('GAME_VERSION is V2.81.35', GAME_VERSION === 'V2.81.35');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -581,13 +586,15 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     phoneLegalOutlineWidth(0.5) >= 2.5
     && phoneLegalOutlineWidth(0.5) <= 5
     && Math.abs(phoneLegalOutlineWidth(0.9) - PHONE_LEGAL_OUTLINE_CSS_PX / 0.9) < 1e-9);
-  check('phone hides country strokes through dest-cluster Fit; desktop keeps 0.4',
-    phoneCountryOutlineWidth(0.11, { mobile: true }) === 0
-    && phoneCountryOutlineWidth(0.316, { mobile: true }) === 0
-    && phoneCountryOutlineWidth(0.5, { mobile: true }) === 0
-    && phoneCountryOutlineWidth(0.7, { mobile: true }) === 0
-    && phoneCountryOutlineWidth(0.9, { mobile: true }) === 1
+  check('phone draws a capped CSS-px country hairline at Fit / world / setup',
+    phoneCountryOutlineWidth(0.11, { mobile: true }) > 0
+    && phoneCountryOutlineWidth(0.11, { mobile: true }) <= PHONE_COUNTRY_HAIRLINE_WORLD_MAX
+    && phoneCountryOutlineWidth(0.316, { mobile: true }) > 0
+    && phoneCountryOutlineWidth(0.5, { mobile: true }) > 0
+    && phoneCountryOutlineWidth(0.7, { mobile: true }) > 0
+    && Math.abs(phoneCountryOutlineWidth(0.9, { mobile: true }) - PHONE_COUNTRY_HAIRLINE_CSS_PX / 0.9) < 1e-9
     && phoneCountryOutlineWidth(0.5, { mobile: false }) === 1
+    && phoneCountryOutlineWidth(0.3, { mobile: false }) === 0
     && PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM === 0.85);
   check('phone ownership seam stays thin so world Fit is not choppy dark strokes',
     phoneOwnershipSeamWidth(0.35, { mobile: true }) <= 3
@@ -601,9 +608,10 @@ console.log('=== V2.66 leftover sidebar must not re-hide the phone tooltip ===')
     && shouldSkipPhoneMapArt(0.7, { mobile: true }) === true
     && shouldSkipPhoneMapArt(0.9, { mobile: true }) === false
     && shouldSkipPhoneMapArt(0.5, { mobile: false }) === false);
-  check('phone setup skips map art and country strokes at dest-cluster zoom',
+  check('phone setup skips map art; CSS-px hairline still draws at dest zoom',
     shouldSkipPhoneMapArt(1.2, { mobile: true, setup: true }) === true
-    && phoneCountryOutlineWidth(1.2, { mobile: true, setup: true }) === 0
+    && phoneCountryOutlineWidth(1.2, { mobile: true, setup: true }) > 0
+    && phoneCountryOutlineWidth(1.2, { mobile: true, setup: true }) <= PHONE_COUNTRY_HAIRLINE_WORLD_MAX
     && isPhoneSetupPhase(GAME_PHASES.CAPITAL_PLACEMENT) === true
     && isPhoneSetupPhase(GAME_PHASES.UNIT_PLACEMENT) === true);
   check('world Fit legal edge is a visible owned-tile hairline, not a 9px double hull',
@@ -2000,6 +2008,29 @@ console.log('=== V2.81.34 Fit fills-only + China inspect ===');
     && /renderCrossWaterConnections/.test(mainSrc)
     && /shouldStrokePhoneSeaDashes/.test(rendererSrc)
     && /LAND_BRIDGES/.test(rendererSrc));
+}
+
+console.log('=== V2.81.35 CSS-px territory hairline + Fit ownership ===');
+{
+  const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
+  check('Fit / world / setup hairline is ~1 CSS px, capped so it cannot stair-step',
+    phoneCountryOutlineWidth(0.11, { mobile: true, setup: true }) === PHONE_COUNTRY_HAIRLINE_WORLD_MAX
+    && phoneCountryOutlineWidth(0.11, { mobile: true, setup: true })
+      * 0.11 < 1.1
+    && Math.abs(phoneCountryOutlineWidth(1, { mobile: true }) - PHONE_COUNTRY_HAIRLINE_CSS_PX) < 1e-9
+    && PHONE_COUNTRY_HAIRLINE_COLOR === 'rgba(0, 0, 0, 0.35)'
+    && /PHONE_COUNTRY_HAIRLINE_COLOR/.test(rendererSrc)
+    && shouldStrokePhoneLegalHairline(0.11, { mobile: true }) === false
+    && shouldSkipPhoneWaterMask({ mobile: true, setup: true }) === true
+    && shouldStrokePhoneSeaDashes(0.11, { mobile: true, setup: true }) === false);
+  check('phone Fit still shows stacks and ownership flags',
+    shouldHideUnitsAtZoom(0.11, { mobile: true }) === false
+    && phoneUnitIconSize(0.11, { mobile: true }) >= 16
+    && shouldDrawPhoneOwnershipFlags(0.11, { mobile: true }) === true
+    && shouldDrawPhoneOwnershipFlags(0.2, { mobile: false }) === false
+    && phoneOwnershipFlagSize(0.11, { mobile: true }) >= 10
+    && /shouldDrawPhoneOwnershipFlags/.test(rendererSrc)
+    && /phoneOwnershipFlagSize/.test(rendererSrc));
 }
 
 if (failures) {

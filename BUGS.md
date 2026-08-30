@@ -2,6 +2,14 @@
 
 ---
 
+## 8.30.26 — V2.81.35 CSS-px territory hairline; Fit ownership readable
+
+James lookpass of V2.81.34 (`fvll56cmt` / 59833dd): he would replace live V2.80 except borders — Fit/world were continent blobs with no tile edges, ownership unreadable. ROOT: `phoneCountryOutlineWidth` returned 0 in mobile setup and below zoom 0.85; seam was same-color bleed; legal hairline off; map art skipped.
+
+Fix: phone draws a stable ~1 CSS-px `rgba(0,0,0,0.35)` hairline on every land tile, world-px capped at 5 so it cannot stair-step. Water-mask / sea dashes / baked PNG / gold legal grid stay off. Phone Fit keeps unit stacks and ownership flags. SCHEMA 11. GAME_VERSION V2.81.35. No production deploy.
+
+---
+
 ## 8.29.26 — V2.81.34 Fit fills-only; China inspect even if dealt
 
 Skeptic remaining after V2.81.33 (`4nqw8gbfh` / 25dbd6c): owned Confirm → star + DEPLOY HOLD. FAIL: Fit + world still read as jagged dark country strokes (water-mask stroke + fat/zero seam AA). China peek still minted `Place Capital: China` when the 2p deal assigned China.

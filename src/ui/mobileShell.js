@@ -326,8 +326,30 @@ export const PHONE_FIT_PAD_TOP = 64;
 export const PHONE_FIT_PAD_BOTTOM = 120;
 
 export function phoneUnitIconSize(zoom, { mobile } = {}) {
-  if (mobile) return Math.max(20, Math.min(36, 28 * Math.max(Number(zoom) || 0, 0.35)));
-  return Math.max(14, Math.min(24, 20 * (Number(zoom) || 0)));
+  if (!mobile) return Math.max(14, Math.min(24, 20 * (Number(zoom) || 0)));
+  const z = Number(zoom);
+  const safe = Number.isFinite(z) && z > 0 ? z : 1;
+  if (safe >= PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) {
+    return Math.max(20, Math.min(36, 28 * safe));
+  }
+  // ~8 CSS px at dest Fit; cap world-px so a stack cannot cover a continent
+  // at world zoom (James V2.81.34: ownership unreadable blobs).
+  return Math.min(28, Math.max(16, 8 / safe));
+}
+
+export function shouldDrawPhoneOwnershipFlags(zoom, { mobile = false } = {}) {
+  if (mobile) return true;
+  return Number(zoom) >= 0.35;
+}
+
+export function phoneOwnershipFlagSize(zoom, { mobile = false } = {}) {
+  const z = Number(zoom);
+  const safe = Number.isFinite(z) && z > 0 ? z : 1;
+  if (!mobile) return Math.max(16, Math.min(28, 22 * safe));
+  if (safe >= PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) {
+    return Math.max(16, Math.min(28, 22 * safe));
+  }
+  return Math.min(22, Math.max(10, 7 / safe));
 }
 
 export function shouldHideUnitsAtZoom(zoom, { mobile } = {}) {
@@ -827,6 +849,11 @@ export const PHONE_COUNTRY_OUTLINE_WORLD_MIN = 1;
 export const PHONE_COUNTRY_OUTLINE_WORLD_MAX = 14;
 export const PHONE_COUNTRY_OUTLINE_MIN_ZOOM = 0.4;
 export const PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM = 0.85;
+/** James V2.81.34 lookpass: fills-only hid every tile edge. Neutral
+ *  CSS-px hairline — not gold legal, not a fat world-px stair-step. */
+export const PHONE_COUNTRY_HAIRLINE_CSS_PX = 1;
+export const PHONE_COUNTRY_HAIRLINE_WORLD_MAX = 5;
+export const PHONE_COUNTRY_HAIRLINE_COLOR = 'rgba(0, 0, 0, 0.35)';
 export const PHONE_LEGAL_HAIRLINE_CSS_PX = 2.25;
 
 // Poly dashed faction-color. Cream/ivory is map chrome — never return it.
@@ -906,19 +933,22 @@ export function phoneLegalDashPattern(zoom) {
   ];
 }
 
-// Phone dest-cluster Fit is often 0.28–0.55. A 0.4 cutoff still painted
-// dark country strokes on every land (James V2.81.27 gwsbmvlpj). Hide
-// worldwide outlines until the user is clearly zoomed in. Desktop keeps
-// the 0.4 floor.
+// Phone: a stable ~1 CSS-px dark hairline on every land tile at Fit,
+// world, and setup. Cap world-px so the camera cannot stair-step a fat
+// rim (James V2.81.32–34). Desktop keeps the 0.4 hide / 1 world-px floor.
 export function phoneCountryOutlineWidth(zoom, { mobile = false, setup = false } = {}) {
-  if (mobile && setup) return 0;
+  void setup;
   const z = Number(zoom);
-  if (!Number.isFinite(z) || z <= 0) {
-    return mobile ? 0 : PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+  if (!mobile) {
+    if (!Number.isFinite(z) || z <= 0) return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+    if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) return 0;
+    return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
   }
-  if (mobile && z < PHONE_COUNTRY_OUTLINE_CLOSE_ZOOM) return 0;
-  if (z < PHONE_COUNTRY_OUTLINE_MIN_ZOOM) return 0;
-  return PHONE_COUNTRY_OUTLINE_WORLD_MIN;
+  const safe = Number.isFinite(z) && z > 0 ? z : 1;
+  return Math.min(
+    PHONE_COUNTRY_HAIRLINE_WORLD_MAX,
+    Math.max(1, PHONE_COUNTRY_HAIRLINE_CSS_PX / safe),
+  );
 }
 
 export function phoneOwnershipSeamWidth(zoom, { mobile = false, setup = false } = {}) {
