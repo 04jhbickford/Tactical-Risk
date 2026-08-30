@@ -188,7 +188,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.38', GAME_VERSION === 'V2.81.38');
+check('GAME_VERSION is V2.81.39', GAME_VERSION === 'V2.81.39');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -2072,11 +2072,21 @@ console.log('=== V2.81.38 auto-place icon + type cap + Resign ===');
     && /_commitPhoneIconDeploy/.test(panelSrc)
     && /keepPhonePair/.test(panelSrc)
     && /movePendingDest/.test(panelSrc));
-  check('Games menu has Resign; resign never deletes a game document',
+  check('Games menu has Resign; all-resign deletes the game doc',
     /data-action="resign"/.test(hudSrc)
     && /Resign/.test(hudSrc)
-    && /shouldDeleteGameAfterResign/.test(surrenderSrc)
-    && !/deleteDoc/.test(surrenderSrc));
+    && /If no seated humans remain, the game is deleted/.test(hudSrc)
+    && /shouldDelete/.test(surrenderSrc)
+    && /deleteDoc/.test(surrenderSrc));
+}
+
+console.log('=== V2.81.39 all-resign deleteDoc ===');
+{
+  const rules = readFileSync(join(root, 'firestore.rules'), 'utf8');
+  check('seated player may deleteDoc a finished game; admin still can',
+    /allow delete: if isAdmin\(\)/.test(rules)
+    && /resource\.data\.status == 'finished'/.test(rules)
+    && /request\.auth\.uid in resource\.data\.playerUserIds/.test(rules));
 }
 
 console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');

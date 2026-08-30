@@ -2,7 +2,15 @@
 
 ---
 
-## 8.30.26 — V2.81.38 auto-place icon; type-cap leftover; Resign deletes empty games
+## 8.30.26 — V2.81.39 restore all-resign deleteDoc
+
+James 8:09am lock: Resign in Games menu; if ALL players resign, delete the game. PR 28 / live V2.81.38 never-delete was the wrong path (Auto-review / skipped-widget decline is not the product).
+
+Fix: `shouldDeleteGameAfterResign({ humansRemain: false })` is true. `leaveGame` marks finished then `deleteDoc` when no seated humans remain. Rules: admin OR (auth seated player + status finished + uid in playerUserIds). HUD copy says the game is deleted. SCHEMA 11 `surrendered`. Auto-place / type-cap / 36–38 holds stay. No bulk wipe of existing `/games`. GAME_VERSION V2.81.39.
+
+---
+
+## 8.30.26 — V2.81.38 auto-place icon; type-cap leftover; Resign in Games menu
 
 James he-correct on live V2.81.37: after naming an eligible dest, each unit-icon tap should deploy/move/attack THAT type immediately (same as landing planes). Confirm on that path is gone. One eligible bomber still let him keep clicking ("deploy 6 bombers") then placed infantry/tanks. Games menu needed Resign. James declined the one-time wipe — do not delete game documents.
 

@@ -13,6 +13,7 @@
 import {
   doc,
   runTransaction,
+  deleteDoc,
   serverTimestamp,
   arrayRemove
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
@@ -86,8 +87,21 @@ export async function leaveGame(gameId, userId) {
         }
       }
 
-      // James declined the wipe. Never delete the game document.
-      void shouldDeleteGameAfterResign({ humansRemain: result.humansRemain });
+      const deleteAfter = shouldDeleteGameAfterResign({ humansRemain: result.humansRemain });
+      if (deleteAfter) {
+        // Keep the resigning seat in playerUserIds so a follow-up delete
+        // is authorized (rules: seated player + status finished).
+        transaction.update(gameRef, {
+          state,
+          stateVersion: (data.stateVersion || 0) + 1,
+          currentPlayerId: result.currentPlayerId,
+          status: 'finished',
+          lobbyData,
+          updatedAt: serverTimestamp()
+        });
+        return { success: true, surrendered: true, gameFinished: true, shouldDelete: true };
+      }
+
       transaction.update(gameRef, {
         state,
         stateVersion: (data.stateVersion || 0) + 1,
@@ -98,8 +112,18 @@ export async function leaveGame(gameId, userId) {
         updatedAt: serverTimestamp()
       });
 
-      return { success: true, surrendered: true, gameFinished: status === 'finished', deleted: false };
+      return { success: true, surrendered: true, gameFinished: status === 'finished', shouldDelete: false };
     });
+
+    if (outcome?.success && outcome.shouldDelete) {
+      try {
+        await deleteDoc(gameRef);
+        return { ...outcome, deleted: true };
+      } catch (deleteError) {
+        console.error('[Surrender] delete after all-resign failed:', deleteError);
+        return { ...outcome, deleted: false, error: deleteError.message };
+      }
+    }
 
     return outcome;
   } catch (error) {
