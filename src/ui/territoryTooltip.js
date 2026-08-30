@@ -210,6 +210,35 @@ export function resolvePhoneCapitalPeekAction({
   return PHONE_CAPITAL_PEEK_IGNORE;
 }
 
+/** Desktop and phone Place Capital share this: owned home land names
+ *  Confirm; inspect-only / enemy / water clears the peek so Confirm
+ *  cannot stick to "just any territory". */
+export function applyCapitalPlacementPeek({
+  phase,
+  hit = null,
+  currentPlayerId = null,
+  getOwner = null,
+} = {}) {
+  if (phase !== GAME_PHASES.CAPITAL_PLACEMENT || !hit?.name) {
+    return { peek: null, capitalLandName: null };
+  }
+  const owner = typeof getOwner === 'function' ? getOwner(hit.name) : null;
+  const tappedIsOwnedLand = !!(!hit.isWater && owner && owner === currentPlayerId);
+  const peek = resolvePhoneCapitalPeekAction({
+    phase,
+    tappedIsOwnedLand,
+    tappedIsLand: !hit.isWater,
+    tappedIsWater: !!hit.isWater,
+    hasHit: true,
+    landName: hit.name,
+    currentPlayerId,
+  });
+  return {
+    peek,
+    capitalLandName: peek === PHONE_CAPITAL_PEEK_CONFIRM ? hit.name : null,
+  };
+}
+
 // Noun first on phone setup. Same handlers; this only decides whether a
 // tap may change selection / dest. Place Capital: a hit (owned, enemy,
 // or sea) applies so inspect can clear a stale Confirm. A miss does not.

@@ -2,6 +2,14 @@
 
 ---
 
+## 8.30.26 — V2.81.41 Place Capital Confirm; hide merge seams
+
+Robert + Sean on live V2.81.40 desktop: Place Capital never committed (click selected the land, HUD stayed "CLICK YOUR TERRITORY"). Live-build bug — `_phoneCapitalLandName` was phone-only so Confirm never mounted. Sean’s “two Chinas” is the intended Sinkiang merge, not a missing country.
+
+Fix: desktop and phone share `applyCapitalPlacementPeek` (owned land → named Confirm; China/Wake/Germany/Japan stay inspect). `placeCapital` only counts as committed when it returns `true`. Land hairlines stroke merged-territory *external* edges so the old China/ASE internal seam does not draw. No Sinkiang/Libya restore. Sea hairlines + yellow land-bridge lanes stay. SCHEMA 11. GAME_VERSION V2.81.41.
+
+---
+
 ## 8.30.26 — V2.81.40 phone battle odds hero
 
 James he-correct on live V2.81.39: mobile battle screen hid the probability (compact bar is display:none on the phone summary), so he could not tell the chance to take the land.

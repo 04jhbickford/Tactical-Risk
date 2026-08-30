@@ -22,6 +22,7 @@ const {
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
   resolvePhoneCapitalPeekAction,
+  applyCapitalPlacementPeek,
   PHONE_CAPITAL_PEEK_CONFIRM,
   PHONE_CAPITAL_PEEK_INSPECT,
   PHONE_CAPITAL_PEEK_IGNORE,
@@ -159,12 +160,17 @@ const {
   shouldAutoCommitPhoneCapital,
   resolvePhoneCapitalCta,
   resolvePhoneCapitalCommitLand,
+  isCapitalPlacementCommitted,
   shouldShowPhoneSetupUndo,
   shouldShowSelectUnitsCta,
   PHASE_HINTS,
 } = await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
 const { GAME_PHASES, TURN_PHASES, orderRiskSetupSeats } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
+const { TerritoryMap } =
+  await import(pathToFileURL(join(root, 'src/map/territoryMap.js')));
+const { mergedTerritoryOutlineEdges } =
+  await import(pathToFileURL(join(root, 'src/map/territoryRenderer.js')));
 const { formatAiTurnLine, resolveHudWhoseTurn } =
   await import(pathToFileURL(join(root, 'src/ui/hudClarity.js')));
 const { shouldIgnoreFactionCardToggle, shouldSeatFactionOnPointerDown, LOBBY_SELECT_TOGGLE_GUARD_MS } =
@@ -188,7 +194,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.40', GAME_VERSION === 'V2.81.40');
+check('GAME_VERSION is V2.81.41', GAME_VERSION === 'V2.81.41');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -1265,7 +1271,8 @@ check('inspect≠commit still holds — tap never auto-places capital',
   const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
   const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
   check('peek stores the land name and paints the 22d4b13 Confirm tray',
-    /_phoneCapitalLandName = hit\.name/.test(mainSrc)
+    /_phoneCapitalLandName = capitalLandName/.test(mainSrc)
+    && /applyCapitalPlacementPeek/.test(mainSrc)
     && /setSelectedTerritory\(hit\)/.test(mainSrc)
     && /setSelectedTerritory\(selectedTerritory\)/.test(mainSrc)
     && /resolvePhoneCapitalCta\(/.test(panelSrc)
@@ -2169,6 +2176,61 @@ console.log('=== V2.81.35 CSS-px territory hairline + Fit ownership ===');
     && phoneOwnershipFlagSize(0.11, { mobile: true }) >= 10
     && /shouldDrawPhoneOwnershipFlags/.test(rendererSrc)
     && /phoneOwnershipFlagSize/.test(rendererSrc));
+}
+
+console.log('=== V2.81.41 capital Confirm + merged outline seams ===');
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
+  const territories = JSON.parse(readFileSync(join(root, 'data/territories.json'), 'utf8'));
+  const map = new TerritoryMap(territories);
+  const byName = Object.fromEntries(territories.map((t) => [t.name, t]));
+  const rawEdgeCount = (polys) => (polys || []).reduce((n, ring) => {
+    let c = 0;
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i];
+      const b = ring[(i + 1) % ring.length];
+      if (a[0] !== b[0] || a[1] !== b[1]) c += 1;
+    }
+    return n + c;
+  }, 0);
+  const peekOwned = applyCapitalPlacementPeek({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    hit: { name: 'Ukraine S.S.R.', isWater: false },
+    currentPlayerId: 'Russians',
+    getOwner: () => 'Russians',
+  });
+  const peekChina = applyCapitalPlacementPeek({
+    phase: GAME_PHASES.CAPITAL_PLACEMENT,
+    hit: { name: 'China', isWater: false },
+    currentPlayerId: 'Russians',
+    getOwner: () => 'Russians',
+  });
+  check('desktop/phone owned peek names Confirm; China inspect does not',
+    peekOwned.capitalLandName === 'Ukraine S.S.R.'
+    && peekOwned.peek === PHONE_CAPITAL_PEEK_CONFIRM
+    && peekChina.capitalLandName === null
+    && peekChina.peek === PHONE_CAPITAL_PEEK_INSPECT
+    && isCapitalPlacementCommitted(true) === true
+    && isCapitalPlacementCommitted({ success: false }) === false
+    && isCapitalPlacementCommitted(false) === false
+    && /isCapitalPlacementCommitted\(gameState\.placeCapital/.test(mainSrc)
+    && (mainSrc.match(/applyCapitalPlacementPeek/g) || []).length >= 2);
+  check('China stays one territory; merged outline drops the old internal seam',
+    !!byName.China && !byName.Sinkiang
+    && byName.China.polygons.length >= 2
+    && map.hitTest(byName.China.center[0], byName.China.center[1])?.name === 'China'
+    && map.hitTest(byName.Manchuria.center[0], byName.Manchuria.center[1])?.name === 'Manchuria'
+    && mergedTerritoryOutlineEdges(byName.China.polygons).length
+      < rawEdgeCount(byName.China.polygons)
+    && /_strokeEdges\(ctx, this\._getExternalEdgesWithTolerance/.test(rendererSrc)
+    && !/territoryPolygonLabelAnchors/.test(rendererSrc));
+  check('ASE stays one merged Africa land; Libya is not restored',
+    !byName.Libya
+    && byName['Anglo Sudan Egypt'].polygons.length >= 2
+    && map.hitTest(1064, 998)?.name === 'Anglo Sudan Egypt'
+    && mergedTerritoryOutlineEdges(byName['Anglo Sudan Egypt'].polygons).length
+      < rawEdgeCount(byName['Anglo Sudan Egypt'].polygons));
 }
 
 if (failures) {

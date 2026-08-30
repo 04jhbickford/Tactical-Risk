@@ -53,6 +53,112 @@ const LAND_BRIDGES = [
   ['Japan', 'Manchuria'],  // Korea Strait crossing
 ];
 
+function pointInPolygonRing(px, py, ring) {
+  let inside = false;
+  const n = ring?.length || 0;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = ring[i][0];
+    const yi = ring[i][1];
+    const xj = ring[j][0];
+    const yj = ring[j][1];
+    if (((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function pointToSegmentDist(point, p1, p2) {
+  const [px, py] = point;
+  const [x1, y1] = p1;
+  const [x2, y2] = p2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+/** James merged rings on purpose. An old shared China/Sinkiang (or
+ *  ASE/Libya) border is the same country — drop it from the outline. */
+export function isMergedInternalSeam(edge, siblingRings, {
+  probePx = 6,
+  coverTol = 12,
+} = {}) {
+  if (!edge?.p1 || !edge?.p2 || !Array.isArray(siblingRings) || !siblingRings.length) {
+    return false;
+  }
+  const samples = 5;
+  let coverHits = 0;
+  for (let s = 0; s <= samples; s++) {
+    const t = s / samples;
+    const px = edge.p1[0] + t * (edge.p2[0] - edge.p1[0]);
+    const py = edge.p1[1] + t * (edge.p2[1] - edge.p1[1]);
+    let covered = false;
+    for (const ring of siblingRings) {
+      if (!ring || ring.length < 2) continue;
+      for (let i = 0; i < ring.length; i++) {
+        if (pointToSegmentDist([px, py], ring[i], ring[(i + 1) % ring.length]) <= coverTol) {
+          covered = true;
+          break;
+        }
+      }
+      if (covered) break;
+    }
+    if (covered) coverHits += 1;
+  }
+  if (coverHits >= samples * 0.7) return true;
+
+  const mx = (edge.p1[0] + edge.p2[0]) / 2;
+  const my = (edge.p1[1] + edge.p2[1]) / 2;
+  const dx = edge.p2[0] - edge.p1[0];
+  const dy = edge.p2[1] - edge.p1[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len) * probePx;
+  const ny = (dx / len) * probePx;
+  const left = [mx + nx, my + ny];
+  const right = [mx - nx, my - ny];
+  for (const ring of siblingRings) {
+    if (!ring || ring.length < 3) continue;
+    if (pointInPolygonRing(left[0], left[1], ring)
+      || pointInPolygonRing(right[0], right[1], ring)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function mergedTerritoryOutlineEdges(polygons) {
+  const rings = (polygons || []).filter((p) => Array.isArray(p) && p.length >= 3);
+  if (rings.length <= 1) {
+    const ring = rings[0];
+    if (!ring) return [];
+    const edges = [];
+    for (let i = 0; i < ring.length; i++) {
+      const p1 = ring[i];
+      const p2 = ring[(i + 1) % ring.length];
+      if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
+      edges.push([p1, p2]);
+    }
+    return edges;
+  }
+  const out = [];
+  for (let i = 0; i < rings.length; i++) {
+    const siblings = rings.filter((_, j) => j !== i);
+    const ring = rings[i];
+    for (let k = 0; k < ring.length; k++) {
+      const p1 = ring[k];
+      const p2 = ring[(k + 1) % ring.length];
+      if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
+      if (isMergedInternalSeam({ p1, p2 }, siblings)) continue;
+      out.push([p1, p2]);
+    }
+  }
+  return out;
+}
+
 export class TerritoryRenderer {
   // Per-territory offsets for flags/labels/units (shared across render functions)
   static TERRITORY_OFFSETS = {
@@ -668,10 +774,14 @@ export class TerritoryRenderer {
       ctx.lineWidth = countryW;
       for (const t of this.territories) {
         if (t.isWater) continue;
-        for (const poly of t.polygons || []) {
+        const rings = t.polygons || [];
+        if (rings.length <= 1) {
+          const poly = rings[0];
           if (!poly || poly.length < 3) continue;
           this._strokePoly(ctx, poly);
+          continue;
         }
+        this._strokeEdges(ctx, this._getExternalEdgesWithTolerance(rings, t.name));
       }
     }
 
@@ -960,92 +1070,7 @@ export class TerritoryRenderer {
    * Edges that approximately match or overlap between polygons are considered internal and excluded.
    */
   _computeExternalEdges(polygons) {
-    const TOLERANCE = 12; // pixels
-
-    // Check if a point is close to a line segment, returns distance
-    const pointToEdgeDist = (point, e) => {
-      const [px, py] = point;
-      const [x1, y1] = e.p1;
-      const [x2, y2] = e.p2;
-
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const lenSq = dx * dx + dy * dy;
-
-      if (lenSq === 0) {
-        return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2);
-      }
-
-      // Project point onto line, clamped to segment
-      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
-      const projX = x1 + t * dx;
-      const projY = y1 + t * dy;
-
-      return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
-    };
-
-    // Check if an edge is "covered" by any edge from another polygon
-    // Sample points along the edge and check if most are close to edges from other polygon
-    const isEdgeCovered = (edge, otherEdges) => {
-      const samples = 5;
-      let closeCount = 0;
-
-      for (let s = 0; s <= samples; s++) {
-        const t = s / samples;
-        const px = edge.p1[0] + t * (edge.p2[0] - edge.p1[0]);
-        const py = edge.p1[1] + t * (edge.p2[1] - edge.p1[1]);
-        const point = [px, py];
-
-        // Check if this point is close to any edge from other polygon
-        for (const other of otherEdges) {
-          if (pointToEdgeDist(point, other) <= TOLERANCE) {
-            closeCount++;
-            break;
-          }
-        }
-      }
-
-      // If most sample points are close to other edges, this edge is internal
-      return closeCount >= samples * 0.7;
-    };
-
-    // Collect edges grouped by polygon
-    const edgesByPoly = [];
-    for (let polyIdx = 0; polyIdx < polygons.length; polyIdx++) {
-      const poly = polygons[polyIdx];
-      const edges = [];
-      for (let i = 0; i < poly.length; i++) {
-        const p1 = poly[i];
-        const p2 = poly[(i + 1) % poly.length];
-        // Skip zero-length edges
-        if (p1[0] === p2[0] && p1[1] === p2[1]) continue;
-        edges.push({ p1, p2, polyIdx, internal: false });
-      }
-      edgesByPoly.push(edges);
-    }
-
-    // For each edge, check if it's covered by edges from other polygons
-    const allEdges = [];
-    for (let polyIdx = 0; polyIdx < edgesByPoly.length; polyIdx++) {
-      // Collect edges from all OTHER polygons
-      const otherEdges = [];
-      for (let otherIdx = 0; otherIdx < edgesByPoly.length; otherIdx++) {
-        if (otherIdx !== polyIdx) {
-          otherEdges.push(...edgesByPoly[otherIdx]);
-        }
-      }
-
-      // Check each edge in this polygon
-      for (const edge of edgesByPoly[polyIdx]) {
-        edge.internal = isEdgeCovered(edge, otherEdges);
-        allEdges.push(edge);
-      }
-    }
-
-    // Return only external edges
-    return allEdges
-      .filter(e => !e.internal)
-      .map(e => [e.p1, e.p2]);
+    return mergedTerritoryOutlineEdges(polygons);
   }
 
   /** Draw capital markers with faction flags */

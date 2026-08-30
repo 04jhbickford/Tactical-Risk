@@ -28,6 +28,7 @@ import {
   resolveTurnChrome,
   emitYourTurnEvent,
   resolvePhoneCapitalCommitLand,
+  isCapitalPlacementCommitted,
 } from './ui/playerPanel.js';
 import { TerritoryTooltip } from './ui/territoryTooltip.js';
 import { PurchasePopup } from './ui/purchasePopup.js';
@@ -62,7 +63,6 @@ import {
   isPhoneLegalSetupSeaDest,
   shouldSkipPhoneMapArt,
   shouldSkipPhoneWaterMask,
-  isPhoneCapitalInspectOnlyLand,
   PHONE_SELECT_PULSE_MS,
   PHONE_CONFIRM_PULSE_MS,
 } from './ui/mobileShell.js';
@@ -74,9 +74,7 @@ import {
   shouldInspectPhoneHold,
   shouldCommitPhoneSetupTap,
   shouldApplyPhoneSetupLandTap,
-  resolvePhoneCapitalPeekAction,
-  PHONE_CAPITAL_PEEK_CONFIRM,
-  PHONE_CAPITAL_PEEK_INSPECT,
+  applyCapitalPlacementPeek,
   shouldCommitPhoneSetupPeekAfterGesture,
   isPhoneSetupPlacementPhase,
   shouldRefitPhoneSetupHit,
@@ -418,7 +416,7 @@ async function init() {
           kickPaint();
           break;
         }
-        if (gameState.placeCapital(capitalLand)) {
+        if (isCapitalPlacementCommitted(gameState.placeCapital(capitalLand))) {
           actionLog.logCapitalPlacement(capitalLand, placingPlayer);
           tooltip.hide();
           unitTooltip.hide();
@@ -2125,26 +2123,16 @@ async function init() {
     })) return false;
 
     if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
-      const peek = resolvePhoneCapitalPeekAction({
+      const { capitalLandName } = applyCapitalPlacementPeek({
         phase: gameState.phase,
-        tappedIsOwnedLand,
-        tappedIsLand,
-        tappedIsWater,
-        hasHit: true,
-        landName: hit.name,
+        hit,
         currentPlayerId: gameState.currentPlayer?.id,
-        inspectOnly: isPhoneCapitalInspectOnlyLand(
-          hit.name, gameState.currentPlayer?.id,
-        ),
+        getOwner: (name) => gameState.getOwner(name),
       });
       selectedTerritory = hit;
-      if (peek === PHONE_CAPITAL_PEEK_CONFIRM) {
-        playerPanel._phoneCapitalLandName = hit.name;
-      } else {
-        playerPanel._phoneCapitalLandName = null;
-        // Inspect cue is the tile outline only. A toast here stacked
-        // when canvas mouseup re-applied the same peek (V2.81.32).
-      }
+      playerPanel._phoneCapitalLandName = capitalLandName;
+      // Inspect cue is the tile outline only. A toast here stacked
+      // when canvas mouseup re-applied the same peek (V2.81.32).
     } else {
       selectedTerritory = hit;
       if (gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
@@ -2639,6 +2627,15 @@ async function init() {
             camera.dirty = true;
           }
           return;
+        }
+        if (gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+          const { capitalLandName } = applyCapitalPlacementPeek({
+            phase: gameState.phase,
+            hit,
+            currentPlayerId: gameState.currentPlayer?.id,
+            getOwner: (name) => gameState.getOwner(name),
+          });
+          playerPanel._phoneCapitalLandName = capitalLandName;
         }
         selectedTerritory = hit;
         playerPanel.setSelectedTerritory(hit);

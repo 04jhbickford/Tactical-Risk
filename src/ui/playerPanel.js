@@ -445,6 +445,12 @@ export function resolvePhoneCapitalCta({
   };
 }
 
+/** placeCapital returns true. The MP guard must not count as a commit
+ *  if it returns a truthy { success: false } object. */
+export function isCapitalPlacementCommitted(result) {
+  return result === true;
+}
+
 /** Confirm click resolves an owned land and commits. Owner mismatch
  *  returns null so the handler can clear the CTA instead of no-op. */
 export function resolvePhoneCapitalCommitLand({
