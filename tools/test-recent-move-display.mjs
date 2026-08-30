@@ -18,7 +18,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.39', GAME_VERSION === 'V2.81.39');
+check('GAME_VERSION is V2.81.40', GAME_VERSION === 'V2.81.40');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== formatRecentMove: real attack ===');

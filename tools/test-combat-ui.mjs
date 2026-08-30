@@ -61,6 +61,8 @@ const {
   formatCombatForceLine,
   resolveCombatNextLine,
   shouldUsePhoneCombatSummary,
+  phoneCombatAttackerWinPercent,
+  formatPhoneCombatHeroOdds,
 } = await import(pathToFileURL(join(root, 'src/ui/combatUI.js')));
 
 const unitDefs = {
@@ -114,7 +116,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.39', GAME_VERSION === 'V2.81.39');
+check('GAME_VERSION is V2.81.40', GAME_VERSION === 'V2.81.40');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
@@ -316,6 +318,29 @@ console.log('=== V2.81.36 phone combat summary ===');
     && /4 infantry/.test(ui.el.innerHTML)
     && /2 tank/.test(ui.el.innerHTML)
     && ui.el.classList.contains('combat-popup--phone'));
+  const hero = formatPhoneCombatHeroOdds({
+    attackerWinPercent: phoneCombatAttackerWinPercent({
+      attackers: game.combatQueue ? ui.combatState.attackers : [],
+      defenders: ui.combatState.defenders,
+      unitDefs,
+    }),
+    territoryName: 'Anglo-Sudan Egypt',
+    hasAttackers: true,
+    hasDefenders: true,
+  });
+  check('phone hero odds are first and player-facing take-chance',
+    /phone-combat-hero-pct/.test(ui.el.innerHTML)
+    && ui.el.innerHTML.indexOf('phone-combat-hero') < ui.el.innerHTML.indexOf('phone-combat-vs')
+    && ui.el.innerHTML.indexOf('phone-combat-hero') < ui.el.innerHTML.indexOf('phone-combat-row')
+    && /to take Anglo-Sudan Egypt/.test(ui.el.innerHTML)
+    && hero.text.endsWith('%')
+    && hero.percent > 0
+    && formatPhoneCombatHeroOdds({
+      attackerWinPercent: 0, hasAttackers: false, hasDefenders: true,
+    }).label === 'no attacking units'
+    && formatPhoneCombatHeroOdds({
+      phase: 'resolved', winner: 'attacker', territoryName: 'Karelia S.S.R.',
+    }).text === '100%');
   document.documentElement.classList.remove('mobile-shell');
 }
 

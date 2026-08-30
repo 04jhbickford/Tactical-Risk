@@ -18680,7 +18680,8 @@ iframe[title="Vercel Live Feedback"] {
   html.mobile-shell .combat-popup--phone .combat-forces-header,
   html.mobile-shell .combat-popup--phone .probability-bar-compact,
   html.mobile-shell .combat-popup--phone .combat-phase-indicator,
-  html.mobile-shell .combat-popup--phone .left-modal-minimize-btn {
+  html.mobile-shell .combat-popup--phone .left-modal-minimize-btn,
+  html.mobile-shell .combat-popup--phone .combat-header {
     display: none;
   }
 
@@ -18689,6 +18690,34 @@ iframe[title="Vercel Live Feedback"] {
     flex-direction: column;
     gap: 6px;
     margin-bottom: 8px;
+  }
+
+  html.mobile-shell .phone-combat-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 8px 8px;
+    text-align: center;
+  }
+
+  html.mobile-shell .phone-combat-hero-pct {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: #fde68a;
+  }
+
+  html.mobile-shell .phone-combat-hero-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   html.mobile-shell .phone-combat-vs {

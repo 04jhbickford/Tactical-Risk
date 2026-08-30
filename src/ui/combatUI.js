@@ -63,6 +63,72 @@ export function shouldUsePhoneCombatSummary({ mobile = false } = {}) {
   return !!mobile;
 }
 
+// Same simplified expected-hits model the desktop bar uses. UI only —
+// does not change combat resolution.
+export function phoneCombatAttackerWinPercent({
+  attackers = [],
+  defenders = [],
+  unitDefs = {},
+} = {}) {
+  let attackPower = 0;
+  let attackUnits = 0;
+  for (const unit of attackers || []) {
+    const def = unitDefs?.[unit.type];
+    if (def && def.attack > 0) {
+      attackPower += (def.attack / 6) * unit.quantity;
+      attackUnits += unit.quantity;
+    }
+  }
+
+  let defensePower = 0;
+  let defenseUnits = 0;
+  for (const unit of defenders || []) {
+    const def = unitDefs?.[unit.type];
+    if (def && def.defense > 0) {
+      defensePower += (def.defense / 6) * unit.quantity;
+      defenseUnits += unit.quantity;
+    }
+  }
+
+  if (attackUnits === 0 || defenseUnits === 0) {
+    return attackUnits > 0 ? 100 : 0;
+  }
+
+  const attackerAdvantage = (attackPower / defenseUnits) - (defensePower / attackUnits);
+  const probability = 50 + (attackerAdvantage * 30);
+  return Math.max(5, Math.min(95, probability));
+}
+
+export function formatPhoneCombatHeroOdds({
+  attackerWinPercent = 0,
+  territoryName = '',
+  hasAttackers = false,
+  hasDefenders = false,
+  phase = null,
+  winner = null,
+} = {}) {
+  const land = String(territoryName || '').trim();
+  if (phase === 'resolved') {
+    if (winner === 'attacker') {
+      return {
+        percent: 100,
+        text: '100%',
+        label: land ? `Taken · ${land}` : 'Territory taken',
+      };
+    }
+    return {
+      percent: 0,
+      text: '0%',
+      label: land ? `Held · ${land}` : 'Defender holds',
+    };
+  }
+  const pct = Math.round(Math.max(0, Math.min(100, Number(attackerWinPercent) || 0)));
+  let label = land ? `to take ${land}` : 'to take this territory';
+  if (!hasAttackers) label = 'no attacking units';
+  else if (!hasDefenders) label = land ? `undefended · ${land}` : 'undefended';
+  return { percent: pct, text: `${pct}%`, label };
+}
+
 export class CombatUI {
   constructor() {
     this.gameState = null;
@@ -756,38 +822,11 @@ export class CombatUI {
   }
 
   _calculateProbability() {
-    // Simplified probability calculation based on expected hits
-    const { attackers, defenders } = this.combatState;
-
-    let attackPower = 0;
-    let attackUnits = 0;
-    for (const unit of attackers) {
-      const def = this.unitDefs[unit.type];
-      if (def && def.attack > 0) {
-        attackPower += (def.attack / 6) * unit.quantity;
-        attackUnits += unit.quantity;
-      }
-    }
-
-    let defensePower = 0;
-    let defenseUnits = 0;
-    for (const unit of defenders) {
-      const def = this.unitDefs[unit.type];
-      if (def && def.defense > 0) {
-        defensePower += (def.defense / 6) * unit.quantity;
-        defenseUnits += unit.quantity;
-      }
-    }
-
-    if (attackUnits === 0 || defenseUnits === 0) {
-      return attackUnits > 0 ? 100 : 0;
-    }
-
-    // Simplified: compare expected hits per round vs units
-    const attackerAdvantage = (attackPower / defenseUnits) - (defensePower / attackUnits);
-    // Convert to percentage (sigmoid-like)
-    const probability = 50 + (attackerAdvantage * 30);
-    return Math.max(5, Math.min(95, probability));
+    return phoneCombatAttackerWinPercent({
+      attackers: this.combatState?.attackers,
+      defenders: this.combatState?.defenders,
+      unitDefs: this.unitDefs,
+    });
   }
 
   _getTotalUnits(units) {
@@ -2219,6 +2258,14 @@ export class CombatUI {
     const atk = formatCombatForceLine(attackers) || 'none';
     const def = formatCombatForceLine(defenders) || 'none';
     const next = resolveCombatNextLine(phase, { winner });
+    const hero = formatPhoneCombatHeroOdds({
+      attackerWinPercent: this._calculateProbability(),
+      territoryName: this.currentTerritory,
+      hasAttackers: this._getTotalUnits(attackers) > 0,
+      hasDefenders: this._getTotalUnits(defenders) > 0,
+      phase,
+      winner,
+    });
     const detail = this.phoneCombatDetailSide;
     const detailUnits = detail === 'defender' ? defenders : attackers;
     const detailName = detail === 'defender'
@@ -2237,6 +2284,10 @@ export class CombatUI {
     }
     return `
       <div class="phone-combat-summary">
+        <div class="phone-combat-hero" aria-live="polite">
+          <div class="phone-combat-hero-pct">${hero.text}</div>
+          <div class="phone-combat-hero-label">${hero.label}</div>
+        </div>
         <div class="phone-combat-vs">${attackerPlayer?.name || 'Attacker'} vs ${defenderPlayer?.name || 'Defender'}</div>
         <button type="button" class="phone-combat-row${detail === 'attacker' ? ' open' : ''}" data-action="phone-combat-detail" data-side="attacker">
           <span class="phone-combat-row-who">Attack</span>

@@ -188,7 +188,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.39', GAME_VERSION === 'V2.81.39');
+check('GAME_VERSION is V2.81.40', GAME_VERSION === 'V2.81.40');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -2087,6 +2087,16 @@ console.log('=== V2.81.39 all-resign deleteDoc ===');
     /allow delete: if isAdmin\(\)/.test(rules)
     && /resource\.data\.status == 'finished'/.test(rules)
     && /request\.auth\.uid in resource\.data\.playerUserIds/.test(rules));
+}
+
+console.log('=== V2.81.40 phone battle odds hero ===');
+{
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const { phoneBlock } = phoneCssParts(css);
+  check('phone combat hero is large and first; compact bar stays hidden',
+    /\.phone-combat-hero-pct \{[\s\S]*?font-size:\s*40px/.test(phoneBlock)
+    && /combat-popup--phone \.probability-bar-compact,/.test(phoneBlock)
+    && /combat-popup--phone \.combat-header \{/.test(phoneBlock));
 }
 
 console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');

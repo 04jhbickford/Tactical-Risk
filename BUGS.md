@@ -2,6 +2,14 @@
 
 ---
 
+## 8.30.26 — V2.81.40 phone battle odds hero
+
+James he-correct on live V2.81.39: mobile battle screen hid the probability (compact bar is display:none on the phone summary), so he could not tell the chance to take the land.
+
+Fix: same expected-hits % as the desktop bar, painted first on the phone summary as a large hero number (`68%` / to take this territory). Summary-first + tap-for-detail stays. No new combat model. SCHEMA 11. GAME_VERSION V2.81.40.
+
+---
+
 ## 8.30.26 — V2.81.39 restore all-resign deleteDoc
 
 James 8:09am lock: Resign in Games menu; if ALL players resign, delete the game. PR 28 / live V2.81.38 never-delete was the wrong path (Auto-review / skipped-widget decline is not the product).
