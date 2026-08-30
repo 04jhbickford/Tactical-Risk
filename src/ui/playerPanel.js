@@ -17,6 +17,7 @@ import {
   shouldShowPhoneTrayToggle,
   shouldShowPhonePlaceMeta,
   shouldAutoStagePhoneDeployPair,
+  nextStagedCount,
   shouldUsePhonePairGrammar,
   shouldShowPhonePeekMax,
   shouldShowPhoneDeployChip,
@@ -267,7 +268,7 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
     if (land && selectedUnitType) return `To ${land}`;
     if (land) return `Tap a unit · ${land}`;
     if (selectedUnitType) return 'Tap land, then unit';
-    return 'Tap unit, then land';
+    return 'Tap land, then unit';
   }
   if (phase === GAME_PHASES.PLAYING
     && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
@@ -278,7 +279,7 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
     if (land && selectedUnitType) return `To ${land}`;
     if (land) return `Tap a unit · ${land}`;
     if (selectedUnitType) return 'Tap land, then unit';
-    return 'Tap unit, then land';
+    return 'Tap land, then unit';
   }
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
@@ -887,7 +888,7 @@ export class PlayerPanel {
     if (this._shouldStagePhonePairLand(territory)) {
       this._phoneDeployLandName = territory.name;
     }
-    this._maybeStagePhonePair();
+    // Land tap names the eligible tile only. Icon taps add +1 (V2.81.37).
     if (immediate) this.flushRender();
     else this._scheduleRender();
   }
@@ -932,24 +933,28 @@ export class PlayerPanel {
   _maybeStagePhoneDeployPair() {
     const dest = this._phoneDeployDest();
     if (!this._phoneUnitFitsTerritory(this.selectedUnitType, dest)) return;
-    if (!shouldAutoStagePhoneDeployPair({
-      mobile: isMobileShell(),
-      phase: this.gameState?.phase,
-      unitType: this.selectedUnitType,
-      territory: dest,
-      queuedForType: Number(this.placementQueue?.[this.selectedUnitType]) || 0,
-    })) return;
     const unitsToPlace = this.gameState.getUnitsToPlace?.(this.gameState.currentPlayer?.id) || [];
     const available = quantityAvailableForType(unitsToPlace, this.selectedUnitType);
     const limit = this.gameState.getUnitsPerRoundLimit?.() || 6;
     const placedThisRound = this.gameState.unitsPlacedThisRound || 0;
-    this.placementQueue = applyPlaceQueueDelta({
-      queue: {},
+    const before = Number(this.placementQueue?.[this.selectedUnitType]) || 0;
+    const next = applyPlaceQueueDelta({
+      queue: this.placementQueue || {},
       unitType: this.selectedUnitType,
       delta: 1,
       available,
       slotsRemaining: limit - placedThisRound,
     });
+    const after = Number(next[this.selectedUnitType]) || 0;
+    if (!shouldAutoStagePhoneDeployPair({
+      mobile: isMobileShell(),
+      phase: this.gameState?.phase,
+      unitType: this.selectedUnitType,
+      territory: dest,
+      queuedForType: before,
+      canAdd: after > before,
+    })) return;
+    this.placementQueue = next;
     this.selectedTerritory = dest;
     this._phoneDeployLandName = dest.name;
   }
@@ -960,12 +965,11 @@ export class PlayerPanel {
     const player = this.gameState?.currentPlayer;
     if (!dest || !this._isValidMobilizeLocation(dest, player)) return;
     if (!this._phoneMobilizeFitsDest(this.selectedUnitType, dest, player)) return;
-    if ((Number(this.placementQueue?.[this.selectedUnitType]) || 0) > 0) return;
     const pending = this.gameState.getPendingPurchases?.() || [];
     const available = quantityAvailableForType(pending, this.selectedUnitType);
     const slots = this._mobilizeSlotsRemaining(dest, player);
     this.placementQueue = applyPlaceQueueDelta({
-      queue: {},
+      queue: this.placementQueue || {},
       unitType: this.selectedUnitType,
       delta: 1,
       available,
@@ -987,8 +991,23 @@ export class PlayerPanel {
     });
     if (!unit) return;
     const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
-    if ((Number(this.moveSelectedUnits[unitKey]) || 0) > 0) return;
-    this.moveSelectedUnits = { ...this.moveSelectedUnits, [unitKey]: 1 };
+    const current = Number(this.moveSelectedUnits[unitKey]) || 0;
+    const nextQty = nextStagedCount({ current, available: unit.quantity });
+    if (nextQty <= current) return;
+    const nextSelected = { ...this.moveSelectedUnits, [unitKey]: nextQty };
+    if (this.movePendingDest) {
+      const saved = this.moveSelectedUnits;
+      this.moveSelectedUnits = nextSelected;
+      const turnPhase = this.gameState?.turnPhase;
+      const dests = this._getValidDestinations(
+        from,
+        player,
+        turnPhase === TURN_PHASES.COMBAT_MOVE,
+      );
+      this.moveSelectedUnits = saved;
+      if (!dests.some((d) => d.name === this.movePendingDest)) return;
+    }
+    this.moveSelectedUnits = nextSelected;
     this.selectedTerritory = from;
     this._phoneDeployLandName = from.name;
   }

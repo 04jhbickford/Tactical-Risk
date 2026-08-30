@@ -170,9 +170,28 @@ export function shouldAutoStagePhoneDeployPair({
   unitType,
   territory,
   queuedForType = 0,
+  canAdd = true,
 } = {}) {
+  void queuedForType;
   return shouldShowPhoneDeployQty({ mobile, phase, unitType, territory })
-    && Number(queuedForType) === 0;
+    && !!canAdd;
+}
+
+/** Repeat icon taps add +1 of that type onto the named eligible land.
+ *  Land tap only names the dest — it does not increment. */
+export function shouldIncrementPhonePairIcon({
+  hasNamedLand = false,
+  unitType = null,
+  canAdd = false,
+} = {}) {
+  return !!hasNamedLand && !!unitType && !!canAdd;
+}
+
+export function nextStagedCount({ current = 0, available = 0 } = {}) {
+  const cur = Math.max(0, Number(current) || 0);
+  const max = Math.max(0, Number(available) || 0);
+  if (cur >= max) return cur;
+  return cur + 1;
 }
 
 // Place Capital / Initial Deployment expand was a 4-tab sheet that ate

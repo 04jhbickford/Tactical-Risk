@@ -2,6 +2,14 @@
 
 ---
 
+## 8.30.26 — V2.81.37 land then unit icon; repeat icon adds +1
+
+James he-correct on live V2.81.36: deploy / move / attack were not "click eligible land, then keep clicking the unit icon" like landing planes. First icon tap staged 1 and further taps no-op'd; land tap could also auto-stage.
+
+Fix: named eligible land first. Each unit-icon tap stages +1 of that type (mixed stacks: repeat each type). Max still dumps remaining of that type. Confirm commits. Illegal dest / sea-vs-land / exhausted type does not add. SCHEMA 11. GAME_VERSION V2.81.37.
+
+---
+
 ## 8.30.26 — V2.81.36 sea hairlines; no start tac bomber; tech + mixed attack + phone combat
 
 James he-correct on live V2.81.35: ocean was flat teal (no sea-zone edges); starting tray had a tactical bomber; tech roll count was unclear; mixed-stack attack was unit-by-unit; battle sheet did not fit iPhone.

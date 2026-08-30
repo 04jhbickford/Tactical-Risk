@@ -72,6 +72,8 @@ const {
   shouldHidePhoneSetupMinimap,
   shouldShowPhoneDeployQty,
   shouldAutoStagePhoneDeployPair,
+  shouldIncrementPhonePairIcon,
+  nextStagedCount,
   shouldUsePhonePairGrammar,
   shouldShowPhonePeekMax,
   phonePointerHint,
@@ -180,7 +182,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.36', GAME_VERSION === 'V2.81.36');
+check('GAME_VERSION is V2.81.37', GAME_VERSION === 'V2.81.37');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -725,9 +727,9 @@ check('desktop purchase hint stays empty (PHASE_HINTS frozen)',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
 check('phone peek hint is the same pair grammar for mobilize / move',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === 'Tap a unit to buy'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap unit, then land'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap unit, then land'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap unit, then land');
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap land, then unit'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap land, then unit'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap land, then unit');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
@@ -767,8 +769,8 @@ check('inspect hold does not commit a setup tap',
   && shouldCommitPhoneSetupTap({
     mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, inspected: false,
   }) === true);
-check('phone deploy hint is Tap unit, then land',
-  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap unit, then land');
+check('phone deploy hint is Tap land, then unit',
+  resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap land, then unit');
 check('land-then-unit names the territory; unit-then-land asks for land',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, null, { territoryName: 'Yakut S.S.R.' })
     === 'Tap a unit · Yakut S.S.R.'
@@ -985,7 +987,7 @@ check('phone setup undo is required for place and last capital',
   }) === false);
 check('deploy peek hint is pair-aware',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null, 'infantry') === 'Tap land, then unit'
-  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap unit, then land');
+  && resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap land, then unit');
 check('place-tap still does not inspect (V2.69 split stays)',
   shouldShowPhoneTooltipOnTap({ mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT }) === false
   && shouldInspectPhoneHold({
@@ -1135,15 +1137,27 @@ check('phone placement hints say Tap, desktop stay Click',
       && shouldShowPhoneDeployQty({
         mobile: false, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
       }) === false);
-    check('first pair auto-stages once; a second tap does not restack',
+    check('named land + icon tap stages +1 each time until the type is exhausted',
       shouldAutoStagePhoneDeployPair({
         mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
-        queuedForType: 0,
+        queuedForType: 0, canAdd: true,
       }) === true
       && shouldAutoStagePhoneDeployPair({
         mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
-        queuedForType: 1,
-      }) === false);
+        queuedForType: 1, canAdd: true,
+      }) === true
+      && shouldAutoStagePhoneDeployPair({
+        mobile: true, phase: GAME_PHASES.UNIT_PLACEMENT, unitType: 'tank', territory: land,
+        queuedForType: 3, canAdd: false,
+      }) === false
+      && shouldIncrementPhonePairIcon({
+        hasNamedLand: true, unitType: 'infantry', canAdd: true,
+      }) === true
+      && shouldIncrementPhonePairIcon({
+        hasNamedLand: false, unitType: 'infantry', canAdd: true,
+      }) === false
+      && nextStagedCount({ current: 2, available: 5 }) === 3
+      && nextStagedCount({ current: 5, available: 5 }) === 5);
   }
   {
     const html = readFileSync(join(root, 'index.html'), 'utf8');
@@ -2015,6 +2029,21 @@ console.log('=== V2.81.34 Fit fills-only + China inspect ===');
     && /renderCrossWaterConnections/.test(mainSrc)
     && /shouldStrokePhoneSeaDashes/.test(rendererSrc)
     && /LAND_BRIDGES/.test(rendererSrc));
+}
+
+console.log('=== V2.81.37 land then icon +1 each tap ===');
+{
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('repeat icon tap increments; land tap does not auto-stage',
+    nextStagedCount({ current: 0, available: 4 }) === 1
+    && nextStagedCount({ current: 1, available: 4 }) === 2
+    && nextStagedCount({ current: 4, available: 4 }) === 4
+    && shouldIncrementPhonePairIcon({
+      hasNamedLand: true, unitType: 'armour', canAdd: true,
+    }) === true
+    && /Land tap names the eligible tile only/.test(panelSrc)
+    && /nextStagedCount/.test(panelSrc)
+    && /movePendingDest/.test(panelSrc));
 }
 
 console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');
