@@ -2,7 +2,7 @@
 
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
-import { isMobileShell, formatMobilePhaseWord, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster, isPhoneSetupPhase } from './mobileShell.js';
+import { isMobileShell, formatMobilePhaseWord, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster, isPhoneSetupPhase, phoneMenuHomeActions } from './mobileShell.js';
 import { resolveHudClarity, shouldShowHudTicker } from './hudClarity.js';
 
 export class HUD {
@@ -284,37 +284,26 @@ export class HUD {
         ${this.menuTab ? `
           <div class="phone-menu-panel">${tabHTML}</div>
         ` : `
-          <div class="phone-menu-list">
-            <button class="phone-menu-row" data-action="menu-tab" data-tab="stats">
+          <div class="phone-menu-home">
+            ${(() => {
+              const rows = phoneMenuHomeActions();
+              const pin = rows.filter((r) => r.kind === 'danger');
+              const rest = rows.filter((r) => r.kind !== 'danger');
+              const rowHtml = (row, extra = '') => {
+                const tab = row.tab ? ` data-tab="${row.tab}"` : '';
+                const danger = row.kind === 'danger' ? ' phone-menu-resign' : '';
+                return `
+            <button class="phone-menu-row${danger}${extra}" data-action="${row.action}"${tab}>
               <span class="phone-menu-mark" aria-hidden="true"></span>
-              <span class="phone-menu-label">Players</span>
-              <span class="phone-menu-meta">›</span>
-            </button>
-            <button class="phone-menu-row" data-action="menu-tab" data-tab="territory">
-              <span class="phone-menu-mark" aria-hidden="true"></span>
-              <span class="phone-menu-label">Territory</span>
-              <span class="phone-menu-meta">›</span>
-            </button>
-            <button class="phone-menu-row" data-action="menu-tab" data-tab="log">
-              <span class="phone-menu-mark" aria-hidden="true"></span>
-              <span class="phone-menu-label">Log</span>
-              <span class="phone-menu-meta">›</span>
-            </button>
-            <button class="phone-menu-row" data-action="rules">
-              <span class="phone-menu-mark" aria-hidden="true"></span>
-              <span class="phone-menu-label">Game Rules</span>
-              <span class="phone-menu-meta">›</span>
-            </button>
-            <button class="phone-menu-row" data-action="exit-lobby">
-              <span class="phone-menu-mark" aria-hidden="true"></span>
-              <span class="phone-menu-label">Save & Exit</span>
-              <span class="phone-menu-meta">›</span>
-            </button>
-            <button class="phone-menu-row" data-action="resign">
-              <span class="phone-menu-mark" aria-hidden="true"></span>
-              <span class="phone-menu-label">Resign</span>
-              <span class="phone-menu-meta">›</span>
-            </button>
+              <span class="phone-menu-label">${row.label}</span>
+              <span class="phone-menu-meta">${row.meta || ''}</span>
+            </button>`;
+              };
+              return `${pin.map((r) => rowHtml(r, ' phone-menu-first')).join('')}
+            <div class="phone-menu-list">
+              ${rest.map((r) => rowHtml(r)).join('')}
+            </div>`;
+            })()}
           </div>
           ${shouldShowPhoneMenuPlayerRoster({ mobile: true }) ? playersHtml : ''}
         `}

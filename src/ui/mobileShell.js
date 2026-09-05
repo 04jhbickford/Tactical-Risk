@@ -146,6 +146,31 @@ export function shouldShowPhoneMenuPlayerRoster({ mobile } = {}) {
   return !mobile;
 }
 
+// Resign must be first-viewport on the phone ⋯ sheet — not the last
+// row under Players / Territory / Log / Rules / Exit (52dvh clips it).
+export const PHONE_MENU_RESIGN_LABEL = 'Resign';
+export const PHONE_MENU_RESIGN_META = 'Leave this game';
+
+export function phoneMenuHomeActions() {
+  return [
+    {
+      action: 'resign',
+      label: PHONE_MENU_RESIGN_LABEL,
+      meta: PHONE_MENU_RESIGN_META,
+      kind: 'danger',
+    },
+    { action: 'menu-tab', tab: 'stats', label: 'Players', meta: '›' },
+    { action: 'menu-tab', tab: 'territory', label: 'Territory', meta: '›' },
+    { action: 'menu-tab', tab: 'log', label: 'Log', meta: '›' },
+    { action: 'rules', label: 'Game Rules', meta: '›' },
+    { action: 'exit-lobby', label: 'Save & Exit', meta: '›' },
+  ];
+}
+
+export function isPhoneMenuResignFirst(actions = phoneMenuHomeActions()) {
+  return actions[0]?.action === 'resign';
+}
+
 // Peek deploy is chips + one thumb. The 0/6 line is not a second panel.
 export function shouldShowPhonePlaceMeta({ mobile, phase, peek } = {}) {
   return !!mobile && phase === GAME_PHASES.UNIT_PLACEMENT && !peek;

@@ -19,6 +19,7 @@ On a real iPhone (Safari) and iPhone-narrow Chrome at 390 and 500:
 - [ ] Phase or seat change clears peek / illegal Confirm; looks-broken bar if Confirm would have stuck.
 - [ ] Confirm / Done fully clear of the home indicator; Undo ghost beside. Landscape short-side ≤640 stays phone tray.
 - [ ] After a save-failed toast: board matches server, no WAITING lock, no empty rematch / toast loop.
+- [ ] ⋯ sheet: Resign is first-viewport (Leave this game), no hunting. Deploy count stays +/−/Max.
 
 ---
 

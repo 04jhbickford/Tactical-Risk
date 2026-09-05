@@ -68,6 +68,10 @@ const {
   shouldShowPhoneDetentTabs,
   shouldShowPhoneTrayToggle,
   shouldShowPhoneMenuPlayerRoster,
+  phoneMenuHomeActions,
+  isPhoneMenuResignFirst,
+  PHONE_MENU_RESIGN_LABEL,
+  PHONE_MENU_RESIGN_META,
   shouldShowPhonePlaceMeta,
   shouldParkPhoneMapTools,
   shouldHidePhoneSetupMinimap,
@@ -2267,6 +2271,19 @@ console.log('=== V2.81.42 peek flush + thumb CTA safe-area ===');
     && /\.pp-peek-cta-row \{[\s\S]*?flex-direction:\s*row|\.pp-tray-peek \.pp-bottom-buttons \{[\s\S]*?flex-direction:\s*row/.test(phoneBlock));
   check('looks-broken bar is in the phone tray',
     /\.pp-looks-broken-bar \{/.test(phoneBlock));
+  const menu = phoneMenuHomeActions();
+  const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
+  check('phone ⋯ sheet pins Resign first-viewport, labeled Leave this game',
+    isPhoneMenuResignFirst(menu) === true
+    && menu[0].label === PHONE_MENU_RESIGN_LABEL
+    && menu[0].meta === PHONE_MENU_RESIGN_META
+    && /phoneMenuHomeActions/.test(hudSrc)
+    && /phone-menu-resign/.test(hudSrc)
+    && /phone-menu-first/.test(hudSrc)
+    && hudSrc.indexOf('phone-menu-resign') < hudSrc.indexOf('phone-menu-list'));
+  check('phone ⋯ Resign stays pinned above the scrolling list',
+    /\.phone-menu-home \.phone-menu-resign \{[\s\S]*?flex:\s*0 0 auto/.test(phoneBlock)
+    && /\.phone-menu-list \{[\s\S]*?overflow-y:\s*auto/.test(phoneBlock));
 }
 
 if (failures) {

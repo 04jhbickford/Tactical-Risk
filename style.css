@@ -18442,9 +18442,36 @@ iframe[title="Vercel Live Feedback"] {
     white-space: nowrap;
   }
 
+  .phone-menu-home {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .phone-menu-home .phone-menu-resign {
+    flex: 0 0 auto;
+    margin: 8px 12px 0;
+    background: rgba(248, 113, 113, 0.16);
+    color: #fecaca;
+  }
+
+  .phone-menu-home .phone-menu-resign .phone-menu-mark {
+    background: #f87171;
+  }
+
+  .phone-menu-home .phone-menu-resign .phone-menu-meta {
+    color: #fca5a5;
+    font-weight: 700;
+  }
+
   .phone-menu-list {
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
     padding: 8px 12px;
     gap: 8px;
   }
