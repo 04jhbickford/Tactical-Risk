@@ -143,6 +143,11 @@ export function isMyGamesActiveStatus(status) {
   return MY_GAMES_ACTIVE_STATUSES.includes(status);
 }
 
+export function shouldReconnectToGame({ exists = true, status = 'active' } = {}) {
+  if (!exists) return false;
+  return isMyGamesActiveStatus(status || 'active');
+}
+
 // Token hiccup after Sign In must still list games. Wiping the list here
 // is how B25 showed "No active games found" while Bastion stayed signed in.
 // A remembered last match is enough to keep My Games from going empty.

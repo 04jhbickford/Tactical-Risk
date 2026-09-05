@@ -13,7 +13,7 @@ import {
 import { getFirebaseDb } from '../multiplayer/firebase.js';
 import { getAuthManager } from '../multiplayer/auth.js';
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
-import { leaveGame } from '../multiplayer/surrender.js';
+import { leaveGame, isAllResignDeleteFailure, retryDeleteFinishedGame } from '../multiplayer/surrender.js';
 import {
   mergeMyActiveGames,
   shouldAbortMyGamesOnTokenHiccup,
@@ -25,6 +25,8 @@ import {
   readLastMatch,
   recoverMyGamesOnLoad,
   shouldWipeMyGamesOnError,
+  shouldForgetLastMatchAfterLookup,
+  shouldJoinListedGame,
 } from '../multiplayer/lastMatch.js';
 
 export { shouldOpenLeaveConfirm };
@@ -123,20 +125,27 @@ export class GameList {
       const byStarter = starterSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       this.games = mergeMyActiveGames({ bySeat, byStarter });
       let lastGame = null;
+      let lastMatchMissing = false;
       if (remembered?.gameId && !this.games.some(g => g.id === remembered.gameId)) {
         try {
           const snap = await getDoc(doc(this.db, 'games', remembered.gameId));
           if (snap.exists()) {
             lastGame = { id: snap.id, ...snap.data() };
+          } else {
+            lastMatchMissing = true;
           }
         } catch (err) {
           console.warn('[GameList] last-match getDoc failed', err);
         }
       }
+      if (shouldForgetLastMatchAfterLookup({ lastMatchMissing, lastMatchGame: lastGame })) {
+        forgetLastMatch();
+      }
       this.games = recoverMyGamesOnLoad({
         games: this.games,
         lastMatchGame: lastGame,
-        lastMatch: remembered,
+        lastMatch: lastMatchMissing ? null : remembered,
+        lastMatchMissing,
       });
       console.log(`[GameList] Found ${this.games.length} active games for userId ${userId}`);
 
@@ -395,6 +404,13 @@ export class GameList {
         const gameId = item.dataset.gameId;
         const game = this.games.find(g => g.id === gameId);
         console.log('[GameList] Game clicked:', { gameId, game });
+        if (!shouldJoinListedGame({ game })) {
+          if (gameId) forgetLastMatch();
+          alert('That game is no longer active.');
+          await this._loadGames();
+          this._render();
+          return;
+        }
         if (game && this.onSelectGame) {
           this.hide();
           console.log('[GameList] Calling onSelectGame...');
@@ -424,8 +440,17 @@ export class GameList {
 
         btn.disabled = true;
         const userId = this.authManager.getUserId();
-        const result = await leaveGame(gameId, userId);
-        if (result.success) {
+        let result = await leaveGame(gameId, userId);
+        if (result.success && isAllResignDeleteFailure(result)) {
+          const retry = confirm('Could not remove the finished game. Retry delete?');
+          if (retry) {
+            result = await retryDeleteFinishedGame(gameId);
+          }
+          if (!result?.deleted) {
+            alert('Game is finished but could not be removed. Refresh My Games — it is not playable.');
+          }
+        }
+        if (result.success || result.deleted || result.shouldDelete) {
           const remembered = readLastMatch();
           if (remembered?.gameId === gameId) forgetLastMatch();
           await this._loadGames();

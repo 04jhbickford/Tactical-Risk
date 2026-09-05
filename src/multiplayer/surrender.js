@@ -22,7 +22,45 @@ import { getFirebaseDb } from './firebase.js';
 // robustness harness can exercise the exact same logic. Re-exported here for
 // existing importers.
 import { applySurrenderToState, shouldDeleteGameAfterResign } from './surrenderCore.js';
+import { rewriteLobbyHostAfterResign } from './hostHandoff.js';
 export { applySurrenderToState, shouldDeleteGameAfterResign };
+
+const DELETE_RETRY_ATTEMPTS = 3;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function deleteGameDocWithRetry(gameRef, { attempts = DELETE_RETRY_ATTEMPTS } = {}) {
+  let lastError = null;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      await deleteDoc(gameRef);
+      return { deleted: true };
+    } catch (err) {
+      lastError = err;
+      if (i < attempts) await delay(150 * i);
+    }
+  }
+  return { deleted: false, error: lastError?.message || String(lastError) };
+}
+
+export function isAllResignDeleteFailure(outcome) {
+  return !!(outcome && outcome.success && outcome.shouldDelete && outcome.deleted !== true);
+}
+
+export async function retryDeleteFinishedGame(gameId) {
+  const db = getFirebaseDb();
+  if (!db || !gameId) return { success: false, deleted: false, error: 'Not connected', shouldDelete: true };
+  const gameRef = doc(db, 'games', gameId);
+  const result = await deleteGameDocWithRetry(gameRef);
+  return {
+    success: !!result.deleted,
+    deleted: !!result.deleted,
+    error: result.error,
+    shouldDelete: true,
+  };
+}
 
 // Surrender/leave a game from outside a live session (e.g. the My Games list).
 // Uses a transaction so we never clobber a concurrent state push.
@@ -66,26 +104,16 @@ export async function leaveGame(gameId, userId) {
       // can't continue — the host ran the AI), finish the game
       const status = (result.gameOver || !result.humansRemain) ? 'finished' : (data.status || 'active');
 
-      // If the leaving player was the host, hand the host flag (and with it AI
-      // control) to the next active human. Clients pick this up on (re)join.
-      let lobbyData = data.lobbyData;
-      if (lobbyData?.players?.some(p => p.oderId === userId && p.isHost)) {
-        const surrenderedIds = new Set(
-          state.players.filter(p => p.surrendered).map(p => p.oderId)
-        );
-        const nextHost = lobbyData.players.find(
-          p => !p.isAI && p.oderId !== userId && !surrenderedIds.has(p.oderId)
-        );
-        if (nextHost) {
-          lobbyData = {
-            ...lobbyData,
-            players: lobbyData.players.map(p => ({
-              ...p,
-              isHost: p.oderId === nextHost.oderId
-            }))
-          };
-        }
-      }
+      // If the leaving player was the host, rewrite lobbyData hostId + isHost
+      // so live clients (no rejoin) pick up AI authority from the snapshot.
+      const surrenderedIds = new Set(
+        (state.players || []).filter(p => p.surrendered).map(p => p.oderId)
+      );
+      const lobbyData = rewriteLobbyHostAfterResign({
+        lobbyData: data.lobbyData,
+        leavingUserId: userId,
+        surrenderedIds,
+      });
 
       const deleteAfter = shouldDeleteGameAfterResign({ humansRemain: result.humansRemain });
       if (deleteAfter) {
@@ -116,13 +144,10 @@ export async function leaveGame(gameId, userId) {
     });
 
     if (outcome?.success && outcome.shouldDelete) {
-      try {
-        await deleteDoc(gameRef);
-        return { ...outcome, deleted: true };
-      } catch (deleteError) {
-        console.error('[Surrender] delete after all-resign failed:', deleteError);
-        return { ...outcome, deleted: false, error: deleteError.message };
-      }
+      const deleted = await deleteGameDocWithRetry(gameRef);
+      if (deleted.deleted) return { ...outcome, deleted: true };
+      console.error('[Surrender] delete after all-resign failed:', deleted.error);
+      return { ...outcome, deleted: false, error: deleted.error };
     }
 
     return outcome;

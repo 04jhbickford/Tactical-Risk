@@ -116,7 +116,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.41', GAME_VERSION === 'V2.81.41');
+check('GAME_VERSION is V2.81.42', GAME_VERSION === 'V2.81.42');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
@@ -342,6 +342,18 @@ console.log('=== V2.81.36 phone combat summary ===');
       phase: 'resolved', winner: 'attacker', territoryName: 'Karelia S.S.R.',
     }).text === '100%');
   document.documentElement.classList.remove('mobile-shell');
+}
+
+console.log('=== V2.81.42 push_exhausted rematch recovery ===');
+{
+  const { shouldShowPushExhaustedNotice, shouldRematchCombatAfterExhaust, resolveWaitingLockAfterExhaust } =
+    await import(new URL('../src/multiplayer/rematchRecovery.js', import.meta.url));
+  check('exhaust toast de-dupes inside 4s',
+    shouldShowPushExhaustedNotice({ lastShownAt: 10, now: 1000 }) === false
+    && shouldShowPushExhaustedNotice({ lastShownAt: 10, now: 5010 }) === true);
+  check('waiting lock clears after exhaust', resolveWaitingLockAfterExhaust() === false);
+  check('empty combat queue does not rematch',
+    shouldRematchCombatAfterExhaust({ turnPhase: 'combat', queueHasEnemy: false }) === false);
 }
 
 if (failures) {

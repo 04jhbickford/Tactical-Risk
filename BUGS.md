@@ -2,6 +2,26 @@
 
 ---
 
+## 9.5.26 — V2.81.42 polish + multiplayer robustness (DRAFT)
+
+James / FREE TOKEN DAY: live host handoff after Resign, all-resign delete retry, My Games hygiene, presence/sync resume, systemic peek flush, thumb CTA safe-area, push_exhausted rematch polish. SCHEMA 11. GAME_VERSION V2.81.42. Draft only — not production.
+
+HOLDs kept: China merge; capital named Confirm + unit-icon auto-place; type leftover cap; all-resign deletes when no humans; phone shell ≤640 short side; sea hairlines + yellow lanes; desktop+phone capital peek parity.
+
+### P0-8 physical iPhone checklist (cannot run here)
+
+On a real iPhone (Safari) and iPhone-narrow Chrome at 390 and 500:
+
+- [ ] After host Resign with ≥1 human left, remaining human runs AI without a full rejoin; old host cannot.
+- [ ] All-resign: game gone from My Games after one refresh; delete fail shows error + retry (not a Join-able finished orphan).
+- [ ] Finished / deleted ids never Join or auto-resume.
+- [ ] Background / lock / idle ≠ offline for failover; Exit still deletes presence.
+- [ ] Phase or seat change clears peek / illegal Confirm; looks-broken bar if Confirm would have stuck.
+- [ ] Confirm / Done fully clear of the home indicator; Undo ghost beside. Landscape short-side ≤640 stays phone tray.
+- [ ] After a save-failed toast: board matches server, no WAITING lock, no empty rematch / toast loop.
+
+---
+
 ## 8.30.26 — V2.81.41 Place Capital Confirm; hide merge seams
 
 Robert + Sean on live V2.81.40 desktop: Place Capital never committed (click selected the land, HUD stayed "CLICK YOUR TERRITORY"). Live-build bug — `_phoneCapitalLandName` was phone-only so Confirm never mounted. Sean’s “two Chinas” is the intended Sinkiang merge, not a missing country.

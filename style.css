@@ -16959,12 +16959,13 @@ iframe[title="Vercel Live Feedback"] {
   }
 }
 
-/* ---------- V2.81 phone chrome tree (≤640px) ----------
+/* ---------- V2.81 phone chrome tree (≤640px short side) ----------
    Separate phone UX — not the desktop lobby/HUD squeezed. The V2.61
    tablet band is 641–900; desktop ≥901 stay on their existing trees.
    500 CSS-px Chrome boxes must keep this bottom tray, not the 280px rail.
-   Phone rules live only in this query and/or html.mobile-shell. */
-@media (max-width: 640px) {
+   Landscape phones (short side ≤640, long <1024) stay on this tree so
+   Confirm/Done clear the home indicator the same as 390/500 portrait. */
+@media (max-width: 640px), (max-height: 640px) and (max-width: 1023px) {
   html,
   body {
     height: 100dvh;
@@ -16973,7 +16974,7 @@ iframe[title="Vercel Live Feedback"] {
 
   html.mobile-shell {
     --mobile-top-bar: calc(48px + env(safe-area-inset-top, 0px));
-    --mobile-cta: calc(56px + env(safe-area-inset-bottom, 0px));
+    --mobile-cta: calc(72px + env(safe-area-inset-bottom, 0px));
     /* One phone row grammar: mark left, copy on the same baseline.
        Same role = same size. Seated vs unseated does not re-center. */
     --phone-gutter: 16px;
@@ -17367,7 +17368,7 @@ iframe[title="Vercel Live Feedback"] {
     height: auto;
     border-left: none;
     border-top: 1px solid rgba(255, 255, 255, 0.12);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
   }
 
   /* Beat .pp-phase.compact { display: flex } so PLACE CAPITAL / CLICK
@@ -17491,7 +17492,7 @@ iframe[title="Vercel Live Feedback"] {
     gap: 6px;
     max-width: 100vw;
     overflow-x: hidden;
-    padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 6px 12px calc(28px + env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
     margin-top: auto;
   }
@@ -17642,6 +17643,19 @@ iframe[title="Vercel Live Feedback"] {
     font-weight: 700;
     line-height: 1;
     color: #fde68a;
+  }
+
+  .pp-looks-broken-bar {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(250, 204, 21, 0.16);
+    color: #fde68a;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.3;
   }
 
   .pp-peek-cta-row {
@@ -18851,6 +18865,19 @@ iframe[title="Vercel Live Feedback"] {
                   box-shadow var(--phone-confirm-ms, 250ms) linear;
     }
   }
+}
+
+.pp-looks-broken-bar {
+  display: block;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(250, 204, 21, 0.16);
+  color: #fde68a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 /* Handoff hides live chrome (not painted underneath). Class-gated so

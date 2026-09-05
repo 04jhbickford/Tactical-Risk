@@ -87,12 +87,36 @@ export function recoverMyGamesOnLoad({
   games = [],
   lastMatchGame = null,
   lastMatch = null,
+  lastMatchMissing = false,
 } = {}) {
-  let next = mergeLastMatchIntoMyGames({ games, lastMatchGame });
+  const listed = (games || []).filter((g) => shouldListGameInMyGames(g));
+  if (lastMatchMissing) return listed;
+  if (lastMatchGame && !shouldListGameInMyGames(lastMatchGame)) return listed;
+  let next = mergeLastMatchIntoMyGames({ games: listed, lastMatchGame });
+  next = next.filter((g) => shouldListGameInMyGames(g));
   if (next.some((g) => g.id === lastMatch?.gameId)) return next;
   const stub = stubGameFromLastMatch(lastMatch);
   if (stub) return mergeLastMatchIntoMyGames({ games: next, lastMatchGame: stub });
   return next;
+}
+
+export function shouldListGameInMyGames(game) {
+  if (!game?.id) return false;
+  return (game.status || 'active') === 'active' || game.status === 'starting';
+}
+
+export function shouldJoinListedGame({ game = null, exists = true } = {}) {
+  if (!exists || !game?.id) return false;
+  return shouldListGameInMyGames(game);
+}
+
+export function shouldForgetLastMatchAfterLookup({
+  lastMatchMissing = false,
+  lastMatchGame = null,
+} = {}) {
+  if (lastMatchMissing) return true;
+  if (lastMatchGame && !shouldListGameInMyGames(lastMatchGame)) return true;
+  return false;
 }
 
 export function shouldWipeMyGamesOnError({ lastMatch = null } = {}) {

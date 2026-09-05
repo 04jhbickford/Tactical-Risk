@@ -508,5 +508,66 @@ console.log('=== B4: roll logging present + gameplay unchanged (Bug 4) ===');
         gs.toJSON()._rollLog === undefined && gs.toJSON().rollLog === undefined);
 }
 
+console.log('=== H: live host handoff after resign (no rejoin) ===');
+{
+  const { applyLiveHostHandoff, rewriteLobbyHostAfterResign, resolveIsHost, resolveHostOderId } =
+    await import(pathToFileURL(join(root, 'src/multiplayer/hostHandoff.js')));
+  const { shouldShowPushExhaustedNotice, resolveWaitingLockAfterExhaust, shouldRematchCombatAfterExhaust } =
+    await import(pathToFileURL(join(root, 'src/multiplayer/rematchRecovery.js')));
+
+  const lobby = {
+    hostId: 'user_0',
+    players: [
+      { oderId: 'user_0', isHost: true, isAI: false },
+      { oderId: 'user_1', isHost: false, isAI: false },
+      { oderId: 'ai_0', isHost: false, isAI: true },
+    ],
+  };
+  const rewritten = rewriteLobbyHostAfterResign({
+    lobbyData: lobby,
+    leavingUserId: 'user_0',
+    surrenderedIds: new Set(['user_0']),
+  });
+  check('H1: resigning host stamps the next human on lobbyData',
+    rewritten.hostId === 'user_1'
+    && rewritten.players.find((p) => p.oderId === 'user_1')?.isHost === true
+    && rewritten.players.find((p) => p.oderId === 'user_0')?.isHost === false);
+
+  const nextHuman = applyLiveHostHandoff({
+    currentHostOderId: 'user_0',
+    currentIsHost: false,
+    userId: 'user_1',
+    lobbyData: rewritten,
+  });
+  const oldHost = applyLiveHostHandoff({
+    currentHostOderId: 'user_0',
+    currentIsHost: true,
+    userId: 'user_0',
+    lobbyData: rewritten,
+  });
+  check('H2: next human is host for AI without rejoin',
+    nextHuman.changed && nextHuman.isHost && nextHuman.hostOderId === 'user_1');
+  check('H3: old host client cannot run AI',
+    oldHost.changed && oldHost.isHost === false && oldHost.hostOderId === 'user_1');
+  check('H4: failover watches the new host id',
+    resolveHostOderId({ lobbyData: rewritten }) === 'user_1'
+    && resolveIsHost({ userId: 'user_1', lobbyData: rewritten }) === true
+    && resolveIsHost({ userId: 'user_0', lobbyData: rewritten }) === false);
+
+  check('H5: push_exhausted toast is not a tight loop',
+    shouldShowPushExhaustedNotice({ lastShownAt: 0, now: 1000 }) === true
+    && shouldShowPushExhaustedNotice({ lastShownAt: 1000, now: 2000 }) === false
+    && shouldShowPushExhaustedNotice({ lastShownAt: 1000, now: 6000 }) === true);
+  check('H6: exhaust clears waiting lock; empty rematch stays closed',
+    resolveWaitingLockAfterExhaust() === false
+    && shouldRematchCombatAfterExhaust({ turnPhase: 'combat', queueHasEnemy: false }) === false
+    && shouldRematchCombatAfterExhaust({ turnPhase: 'mobilize', queueHasEnemy: true }) === false
+    && shouldRematchCombatAfterExhaust({ turnPhase: 'combat', queueHasEnemy: true }) === true);
+
+  check('H7: SCHEMA 11 stays; all-resign still deletes',
+    SCHEMA_VERSION === 11
+    && shouldDeleteGameAfterResign({ humansRemain: false }) === true);
+}
+
 console.log(failures === 0 ? '\nALL MATRIX CELLS PASS' : `\n${failures} FAILURES`);
 process.exit(failures === 0 ? 0 : 1);

@@ -18,6 +18,7 @@ import {
   shouldReplaceSnapshotListener,
   shouldResumeSnapshots,
 } from './presencePolicy.js';
+import { applyLiveHostHandoff } from './hostHandoff.js';
 
 export class SyncManager {
   constructor(gameId, gameState) {
@@ -27,7 +28,8 @@ export class SyncManager {
     this.gameState = gameState;
     this.localVersion = 0;
     this.isActivePlayer = false;
-    this.isHost = false; // Whether this client is the game host
+    this.isHost = false; // Whether this client is the game host (follows lobbyData)
+    this.hostOderId = null;
     this.isPushing = false;
     this.isLoadingRemoteState = false; // Flag to prevent push during remote state load
     this.unsubscribe = null;
@@ -67,9 +69,36 @@ export class SyncManager {
     }
   }
 
-  // Set whether this client is the host (controls AI players)
+  // Set whether this client is the host (controls AI players).
+  // Live Resign rewrites lobbyData; applyHostFromDoc overrides this
+  // from snapshots so AI authority does not stay frozen at join.
   setIsHost(isHost) {
     this.isHost = isHost;
+  }
+
+  setHostOderId(hostOderId) {
+    this.hostOderId = hostOderId || null;
+  }
+
+  applyHostFromDoc(docData) {
+    const next = applyLiveHostHandoff({
+      currentHostOderId: this.hostOderId,
+      currentIsHost: this.isHost,
+      userId: this.userId,
+      lobbyData: docData?.lobbyData,
+      players: docData?.lobbyData?.players || docData?.players,
+      hostId: docData?.lobbyData?.hostId || docData?.hostId || null,
+    });
+    if (!next.changed && this.hostOderId) return next;
+    this.hostOderId = next.hostOderId;
+    this.isHost = next.isHost;
+    if (next.changed) {
+      this._notifyListeners('host_changed', {
+        hostOderId: next.hostOderId,
+        isHost: next.isHost,
+      });
+    }
+    return next;
   }
 
   // Optional extra authority check (host-failover: when the host is offline,
@@ -139,6 +168,7 @@ export class SyncManager {
 
     // Determine if we're the active player
     this._updateActivePlayer(data.currentPlayerId);
+    this.applyHostFromDoc(data);
 
     this._ensureGameSnapshot();
     return true;
@@ -177,6 +207,7 @@ export class SyncManager {
         this.gameState.loadFromJSON(data.state);
         this.isLoadingRemoteState = false;
         this._updateActivePlayer(data.currentPlayerId);
+        this.applyHostFromDoc(data);
 
         console.log(`[Sync] After load - currentPlayer: ${this.gameState.currentPlayer?.name} (oderId: ${this.gameState.currentPlayer?.oderId})`);
 
@@ -231,6 +262,7 @@ export class SyncManager {
       const newData = snapshot.data();
       console.log(`[Sync] onSnapshot: version=${newData.stateVersion}, localVersion=${this.localVersion}, isPushing=${this.isPushing}, currentPlayerId=${newData.currentPlayerId}`);
       this._checkRemoteVersion(newData);
+      this.applyHostFromDoc(newData);
 
       if (this.isPushing) {
         if (newData.currentPlayerId !== this._lastCurrentPlayerId) {
@@ -513,9 +545,13 @@ export class SyncManager {
     if (!this.db || !this.gameId) return;
     try {
       const snapshot = await getDoc(doc(this.db, 'games', this.gameId));
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        this._notifyListeners('game_deleted', null);
+        return;
+      }
 
       const data = snapshot.data();
+      this.applyHostFromDoc(data);
       const remoteVersion = data.stateVersion || 0;
       if (force || remoteVersion > this.localVersion) {
         console.log(`[Sync] Reloading remote state: local v${this.localVersion} -> remote v${remoteVersion}${force ? ' (force)' : ''}`);

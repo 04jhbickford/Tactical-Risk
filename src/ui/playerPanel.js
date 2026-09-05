@@ -44,6 +44,11 @@ import {
 } from '../state/placeQueue.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
 import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
+import {
+  shouldFlushPeekOnPhaseOrSeatChange,
+  flushPeekState,
+  looksBrokenBarHtml,
+} from './peekFlush.js';
 import { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } from '../state/undoPolicy.js';
 import {
   capturePanelPointerLock,
@@ -585,6 +590,7 @@ export class PlayerPanel {
     this._phoneSetupPeekAt = 0;
     this._phoneCapitalLandName = null;
     this._phoneDeployLandName = null;
+    this._looksBrokenReason = null;
     this._phoneDeployCommittedAt = 0;
     this._phonePairFrozenAt = 0;
     this._phonePairMaxAt = 0;
@@ -1331,6 +1337,38 @@ export class PlayerPanel {
     this.clearAirLanding();
   }
 
+  // One path for phase / seat change: wipe peek names, inspect dest,
+  // and an illegal Confirm so leftover tray verbs cannot stick.
+  flushPeekForPhaseOrSeat({
+    phase = null,
+    turnPhase = null,
+    seatId = null,
+    capitalPeekStillLegal = false,
+  } = {}) {
+    const should = shouldFlushPeekOnPhaseOrSeatChange({
+      prevPhase: this._peekPhase,
+      nextPhase: phase,
+      prevTurnPhase: this._peekTurnPhase,
+      nextTurnPhase: turnPhase,
+      prevSeatId: this._lastRenderedPlayerId,
+      nextSeatId: seatId,
+    });
+    if (!should) return null;
+    const flushed = flushPeekState({
+      hadCapitalPeekName: !!this._phoneCapitalLandName,
+      capitalPeekStillLegal,
+      hadDeployPeekName: !!this._phoneDeployLandName,
+      hadSelectedTerritory: !!this.selectedTerritory,
+    });
+    this.selectedTerritory = flushed.selectedTerritory;
+    this._phoneCapitalLandName = flushed.phoneCapitalLandName;
+    this._phoneDeployLandName = flushed.phoneDeployLandName;
+    this._looksBrokenReason = flushed.looksBrokenReason;
+    this.trayExpanded = false;
+    this.phoneDetentTab = 'actions';
+    return flushed;
+  }
+
   isAirLandingActive() {
     return this.airLandingData && this.airLandingData.airUnitsToLand?.length > 0;
   }
@@ -1401,14 +1439,23 @@ export class PlayerPanel {
       this.contentEl.innerHTML = '<div class="pp-loading">Loading match…</div>';
       return;
     }
-    if (this._lastRenderedPlayerId && this._lastRenderedPlayerId !== player.id) {
-      this.placementQueue = {};
-      this._phoneDeployLandName = null;
-    }
-    this._lastRenderedPlayerId = player.id;
-
     const phase = this.gameState.phase;
     const turnPhase = this.gameState.turnPhase;
+    const flushedPeek = this.flushPeekForPhaseOrSeat({
+      phase,
+      turnPhase,
+      seatId: player.id,
+      capitalPeekStillLegal: false,
+    });
+    if (this._lastRenderedPlayerId && this._lastRenderedPlayerId !== player.id) {
+      this.placementQueue = {};
+    }
+    this._lastRenderedPlayerId = player.id;
+    this._peekPhase = phase;
+    this._peekTurnPhase = turnPhase;
+    if (flushedPeek) {
+      this.selectedTerritory = null;
+    }
     if (isMobileShell() && phase === GAME_PHASES.UNIT_PLACEMENT) {
       const remaining = knownUnitsToPlace(
         this.gameState.getUnitsToPlace?.(player.id) || [],
@@ -1453,13 +1500,6 @@ export class PlayerPanel {
     // reveals one detent of Players / Territory / Log / the full list.
     // Desktop keeps the full sheet + tabs.
     const mobile = isMobileShell();
-    if (mobile && (this._peekPhase !== phase || this._peekTurnPhase !== turnPhase)) {
-      this.trayExpanded = false;
-      this.phoneDetentTab = 'actions';
-      this._peekPhase = phase;
-      this._peekTurnPhase = turnPhase;
-      this._phoneDeployLandName = null;
-    }
     const airLanding = this.isAirLandingActive();
     const movePending = !!this.movePendingDest;
     const peek = shouldPeekPhoneTray({
@@ -1750,7 +1790,7 @@ export class PlayerPanel {
     }
 
     // No buttons to show (a warning-only bar is still useful — e.g. naval hint)
-    if (buttons.length === 0 && !warningHtml && !peekHint && !mobile) return '';
+    if (buttons.length === 0 && !warningHtml && !peekHint && !this._looksBrokenReason && !mobile) return '';
 
     let html = `<div class="pp-bottom-actions${mobile ? ' pp-tray-peek' : ''}">`;
     if (shouldShowPhonePlaceMeta({ mobile, phase, peek: mobile && this.el.classList.contains('player-panel--peek') })) {
@@ -1765,6 +1805,7 @@ export class PlayerPanel {
     if (peekHint) {
       html += `<span class="pp-tray-hint">${peekHint}</span>`;
     }
+    html += looksBrokenBarHtml(this._looksBrokenReason);
     html += peekRow;
     html += warningHtml;
     if (mobile) html += `<div class="pp-peek-cta-row">`;

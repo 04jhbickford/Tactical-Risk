@@ -96,11 +96,20 @@ import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase
 import { getAuthManager } from './multiplayer/auth.js';
 import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
-import { leaveGame } from './multiplayer/surrender.js';
+import { leaveGame, isAllResignDeleteFailure, retryDeleteFinishedGame } from './multiplayer/surrender.js';
 import {
   applySurrenderToState,
   resolveResignPlayerId,
 } from './multiplayer/surrenderCore.js';
+import {
+  resolveHostOderId,
+  resolveIsHost,
+  applyLiveHostHandoff,
+} from './multiplayer/hostHandoff.js';
+import {
+  shouldShowPushExhaustedNotice,
+  resolveWaitingLockAfterExhaust,
+} from './multiplayer/rematchRecovery.js';
 import { createMultiplayerGuard } from './multiplayer/multiplayerGuard.js';
 import { getPresenceManager } from './multiplayer/presenceManager.js';
 import { computeHumanPresent, mayRunAI } from './multiplayer/aiPolicy.js';
@@ -110,6 +119,7 @@ import {
   shouldStartHostFailover,
   presenceStopReason,
   shouldShowSignInForm,
+  shouldReconnectToGame,
 } from './multiplayer/presencePolicy.js';
 import { maybePostTurnNotice } from './multiplayer/turnNotice.js';
 import {
@@ -1005,14 +1015,14 @@ async function init() {
     const playersData = lobbyData?.lobbyData?.players || lobbyData?.players;
     const settingsData = lobbyData?.lobbyData?.settings || lobbyData?.settings;
 
-    // Determine if we're the host (for AI control purposes):
-    // - For lobby: check lobbyData.hostId
-    // - For game: check if any player has isHost: true and matches our userId
-    let isHost = lobbyData?.hostId === user?.id;
-    if (!isHost && playersData) {
-      const hostPlayer = playersData.find(p => p.isHost);
-      isHost = hostPlayer?.oderId === user?.id;
-    }
+    // Determine if we're the host (for AI control purposes).
+    // Live Resign rewrites lobbyData — do not freeze this for the session.
+    let isHost = resolveIsHost({
+      userId: user?.id,
+      lobbyData: lobbyData?.lobbyData || lobbyData,
+      players: playersData,
+      hostId: lobbyData?.hostId || lobbyData?.lobbyData?.hostId || null,
+    });
 
     // Determine if we should initialize the game:
     // - If startedBy exists (game doc), check if we're the starter
@@ -1023,21 +1033,31 @@ async function init() {
 
     // Check if game already has state (rejoining an active game)
     const hasExistingState = lobbyData?.stateVersion > 0 && lobbyData?.state;
+    if (lobbyData?.status && !shouldReconnectToGame({ exists: true, status: lobbyData.status })) {
+      forgetLastMatch();
+      alert('That game is no longer active.');
+      return;
+    }
 
-    // Set host flag on syncManager (for AI control - original host controls AI)
+    // Set host flag on syncManager. Snapshots may rewrite this after Resign.
     syncManager.setIsHost(isHost);
     hud.setClarityContext({ isHost, localUserId: user?.id || null });
 
-    // Host-failover authority: if the host goes offline, the first online
-    // non-surrendered human (in turn order) takes over running AI turns so the
-    // game doesn't stall forever on an AI's turn. Concurrent takeovers are safe:
-    // pushes are transaction-guarded, the loser aborts and reloads.
-    const hostOderId = playersData?.find(p => p.isHost)?.oderId || lobbyData?.hostId || null;
+    // Host-failover authority: if the *current* host goes offline, the first
+    // online non-surrendered human (in turn order) takes over running AI turns
+    // so the game doesn't stall forever on an AI's turn. Concurrent takeovers
+    // are safe: pushes are transaction-guarded, the loser aborts and reloads.
+    let hostOderId = resolveHostOderId({
+      lobbyData: lobbyData?.lobbyData || lobbyData,
+      players: playersData,
+      hostId: lobbyData?.hostId || lobbyData?.lobbyData?.hostId || null,
+    });
+    syncManager.setHostOderId(hostOderId);
     // The host must be CONTINUOUSLY offline this long before anyone takes over
-    // AI duty. Without this grace, a simple host page-refresh (which deletes
-    // their presence doc via beforeunload) made another client seize authority
-    // instantly — two clients then ran the same AI turns concurrently and
-    // interleaved conflicting states (the V2.53 "deployment stuck" playtest bug).
+    // AI duty. Presence docs are NOT deleted on beforeunload / background —
+    // only explicit Exit / Leave deletes presence (B25). A host refresh keeps
+    // the doc (idle, not gone), so failover waits for a missing/gone host.
+    // The V2.53 "deployment stuck" bug was two clients running AI at once.
     const FAILOVER_GRACE_MS = 90000;
     let hostOfflineSince = null;
     let wasFailoverAuthority = false;
@@ -1096,6 +1116,7 @@ async function init() {
       const stateLoaded = await syncManager.startSync();
       if (!stateLoaded) {
         console.error('[MP] Failed to load existing game state');
+        forgetLastMatch();
         alert('Error 1: Failed to rejoin game. Could not load game state.');
         return;
       }
@@ -1172,6 +1193,8 @@ async function init() {
     // Initialize turn event index for turn summary modal
     lastTurnEventIndex = gameState.getTurnEventsLastIndex();
 
+    let lastPushExhaustedToastAt = 0;
+
     // Subscribe to sync events
     syncManager.subscribe(async (event, data) => {
       // Log all sync events to debug tab
@@ -1181,8 +1204,41 @@ async function init() {
         isActivePlayer: data?.isActivePlayer
       });
 
+      if (event === 'host_changed') {
+        const next = applyLiveHostHandoff({
+          currentHostOderId: hostOderId,
+          currentIsHost: isHost,
+          userId: authManager.getUser()?.id,
+          lobbyData: { hostId: data?.hostOderId, players: [{ oderId: data?.hostOderId, isHost: true }] },
+          hostId: data?.hostOderId,
+        });
+        hostOderId = data?.hostOderId || next.hostOderId;
+        isHost = !!data?.isHost;
+        hostOfflineSince = null;
+        syncManager.setIsHost(isHost);
+        syncManager.setHostOderId(hostOderId);
+        hud.setClarityContext({ isHost, localUserId: authManager.getUser()?.id || null });
+      }
+
+      if (event === 'game_deleted') {
+        forgetLastMatch();
+        showNotification('This game was deleted.');
+        if (typeof leaveToLobby === 'function') leaveToLobby();
+        return;
+      }
+
       if (event === 'state_updated' || event === 'turn_changed') {
         camera.dirty = true;
+        const flushed = playerPanel.flushPeekForPhaseOrSeat({
+          phase: gameState.phase,
+          turnPhase: gameState.turnPhase,
+          seatId: gameState.currentPlayer?.id,
+          capitalPeekStillLegal: false,
+        });
+        if (flushed) {
+          selectedTerritory = null;
+          playerPanel.selectedTerritory = null;
+        }
 
         // Async-play awareness: flag the browser tab while it's your turn so a
         // backgrounded player can see it at a glance
@@ -1246,11 +1302,25 @@ async function init() {
       // Retries exhausted: local state has been snapped back to the server's
       // last confirmed truth, so the client can't proceed on un-persisted state.
       if (event === 'push_exhausted') {
-        showNotification('Could not save — game re-synced to the last confirmed state. Please retry your move.');
+        playerPanel.setWaitingForSync(resolveWaitingLockAfterExhaust());
+        const now = Date.now();
+        if (shouldShowPushExhaustedNotice({ lastShownAt: lastPushExhaustedToastAt, now })) {
+          lastPushExhaustedToastAt = now;
+          showNotification('Could not save — game re-synced to the last confirmed state. Please retry your move.');
+        }
         camera.dirty = true;
         combatUI.syncFromAuthoritativeState();
-        playerPanel.setWaitingForSync(false);
         playerPanel.revealActionsAfterResync();
+        const flushed = playerPanel.flushPeekForPhaseOrSeat({
+          phase: gameState.phase,
+          turnPhase: gameState.turnPhase,
+          seatId: gameState.currentPlayer?.id,
+          capitalPeekStillLegal: false,
+        });
+        if (flushed) {
+          selectedTerritory = null;
+          playerPanel.selectedTerritory = null;
+        }
       }
       // push_stale is handled automatically (state reloads); no user action needed
 
@@ -1550,11 +1620,21 @@ async function init() {
         currentPlayerId: gameState?.currentPlayer?.oderId || gameState?.currentPlayer?.id || null,
       });
       if (gameState?.isMultiplayer && syncManager?.gameId && authUserId) {
-        const result = await leaveGame(syncManager.gameId, authUserId);
+        let result = await leaveGame(syncManager.gameId, authUserId);
         if (!result?.success) {
           alert('Failed to resign: ' + (result?.error || 'unknown error'));
           return;
         }
+        if (isAllResignDeleteFailure(result)) {
+          const retry = confirm('Could not remove the finished game. Retry delete?');
+          if (retry) {
+            result = await retryDeleteFinishedGame(syncManager.gameId);
+          }
+          if (isAllResignDeleteFailure(result) || result?.deleted === false) {
+            alert('Game is finished but could not be removed. Refresh My Games — it is not playable.');
+          }
+        }
+        forgetLastMatch();
         leaveToLobby();
         return;
       }

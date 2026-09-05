@@ -73,6 +73,7 @@ const {
   shouldResumeSnapshots,
   shouldAccumulateHostOfflineMs,
   shouldStartHostFailover,
+  shouldReconnectToGame,
   PRESENCE_GONE_MS,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/presencePolicy.js')));
 const {
@@ -103,6 +104,9 @@ const {
   resolveLobbyViewAfterLoss,
   joinFormFieldAttrs,
   joinFormFieldAttrString,
+  shouldListGameInMyGames,
+  shouldJoinListedGame,
+  shouldForgetLastMatchAfterLookup,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
 const { resolveHostLobbyPrimaryCta, resolveStartGameTarget, shouldCreateNewGameOnResume } =
   await import(pathToFileURL(join(root, 'src/multiplayer/lobbyStart.js')));
@@ -157,7 +161,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.41', GAME_VERSION === 'V2.81.41');
+check('GAME_VERSION is V2.81.42', GAME_VERSION === 'V2.81.42');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1471,6 +1475,48 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
     && lobbySrc.includes('_restoreLiveLobby')
     && lobbySrc.includes('_renderLobbyRestoring')
     && lobbySrc.includes('shouldLeaveLobbyView'));
+}
+
+console.log('=== V2.81.42 My Games hygiene + presence comments ===');
+{
+  const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const presenceSrc = readFileSync(join(root, 'src/multiplayer/presenceManager.js'), 'utf8');
+  check('finished / deleted never list or Join',
+    shouldListGameInMyGames({ id: 'g1', status: 'finished' }) === false
+    && shouldJoinListedGame({ game: { id: 'g1', status: 'finished' } }) === false
+    && shouldReconnectToGame({ exists: false, status: 'active' }) === false
+    && shouldReconnectToGame({ exists: true, status: 'finished' }) === false
+    && shouldJoinListedGame({ game: { id: 'g1', status: 'active' } }) === true);
+  check('deleted last-match id is forgotten, not stubbed as Join',
+    shouldForgetLastMatchAfterLookup({ lastMatchMissing: true }) === true
+    && recoverMyGamesOnLoad({
+      games: [],
+      lastMatch: { gameId: 'gone', lobbyCode: 'ABCDEF' },
+      lastMatchMissing: true,
+    }).length === 0);
+  check('finished last-match lookup does not stub an active Join row',
+    recoverMyGamesOnLoad({
+      games: [],
+      lastMatchGame: { id: 'done', status: 'finished' },
+      lastMatch: { gameId: 'done', lobbyCode: 'ABCDEF' },
+    }).length === 0
+    && shouldForgetLastMatchAfterLookup({
+      lastMatchGame: { id: 'done', status: 'finished' },
+    }) === true);
+  check('B25 stub still lists last match when the lookup never ran',
+    recoverMyGamesOnLoad({
+      games: [],
+      lastMatch: { gameId: 'game_zuj', lobbyCode: 'ZUJMNP' },
+    }).map((g) => g.id).join(',') === 'game_zuj');
+  check('beforeunload comments do not claim presence delete',
+    !/beforeunload\) made another client/.test(mainSrc)
+    && /Presence docs are NOT deleted on beforeunload/.test(mainSrc)
+    && /Do NOT delete the presence doc on beforeunload/.test(presenceSrc)
+    && /Explicit Exit is the only delete/.test(presenceSrc));
+  check('idle host does not start failover',
+    shouldAccumulateHostOfflineMs({ hostPresence: 'idle' }) === false
+    && shouldStartHostFailover({ hostPresence: 'idle', offlineForMs: 120000 }) === false
+    && shouldStartHostFailover({ hostPresence: 'offline', offlineForMs: 90000 }) === true);
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

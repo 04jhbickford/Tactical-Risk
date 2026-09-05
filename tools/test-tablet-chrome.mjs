@@ -194,7 +194,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.41', GAME_VERSION === 'V2.81.41');
+check('GAME_VERSION is V2.81.42', GAME_VERSION === 'V2.81.42');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -2231,6 +2231,42 @@ console.log('=== V2.81.41 capital Confirm + merged outline seams ===');
     && map.hitTest(1064, 998)?.name === 'Anglo Sudan Egypt'
     && mergedTerritoryOutlineEdges(byName['Anglo Sudan Egypt'].polygons).length
       < rawEdgeCount(byName['Anglo Sudan Egypt'].polygons));
+}
+
+console.log('=== V2.81.42 peek flush + thumb CTA safe-area ===');
+{
+  const { shouldFlushPeekOnPhaseOrSeatChange, flushPeekState, LOOKS_BROKEN_CONFIRM_COPY } =
+    await import(pathToFileURL(join(root, 'src/ui/peekFlush.js')));
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const { phoneBlock } = phoneCssParts(css);
+  check('phase or seat change flushes; first paint does not',
+    shouldFlushPeekOnPhaseOrSeatChange({
+      prevPhase: 'capital_placement', nextPhase: 'unit_placement',
+      prevSeatId: 'p1', nextSeatId: 'p1',
+    }) === true
+    && shouldFlushPeekOnPhaseOrSeatChange({
+      prevPhase: 'capital_placement', nextPhase: 'capital_placement',
+      prevSeatId: 'p1', nextSeatId: 'p2',
+    }) === true
+    && shouldFlushPeekOnPhaseOrSeatChange({}) === false);
+  const flushed = flushPeekState({
+    hadCapitalPeekName: true, capitalPeekStillLegal: false, hadSelectedTerritory: true,
+  });
+  check('flush clears peek names and raises the looks-broken bar',
+    flushed.phoneCapitalLandName === null
+    && flushed.selectedTerritory === null
+    && flushed.looksBroken === true
+    && flushed.looksBrokenReason === LOOKS_BROKEN_CONFIRM_COPY);
+  check('phone chrome query includes landscape short-side ≤640',
+    /@media \(max-width:\s*640px\),\s*\(max-height:\s*640px\) and \(max-width:\s*1023px\)/.test(css));
+  check('Confirm/Done padding clears home indicator at 390/500',
+    /\.pp-tray-peek \{[\s\S]*?calc\(28px \+ env\(safe-area-inset-bottom/.test(phoneBlock)
+    && /#sidebar,[\s\S]*?\.player-panel \{[\s\S]*?calc\(28px \+ env\(safe-area-inset-bottom/.test(phoneBlock));
+  check('Undo stays a ghost slot beside the primary CTA',
+    /\.pp-peek-undo-slot \{[\s\S]*?flex:\s*0 0 auto/.test(phoneBlock)
+    && /\.pp-peek-cta-row \{[\s\S]*?flex-direction:\s*row|\.pp-tray-peek \.pp-bottom-buttons \{[\s\S]*?flex-direction:\s*row/.test(phoneBlock));
+  check('looks-broken bar is in the phone tray',
+    /\.pp-looks-broken-bar \{/.test(phoneBlock));
 }
 
 if (failures) {
