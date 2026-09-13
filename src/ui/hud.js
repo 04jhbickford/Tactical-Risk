@@ -3,6 +3,7 @@
 import { GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER, TURN_PHASE_NAMES } from '../state/gameState.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import { isMobileShell, formatMobilePhaseWord, formatMobilePlayerMeta, readableFactionTextColor, setShellFlag, shouldShowPhoneMenuPlayerRoster, isPhoneSetupPhase, phoneMenuHomeActions } from './mobileShell.js';
+import { syncBottomSurfaces } from './bottomSurface.js';
 import { resolveHudClarity, shouldShowHudTicker } from './hudClarity.js';
 
 export class HUD {
@@ -368,6 +369,7 @@ export class HUD {
     this.clarityEl.innerHTML = `
       <span class="hud-clarity-turn" data-clarity="turn">${c.whoseTurn}</span>
       <span class="hud-clarity-phase" data-clarity="phase">${c.phase}</span>
+      ${c.next ? `<span class="hud-clarity-next" data-clarity="next">${c.next}</span>` : ''}
       ${c.budget ? `<span class="hud-clarity-budget" data-clarity="budget">${c.budget}</span>` : ''}
       <span class="hud-clarity-last" data-clarity="last">${c.lastAction}</span>
       <span class="hud-clarity-click" data-clarity="click">${c.click}</span>
@@ -382,7 +384,9 @@ export class HUD {
   }
 
   _syncMenuFlag() {
-    setShellFlag('phone-menu-open', isMobileShell() && !!this.menuOpen);
+    const open = isMobileShell() && !!this.menuOpen;
+    setShellFlag('phone-menu-open', open);
+    syncBottomSurfaces({ menuOpen: open });
   }
 
   _updateMenuState() {

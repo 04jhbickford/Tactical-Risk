@@ -3,6 +3,7 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
+import { syncBottomSurfaces } from './bottomSurface.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -61,6 +62,35 @@ export function resolveCombatNextLine(phase, { winner = null } = {}) {
 
 export function shouldUsePhoneCombatSummary({ mobile = false } = {}) {
   return !!mobile;
+}
+
+export const PHONE_COMBAT_STEPS = ['odds', 'select', 'resolve'];
+
+// Progressive disclosure. One job per chip — not one packed 42dvh modal.
+// Odds: take-chance + who-vs-who. Select: assign hits. Resolve: dice / result.
+export function resolvePhoneCombatStep(phase) {
+  if (phase === 'selectCasualties'
+    || phase === 'selectAACasualties'
+    || phase === 'selectBombardmentCasualties'
+    || phase === 'selectRetreat'
+    || phase === 'airLanding') {
+    return 'select';
+  }
+  if (phase === 'rolling' || phase === AA_RESULT_PHASE || phase === 'resolved') {
+    return 'resolve';
+  }
+  return 'odds';
+}
+
+export function phoneCombatStepIndex(step) {
+  const i = PHONE_COMBAT_STEPS.indexOf(step);
+  return i >= 0 ? i + 1 : 1;
+}
+
+// 390-tall landscape (and short phones) cannot host the 40px hero + 3 CTAs.
+export function shouldCompactPhoneCombatHero({ viewportHeight = 0 } = {}) {
+  const h = Number(viewportHeight);
+  return Number.isFinite(h) && h > 0 && h <= 500;
 }
 
 // Same simplified expected-hits model the desktop bar uses. UI only —
@@ -145,6 +175,8 @@ export class CombatUI {
     this.cardAwarded = null;
     this.isMinimized = false;
     this.phoneCombatDetailSide = null;
+    this._phoneCombatStepPin = null;
+    this._lastPhoneCombatPhase = null;
 
     this._create();
   }
@@ -236,11 +268,14 @@ export class CombatUI {
     this.diceAnimation = null;
     this.lastRolls = null;
     this.phoneCombatDetailSide = null;
+    this._phoneCombatStepPin = null;
+    this._lastPhoneCombatPhase = null;
   }
 
   _syncCombatChromeFlag() {
     const visible = !!this.el && !this.el.classList.contains('hidden');
     setShellFlag('combat-active', visible);
+    syncBottomSurfaces();
   }
 
   _initCombatState() {
@@ -1721,6 +1756,10 @@ export class CombatUI {
     const probability = this._calculateProbability();
     const phoneSummary = shouldUsePhoneCombatSummary({ mobile: isMobileShell() });
     this.el.classList.toggle('combat-popup--phone', phoneSummary);
+    if (phoneSummary) {
+      this._renderPhoneCombatSheet(player, defenderPlayer, phase, winner);
+      return;
+    }
 
     let html = `
       <div class="combat-content">
@@ -2253,7 +2292,332 @@ export class CombatUI {
     this._bindEvents();
   }
 
-  _renderPhoneCombatSummary(attackerPlayer, defenderPlayer, phase, winner) {
+  _phoneCombatStep(phase) {
+    if (this._lastPhoneCombatPhase !== phase) {
+      this._phoneCombatStepPin = null;
+      this._lastPhoneCombatPhase = phase;
+    }
+    if (PHONE_COMBAT_STEPS.includes(this._phoneCombatStepPin)) {
+      return this._phoneCombatStepPin;
+    }
+    return resolvePhoneCombatStep(phase);
+  }
+
+  _renderPhoneCombatSheet(player, defenderPlayer, phase, winner) {
+    const step = this._phoneCombatStep(phase);
+    const page = phoneCombatStepIndex(step);
+    const compact = shouldCompactPhoneCombatHero({
+      viewportHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
+    });
+    this.el.classList.toggle('phone-combat-compact', compact);
+    const chips = PHONE_COMBAT_STEPS.map((id) => {
+      const on = id === step;
+      const label = id === 'odds' ? 'Odds' : id === 'select' ? 'Select' : 'Resolve';
+      return `<button type="button" class="phone-combat-chip${on ? ' is-current' : ''}" data-combat-step="${id}" aria-selected="${on ? 'true' : 'false'}">${label}</button>`;
+    }).join('');
+    this.el.innerHTML = `
+      <div class="phone-combat-sheet">
+        <div class="phone-combat-head">
+          <div class="phone-combat-head-row">
+            <p class="phone-combat-kicker">Battle</p>
+            <p class="phone-combat-page">${page} / ${PHONE_COMBAT_STEPS.length}</p>
+          </div>
+          <h2 class="phone-combat-land">${this.currentTerritory}</h2>
+          <div class="phone-combat-steps" role="tablist" aria-label="Battle steps">${chips}</div>
+        </div>
+        <div class="phone-combat-body">
+          ${this._renderPhoneCombatBody(step, player, defenderPlayer, phase, winner, compact)}
+        </div>
+        <div class="phone-combat-cta">
+          ${this._renderPhoneCombatCta(phase)}
+        </div>
+      </div>`;
+    this._bindEvents();
+  }
+
+  _renderPhoneCombatBody(step, player, defenderPlayer, phase, winner, compact) {
+    if (step === 'select') {
+      return this._renderPhoneCombatSelectBody(phase);
+    }
+    if (step === 'resolve') {
+      return this._renderPhoneCombatResolveBody(player, defenderPlayer, phase, winner);
+    }
+    return this._renderPhoneCombatOddsBody(player, defenderPlayer, phase, winner, compact);
+  }
+
+  _renderPhoneCombatOddsBody(player, defenderPlayer, phase, winner, compact) {
+    let html = this._renderPhoneCombatSummary(player, defenderPlayer, phase, winner, { compact });
+    if (phase === 'aaFire') {
+      html += `<p class="phone-combat-blurb">AA guns fire at attacking aircraft (hits on 1). Confirm is Fire AA.</p>`;
+    } else if (phase === 'bombardment') {
+      html += `<p class="phone-combat-blurb">Shore bombardment from adjacent sea. Confirm is Fire Bombardment.</p>`;
+    } else if (phase === 'submarineFirstStrike') {
+      html += `<p class="phone-combat-blurb">Submarines fire first. Submerge from this page, then Confirm first strike.</p>`;
+      html += this._renderSubmarineStrikeBody();
+    } else if (phase === 'ready') {
+      html += `<p class="phone-combat-blurb">Tap your stack already happened. Roll to resolve — dice are this step.</p>`;
+    }
+    return html;
+  }
+
+  _renderPhoneCombatSelectBody(phase) {
+    if (phase === 'selectCasualties') {
+      return `<p class="phone-combat-blurb">Assign hits, then Confirm. This is the only verb that spends them.</p>${this._renderCasualtySelection()}`;
+    }
+    if (phase === 'selectAACasualties') {
+      const { pendingAACasualties, selectedAACasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedAACasualties);
+      return `
+        <p class="phone-combat-blurb">Assign AA hits, then Confirm.</p>
+        <div class="aa-casualty-selection">
+          <div class="casualty-group attacker">
+            <div class="casualty-header">
+              <span class="casualty-title">Select ${pendingAACasualties} Aircraft to Lose (AA Fire)</span>
+              <span class="casualty-count ${selectedTotal === pendingAACasualties ? 'complete' : 'incomplete'}">
+                ${selectedTotal}/${pendingAACasualties}
+              </span>
+            </div>
+            <div class="casualty-units">${this._renderAACasualtyUnits()}</div>
+          </div>
+        </div>`;
+    }
+    if (phase === 'selectBombardmentCasualties') {
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties, defenders } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+      const maxAvailable = this._getTotalUnits(defenders);
+      const effectiveCasualties = Math.min(pendingBombardmentCasualties, maxAvailable);
+      const isComplete = selectedTotal === pendingBombardmentCasualties || selectedTotal === maxAvailable;
+      return `
+        <p class="phone-combat-blurb">Assign bombardment hits, then Confirm.</p>
+        <div class="bombardment-casualty-selection">
+          <div class="casualty-group defender">
+            <div class="casualty-header">
+              <span class="casualty-title">Select ${effectiveCasualties} Defender Casualties (Shore Bombardment)</span>
+              <span class="casualty-count ${isComplete ? 'complete' : 'incomplete'}">${selectedTotal}/${effectiveCasualties}</span>
+            </div>
+            <div class="casualty-units">${this._renderBombardmentCasualtyUnits()}</div>
+          </div>
+        </div>`;
+    }
+    if (phase === 'selectRetreat') {
+      const { retreatOptions } = this.combatState;
+      return `
+        <p class="phone-combat-blurb">Tap one friendly land. All retreating units go there.</p>
+        <div class="retreat-selection">
+          ${(retreatOptions || []).map((dest) => `
+            <button class="combat-btn retreat-dest-btn" data-action="confirm-retreat" data-destination="${dest}">${dest}</button>
+          `).join('')}
+        </div>`;
+    }
+    if (phase === 'airLanding') {
+      return `<p class="phone-combat-blurb">Land each aircraft, then Confirm Landings.</p>${this._renderAirLandingSection()}`;
+    }
+    return `<p class="phone-combat-blurb">Hits to assign appear here after you roll. Stay on Odds to Roll Dice.</p>`;
+  }
+
+  _renderPhoneCombatResolveBody(player, defenderPlayer, phase, winner) {
+    if (phase === 'rolling') {
+      return `<div class="dice-section"><div class="dice-title">Rolling dice…</div><div class="dice-animation"></div></div>`;
+    }
+    if (phase === AA_RESULT_PHASE && this.combatState.aaFired && this.combatState.aaResults) {
+      const { rolls, hits } = this.combatState.aaResults;
+      const defenders = this.combatState.defenders || [];
+      const aaOwner = defenders.find((u) => u.type === 'aaGun')?.owner;
+      const aaPlayer = this.gameState.getPlayer(aaOwner) || defenderPlayer;
+      const losses = this.combatState.selectedAACasualties || {};
+      const lossStr = Object.entries(losses)
+        .filter(([, n]) => n > 0)
+        .map(([type, n]) => `${n}× ${type}`)
+        .join(', ');
+      return `
+        <div class="aa-results">
+          <div class="aa-title">${aaPlayer?.name || 'Defender'} AA guns fire</div>
+          <div class="aa-result-header">AA Fire Results: ${hits} hit(s)</div>
+          <div class="dice-display">
+            ${rolls.slice(0, 12).map((r) => `<div class="die ${r.hit ? 'hit' : 'miss'}">${r.roll}</div>`).join('')}
+            ${rolls.length > 12 ? `<span class="dice-more">+${rolls.length - 12}</span>` : ''}
+          </div>
+          <div class="aa-desc">${hits > 0 ? `Aircraft lost: ${lossStr} (cheapest first)` : 'No aircraft lost'}</div>
+        </div>`;
+    }
+    if (phase === 'resolved') {
+      const { totalAttackerLosses, totalDefenderLosses, initialAttackers, initialDefenders } = this.combatState;
+      return `
+        <div class="combat-result ${winner}">
+          <div class="result-message">
+            ${winner === 'attacker'
+              ? `<span style="color: ${player.color}">${player.name}</span> captures ${this.currentTerritory}!`
+              : `<span style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Defender'}</span> holds ${this.currentTerritory}!`}
+          </div>
+        </div>
+        <div class="battle-summary">
+          <div class="battle-summary-header">Battle Summary</div>
+          <div class="battle-summary-content">
+            <div class="battle-summary-side attacker">
+              <div class="summary-side-header" style="color: ${player.color}">${player.name} Losses</div>
+              ${this._renderLossSummary(totalAttackerLosses, initialAttackers, player.id)}
+            </div>
+            <div class="battle-summary-side defender">
+              <div class="summary-side-header" style="color: ${defenderPlayer?.color || '#888'}">${defenderPlayer?.name || 'Defender'} Losses</div>
+              ${this._renderLossSummary(totalDefenderLosses, initialDefenders, defenderPlayer?.id)}
+            </div>
+          </div>
+        </div>`;
+    }
+    return `<p class="phone-combat-blurb">Dice and the result land here after you roll.</p>`;
+  }
+
+  _renderPhoneCombatCta(phase) {
+    const isAmphibiousAssault = this.gameState.hasAmphibiousAssault(this.currentTerritory);
+    if (phase === 'bombardment') {
+      return `<button class="combat-btn roll" data-action="fire-bombardment">Fire Shore Bombardment</button>`;
+    }
+    if (phase === 'selectBombardmentCasualties') {
+      const { pendingBombardmentCasualties, selectedBombardmentCasualties, defenders } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedBombardmentCasualties);
+      const maxAvailable = this._getTotalUnits(defenders);
+      const canConfirm = selectedTotal === pendingBombardmentCasualties || selectedTotal === maxAvailable;
+      return `<button class="combat-btn confirm" data-action="confirm-bombardment-casualties" ${!canConfirm ? 'disabled' : ''}>Confirm Bombardment Casualties</button>`;
+    }
+    if (phase === 'aaFire') {
+      return `<button class="combat-btn roll" data-action="aa-fire">Fire AA Guns</button>`;
+    }
+    if (phase === AA_RESULT_PHASE) {
+      return `<button class="combat-btn confirm" data-action="confirm-aa-results">Continue</button>`;
+    }
+    if (phase === 'selectAACasualties') {
+      const { pendingAACasualties, selectedAACasualties } = this.combatState;
+      const selectedTotal = this._getTotalSelectedCasualties(selectedAACasualties);
+      const canConfirm = selectedTotal === pendingAACasualties;
+      return `<button class="combat-btn confirm" data-action="confirm-aa-casualties" ${!canConfirm ? 'disabled' : ''}>Confirm AA Casualties</button>`;
+    }
+    if (phase === 'submarineFirstStrike') {
+      return `<button class="combat-btn roll" data-action="submarine-first-strike">Fire First Strike</button>`;
+    }
+    if (phase === 'ready') {
+      return `
+        <button class="combat-btn roll" data-action="roll">Roll Dice</button>
+        <div class="phone-combat-cta-secondary">
+          <button class="combat-btn auto" data-action="auto-battle">Auto Battle</button>
+          ${isAmphibiousAssault
+            ? `<button class="combat-btn retreat" disabled title="Amphibious assault units cannot retreat">Retreat</button>`
+            : `<button class="combat-btn retreat" data-action="retreat">Retreat</button>`}
+        </div>`;
+    }
+    if (phase === 'selectCasualties') {
+      const { attackers, defenders, pendingAttackerCasualties, pendingDefenderCasualties,
+              selectedAttackerCasualties, selectedDefenderCasualties } = this.combatState;
+      const attackerTotal = this._getTotalSelectedCasualties(selectedAttackerCasualties);
+      const defenderTotal = this._getTotalSelectedCasualties(selectedDefenderCasualties);
+      const attackerMax = this._getMaxAbsorbableCasualties(attackers);
+      const defenderMax = this._getMaxAbsorbableCasualties(defenders);
+      const effectiveAttacker = Math.min(pendingAttackerCasualties, attackerMax);
+      const effectiveDefender = Math.min(pendingDefenderCasualties, defenderMax);
+      const canConfirm = attackerTotal >= effectiveAttacker && defenderTotal >= effectiveDefender;
+      return `<button class="combat-btn confirm" data-action="confirm-casualties" ${!canConfirm ? 'disabled' : ''}>Confirm Casualties</button>`;
+    }
+    if (phase === 'airLanding') {
+      const { airUnitsToLand, selectedLandings } = this.combatState;
+      const allSelected = airUnitsToLand.every((u) => {
+        const unitKey = u.id || u.type;
+        return u.landingOptions.length === 0 || selectedLandings[unitKey];
+      });
+      return `<button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>Confirm Landings</button>`;
+    }
+    if (phase === 'resolved') {
+      return `<button class="combat-btn next" data-action="next">${this.gameState.combatQueue.length > 1 ? 'Next Battle' : 'End Combat Phase'}</button>`;
+    }
+    if (phase === 'selectRetreat') {
+      return `<p class="phone-combat-cta-hint">Tap a land above</p>`;
+    }
+    return '';
+  }
+
+  _renderSubmarineStrikeBody() {
+    const {
+      attackerSubsHaveFirstStrike, defenderSubsHaveFirstStrike,
+      attackerSubsCanSubmerge, defenderSubsCanSubmerge,
+      attackerSubmergedSubs, defenderSubmergedSubs, attackers, defenders,
+    } = this.combatState;
+    const attackerSubCount = attackers.filter((u) => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+    const defenderSubCount = defenders.filter((u) => u.type === 'submarine').reduce((s, u) => s + u.quantity, 0);
+    let html = `<div class="submarine-options phone-combat-sub-options">`;
+    if (attackerSubsHaveFirstStrike && attackerSubCount > 0) {
+      const activeSubs = attackerSubCount - attackerSubmergedSubs;
+      html += `<div class="sub-option-group">
+        <div>Attacking Submarines (${activeSubs} active)</div>
+        ${attackerSubsCanSubmerge && activeSubs > 0 ? `
+          <button class="combat-btn submerge" data-action="submerge-sub" data-side="attacker">Submerge 1 Sub</button>
+          ${activeSubs > 1 ? `<button class="combat-btn submerge" data-action="submerge-all-subs" data-side="attacker">Submerge All (${activeSubs})</button>` : ''}
+        ` : ''}
+      </div>`;
+    }
+    if (defenderSubsHaveFirstStrike && defenderSubCount > 0) {
+      const activeSubs = defenderSubCount - defenderSubmergedSubs;
+      html += `<div class="sub-option-group">
+        <div>Defending Submarines (${activeSubs} active)</div>
+        ${defenderSubsCanSubmerge && activeSubs > 0 ? `
+          <button class="combat-btn submerge" data-action="submerge-sub" data-side="defender">Submerge 1 Sub</button>
+          ${activeSubs > 1 ? `<button class="combat-btn submerge" data-action="submerge-all-subs" data-side="defender">Submerge All (${activeSubs})</button>` : ''}
+        ` : ''}
+      </div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  _renderAirLandingSection() {
+    const player = this.gameState.currentPlayer;
+    const { airUnitsToLand, selectedLandings, isRetreating } = this.combatState;
+    let html = `
+      <div class="air-landing-section">
+        <div class="air-landing-header">
+          <span class="air-landing-title">${isRetreating ? 'Retreat — ' : ''}Air Unit Landing Required</span>
+        </div>
+        <div class="air-landing-desc">
+          Air units must land in a territory that was friendly at the start of your turn.
+        </div>`;
+    for (const airUnit of airUnitsToLand) {
+      const def = this.unitDefs[airUnit.type];
+      const imageSrc = player ? getUnitIconPath(airUnit.type, player.id) : null;
+      const unitKey = airUnit.id || airUnit.type;
+      const selectedDest = selectedLandings[unitKey];
+      const hasOptions = airUnit.landingOptions.length > 0;
+      const originInfo = this.gameState.airUnitOrigins?.[this.currentTerritory]?.[airUnit.type];
+      const totalMovement = def?.movement || 4;
+      const distanceTraveled = originInfo?.distance || 0;
+      const remainingMovement = Math.max(0, totalMovement - distanceTraveled);
+      const sameTypeUnits = airUnitsToLand.filter((u) => u.type === airUnit.type);
+      const unitIndex = sameTypeUnits.indexOf(airUnit) + 1;
+      const displayName = sameTypeUnits.length > 1
+        ? `${airUnit.type} #${unitIndex}`
+        : `${airUnit.quantity}× ${airUnit.type}`;
+      html += `
+        <div class="air-landing-unit ${!hasOptions ? 'no-options' : ''}">
+          <div class="air-landing-unit-info">
+            ${imageSrc ? `<img src="${imageSrc}" class="air-landing-icon" alt="${airUnit.type}">` : ''}
+            <div class="air-landing-unit-details">
+              <span class="air-landing-name">${displayName}</span>
+              <span class="air-landing-movement">Movement: ${remainingMovement}/${totalMovement} remaining</span>
+            </div>
+          </div>
+          ${hasOptions ? `
+            <select class="air-landing-select" data-unit="${unitKey}">
+              <option value="">-- Select Landing --</option>
+              ${airUnit.landingOptions.map((opt) =>
+                `<option value="${opt.territory}" ${selectedDest === opt.territory ? 'selected' : ''}>
+                  ${opt.territory} ${opt.isCarrier ? '🚢' : ''} (${opt.distance} away)
+                </option>`
+              ).join('')}
+            </select>
+          ` : `<div class="air-landing-crash"><span class="crash-text">No valid landing — unit will crash</span></div>`}
+        </div>`;
+    }
+    html += `</div>`;
+    return html;
+  }
+
+  _renderPhoneCombatSummary(attackerPlayer, defenderPlayer, phase, winner, { compact = false } = {}) {
     const { attackers, defenders } = this.combatState;
     const atk = formatCombatForceLine(attackers) || 'none';
     const def = formatCombatForceLine(defenders) || 'none';
@@ -2284,7 +2648,7 @@ export class CombatUI {
     }
     return `
       <div class="phone-combat-summary">
-        <div class="phone-combat-hero" aria-live="polite">
+        <div class="phone-combat-hero${compact ? ' phone-combat-hero--compact' : ''}" aria-live="polite">
           <div class="phone-combat-hero-pct">${hero.text}</div>
           <div class="phone-combat-hero-label">${hero.label}</div>
         </div>
@@ -2971,6 +3335,15 @@ export class CombatUI {
       btn.addEventListener('click', () => {
         const side = btn.dataset.side;
         this.phoneCombatDetailSide = this.phoneCombatDetailSide === side ? null : side;
+        this._render();
+      });
+    });
+
+    this.el.querySelectorAll('[data-combat-step]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const step = btn.dataset.combatStep;
+        if (!PHONE_COMBAT_STEPS.includes(step)) return;
+        this._phoneCombatStepPin = step;
         this._render();
       });
     });

@@ -76,9 +76,9 @@ export const PHASE_HINTS = {
   [GAME_PHASES.UNIT_PLACEMENT]: 'Click to place units',
   [TURN_PHASES.DEVELOP_TECH]: '',
   [TURN_PHASES.PURCHASE]: '',
-  [TURN_PHASES.COMBAT_MOVE]: 'Click units → enemy territory',
+  [TURN_PHASES.COMBAT_MOVE]: 'Click stack → highlighted land → Confirm',
   [TURN_PHASES.COMBAT]: '',
-  [TURN_PHASES.NON_COMBAT_MOVE]: 'Click units → friendly territory',
+  [TURN_PHASES.NON_COMBAT_MOVE]: 'Click stack → your land → Confirm',
   [TURN_PHASES.MOBILIZE]: '',
   [TURN_PHASES.COLLECT_INCOME]: '',
 };
@@ -288,13 +288,14 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
   if (phase === GAME_PHASES.PLAYING
     && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
     const mix = opts.selectedSummary || '';
+    const combat = turnPhase === TURN_PHASES.COMBAT_MOVE;
     if (land && dest && mix) return `${land} → ${dest} · ${mix}`;
-    if (land && mix) return `Tap dest · ${mix}`;
-    if (land && dest && selectedUnitType) return `${land} → ${dest}`;
-    if (land && selectedUnitType) return `To ${land}`;
-    if (land) return `Tap a unit · ${land}`;
-    if (selectedUnitType) return 'Tap land, then unit';
-    return 'Tap land, then unit';
+    if (land && dest) return `${land} → ${dest} — Confirm`;
+    if (land && mix) return `Tap a highlighted land · ${mix}`;
+    if (land) return 'Tap a highlighted land, then Confirm';
+    return combat
+      ? 'Tap your stack — legal lands highlight'
+      : 'Tap your stack — your lands highlight';
   }
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
@@ -2117,9 +2118,9 @@ export class PlayerPanel {
       const phaseNames = {
         [TURN_PHASES.DEVELOP_TECH]: 'Researching Technology',
         [TURN_PHASES.PURCHASE]: 'Purchasing Units',
-        [TURN_PHASES.COMBAT_MOVE]: 'Combat Movement',
+        [TURN_PHASES.COMBAT_MOVE]: 'Combat Move',
         [TURN_PHASES.COMBAT]: 'Resolving Combat',
-        [TURN_PHASES.NON_COMBAT_MOVE]: 'Non-Combat Movement',
+        [TURN_PHASES.NON_COMBAT_MOVE]: 'Non-Combat Move (Fortify)',
         [TURN_PHASES.MOBILIZE]: 'Mobilizing Units',
         [TURN_PHASES.COLLECT_INCOME]: 'Collecting Income'
       };
@@ -2163,7 +2164,9 @@ export class PlayerPanel {
         if (hasMovableTerritory) {
           html += this._renderInlineMovement(player, turnPhase);
         } else {
-          html += `<div class="pp-hint">Click a territory with your units to move them</div>`;
+          html += `<div class="pp-hint">${turnPhase === TURN_PHASES.COMBAT_MOVE
+            ? 'Combat Move: click your stack, then a highlighted land, then Confirm. Dice are the next phase.'
+            : 'Fortify: click your stack, then a highlighted friendly land, then Confirm. No attacks this step.'}</div>`;
         }
 
         // Show rockets option during combat move phase (if player has tech)

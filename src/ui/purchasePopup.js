@@ -3,6 +3,8 @@
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { shouldShowPurchase } from '../state/gameState.js';
+import { setShellFlag } from './mobileShell.js';
+import { syncBottomSurfaces } from './bottomSurface.js';
 
 export class PurchasePopup {
   constructor() {
@@ -63,10 +65,18 @@ export class PurchasePopup {
     this.selectedTerritory = null;
     this._render();
     this.el.classList.remove('hidden');
+    this._syncSheetFlag();
   }
 
   hide() {
     this.el.classList.add('hidden');
+    this._syncSheetFlag();
+  }
+
+  _syncSheetFlag() {
+    const visible = !!this.el && !this.el.classList.contains('hidden');
+    setShellFlag('purchase-active', visible);
+    syncBottomSurfaces();
   }
 
   // Called when user clicks a territory on the map during purchase phase
