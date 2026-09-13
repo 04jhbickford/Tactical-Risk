@@ -12,6 +12,13 @@ export const PHASE_GUIDE_IDS = {
   FORTIFY: 'fortify',
 };
 
+export const PHASE_GUIDE_ORDER = [
+  PHASE_GUIDE_IDS.CAPITAL,
+  PHASE_GUIDE_IDS.DEPLOY,
+  PHASE_GUIDE_IDS.ATTACK,
+  PHASE_GUIDE_IDS.FORTIFY,
+];
+
 export const PHASE_GUIDES = {
   [PHASE_GUIDE_IDS.CAPITAL]: {
     id: PHASE_GUIDE_IDS.CAPITAL,
@@ -34,6 +41,19 @@ export const PHASE_GUIDES = {
     job: 'Move leftover units between your lands, then Confirm.',
   },
 };
+
+export function phaseGuidePageIndex(id) {
+  const i = PHASE_GUIDE_ORDER.indexOf(id);
+  return i >= 0 ? i + 1 : 0;
+}
+
+export function adjacentPhaseGuideId(id, delta) {
+  const i = PHASE_GUIDE_ORDER.indexOf(id);
+  if (i < 0) return null;
+  const next = i + Number(delta || 0);
+  if (next < 0 || next >= PHASE_GUIDE_ORDER.length) return null;
+  return PHASE_GUIDE_ORDER[next];
+}
 
 export function resolvePhaseGuideId(phase, turnPhase) {
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return PHASE_GUIDE_IDS.CAPITAL;
@@ -115,17 +135,37 @@ export class PhaseGuide {
     this.el.setAttribute('aria-live', 'polite');
     this.el.innerHTML = `
       <div class="phase-guide-card">
-        <p class="phase-guide-kicker">This phase</p>
+        <div class="phase-guide-head">
+          <p class="phase-guide-kicker">Phase tips</p>
+          <p class="phase-guide-page" aria-live="polite"></p>
+        </div>
+        <div class="phase-guide-contents" role="tablist" aria-label="Phase tip contents"></div>
         <h2 class="phase-guide-title"></h2>
         <p class="phase-guide-job"></p>
+        <p class="phase-guide-manual">Manual — no auto-advance</p>
         <div class="phase-guide-actions">
+          <button type="button" class="phase-guide-prev">Previous</button>
           <button type="button" class="phase-guide-dismiss">Got it</button>
         </div>
       </div>
     `;
+    const contents = this.el.querySelector('.phase-guide-contents');
+    for (const id of PHASE_GUIDE_ORDER) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'phase-guide-chip';
+      btn.dataset.guideId = id;
+      btn.textContent = PHASE_GUIDES[id].title.replace(/^Place /, '').replace(/^Initial /, '');
+      btn.addEventListener('click', () => this.reopen(id));
+      contents.appendChild(btn);
+    }
     document.body.appendChild(this.el);
     this.el.querySelector('.phase-guide-dismiss')?.addEventListener('click', () => {
       this.dismissCurrent();
+    });
+    this.el.querySelector('.phase-guide-prev')?.addEventListener('click', () => {
+      const prev = adjacentPhaseGuideId(this._visibleId, -1);
+      if (prev) this.reopen(prev);
     });
   }
 
@@ -164,8 +204,18 @@ export class PhaseGuide {
     const guide = PHASE_GUIDES[id];
     if (!guide || !this.el) return;
     this._visibleId = id;
+    const page = phaseGuidePageIndex(id);
     this.el.querySelector('.phase-guide-title').textContent = guide.title;
     this.el.querySelector('.phase-guide-job').textContent = guide.job;
+    const pageEl = this.el.querySelector('.phase-guide-page');
+    if (pageEl) pageEl.textContent = `${page} / ${PHASE_GUIDE_ORDER.length}`;
+    const prev = this.el.querySelector('.phase-guide-prev');
+    if (prev) prev.disabled = !adjacentPhaseGuideId(id, -1);
+    this.el.querySelectorAll('.phase-guide-chip').forEach((chip) => {
+      const on = chip.dataset.guideId === id;
+      chip.classList.toggle('is-current', on);
+      chip.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
     this.el.classList.remove('hidden');
     this.el.setAttribute('aria-hidden', 'false');
   }

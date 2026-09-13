@@ -13,8 +13,11 @@ export class RulesPanel {
     this.el.innerHTML = this._getContent();
     document.body.appendChild(this.el);
 
-    // Close button
     this.el.querySelector('.rules-close')?.addEventListener('click', () => this.hide());
+    this.el.querySelector('.rules-contents-select')?.addEventListener('change', (e) => {
+      const id = `rules-${e.target.value}`;
+      this.el.querySelector(`#${id}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
 
     // Close on background click
     this.el.addEventListener('click', (e) => {
@@ -26,12 +29,26 @@ export class RulesPanel {
     return `
       <div class="rules-content">
         <div class="rules-header">
-          <h2>Game Rules</h2>
+          <div class="rules-header-copy">
+            <p class="rules-kicker">How to Play · no sign-in</p>
+            <h2>Game Rules</h2>
+          </div>
           <button class="rules-close">✕</button>
         </div>
+        <label class="rules-contents">
+          <span>Contents</span>
+          <select class="rules-contents-select" aria-label="Rules contents">
+            <option value="phases">Turn Phases</option>
+            <option value="units">Unit Types</option>
+            <option value="combat">Combat Rules</option>
+            <option value="transport">Transport &amp; Carrier</option>
+            <option value="territory">Territory Control</option>
+            <option value="movement">Movement Rules</option>
+          </select>
+        </label>
 
         <div class="rules-sections">
-          <section class="rules-section">
+          <section class="rules-section" id="rules-phases" data-rules-section="phases">
             <h3>Turn Phases</h3>
             <ol>
               <li><strong>Develop Tech</strong> - Spend 5 IPCs per research die. Roll 6 to unlock a technology.</li>
@@ -44,7 +61,7 @@ export class RulesPanel {
             </ol>
           </section>
 
-          <section class="rules-section">
+          <section class="rules-section" id="rules-units" data-rules-section="units">
             <h3>Unit Types</h3>
             <table class="rules-table">
               <thead>
@@ -67,7 +84,7 @@ export class RulesPanel {
             </table>
           </section>
 
-          <section class="rules-section">
+          <section class="rules-section" id="rules-combat" data-rules-section="combat">
             <h3>Combat Rules</h3>
             <ul>
               <li><strong>Attacking:</strong> Roll dice equal to unit's attack value. Each die showing that number or less = hit.</li>
@@ -78,7 +95,7 @@ export class RulesPanel {
             </ul>
           </section>
 
-          <section class="rules-section">
+          <section class="rules-section" id="rules-transport" data-rules-section="transport">
             <h3>Transport & Carrier Rules</h3>
             <ul>
               <li><strong>Transports:</strong> Can carry 2 infantry OR 1 infantry + 1 other land unit.</li>
@@ -88,7 +105,7 @@ export class RulesPanel {
             </ul>
           </section>
 
-          <section class="rules-section">
+          <section class="rules-section" id="rules-territory" data-rules-section="territory">
             <h3>Territory Control</h3>
             <ul>
               <li><strong>Capturing:</strong> Only LAND units can capture territory. Air units alone cannot hold ground.</li>
@@ -98,7 +115,7 @@ export class RulesPanel {
             </ul>
           </section>
 
-          <section class="rules-section">
+          <section class="rules-section" id="rules-movement" data-rules-section="movement">
             <h3>Movement Rules</h3>
             <ul>
               <li><strong>Multi-hop:</strong> Units with movement > 1 can move through friendly territories.</li>

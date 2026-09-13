@@ -37,8 +37,11 @@ const {
   dismissPhaseGuide,
   reopenPhaseGuide,
   resetPhaseGuides,
+  phaseGuidePageIndex,
+  adjacentPhaseGuideId,
   PHASE_GUIDE_IDS,
   PHASE_GUIDES,
+  PHASE_GUIDE_ORDER,
   PHASE_GUIDE_STORAGE_KEY,
 } = await import(pathToFileURL(join(root, 'src/ui/phaseGuide.js')));
 const {
@@ -57,6 +60,7 @@ const pkg = readFileSync(join(root, 'package.json'), 'utf8');
 const lobbySrc = readFileSync(join(root, 'src/ui/lobby.js'), 'utf8');
 const hudSrc = readFileSync(join(root, 'src/ui/hud.js'), 'utf8');
 const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
+const rulesSrc = readFileSync(join(root, 'src/ui/rulesPanel.js'), 'utf8');
 const method = readFileSync(join(root, 'doc/METHOD-SETTLECOAST.md'), 'utf8');
 
 let failures = 0;
@@ -122,7 +126,14 @@ check('orientation change must not reset GameState',
 
 console.log('=== D — phase guides + guest Rules ===');
 check('four one-job guides exist',
-  PHASE_GUIDES.capital && PHASE_GUIDES.deploy && PHASE_GUIDES.attack && PHASE_GUIDES.fortify);
+  PHASE_GUIDES.capital && PHASE_GUIDES.deploy && PHASE_GUIDES.attack && PHASE_GUIDES.fortify
+  && PHASE_GUIDE_ORDER.length === 4);
+check('field-guide pattern is pages + contents, not auto-play',
+  phaseGuidePageIndex(PHASE_GUIDE_IDS.CAPITAL) === 1
+  && phaseGuidePageIndex(PHASE_GUIDE_IDS.FORTIFY) === 4
+  && adjacentPhaseGuideId(PHASE_GUIDE_IDS.CAPITAL, -1) === null
+  && adjacentPhaseGuideId(PHASE_GUIDE_IDS.CAPITAL, 1) === PHASE_GUIDE_IDS.DEPLOY
+  && /Manual — no auto-advance/.test(readFileSync(join(root, 'src/ui/phaseGuide.js'), 'utf8')));
 check('phase ids map Place Capital / Deploy / Attack / Fortify',
   resolvePhaseGuideId(GAME_PHASES.CAPITAL_PLACEMENT) === PHASE_GUIDE_IDS.CAPITAL
   && resolvePhaseGuideId(GAME_PHASES.UNIT_PLACEMENT) === PHASE_GUIDE_IDS.DEPLOY
@@ -152,6 +163,17 @@ check('lobby How to Play does not go through Play Online / auth',
   /data-action="how-to-play"/.test(lobbySrc)
   && /setOnRulesToggle/.test(lobbySrc)
   && !/how-to-play[\s\S]{0,80}onPlayOnline/.test(lobbySrc));
+check('home is a 3-mode tile grid (Local / Online / How to Play)',
+  /lobby-mode-tiles/.test(lobbySrc)
+  && /lobby-phone-card-howto/.test(lobbySrc)
+  && /Start here/.test(lobbySrc));
+check('Rules guest path has contents jump + no-sign-in kicker',
+  /rules-contents-select/.test(rulesSrc)
+  && /no sign-in/.test(rulesSrc));
+check('phone phase guide sits above the CTA band, tray stays on top',
+  /html\.mobile-shell \.phase-guide \{[\s\S]*?bottom:\s*calc\(var\(--mobile-cta/.test(css)
+  && /html\.mobile-shell \.phase-guide \{[\s\S]*?z-index:\s*35/.test(css)
+  && /html\.mobile-shell #sidebar,[\s\S]*?z-index:\s*60/.test(css));
 
 console.log('=== Kills + METHOD ===');
 check('no @designcodeio/threeui dependency',
@@ -162,7 +184,9 @@ check('METHOD doc lists smoke, fixtures, kills',
   && /Playtest fixture matrix/.test(method)
   && /@designcodeio\/threeui/.test(method)
   && /Voice blocker/.test(method)
-  && /Catan/.test(method));
+  && /Catan/.test(method)
+  && /Guest-path visual refs/.test(method)
+  && /Do \*\*not\*\* clone parchment/.test(method));
 
 console.log('=== F — menu rail hover pattern ===');
 check('phone menu magnify is hover+fine only',

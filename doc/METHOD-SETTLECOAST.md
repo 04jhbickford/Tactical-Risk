@@ -60,3 +60,19 @@ Do **not** ship any of the following in this SCHEMA 11 2D pass:
   voice. Do not expand lobby chat unless a leftover is already trivial.
 
 Confirm grammar SILO is held. Tesla corporate branding stays off this product surface.
+
+## 4. Guest-path visual refs (pattern only)
+
+Settlecoast screenshots from the **sign-in wall** (never reached their in-game
+board). Use structure only. Do **not** clone parchment texture, cream paper,
+teal island palette, Sunmere / Catan naming, crests, hex tiles, or 3D art.
+
+| Shot | Steal | Do not ship |
+| --- | --- | --- |
+| `01-lobby-home` | Equal-weight icon tiles: Local / Online (Create or join) / How to Play (guest) | Island hero, “Settle. Trade. Conquer.”, Game lobby as a third play mode |
+| `02-field-guide-narration` | Contents + page index + Previous / Got it on phase tips; Rules contents jump | Auto-advance, narration audio, pause/speed transport, hex illustrations |
+| `03-game-lobby` | PARK — do not expand lobby create/join/chat/voice | Voice, chat, parchment seat lobby |
+| `04-mobile-width-menu` | Single-column phone tiles; Confirm / Resign / Max stay ≥44pt and above the home indicator even if other chrome scrolls | Parchment rail, primaries trapped below the fold |
+
+Phase-guide card `z-index` stays below the phone peek tray (`#sidebar` 60) and
+is inset above `--mobile-cta` so thumb Confirm is never covered.

@@ -18971,13 +18971,71 @@ html.mobile-shell.combat-active .mob-max-btn {
   box-shadow: 0 0 0 2px rgba(201, 164, 74, 0.55);
 }
 
-.lobby-menu-card-rules {
-  margin-top: 4px;
+.lobby-mode-kicker,
+.lobby-phone-path {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94a3b8;
 }
 
-.lobby-phone-howto-meta {
-  font-size: 12px;
+.lobby-mode-tiles {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.menu-card-kicker {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.lobby-menu-card-rules .menu-card-kicker {
+  color: #c9a44a;
+}
+
+@media (min-width: 720px) {
+  .lobby-mode-tiles {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .lobby-mode-tiles .lobby-menu-card {
+    flex-direction: column;
+    align-items: flex-start;
+    min-height: 148px;
+    padding: 18px 16px;
+  }
+}
+
+.rules-kicker {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c9a44a;
+}
+
+.rules-contents {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  font-size: 13px;
   color: #94a3b8;
+}
+
+.rules-contents-select {
+  min-height: 44px;
+  flex: 1 1 auto;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 164, 74, 0.35);
+  background: #1a1a2e;
+  color: #e8dcc4;
 }
 
 .phase-guide {
@@ -19006,12 +19064,50 @@ html.mobile-shell.combat-active .mob-max-btn {
   color: #e8dcc4;
 }
 
+.phase-guide-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .phase-guide-kicker {
   margin: 0 0 4px;
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #c9a44a;
+}
+
+.phase-guide-page {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.phase-guide-contents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
+.phase-guide-chip {
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.phase-guide-chip.is-current {
+  border-color: #c9a44a;
+  color: #f4ead4;
 }
 
 .phase-guide-title {
@@ -19021,12 +19117,24 @@ html.mobile-shell.combat-active .mob-max-btn {
 }
 
 .phase-guide-job {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-size: 14px;
   line-height: 1.4;
   color: #c5c9d4;
 }
 
+.phase-guide-manual {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.phase-guide-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.phase-guide-prev,
 .phase-guide-dismiss {
   min-height: 44px;
   min-width: 88px;
@@ -19040,14 +19148,33 @@ html.mobile-shell.combat-active .mob-max-btn {
   -webkit-tap-highlight-color: transparent;
 }
 
+.phase-guide-prev:disabled {
+  filter: grayscale(1);
+  opacity: 0.45;
+  cursor: default;
+}
+
+.phase-guide-prev:focus-visible,
 .phase-guide-dismiss:focus-visible {
   outline: 2px solid #c9a44a;
   outline-offset: 2px;
 }
 
+html.mobile-shell .phase-guide {
+  top: calc(var(--mobile-top-bar, 48px) + 8px);
+  bottom: calc(var(--mobile-cta, 72px) + 8px);
+  align-items: flex-start;
+  overflow: auto;
+  z-index: 35;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .phone-menu-row:hover {
     transform: scale(1.04);
+  }
+
+  .lobby-mode-tiles .lobby-menu-card:hover {
+    transform: translateY(-2px);
   }
 }
 
@@ -19056,6 +19183,11 @@ html.mobile-shell.combat-active .mob-max-btn {
   html.mobile-shell .pp-tray-peek .pp-bottom-buttons {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  html.mobile-shell #sidebar,
+  html.mobile-shell .player-panel--peek {
+    z-index: 60;
   }
 
   html.mobile-shell .phone-menu-home .phone-menu-resign {

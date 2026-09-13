@@ -134,6 +134,7 @@ export class Lobby {
           <span class="lobby-version-badge">${GAME_VERSION}</span>
         </div>
 
+        <p class="lobby-phone-path">Start here</p>
         <div class="lobby-phone-actions">
           <button class="lobby-phone-card" data-action="local-play">
             <span class="lobby-phone-card-mark" aria-hidden="true">
@@ -155,6 +156,16 @@ export class Lobby {
               <span class="lobby-phone-card-desc">Create or join a game</span>
             </span>
           </button>
+          <button class="lobby-phone-card lobby-phone-card-howto" data-action="how-to-play">
+            <span class="lobby-phone-card-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+            </span>
+            <span class="lobby-phone-card-copy">
+              <span class="lobby-phone-card-kicker">Guest</span>
+              <span class="lobby-phone-card-title">How to Play</span>
+              <span class="lobby-phone-card-desc">Rules · no sign-in</span>
+            </span>
+          </button>
         </div>
 
         ${hasSavedGames ? `
@@ -163,10 +174,6 @@ export class Lobby {
             <span class="saved-count">${savedGames.length}</span>
           </button>
         ` : ''}
-        <button class="lobby-phone-saved lobby-phone-howto" data-action="how-to-play">
-          <span>How to Play</span>
-          <span class="lobby-phone-howto-meta">Rules · no sign-in</span>
-        </button>
       </div>
     `;
   }
@@ -296,14 +303,16 @@ export class Lobby {
           <span class="lobby-version-badge">${GAME_VERSION}</span>
         </div>
 
-        <div class="lobby-menu-grid">
+        <p class="lobby-mode-kicker">Start here</p>
+        <div class="lobby-menu-grid lobby-mode-tiles">
           <button class="lobby-menu-card" data-action="local-play">
             <div class="menu-card-icon">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
             </div>
             <div class="menu-card-content">
+              <p class="menu-card-kicker">This device</p>
               <h3>Local Play</h3>
-              <p>Play on this device with friends or AI opponents</p>
+              <p>Friends or AI on this screen</p>
             </div>
           </button>
 
@@ -312,10 +321,21 @@ export class Lobby {
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
             </div>
             <div class="menu-card-content">
+              <p class="menu-card-kicker">Multiplayer</p>
               <h3>Play Online</h3>
-              <p>Create or join multiplayer games with players worldwide</p>
+              <p>Create or join a game</p>
             </div>
-            <span class="menu-card-badge">Multiplayer</span>
+          </button>
+
+          <button class="lobby-menu-card lobby-menu-card-rules" data-action="how-to-play">
+            <div class="menu-card-icon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+            </div>
+            <div class="menu-card-content">
+              <p class="menu-card-kicker">Guest</p>
+              <h3>How to Play</h3>
+              <p>Rules — no sign-in</p>
+            </div>
           </button>
         </div>
 
@@ -326,16 +346,6 @@ export class Lobby {
             <span class="saved-count">${savedGames.length}</span>
           </button>
         ` : ''}
-
-        <button class="lobby-menu-card lobby-menu-card-rules" data-action="how-to-play">
-          <div class="menu-card-icon">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
-          </div>
-          <div class="menu-card-content">
-            <h3>How to Play</h3>
-            <p>Rules and phase tips — no sign-in required</p>
-          </div>
-        </button>
       </div>
     `;
   }
