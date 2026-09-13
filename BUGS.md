@@ -12,6 +12,7 @@ Paint-first branded `#startup-loader`, phone Confirm chrome (held / unavailable 
 - [ ] 390 + 500: Confirm / Max / Resign clear the home indicator; Max still needs Confirm.
 - [ ] Rotate mid-turn: phase and queues stay.
 - [ ] How to Play from home without signing in; Phase tips reopen from ⋯.
+- [ ] Got it / Next / tip chips advance or dismiss without peeking or placing the land under the finger.
 
 ---
 
