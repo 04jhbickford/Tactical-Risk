@@ -16221,6 +16221,15 @@ iframe[title="Vercel Live Feedback"] {
   width: 100%;
 }
 
+.mp-rejoin-escape {
+  margin-top: 18px;
+}
+
+.mp-rejoin-escape .mp-secondary-btn {
+  width: 100%;
+  text-align: center;
+}
+
 /* Identity Bar - shows "You: [Name]" when it's another player's turn */
 .pp-identity-bar {
   display: flex;

@@ -104,6 +104,9 @@ const {
   resolveLobbyViewAfterLoss,
   joinFormFieldAttrs,
   joinFormFieldAttrString,
+  shouldBlockCompetingEntryForms,
+  shouldShowCompetingEntryForms,
+  resolveRejoinRecoveryUi,
   shouldListGameInMyGames,
   shouldJoinListedGame,
   shouldForgetLastMatchAfterLookup,
@@ -161,7 +164,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.43', GAME_VERSION === 'V2.81.43');
+check('GAME_VERSION is V2.81.44', GAME_VERSION === 'V2.81.44');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -937,8 +940,30 @@ console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, +
     && authUiSrc.includes('shouldShowSignInForm'));
   check('B27: reconnect-only exists and is not Create Game',
     lobbySrc.includes('showReconnectOnly')
-    && /_renderReconnect\(user\) \{[\s\S]*?_renderJoin/.test(lobbySrc)
+    && lobbySrc.includes('_renderReconnect')
     && !/_renderReconnect\(user\) \{[\s\S]*?data-action="create"/.test(lobbySrc));
+  check('V2.81.44: rejoin recovery blocks competing Join / Create / Browse',
+    shouldBlockCompetingEntryForms({ rejoinRequired: true }) === true
+    && shouldBlockCompetingEntryForms({ rejoinRequired: true, dismissed: true }) === false
+    && shouldBlockCompetingEntryForms({ rejoinRequired: false }) === false
+    && shouldShowCompetingEntryForms({ rejoinRequired: true }) === false
+    && shouldShowCompetingEntryForms({ rejoinRequired: false }) === true);
+  check('V2.81.44: recovery UI is Rejoin-only for any live code',
+    resolveRejoinRecoveryUi({ rejoinRequired: true }).showJoinForm === false
+    && resolveRejoinRecoveryUi({ rejoinRequired: true }).showCreateForm === false
+    && resolveRejoinRecoveryUi({ rejoinRequired: true }).showBrowse === false
+    && resolveRejoinRecoveryUi({ rejoinRequired: true }).showRejoinCta === true
+    && resolveRejoinRecoveryUi({ rejoinRequired: true }).showDismissEscape === true
+    && resolveRejoinRecoveryUi({ rejoinRequired: true, dismissed: true }).showJoinForm === true
+    && resolveRejoinRecoveryUi({ rejoinRequired: false }).showJoinForm === true);
+  check('V2.81.44: reconnect markup gates Join / Create / Browse through recovery UI',
+    /_renderReconnect\(user\) \{[\s\S]*?resolveRejoinRecoveryUi/.test(lobbySrc)
+    && /showJoinForm \? this\._renderJoin/.test(lobbySrc)
+    && /showCreateForm \? this\._renderCreate/.test(lobbySrc)
+    && /showBrowse \? this\._renderBrowse/.test(lobbySrc)
+    && /data-action="dismiss-rejoin"/.test(lobbySrc)
+    && /data-action="rejoin-last"/.test(lobbySrc)
+    && lobbySrc.includes('_blocksCompetingEntry'));
 
   const territories = [
     { name: 'East US', isWater: false, connections: [] },

@@ -289,3 +289,32 @@ export function joinFormFieldAttrString(kind) {
     .map(([key, value]) => `${key}="${value}"`)
     .join(' ');
 }
+
+// Still-in-match / sign-in-dropped recovery: Rejoin is the only primary
+// join action. Competing Create / Join / Browse must stay hidden until
+// the player explicitly dismisses this path. Any live lobby code.
+export function shouldBlockCompetingEntryForms({
+  rejoinRequired = false,
+  dismissed = false,
+} = {}) {
+  if (dismissed) return false;
+  return !!rejoinRequired;
+}
+
+export function shouldShowCompetingEntryForms(opts = {}) {
+  return !shouldBlockCompetingEntryForms(opts);
+}
+
+export function resolveRejoinRecoveryUi({
+  rejoinRequired = false,
+  dismissed = false,
+} = {}) {
+  const block = shouldBlockCompetingEntryForms({ rejoinRequired, dismissed });
+  return {
+    showRejoinCta: !!rejoinRequired && !dismissed,
+    showJoinForm: !block,
+    showCreateForm: !block,
+    showBrowse: !block,
+    showDismissEscape: !!rejoinRequired && !dismissed,
+  };
+}
