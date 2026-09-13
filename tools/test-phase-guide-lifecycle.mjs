@@ -185,6 +185,7 @@ check('CSS: guide inset above CTA and z 75',
   /html\.mobile-shell \.phase-guide \{[\s\S]*?bottom:\s*calc\(var\(--mobile-cta/.test(css)
   && /html\.mobile-shell \.phase-guide \{[\s\S]*?z-index:\s*75/.test(css)
   && /phase-guide-open[\s\S]*?phone-peek-row/.test(css)
+  && /handoff-active[\s\S]*?\.phase-guide/.test(css)
   && /Never show this again/.test(guideSrc));
 check('METHOD documents the gate, never, and ladder',
   /round === 1/.test(method)

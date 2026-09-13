@@ -18929,7 +18929,8 @@ html.mobile-shell.handoff-active #zoom-controls,
 html.mobile-shell.handoff-active #minimap,
 html.mobile-shell.handoff-active .phone-menu-sheet,
 html.mobile-shell.handoff-active .territory-tooltip,
-html.mobile-shell.handoff-active .unit-tooltip {
+html.mobile-shell.handoff-active .unit-tooltip,
+html.mobile-shell.handoff-active .phase-guide {
   display: none !important;
 }
 
