@@ -2,6 +2,24 @@
 
 ---
 
+## 9.13.26 — V2.81.44 hide Join form on rejoin recovery (SCHEMA 11, DRAFT)
+
+James screenshot: Online Join Game while sign-in-dropped / still-in-match recovery is active showed “Still in the match” + gold Rejoin CTA **and** the full Join Game form (code, password, Join Game). Copy says do not start a new one; the form invites exactly that.
+
+Cause: `_renderReconnect` always appended `_renderJoin`. Generic rule now: when rejoin recovery is the active path, competing Create / Join / Browse stay hidden until an explicit “Leave this match / find another game” dismiss. Not a 2LPT76 one-off. SCHEMA 11. GAME_VERSION V2.81.44. Draft only — not production.
+
+HOLDs kept: Confirm grammar; China / Sinkiang merge; SCHEMA 11.
+
+### Smoke (this PR)
+
+- [ ] Reconnect / still-in-match screen: Rejoin is the only primary join action.
+- [ ] GAME CODE / PASSWORD / Join Game are not visible or submittable in that state.
+- [ ] Create Game / Open Games do not appear on the same screen.
+- [ ] Rejoin {code} still joins the remembered live match.
+- [ ] “Leave this match / find another game” reveals the normal menu; Rejoin banner remains there.
+
+---
+
 ## 9.13.26 — V2.81.43 Settlecoast UX polish (2D, SCHEMA 11, DRAFT)
 
 Paint-first branded `#startup-loader`, phone Confirm chrome (held / unavailable / queued), 44pt + safe-area on primary CTAs, dismissible Place Capital / Deploy / Attack / Fortify tips, How to Play on Local home without sign-in. METHOD in `doc/METHOD-SETTLECOAST.md`. No Three.js, no `@designcodeio/threeui`, no voice. Confirm grammar SILO held. Draft only — not production.

@@ -15,6 +15,8 @@ import {
   shouldLeaveLobbyView,
   shouldNavigateToHome,
   resolveLobbyViewAfterLoss,
+  shouldBlockCompetingEntryForms,
+  resolveRejoinRecoveryUi,
 } from '../multiplayer/lastMatch.js';
 import { resolveHostLobbyPrimaryCta } from '../multiplayer/lobbyStart.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
@@ -84,19 +86,28 @@ export class MultiplayerLobby {
       return;
     }
     if (action === 'create') {
-      if (this.mode === 'reconnect') return;
+      if (this._blocksCompetingEntry()) return;
       this.mode = 'create';
       this._render();
       return;
     }
     if (action === 'browse') {
+      if (this._blocksCompetingEntry()) return;
       this.mode = 'browse';
       this._render();
       this._loadBrowseGames();
     }
   }
 
+  _blocksCompetingEntry() {
+    return shouldBlockCompetingEntryForms({
+      rejoinRequired: this.mode === 'reconnect',
+      dismissed: !!this._rejoinDismissed,
+    });
+  }
+
   _openJoinByCode() {
+    if (this._blocksCompetingEntry()) return;
     if (this.mode === 'reconnect') this._fromReconnect = true;
     this.mode = 'join';
     this._render();
@@ -109,6 +120,7 @@ export class MultiplayerLobby {
   showReconnectOnly() {
     this.mode = 'reconnect';
     this._fromReconnect = true;
+    this._rejoinDismissed = false;
     this.show();
   }
 
@@ -296,6 +308,15 @@ export class MultiplayerLobby {
   }
 
   _renderReconnect(user) {
+    const ui = resolveRejoinRecoveryUi({
+      rejoinRequired: true,
+      dismissed: !!this._rejoinDismissed,
+    });
+    const competing = [
+      ui.showJoinForm ? this._renderJoin(user) : '',
+      ui.showCreateForm ? this._renderCreate(user) : '',
+      ui.showBrowse ? this._renderBrowse(user) : '',
+    ].join('');
     return `
       <div class="mp-identity-box">
         <p class="mp-welcome">Still in the match</p>
@@ -303,8 +324,15 @@ export class MultiplayerLobby {
           Sign-in dropped. Rejoin the live game — do not start a new one.
         </p>
       </div>
-      ${this._renderLastMatchBanner()}
-      ${this._renderJoin(user)}
+      ${ui.showRejoinCta ? this._renderLastMatchBanner() : ''}
+      ${competing}
+      ${ui.showDismissEscape ? `
+      <div class="mp-footer-actions mp-rejoin-escape">
+        <button type="button" class="mp-secondary-btn" data-action="dismiss-rejoin">
+          Leave this match / find another game
+        </button>
+      </div>
+      ` : ''}
     `;
   }
 
@@ -779,6 +807,13 @@ export class MultiplayerLobby {
   }
 
   _bindEvents() {
+    this.el.querySelector('[data-action="dismiss-rejoin"]')?.addEventListener('click', () => {
+      this._rejoinDismissed = true;
+      this._fromReconnect = false;
+      this.mode = 'menu';
+      this._render();
+    });
+
     this.el.querySelector('[data-action="rejoin-last"]')?.addEventListener('click', async () => {
       const last = readLastMatch();
       if (last?.lobbyCode) {
@@ -1037,6 +1072,7 @@ export class MultiplayerLobby {
   }
 
   async _handleCreate(form) {
+    if (this._blocksCompetingEntry()) return;
     const name = form.querySelector('#create-name').value;
     const maxPlayers = parseInt(form.querySelector('#create-max-players').value);
     const startingIPCs = parseInt(form.querySelector('#create-ipcs').value);
@@ -1075,6 +1111,7 @@ export class MultiplayerLobby {
   }
 
   async _handleJoin(form) {
+    if (this._blocksCompetingEntry()) return;
     const code = form.querySelector('#join-code').value.toUpperCase();
     const password = form.querySelector('#join-password').value;
 
