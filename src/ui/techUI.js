@@ -1,6 +1,8 @@
 // Tech Research UI - popup for developing technologies during DEVELOP_TECH phase
 
 import { TECHNOLOGIES, shouldShowTechResearch } from '../state/gameState.js';
+import { setShellFlag } from './mobileShell.js';
+import { syncBottomSurfaces } from './bottomSurface.js';
 
 export class TechUI {
   constructor() {
@@ -38,10 +40,18 @@ export class TechUI {
     this.breakthrough = false;
     this._render();
     this.el.classList.remove('hidden');
+    this._syncSheetFlag();
   }
 
   hide() {
     this.el.classList.add('hidden');
+    this._syncSheetFlag();
+  }
+
+  _syncSheetFlag() {
+    const visible = !!this.el && !this.el.classList.contains('hidden');
+    setShellFlag('tech-active', visible);
+    syncBottomSurfaces();
   }
 
   _render() {

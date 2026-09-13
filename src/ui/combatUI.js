@@ -3,6 +3,7 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
+import { syncBottomSurfaces } from './bottomSurface.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -241,6 +242,7 @@ export class CombatUI {
   _syncCombatChromeFlag() {
     const visible = !!this.el && !this.el.classList.contains('hidden');
     setShellFlag('combat-active', visible);
+    syncBottomSurfaces();
   }
 
   _initCombatState() {

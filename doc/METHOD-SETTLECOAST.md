@@ -1,7 +1,7 @@
 # METHOD — Settlecoast UX steals for SCHEMA 11 (2D only)
 
-Tactical Risk display version **V2.81.43**. `SCHEMA_VERSION` stays **11** (no state-shape change).
-This document is the in-repo METHOD for the V2.81.43 polish pass. Theme, copy, and
+Tactical Risk display version **V2.81.45**. `SCHEMA_VERSION` stays **11** (no state-shape change).
+This document is the in-repo METHOD for the V2.81.43–V2.81.45 polish pass. Theme, copy, and
 mechanics stay Tactical Risk. Settlecoast is a UX pattern source only.
 
 ## 1. Production smoke checklist
@@ -38,13 +38,15 @@ Do not un-split China / polygon merges.
 | How to Play (guest) | Rules open, no sign-in | same | same | same | Rules readable |
 | Place Capital | peek land → Confirm | same + 44pt Confirm | same | state kept on rotate | Confirm chrome visible |
 | Initial Deploy | land → unit → Confirm; Max still needs Confirm | same | same | state kept | queued / held / unavailable |
-| Attack | stack → enemy → Confirm Attack | same | same | state kept | phase tip once |
-| Fortify | stack → own land → Confirm | same | same | state kept | phase tip once |
-| Re-open tips | Menu → Phase tips | ⋯ → Phase tips | ⋯ → Phase tips | same | card, no motion |
+| Combat Move | stack → highlighted land → Confirm | same | same | state kept | phase tip once (round 1) |
+| Fortify | stack → own land → Confirm | same | same | state kept | phase tip once (round 1) |
+| Re-open tips | Menu → Phase tips | ⋯ → Phase tips | ⋯ → Phase tips | same | card, no motion; blocked if Never |
 
-Phase-tip storage key: `tacticalRisk_phaseGuides`. First session shows each of
-Place Capital / Initial Deploy / Attack / Fortify once. Menu re-opens the current
-(or Place Capital) tip.
+Phase-tip storage key: `tacticalRisk_phaseGuides`. Auto-show during setup and
+PLAYING while `gameState.round === 1`. After the first PLAYING round
+(`round > 1`) tips never auto-open. **Got it** dismisses that page. **Never
+show this again** sets `store.never` and blocks auto-show **and** menu reopen.
+Menu → Phase tips still works unless Never is set. Manual paging only.
 
 ## 3. Explicit kills
 
@@ -74,5 +76,40 @@ teal island palette, Sunmere / Catan naming, crests, hex tiles, or 3D art.
 | `03-game-lobby` | PARK — do not expand lobby create/join/chat/voice | Voice, chat, parchment seat lobby |
 | `04-mobile-width-menu` | Single-column phone tiles; Confirm / Resign / Max stay ≥44pt and above the home indicator even if other chrome scrolls | Parchment rail, primaries trapped below the fold |
 
-Phase-guide card `z-index` stays below the phone peek tray (`#sidebar` 60) and
-is inset above `--mobile-cta` so thumb Confirm is never covered.
+## 5. V2.81.45 — tutorial lifecycle, one bottom surface, Combat Move honesty
+
+**Auto-show gate.** There is no persisted `turnNumber` (SCHEMA 11). We use
+`gameState.round`, which starts at 1 and increments in `nextTurn()` after every
+seat has gone. Auto-show = setup phases **or** PLAYING while `round === 1`.
+Once `round > 1`, `shouldAutoShowPhaseGuide` is false. Menu reopen still works
+unless `store.never === true`.
+
+**Never.** `tacticalRisk_phaseGuides.never`. `shouldShowPhaseGuide` honors it.
+
+**One bottom surface.** When the phase-guide, combat/purchase/tech sheet, or ⋯
+menu is open, sibling peek / leftover sidebar / unit-tray chrome collapses.
+Confirm / Resign / Max stay on the CTA rail (≥44pt, `safe-area-inset-bottom`)
+except when a sheet owns its own buttons (combat / purchase / tech).
+
+**Z-index ladder (phone / `html.mobile-shell`):**
+
+| z | Surface |
+| --- | --- |
+| 40 | territory / unit tooltips |
+| 50 | leftover desktop sidebar (`.player-panel`, unscoped) |
+| 60 | peek tray / `#sidebar` |
+| 65 | CTA rail (Confirm / Resign / Max) — never covered by the guide |
+| 70 | `#hud` |
+| 75 | phase-guide card (inset above `--mobile-cta`) |
+| 150 | leftover purchase / tech side sheets (desktop) |
+| 200 | combat sheet + phone ⋯ menu; purchase/tech dock to bottom on phone |
+| 2000 | critical banners |
+
+**Combat Move vs Attack.** The HUD chip is **Combat Move**, not Attack. Dice
+are the **Combat** phase. One-job: tap stack → tap highlighted land → Confirm.
+Fortify is Non-Combat Move on your lands. Place / Deploy keep land → unit →
+Confirm (SILO).
+
+Phase-guide card sits at z-index **75**, above the peek tray (60) but inset
+above `--mobile-cta` so thumb Confirm is never covered. When the guide is
+open, peek chips / leftover sidebar body demote.

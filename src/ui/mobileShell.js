@@ -103,7 +103,7 @@ export function formatMobilePhaseWord(gamePhase, turnPhase) {
   if (gamePhase === GAME_PHASES.PLAYING) {
     if (turnPhase === TURN_PHASES.DEVELOP_TECH) return 'Tech';
     if (turnPhase === TURN_PHASES.PURCHASE) return 'Buy';
-    if (turnPhase === TURN_PHASES.COMBAT_MOVE) return 'Attack';
+    if (turnPhase === TURN_PHASES.COMBAT_MOVE) return 'Combat Move';
     if (turnPhase === TURN_PHASES.COMBAT) return 'Combat';
     if (turnPhase === TURN_PHASES.NON_COMBAT_MOVE) return 'Fortify';
     if (turnPhase === TURN_PHASES.MOBILIZE) return 'Mobilize';

@@ -2,11 +2,30 @@
 
 ---
 
-## 9.13.26 — V2.81.44 hide Join form on rejoin recovery (SCHEMA 11, DRAFT)
+## 9.13.26 — V2.81.45 tutorial lifecycle + HUD stack + Combat Move (SCHEMA 11)
+
+James he-corrects after rejoin PR 34. Shipped with V2.81.44 in the same window.
+SCHEMA 11. Tips stay; they stop auto-showing after PLAYING `round > 1`. Never
+show this again persists on `tacticalRisk_phaseGuides`. One phone bottom surface
+when a guide/sheet/menu is open. Combat Move naming honesty; land→unit→Confirm
+SILO held for Place/Deploy. Tesla branding off. No lobby/voice.
+
+### Smoke (this PR)
+
+- [ ] Place Capital / Deploy tips still auto-show on a new local match.
+- [ ] After the first PLAYING round (`round > 1`) tips do not auto-pop.
+- [ ] Never show this again blocks auto-show and Menu → Phase tips.
+- [ ] Menu → Phase tips still works after Got it (unless Never).
+- [ ] 390 + 500: guide/sheet/menu never stacks on peek chips; Confirm/Resign/Max stay ≥44pt above the home indicator.
+- [ ] Combat Move HUD/tip says Combat Move (not Attack); stack → highlighted land → Confirm.
+
+---
+
+## 9.13.26 — V2.81.44 hide Join form on rejoin recovery (SCHEMA 11)
 
 James screenshot: Online Join Game while sign-in-dropped / still-in-match recovery is active showed “Still in the match” + gold Rejoin CTA **and** the full Join Game form (code, password, Join Game). Copy says do not start a new one; the form invites exactly that.
 
-Cause: `_renderReconnect` always appended `_renderJoin`. Generic rule now: when rejoin recovery is the active path, competing Create / Join / Browse stay hidden until an explicit “Leave this match / find another game” dismiss. Not a 2LPT76 one-off. SCHEMA 11. GAME_VERSION V2.81.44. Draft only — not production.
+Cause: `_renderReconnect` always appended `_renderJoin`. Generic rule now: when rejoin recovery is the active path, competing Create / Join / Browse stay hidden until an explicit “Leave this match / find another game” dismiss. Not a 2LPT76 one-off. SCHEMA 11. GAME_VERSION V2.81.44. Shipped with V2.81.45.
 
 HOLDs kept: Confirm grammar; China / Sinkiang merge; SCHEMA 11.
 

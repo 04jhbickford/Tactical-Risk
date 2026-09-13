@@ -198,7 +198,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.44', GAME_VERSION === 'V2.81.44');
+check('GAME_VERSION is V2.81.45', GAME_VERSION === 'V2.81.45');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -315,9 +315,9 @@ check('iPad landscape 1024×768 not phone', shouldUseMobileShell(1024, 768) === 
 console.log('=== V2.63 phase identity (not the tablet 9px / hidden-dots path) ===');
 check('3/7 Combat Movement',
   formatMobilePhaseLabel(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === '3/7 Combat Movement');
-check('HUD phase is one word',
+check('HUD phase chip is honest Combat Move',
   formatMobilePhaseWord(GAME_PHASES.UNIT_PLACEMENT, null) === 'Deploy'
-  && formatMobilePhaseWord(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Attack');
+  && formatMobilePhaseWord(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Combat Move');
 check('peeked tile hides its map label',
   shouldHidePhoneMapLabel({ mobile: true, name: 'Novosibirsk', peekedName: 'Novosibirsk' }) === true
   && shouldHidePhoneMapLabel({ mobile: true, name: 'China', peekedName: 'Novosibirsk' }) === false
@@ -332,8 +332,8 @@ check('setup phase keeps its name',
 console.log('=== V2.63 tray peek PHASE_HINTS + visible IPC/OUT ===');
 check('combat-move hint is the existing PHASE_HINTS line',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_HINTS[TURN_PHASES.COMBAT_MOVE]);
-check('hint text is Click units → enemy territory',
-  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Click units → enemy territory');
+check('hint text is stack → highlighted land → Confirm',
+  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Click stack → highlighted land → Confirm');
 check('purchase phase hint may be empty (still a legal peek)',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
 check('IPC is visible, not title-only',
@@ -741,11 +741,11 @@ check('phone air-landing keeps the body up; dest-pending combat stays peeked',
   && shouldPeekPhoneTray({ mobile: true, movePending: true }) === true);
 check('desktop purchase hint stays empty (PHASE_HINTS frozen)',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
-check('phone peek hint is the same pair grammar for mobilize / move',
+check('phone peek hint keeps deploy SILO; Combat Move is stack-first',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === 'Tap a unit to buy'
   && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap land, then unit'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap land, then unit'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap land, then unit');
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap your stack — legal lands highlight'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap your stack — your lands highlight');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
@@ -1633,7 +1633,7 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     }) === 'To Ukraine S.S.R.'
     && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
       territoryName: 'Ukraine S.S.R.', destName: 'West Russia',
-    }) === 'Ukraine S.S.R. → West Russia'
+    }) === 'Ukraine S.S.R. → West Russia — Confirm'
     && /_commitPhoneIconMobilize/.test(panelSrc)
     && /_commitPhoneIconMove/.test(panelSrc)
     && /shouldHidePhonePairConfirm/.test(panelSrc));

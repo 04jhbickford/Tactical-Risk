@@ -2,7 +2,7 @@
 // the strip must say whose turn, what last landed, and that the match lives.
 // No Firebase. HUD and harnesses share this.
 
-import { GAME_PHASES } from '../state/gameState.js';
+import { GAME_PHASES, TURN_PHASES } from '../state/gameState.js';
 import { formatMobilePhaseLabel } from './mobileShell.js';
 import { resolveTurnChrome } from './playerPanel.js';
 import { placementBudgetCopy } from '../state/placeQueue.js';
@@ -12,6 +12,17 @@ export function resolveHudPhaseLabel({ phase, turnPhase } = {}) {
   if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return 'Place Capital';
   if (phase === GAME_PHASES.UNIT_PLACEMENT) return 'Initial Deployment';
   return formatMobilePhaseLabel(phase, turnPhase) || 'Setup';
+}
+
+// Combat Move ≠ Combat (dice). Fortify = Non-Combat Move. Copy only.
+export function resolveHudNextStep({ phase, turnPhase } = {}) {
+  if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.COMBAT_MOVE) {
+    return 'Combat Move: tap stack → highlighted land → Confirm. Dice are next.';
+  }
+  if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
+    return 'Fortify: tap stack → your land → Confirm. No attacks this step.';
+  }
+  return null;
 }
 
 // One live AI beat — never YOUR TURN on an AI seat.
@@ -163,6 +174,7 @@ export function resolveHudClarity({
     ownSeat: whose.ownSeat,
     badge: whose.badge,
     phase: resolveHudPhaseLabel({ phase, turnPhase }),
+    next: resolveHudNextStep({ phase, turnPhase }),
     budget: resolveHudDeployBudget({
       phase, deployedThisRound, limit, poolRemaining,
     }),

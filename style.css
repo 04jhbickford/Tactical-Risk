@@ -101,6 +101,10 @@ html, body {
   color: #ffe0b2;
 }
 
+.hud-clarity-next {
+  color: #fde68a;
+}
+
 /* --- HUD --- */
 #hud {
   position: absolute;
@@ -19047,12 +19051,16 @@ html.mobile-shell.combat-active .mob-max-btn {
   color: #e8dcc4;
 }
 
+/* Phone z-index ladder (V2.81.45): tooltips 40 · leftover sidebar 50 ·
+   peek/#sidebar 60 · CTA rail 65 · HUD 70 · phase-guide 75 · leftover
+   purchase/tech sheets 150 · combat + ⋯ menu 200 · banners 2000.
+   One bottom surface at a time — see .bottom-surface-* / .phase-guide-open. */
 .phase-guide {
   position: fixed;
   top: calc(56px + env(safe-area-inset-top, 0px));
   left: 12px;
   right: 12px;
-  z-index: 80;
+  z-index: 75;
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -19132,6 +19140,17 @@ html.mobile-shell.combat-active .mob-max-btn {
   color: #c5c9d4;
 }
 
+.phase-guide-next-line {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #fde68a;
+}
+
+.phase-guide-next-line[hidden] {
+  display: none;
+}
+
 .phase-guide-manual {
   margin: 0 0 12px;
   font-size: 12px;
@@ -19140,6 +19159,7 @@ html.mobile-shell.combat-active .mob-max-btn {
 
 .phase-guide-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -19165,9 +19185,28 @@ html.mobile-shell.combat-active .mob-max-btn {
 }
 
 .phase-guide-prev:focus-visible,
-.phase-guide-dismiss:focus-visible {
+.phase-guide-dismiss:focus-visible,
+.phase-guide-never:focus-visible {
   outline: 2px solid #c9a44a;
   outline-offset: 2px;
+}
+
+.phase-guide-never {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html.mobile-shell .phase-guide {
@@ -19175,7 +19214,55 @@ html.mobile-shell .phase-guide {
   bottom: calc(var(--mobile-cta, 72px) + 8px);
   align-items: flex-start;
   overflow: auto;
-  z-index: 80;
+  z-index: 75;
+}
+
+/* Guide / sheet / menu: one bottom surface. CTA rail stays ≥44pt + safe-area. */
+html.mobile-shell.phase-guide-open .player-panel--peek .phone-peek-row,
+html.mobile-shell.phase-guide-open .player-panel--peek .phone-peek-pair-hint,
+html.mobile-shell.phase-guide-open .player-panel--peek .phone-place-tray,
+html.mobile-shell.phase-guide-open .player-panel--peek .pp-tray-hint,
+html.mobile-shell.phase-guide-open .phone-tray-body,
+html.mobile-shell.phase-guide-open .phone-detent-tabs,
+html.mobile-shell.bottom-surface-sheet .player-panel--peek .phone-peek-row,
+html.mobile-shell.bottom-surface-sheet .player-panel--peek .phone-peek-pair-hint,
+html.mobile-shell.bottom-surface-sheet .player-panel--peek .phone-place-tray,
+html.mobile-shell.bottom-surface-sheet .phone-tray-body,
+html.mobile-shell.bottom-surface-menu .phase-guide {
+  display: none !important;
+}
+
+html.mobile-shell.combat-active .phase-guide,
+html.mobile-shell.purchase-active .phase-guide,
+html.mobile-shell.tech-active .phase-guide,
+html.mobile-shell.phone-menu-open .phase-guide,
+html.mobile-shell.bottom-surface-sheet .phase-guide {
+  display: none !important;
+}
+
+html.mobile-shell.phase-guide-open .player-panel--expanded,
+html.mobile-shell.bottom-surface-sheet .player-panel--expanded {
+  max-height: none;
+}
+
+html.mobile-shell.purchase-active .pp-bottom-actions,
+html.mobile-shell.tech-active .pp-bottom-actions {
+  display: none !important;
+}
+
+html.mobile-shell.purchase-active .purchase-panel,
+html.mobile-shell.tech-active .tech-popup {
+  top: auto;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  width: 100%;
+  max-width: none;
+  max-height: 42dvh;
+  border-radius: 14px 14px 0 0;
+  z-index: 200;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (hover: hover) and (pointer: fine) {

@@ -1,10 +1,25 @@
 // First-session, one-job phase tips. Dismissible; re-open from the menu.
 // Copy is Tactical Risk — not Catan / Settlecoast.
+//
+// Auto-show rule (V2.81.45): tips auto-open during setup (Place Capital /
+// Initial Deploy) and during PLAYING while gameState.round === 1. There is
+// no persisted turnNumber (SCHEMA stays 11). `round` starts at 1 and
+// increments in nextTurn() after every seat has gone. After the first
+// PLAYING round completes (round > 1), sync() never auto-shows.
+//
+// A human seat therefore sees Combat Move / Fortify tips on their first
+// PLAYING turn (all first-round seats share round === 1).
+//
+// Menu → Phase tips still reopens the current (or Place Capital) tip unless
+// the player tapped “Never show this again” (store.never === true).
+// Manual paging only — no auto-advance.
 
 import { GAME_PHASES, TURN_PHASES } from '../state/gameState.js';
+import { syncBottomSurfaces } from './bottomSurface.js';
 
 export const PHASE_GUIDE_STORAGE_KEY = 'tacticalRisk_phaseGuides';
 export const PHASE_GUIDE_MAP_GUARD_MS = 400;
+export const PHASE_GUIDE_NEVER_KEY = 'never';
 
 let mapGuardUntil = 0;
 
@@ -27,21 +42,25 @@ export const PHASE_GUIDES = {
     id: PHASE_GUIDE_IDS.CAPITAL,
     title: 'Place Capital',
     job: 'Tap one of your lands, then Confirm. That city becomes your capital.',
+    next: 'Land → Confirm. Max is not used here.',
   },
   [PHASE_GUIDE_IDS.DEPLOY]: {
     id: PHASE_GUIDE_IDS.DEPLOY,
     title: 'Initial Deploy',
     job: 'Tap land, pick a unit, then Confirm. Max fills the count — Confirm still places.',
+    next: 'Land → unit → Confirm. That grammar stays for deploy.',
   },
   [PHASE_GUIDE_IDS.ATTACK]: {
     id: PHASE_GUIDE_IDS.ATTACK,
-    title: 'Attack',
-    job: 'Tap your stack, tap an enemy land, then Confirm Attack.',
+    title: 'Combat Move',
+    job: 'This is Combat Move, not Combat. Position stacks for later battle — dice happen next. Tap your stack, tap a highlighted land, then Confirm.',
+    next: 'Legal lands already glow on the map. Stack → highlighted land → Confirm.',
   },
   [PHASE_GUIDE_IDS.FORTIFY]: {
     id: PHASE_GUIDE_IDS.FORTIFY,
     title: 'Fortify',
-    job: 'Move leftover units between your lands, then Confirm.',
+    job: 'This is Non-Combat Move (Fortify). Tap your stack, tap a highlighted friendly land, then Confirm. No attacks this step.',
+    next: 'Only your lands highlight. Stack → your land → Confirm.',
   },
 };
 
@@ -89,13 +108,41 @@ export function writePhaseGuideStore(store, storage = globalThis.localStorage) {
   }
 }
 
+export function isPhaseGuideNever(store = readPhaseGuideStore()) {
+  return store?.[PHASE_GUIDE_NEVER_KEY] === true;
+}
+
+// Auto-show window: setup always; PLAYING only while round === 1.
+// round > 1 means the first PLAYING round of the match is done.
+export function isPhaseGuideAutoShowWindow({ phase, round } = {}) {
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT) {
+    return true;
+  }
+  if (phase === GAME_PHASES.PLAYING && Number(round) === 1) {
+    return true;
+  }
+  return false;
+}
+
 export function shouldShowPhaseGuide(id, store = readPhaseGuideStore()) {
   if (!id || !PHASE_GUIDES[id]) return false;
+  if (isPhaseGuideNever(store)) return false;
   return store[id] !== 'dismissed';
+}
+
+export function shouldAutoShowPhaseGuide(id, store = readPhaseGuideStore(), ctx = {}) {
+  if (!shouldShowPhaseGuide(id, store)) return false;
+  return isPhaseGuideAutoShowWindow(ctx);
 }
 
 export function dismissPhaseGuide(id, store = readPhaseGuideStore(), storage = globalThis.localStorage) {
   const next = { ...store, [id]: 'dismissed' };
+  writePhaseGuideStore(next, storage);
+  return next;
+}
+
+export function neverShowPhaseGuides(store = readPhaseGuideStore(), storage = globalThis.localStorage) {
+  const next = { ...store, [PHASE_GUIDE_NEVER_KEY]: true };
   writePhaseGuideStore(next, storage);
   return next;
 }
@@ -130,6 +177,7 @@ export function pointHitsPhaseGuideChrome(clientX, clientY, root = (typeof docum
 }
 
 // Got it dismisses this job. Next pages; last page Next is also dismiss.
+// Never persists store.never and blocks auto-show + menu reopen.
 export function resolvePhaseGuideControl({ action, currentId } = {}) {
   if (action === 'prev') {
     const id = adjacentPhaseGuideId(currentId, -1);
@@ -142,6 +190,9 @@ export function resolvePhaseGuideControl({ action, currentId } = {}) {
   if (action === 'dismiss' || action === 'got-it') {
     return { kind: 'dismiss', id: currentId || null };
   }
+  if (action === 'never') {
+    return { kind: 'never', id: currentId || null };
+  }
   if (action === 'goto' && currentId) {
     return { kind: 'show', id: currentId };
   }
@@ -150,6 +201,7 @@ export function resolvePhaseGuideControl({ action, currentId } = {}) {
 
 export function reopenPhaseGuide(id, store = readPhaseGuideStore(), storage = globalThis.localStorage) {
   if (!id || !PHASE_GUIDES[id]) return store;
+  if (isPhaseGuideNever(store)) return store;
   const next = { ...store };
   delete next[id];
   writePhaseGuideStore(next, storage);
@@ -188,12 +240,14 @@ export class PhaseGuide {
         <div class="phase-guide-contents" role="tablist" aria-label="Phase tip contents"></div>
         <h2 class="phase-guide-title"></h2>
         <p class="phase-guide-job"></p>
+        <p class="phase-guide-next-line"></p>
         <p class="phase-guide-manual">Manual — no auto-advance</p>
         <div class="phase-guide-actions">
           <button type="button" class="phase-guide-prev" data-guide-action="prev">Previous</button>
           <button type="button" class="phase-guide-next" data-guide-action="next">Next</button>
           <button type="button" class="phase-guide-dismiss" data-guide-action="got-it">Got it</button>
         </div>
+        <button type="button" class="phase-guide-never" data-guide-action="never">Never show this again</button>
       </div>
     `;
     const contents = this.el.querySelector('.phase-guide-contents');
@@ -239,6 +293,7 @@ export class PhaseGuide {
     armPhaseGuideMapGuard();
     if (resolved.kind === 'show' && resolved.id) this.reopen(resolved.id);
     else if (resolved.kind === 'dismiss') this.dismissCurrent();
+    else if (resolved.kind === 'never') this.neverAgain();
   }
 
   currentId() {
@@ -247,28 +302,48 @@ export class PhaseGuide {
     return resolvePhaseGuideId(this.gameState.phase, this.gameState.turnPhase);
   }
 
+  _autoCtx() {
+    return {
+      phase: this.gameState?.phase,
+      round: this.gameState?.round,
+    };
+  }
+
   sync() {
     const id = this.currentId();
     const store = readPhaseGuideStore(this.storage);
     if (this._forceId) {
+      if (isPhaseGuideNever(store)) {
+        this.hide();
+        return;
+      }
       this._show(this._forceId);
       return;
     }
-    if (id && shouldShowPhaseGuide(id, store)) this._show(id);
+    if (id && shouldAutoShowPhaseGuide(id, store, this._autoCtx())) this._show(id);
     else this.hide();
   }
 
   reopen(preferredId) {
+    const store = readPhaseGuideStore(this.storage);
+    if (isPhaseGuideNever(store)) return store;
     const id = preferredId || this.currentId() || PHASE_GUIDE_IDS.CAPITAL;
     this._forceId = id;
-    reopenPhaseGuide(id, readPhaseGuideStore(this.storage), this.storage);
+    reopenPhaseGuide(id, store, this.storage);
     this._show(id);
+    return id;
   }
 
   dismissCurrent() {
     const id = this._visibleId || this.currentId();
     this._forceId = null;
     if (id) dismissPhaseGuide(id, readPhaseGuideStore(this.storage), this.storage);
+    this.hide();
+  }
+
+  neverAgain() {
+    this._forceId = null;
+    neverShowPhaseGuides(readPhaseGuideStore(this.storage), this.storage);
     this.hide();
   }
 
@@ -279,6 +354,11 @@ export class PhaseGuide {
     const page = phaseGuidePageIndex(id);
     this.el.querySelector('.phase-guide-title').textContent = guide.title;
     this.el.querySelector('.phase-guide-job').textContent = guide.job;
+    const nextEl = this.el.querySelector('.phase-guide-next-line');
+    if (nextEl) {
+      nextEl.textContent = guide.next || '';
+      nextEl.hidden = !guide.next;
+    }
     const pageEl = this.el.querySelector('.phase-guide-page');
     if (pageEl) pageEl.textContent = `${page} / ${PHASE_GUIDE_ORDER.length}`;
     const prev = this.el.querySelector('.phase-guide-prev');
@@ -292,6 +372,7 @@ export class PhaseGuide {
     });
     this.el.classList.remove('hidden');
     this.el.setAttribute('aria-hidden', 'false');
+    this._syncSurface(true);
   }
 
   hide() {
@@ -300,5 +381,12 @@ export class PhaseGuide {
     if (!this.el) return;
     this.el.classList.add('hidden');
     this.el.setAttribute('aria-hidden', 'true');
+    this._syncSurface(false);
+  }
+
+  _syncSurface(visible) {
+    if (typeof document === 'undefined') return;
+    document.documentElement.classList.toggle('phase-guide-open', !!visible);
+    syncBottomSurfaces({ phaseGuideVisible: !!visible });
   }
 }

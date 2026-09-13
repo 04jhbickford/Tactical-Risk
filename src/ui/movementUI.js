@@ -956,7 +956,7 @@ export class MovementUI {
       <div class="mp-drag-handle"></div>
       <div class="mp-header">
         <div class="mp-title">${phaseLabel}</div>
-        <div class="mp-phase">${isCombatMove ? 'Combat Movement' : 'Non-Combat Movement'}</div>
+        <div class="mp-phase">${isCombatMove ? 'Combat Move' : 'Non-Combat Move (Fortify)'}</div>
       </div>
 
       <div class="mp-from">
@@ -1233,7 +1233,7 @@ export class MovementUI {
     const player = this.gameState.currentPlayer;
     const isCombatMove = this.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE;
     const isNonCombatMove = this.gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
-    const phaseLabel = isCombatMove ? 'Combat Movement' : 'Non-Combat Movement';
+    const phaseLabel = isCombatMove ? 'Combat Move' : 'Non-Combat Move (Fortify)';
     // Allow undo during both combat and non-combat move phases
     const canUndo = (isCombatMove || isNonCombatMove) && this.gameState.moveHistory && this.gameState.moveHistory.length > 0;
 

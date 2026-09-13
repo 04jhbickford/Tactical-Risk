@@ -34,6 +34,8 @@ const {
 const {
   resolvePhaseGuideId,
   shouldShowPhaseGuide,
+  shouldAutoShowPhaseGuide,
+  neverShowPhaseGuides,
   dismissPhaseGuide,
   reopenPhaseGuide,
   resetPhaseGuides,
@@ -75,7 +77,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version + schema ===');
-check('GAME_VERSION is V2.81.44', GAME_VERSION === 'V2.81.44');
+check('GAME_VERSION is V2.81.45', GAME_VERSION === 'V2.81.45');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== B — paint-first loader ===');
@@ -157,11 +159,12 @@ check('phase-guide chrome is a HUD hit, not a land tap',
   && /isPhaseGuideChromeTarget/.test(readFileSync(join(root, 'src/ui/territoryTooltip.js'), 'utf8'))
   && /shouldBlockMapForPhaseGuide/.test(mainSrc)
   && /data-guide-action="next"/.test(readFileSync(join(root, 'src/ui/phaseGuide.js'), 'utf8')));
-check('phase ids map Place Capital / Deploy / Attack / Fortify',
+check('phase ids map Place Capital / Deploy / Combat Move / Fortify',
   resolvePhaseGuideId(GAME_PHASES.CAPITAL_PLACEMENT) === PHASE_GUIDE_IDS.CAPITAL
   && resolvePhaseGuideId(GAME_PHASES.UNIT_PLACEMENT) === PHASE_GUIDE_IDS.DEPLOY
   && resolvePhaseGuideId(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_GUIDE_IDS.ATTACK
   && resolvePhaseGuideId(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === PHASE_GUIDE_IDS.FORTIFY
+  && PHASE_GUIDES.attack.title === 'Combat Move'
   && resolvePhaseGuideId(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === null);
 {
   resetPhaseGuides();
@@ -175,6 +178,16 @@ check('phase ids map Place Capital / Deploy / Attack / Fortify',
     shouldShowPhaseGuide(PHASE_GUIDE_IDS.CAPITAL) === true);
   check('storage key is first-session only',
     PHASE_GUIDE_STORAGE_KEY === 'tacticalRisk_phaseGuides');
+  neverShowPhaseGuides();
+  check('never blocks shouldShow and menu reopen',
+    shouldShowPhaseGuide(PHASE_GUIDE_IDS.CAPITAL) === false
+    && shouldShowPhaseGuide(PHASE_GUIDE_IDS.CAPITAL, reopenPhaseGuide(PHASE_GUIDE_IDS.CAPITAL)) === false);
+  resetPhaseGuides();
+  check('round > 1 stops auto-show only',
+    shouldAutoShowPhaseGuide(PHASE_GUIDE_IDS.ATTACK, {}, {
+      phase: GAME_PHASES.PLAYING, round: 2,
+    }) === false
+    && shouldShowPhaseGuide(PHASE_GUIDE_IDS.ATTACK) === true);
 }
 check('phone menu exposes Phase tips + Game Rules',
   phoneMenuHomeActions().some((r) => r.action === 'phase-tips')
@@ -195,9 +208,10 @@ check('Rules guest path has contents jump + no-sign-in kicker',
   && /no sign-in/.test(rulesSrc));
 check('phone phase guide sits above the leftover sidebar so Got it is hittable',
   /html\.mobile-shell \.phase-guide \{[\s\S]*?bottom:\s*calc\(var\(--mobile-cta/.test(css)
-  && /html\.mobile-shell \.phase-guide \{[\s\S]*?z-index:\s*80/.test(css)
+  && /html\.mobile-shell \.phase-guide \{[\s\S]*?z-index:\s*75/.test(css)
   && /\.phase-guide \{[\s\S]*?pointer-events:\s*none/.test(css)
-  && /\.phase-guide-card \{[\s\S]*?pointer-events:\s*auto/.test(css));
+  && /\.phase-guide-card \{[\s\S]*?pointer-events:\s*auto/.test(css)
+  && /data-guide-action="never"/.test(readFileSync(join(root, 'src/ui/phaseGuide.js'), 'utf8')));
 
 console.log('=== Kills + METHOD ===');
 check('no @designcodeio/threeui dependency',
