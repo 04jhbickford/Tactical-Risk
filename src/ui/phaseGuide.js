@@ -4,6 +4,9 @@
 import { GAME_PHASES, TURN_PHASES } from '../state/gameState.js';
 
 export const PHASE_GUIDE_STORAGE_KEY = 'tacticalRisk_phaseGuides';
+export const PHASE_GUIDE_MAP_GUARD_MS = 400;
+
+let mapGuardUntil = 0;
 
 export const PHASE_GUIDE_IDS = {
   CAPITAL: 'capital',
@@ -102,6 +105,49 @@ export function resetPhaseGuides(storage = globalThis.localStorage) {
   return {};
 }
 
+export function armPhaseGuideMapGuard(now = Date.now(), ms = PHASE_GUIDE_MAP_GUARD_MS) {
+  mapGuardUntil = Number(now) + Number(ms);
+  return mapGuardUntil;
+}
+
+export function shouldBlockMapForPhaseGuide(now = Date.now()) {
+  return Number(now) < Number(mapGuardUntil);
+}
+
+export function isPhaseGuideChromeTarget(target) {
+  return !!(target?.closest?.('#phase-guide') || target?.closest?.('.phase-guide-card'));
+}
+
+export function pointHitsPhaseGuideChrome(clientX, clientY, root = (typeof document !== 'undefined' ? document.getElementById('phase-guide') : null)) {
+  if (!root || root.classList?.contains('hidden') || root.hidden) return false;
+  const card = root.querySelector?.('.phase-guide-card') || root;
+  const r = card.getBoundingClientRect?.();
+  if (!r || r.width <= 0 || r.height <= 0) return false;
+  const x = Number(clientX);
+  const y = Number(clientY);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
+// Got it dismisses this job. Next pages; last page Next is also dismiss.
+export function resolvePhaseGuideControl({ action, currentId } = {}) {
+  if (action === 'prev') {
+    const id = adjacentPhaseGuideId(currentId, -1);
+    return id ? { kind: 'show', id } : { kind: 'noop', id: currentId || null };
+  }
+  if (action === 'next') {
+    const id = adjacentPhaseGuideId(currentId, 1);
+    return id ? { kind: 'show', id } : { kind: 'dismiss', id: currentId || null };
+  }
+  if (action === 'dismiss' || action === 'got-it') {
+    return { kind: 'dismiss', id: currentId || null };
+  }
+  if (action === 'goto' && currentId) {
+    return { kind: 'show', id: currentId };
+  }
+  return { kind: 'noop', id: currentId || null };
+}
+
 export function reopenPhaseGuide(id, store = readPhaseGuideStore(), storage = globalThis.localStorage) {
   if (!id || !PHASE_GUIDES[id]) return store;
   const next = { ...store };
@@ -144,8 +190,9 @@ export class PhaseGuide {
         <p class="phase-guide-job"></p>
         <p class="phase-guide-manual">Manual — no auto-advance</p>
         <div class="phase-guide-actions">
-          <button type="button" class="phase-guide-prev">Previous</button>
-          <button type="button" class="phase-guide-dismiss">Got it</button>
+          <button type="button" class="phase-guide-prev" data-guide-action="prev">Previous</button>
+          <button type="button" class="phase-guide-next" data-guide-action="next">Next</button>
+          <button type="button" class="phase-guide-dismiss" data-guide-action="got-it">Got it</button>
         </div>
       </div>
     `;
@@ -155,18 +202,43 @@ export class PhaseGuide {
       btn.type = 'button';
       btn.className = 'phase-guide-chip';
       btn.dataset.guideId = id;
+      btn.dataset.guideAction = 'goto';
       btn.textContent = PHASE_GUIDES[id].title.replace(/^Place /, '').replace(/^Initial /, '');
-      btn.addEventListener('click', () => this.reopen(id));
       contents.appendChild(btn);
     }
     document.body.appendChild(this.el);
-    this.el.querySelector('.phase-guide-dismiss')?.addEventListener('click', () => {
-      this.dismissCurrent();
+    const isolate = (e) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation?.();
+      armPhaseGuideMapGuard();
+    };
+    for (const type of ['pointerdown', 'pointerup', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'click']) {
+      this.el.addEventListener(type, (e) => {
+        if (!isPhaseGuideChromeTarget(e.target)) return;
+        isolate(e);
+        if (type !== 'click' && type !== 'pointerup') return;
+        const btn = e.target?.closest?.('[data-guide-action]');
+        if (!btn || this.el.classList.contains('hidden')) return;
+        this._applyOnce(btn.dataset.guideAction, btn.dataset.guideId);
+      }, true);
+    }
+  }
+
+  _applyOnce(action, gotoId) {
+    const now = Date.now();
+    if (now - (this._lastApplyAt || 0) < 350) return;
+    this._lastApplyAt = now;
+    this._applyControl(action, gotoId);
+  }
+
+  _applyControl(action, gotoId) {
+    const resolved = resolvePhaseGuideControl({
+      action,
+      currentId: action === 'goto' ? gotoId : this._visibleId,
     });
-    this.el.querySelector('.phase-guide-prev')?.addEventListener('click', () => {
-      const prev = adjacentPhaseGuideId(this._visibleId, -1);
-      if (prev) this.reopen(prev);
-    });
+    armPhaseGuideMapGuard();
+    if (resolved.kind === 'show' && resolved.id) this.reopen(resolved.id);
+    else if (resolved.kind === 'dismiss') this.dismissCurrent();
   }
 
   currentId() {
@@ -210,7 +282,9 @@ export class PhaseGuide {
     const pageEl = this.el.querySelector('.phase-guide-page');
     if (pageEl) pageEl.textContent = `${page} / ${PHASE_GUIDE_ORDER.length}`;
     const prev = this.el.querySelector('.phase-guide-prev');
+    const next = this.el.querySelector('.phase-guide-next');
     if (prev) prev.disabled = !adjacentPhaseGuideId(id, -1);
+    if (next) next.disabled = false;
     this.el.querySelectorAll('.phase-guide-chip').forEach((chip) => {
       const on = chip.dataset.guideId === id;
       chip.classList.toggle('is-current', on);

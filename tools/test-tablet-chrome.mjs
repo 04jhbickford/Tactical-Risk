@@ -1373,11 +1373,13 @@ check('Confirm names the pair',
 {
   const hud = { closest: (sel) => (sel === '#hud' ? {} : null) };
   const sheet = { closest: (sel) => (sel === '.phone-menu-sheet' ? {} : null) };
+  const tip = { closest: (sel) => (sel === '#phase-guide' || sel === '.phase-guide-card' ? {} : null) };
   const map = { closest: () => null };
   const zoomBtn = { closest: (sel) => (sel === '#zoom-controls' ? {} : null) };
   check('⋯ / Map / HUD chrome are not setup land peeks',
     isPhoneHudChromeTarget(hud) === true
     && isPhoneHudChromeTarget(sheet) === true
+    && isPhoneHudChromeTarget(tip) === true
     && isPhoneHudChromeTarget(map) === false);
   check('Map +/−/Fit chrome is not a land peek',
     isPhoneMapToolsChromeTarget(zoomBtn) === true

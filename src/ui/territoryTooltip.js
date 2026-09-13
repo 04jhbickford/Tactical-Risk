@@ -3,6 +3,7 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { isMobileShell, readableFactionTextColor, isPhoneCapitalInspectOnlyLand } from './mobileShell.js';
 import { GAME_PHASES } from '../state/gameState.js';
+import { isPhaseGuideChromeTarget } from './phaseGuide.js';
 
 // Phone tooltip sits under #hud (70) so the full-screen menu sheet covers it.
 // Desktop / tablet keep the unscoped z-index: 100.
@@ -150,6 +151,7 @@ export function isPhoneHudChromeTarget(target) {
     || target?.closest?.('.phone-menu-sheet')
     || target?.closest?.('.hud-menu-btn')
     || target?.closest?.('.hud-menu-container')
+    || isPhaseGuideChromeTarget(target)
     || isPhoneHandoffChromeTarget(target)
     || isPhoneMapToolsChromeTarget(target));
 }

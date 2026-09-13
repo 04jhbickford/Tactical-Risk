@@ -39,10 +39,15 @@ const {
   resetPhaseGuides,
   phaseGuidePageIndex,
   adjacentPhaseGuideId,
+  resolvePhaseGuideControl,
+  armPhaseGuideMapGuard,
+  shouldBlockMapForPhaseGuide,
+  isPhaseGuideChromeTarget,
   PHASE_GUIDE_IDS,
   PHASE_GUIDES,
   PHASE_GUIDE_ORDER,
   PHASE_GUIDE_STORAGE_KEY,
+  PHASE_GUIDE_MAP_GUARD_MS,
 } = await import(pathToFileURL(join(root, 'src/ui/phaseGuide.js')));
 const {
   GAME_PHASES,
@@ -134,6 +139,24 @@ check('field-guide pattern is pages + contents, not auto-play',
   && adjacentPhaseGuideId(PHASE_GUIDE_IDS.CAPITAL, -1) === null
   && adjacentPhaseGuideId(PHASE_GUIDE_IDS.CAPITAL, 1) === PHASE_GUIDE_IDS.DEPLOY
   && /Manual — no auto-advance/.test(readFileSync(join(root, 'src/ui/phaseGuide.js'), 'utf8')));
+check('Got it dismisses; Next pages then dismisses last',
+  resolvePhaseGuideControl({ action: 'got-it', currentId: 'capital' }).kind === 'dismiss'
+  && resolvePhaseGuideControl({ action: 'next', currentId: 'capital' }).id === 'deploy'
+  && resolvePhaseGuideControl({ action: 'next', currentId: 'fortify' }).kind === 'dismiss'
+  && resolvePhaseGuideControl({ action: 'prev', currentId: 'deploy' }).id === 'capital');
+{
+  const now = 1_000_000;
+  armPhaseGuideMapGuard(now, PHASE_GUIDE_MAP_GUARD_MS);
+  check('map guard blocks leftover board taps after a tip click',
+    shouldBlockMapForPhaseGuide(now + 1) === true
+    && shouldBlockMapForPhaseGuide(now + PHASE_GUIDE_MAP_GUARD_MS) === false);
+}
+check('phase-guide chrome is a HUD hit, not a land tap',
+  isPhaseGuideChromeTarget({ closest: (sel) => sel === '#phase-guide' ? {} : null }) === true
+  && isPhaseGuideChromeTarget({ closest: () => null }) === false
+  && /isPhaseGuideChromeTarget/.test(readFileSync(join(root, 'src/ui/territoryTooltip.js'), 'utf8'))
+  && /shouldBlockMapForPhaseGuide/.test(mainSrc)
+  && /data-guide-action="next"/.test(readFileSync(join(root, 'src/ui/phaseGuide.js'), 'utf8')));
 check('phase ids map Place Capital / Deploy / Attack / Fortify',
   resolvePhaseGuideId(GAME_PHASES.CAPITAL_PLACEMENT) === PHASE_GUIDE_IDS.CAPITAL
   && resolvePhaseGuideId(GAME_PHASES.UNIT_PLACEMENT) === PHASE_GUIDE_IDS.DEPLOY
@@ -170,10 +193,11 @@ check('home is a 3-mode tile grid (Local / Online / How to Play)',
 check('Rules guest path has contents jump + no-sign-in kicker',
   /rules-contents-select/.test(rulesSrc)
   && /no sign-in/.test(rulesSrc));
-check('phone phase guide sits above the CTA band, tray stays on top',
+check('phone phase guide sits above the leftover sidebar so Got it is hittable',
   /html\.mobile-shell \.phase-guide \{[\s\S]*?bottom:\s*calc\(var\(--mobile-cta/.test(css)
-  && /html\.mobile-shell \.phase-guide \{[\s\S]*?z-index:\s*35/.test(css)
-  && /html\.mobile-shell #sidebar,[\s\S]*?z-index:\s*60/.test(css));
+  && /html\.mobile-shell \.phase-guide \{[\s\S]*?z-index:\s*80/.test(css)
+  && /\.phase-guide \{[\s\S]*?pointer-events:\s*none/.test(css)
+  && /\.phase-guide-card \{[\s\S]*?pointer-events:\s*auto/.test(css));
 
 console.log('=== Kills + METHOD ===');
 check('no @designcodeio/threeui dependency',

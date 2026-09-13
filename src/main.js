@@ -38,7 +38,11 @@ import { TechUI } from './ui/techUI.js';
 import { PlacementUI } from './ui/placementUI.js';
 import { MobilizeUI } from './ui/mobilizeUI.js';
 import { RulesPanel } from './ui/rulesPanel.js';
-import { PhaseGuide } from './ui/phaseGuide.js';
+import {
+  PhaseGuide,
+  shouldBlockMapForPhaseGuide,
+  pointHitsPhaseGuideChrome,
+} from './ui/phaseGuide.js';
 import {
   dismissStartupLoader,
   reportStartupError,
@@ -2128,7 +2132,9 @@ async function init() {
       || isPhoneTrayChromeTarget(e.target)
       || isPhoneCapitalCtaTarget(e.target)
       || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)
-      || pointHitsPhoneHandoffChrome(e.clientX, e.clientY)) return;
+      || pointHitsPhoneHandoffChrome(e.clientX, e.clientY)
+      || pointHitsPhaseGuideChrome(e.clientX, e.clientY)
+      || shouldBlockMapForPhaseGuide()) return;
     phoneSetupGestureStart = { x: e.clientX, y: e.clientY };
     phoneSetupPeekThisGesture = false;
   };
@@ -2158,7 +2164,9 @@ async function init() {
       || isPhoneTrayChromeTarget(e.target)
       || isPhoneCapitalCtaTarget(e.target)
       || pointHitsPhoneMapToolsChrome(e.clientX, e.clientY)
-      || pointHitsPhoneHandoffChrome(e.clientX, e.clientY)) return false;
+      || pointHitsPhoneHandoffChrome(e.clientX, e.clientY)
+      || pointHitsPhaseGuideChrome(e.clientX, e.clientY)
+      || shouldBlockMapForPhaseGuide()) return false;
     // Chip / hint / CTA row are chrome even when the event target is the
     // canvas (iPhone fat-finger / pointer-events gap). Point-in-chrome
     // must win before the map peek can overwrite a named land.
@@ -2260,9 +2268,9 @@ async function init() {
         mobile: isMobileShell(),
         phase: gameState?.phase,
       });
-    if (blockMapAsPanel) {
+    if (blockMapAsPanel || shouldBlockMapForPhaseGuide() || pointHitsPhaseGuideChrome(e.clientX, e.clientY)) {
       e.preventDefault();
-      playerPanel._onPanelPointerDown(e);
+      if (blockMapAsPanel) playerPanel._onPanelPointerDown(e);
       return;
     }
     e.preventDefault();
@@ -2589,8 +2597,8 @@ async function init() {
           mobile: isMobileShell(),
           phase: gameState?.phase,
         });
-      if (blockMapAsPanel) {
-        playerPanel.commitLockedPanelGesture(e);
+      if (blockMapAsPanel || shouldBlockMapForPhaseGuide() || pointHitsPhaseGuideChrome(e.clientX, e.clientY)) {
+        if (blockMapAsPanel) playerPanel.commitLockedPanelGesture(e);
         camera.dirty = true;
         return;
       }
