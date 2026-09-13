@@ -60,6 +60,7 @@ export class Lobby {
     this.setup = setup;
     this.onStart = onStart;
     this.onPlayOnline = onPlayOnline;
+    this.onRulesToggle = null;
     this.mode = 'main'; // 'main', 'local-setup', 'my-games'
     this.selectedPlayers = [];
     this.playerNames = {};
@@ -73,6 +74,10 @@ export class Lobby {
     this._ignoreCardTogglePlayer = null;
     this._docClickBound = false;
     this._create();
+  }
+
+  setOnRulesToggle(callback) {
+    this.onRulesToggle = callback;
   }
 
   _create() {
@@ -158,6 +163,10 @@ export class Lobby {
             <span class="saved-count">${savedGames.length}</span>
           </button>
         ` : ''}
+        <button class="lobby-phone-saved lobby-phone-howto" data-action="how-to-play">
+          <span>How to Play</span>
+          <span class="lobby-phone-howto-meta">Rules · no sign-in</span>
+        </button>
       </div>
     `;
   }
@@ -317,6 +326,16 @@ export class Lobby {
             <span class="saved-count">${savedGames.length}</span>
           </button>
         ` : ''}
+
+        <button class="lobby-menu-card lobby-menu-card-rules" data-action="how-to-play">
+          <div class="menu-card-icon">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
+          </div>
+          <div class="menu-card-content">
+            <h3>How to Play</h3>
+            <p>Rules and phase tips — no sign-in required</p>
+          </div>
+        </button>
       </div>
     `;
   }
@@ -545,6 +564,10 @@ export class Lobby {
         this.hide();
         this.onPlayOnline();
       }
+    });
+
+    this.el.querySelector('[data-action="how-to-play"]')?.addEventListener('click', () => {
+      if (this.onRulesToggle) this.onRulesToggle();
     });
 
     this.el.querySelector('[data-action="my-games"]')?.addEventListener('click', () => {

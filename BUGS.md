@@ -2,6 +2,19 @@
 
 ---
 
+## 9.13.26 — V2.81.43 Settlecoast UX polish (2D, SCHEMA 11, DRAFT)
+
+Paint-first branded `#startup-loader`, phone Confirm chrome (held / unavailable / queued), 44pt + safe-area on primary CTAs, dismissible Place Capital / Deploy / Attack / Fortify tips, How to Play on Local home without sign-in. METHOD in `doc/METHOD-SETTLECOAST.md`. No Three.js, no `@designcodeio/threeui`, no voice. Confirm grammar SILO held. Draft only — not production.
+
+### Smoke (this PR)
+
+- [ ] Cold load never whitescreens; TR loader then home.
+- [ ] 390 + 500: Confirm / Max / Resign clear the home indicator; Max still needs Confirm.
+- [ ] Rotate mid-turn: phase and queues stay.
+- [ ] How to Play from home without signing in; Phase tips reopen from ⋯.
+
+---
+
 ## 9.5.26 — V2.81.42 polish + multiplayer robustness (DRAFT)
 
 James / FREE TOKEN DAY: live host handoff after Resign, all-resign delete retry, My Games hygiene, presence/sync resume, systemic peek flush, thumb CTA safe-area, push_exhausted rematch polish. SCHEMA 11. GAME_VERSION V2.81.42. Draft only — not production.

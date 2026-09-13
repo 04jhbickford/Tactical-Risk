@@ -1,0 +1,62 @@
+# METHOD — Settlecoast UX steals for SCHEMA 11 (2D only)
+
+Tactical Risk display version **V2.81.43**. `SCHEMA_VERSION` stays **11** (no state-shape change).
+This document is the in-repo METHOD for the V2.81.43 polish pass. Theme, copy, and
+mechanics stay Tactical Risk. Settlecoast is a UX pattern source only.
+
+## 1. Production smoke checklist
+
+Run on a cold load (hard refresh) against the PR preview or a local static server.
+Do **not** treat a single screenshot as a pass.
+
+1. **Cold load branded** — First paint is the Tactical Risk `#startup-loader`
+   (navy briefing chrome, gold accents). Never a blank white / Vercel shell.
+   Title + tagline + staged progress + status line are visible before `src/main.js`
+   finishes. No Catan / Settlecoast / Sunmere copy or teal-island palette.
+2. **First input** — Home / Local setup accepts a click or tap without a white
+   flash after the loader dismisses.
+3. **One core Confirm action** — Place Capital or Deploy: land → (unit) → named
+   Confirm. Max fills a count only; Confirm still commits.
+4. **390 + 500 viewports** — Phone shell at ~390 CSS-px and ~500 CSS-px. Primary
+   Resign / Confirm / Max / phase CTAs stay ≥44pt, do not overlap, and clear
+   `safe-area-inset-*` (home indicator / notch). Cancel / Undo / Reset stay reachable.
+5. **Console clean** — No uncaught errors on cold start, home, or the Confirm path.
+6. **Orientation no state reset** — Rotate portrait ↔ landscape mid-setup or mid-turn.
+   `GameState` must not re-init; capitals, queues, and the current phase stay.
+7. **Reduced motion** — `prefers-reduced-motion: reduce` or `data-motion="reduced"`
+   on the loader: no looping shimmer; hide/show is instant. Confirm still usable.
+
+## 2. Playtest fixture matrix
+
+Preferred debug fixtures: Local Play, 2 factions, Place Capital → Initial Deploy,
+then skip to Combat Movement (Attack) and Non-Combat Movement (Fortify).
+Do not un-split China / polygon merges.
+
+| Journey | Desktop | Touch portrait 390 | Touch portrait 500 | Landscape phone | Reduced motion |
+| --- | --- | --- | --- | --- | --- |
+| Cold load → home | branded loader → Local / How to Play | same | same | same | no shimmer, instant dismiss |
+| How to Play (guest) | Rules open, no sign-in | same | same | same | Rules readable |
+| Place Capital | peek land → Confirm | same + 44pt Confirm | same | state kept on rotate | Confirm chrome visible |
+| Initial Deploy | land → unit → Confirm; Max still needs Confirm | same | same | state kept | queued / held / unavailable |
+| Attack | stack → enemy → Confirm Attack | same | same | state kept | phase tip once |
+| Fortify | stack → own land → Confirm | same | same | state kept | phase tip once |
+| Re-open tips | Menu → Phase tips | ⋯ → Phase tips | ⋯ → Phase tips | same | card, no motion |
+
+Phase-tip storage key: `tacticalRisk_phaseGuides`. First session shows each of
+Place Capital / Initial Deploy / Attack / Fortify once. Menu re-opens the current
+(or Place Capital) tip.
+
+## 3. Explicit kills
+
+Do **not** ship any of the following in this SCHEMA 11 2D pass:
+
+- **Catan / Settlecoast / Sunmere theme or mechanics** — no island palette, no
+  settler copy, no resource/hex rules. TR WWII grand-strategy language only.
+- **Three.js board** — keep the existing 2D canvas map. Do not add a WebGL scene.
+- **`@designcodeio/threeui` vendor** — do not install the package. Menu rail /
+  seating may copy the *pattern* (static large hits on touch; hover-magnify only
+  when `(hover: hover) and (pointer: fine)`).
+- **Voice blocker** — lobby create/join + chat + voice stay PARKED. Do not build
+  voice. Do not expand lobby chat unless a leftover is already trivial.
+
+Confirm grammar SILO is held. Tesla corporate branding stays off this product surface.

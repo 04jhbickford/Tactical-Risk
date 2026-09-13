@@ -42,6 +42,11 @@ import {
   placementBudgetCopy,
   queueAfterDeployAttempt,
 } from '../state/placeQueue.js';
+import {
+  resolveConfirmChrome,
+  isQueuedConfirmAction,
+  confirmChromeClass,
+} from './confirmChrome.js';
 import { resolvePresenceState } from '../multiplayer/presencePolicy.js';
 import { resolveHostReconnectCopy } from '../multiplayer/lastMatch.js';
 import {
@@ -591,6 +596,7 @@ export class PlayerPanel {
     this._phoneCapitalLandName = null;
     this._phoneDeployLandName = null;
     this._looksBrokenReason = null;
+    this._heldChromeEl = null;
     this._phoneDeployCommittedAt = 0;
     this._phonePairFrozenAt = 0;
     this._phonePairMaxAt = 0;
@@ -599,6 +605,8 @@ export class PlayerPanel {
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
     });
+    this.contentEl.addEventListener('pointerup', () => this._clearHeldChrome());
+    this.contentEl.addEventListener('pointerleave', () => this._clearHeldChrome());
     this.contentEl.addEventListener('click', (e) => this._onPanelClick(e));
     this.contentEl.addEventListener('change', (e) => this._onPanelChange(e));
   }
@@ -642,6 +650,7 @@ export class PlayerPanel {
       this._queueGestureApplied = false;
     }
     this._panelPointerAt = Date.now();
+    this._markHeldChrome(e.target);
     this._pointerLock = this._readPointerLock(e);
     const unit = e.target?.closest?.('[data-unit]')?.dataset?.unit
       || this._pointerLock?.dataset?.unit
@@ -716,6 +725,38 @@ export class PlayerPanel {
       panelRect: this.el.getBoundingClientRect?.(),
       chromeRects,
     });
+  }
+
+  _markHeldChrome(target) {
+    this._clearHeldChrome();
+    const btn = target?.closest?.('.pp-confirm-btn, .pp-peek-max, .pp-action-btn.primary, .pp-qty-btn.max-btn');
+    if (!btn || btn.disabled || btn.classList.contains('disabled')) return;
+    btn.classList.add('is-held');
+    const queued = isQueuedConfirmAction(btn.dataset.action);
+    const chrome = resolveConfirmChrome({
+      held: true,
+      queued,
+      selectUnits: btn.classList.contains('pp-select-units'),
+    });
+    btn.dataset.chrome = chrome;
+    btn.classList.remove('pp-chrome-ready', 'pp-chrome-queued', 'pp-chrome-unavailable');
+    btn.classList.add(confirmChromeClass(chrome));
+    this._heldChromeEl = btn;
+  }
+
+  _clearHeldChrome() {
+    const btn = this._heldChromeEl;
+    this._heldChromeEl = null;
+    if (!btn) return;
+    btn.classList.remove('is-held');
+    const chrome = resolveConfirmChrome({
+      disabled: !!btn.disabled || btn.classList.contains('disabled'),
+      queued: isQueuedConfirmAction(btn.dataset.action),
+      selectUnits: btn.classList.contains('pp-select-units'),
+    });
+    btn.dataset.chrome = chrome;
+    btn.classList.remove('pp-chrome-held', 'pp-chrome-ready', 'pp-chrome-queued', 'pp-chrome-unavailable');
+    btn.classList.add(confirmChromeClass(chrome));
   }
 
   shouldBlockMapSelect(now = Date.now(), point = null) {
@@ -1861,7 +1902,7 @@ export class PlayerPanel {
         remainingOfType: this._phoneIconRemaining(this.selectedUnitType, player, phase, turnPhase),
       })) {
         html += `
-        <button type="button" class="pp-peek-max" data-action="phone-pair-max" data-unit="${this.selectedUnitType}">
+        <button type="button" class="pp-peek-max" data-action="phone-pair-max" data-unit="${this.selectedUnitType}" data-chrome="ready">
           Max
         </button>`;
       }
@@ -1873,10 +1914,15 @@ export class PlayerPanel {
       const undoableClass = btn.undoable ? 'undoable' : '';
       const selectUnitsClass = btn.selectUnits ? 'pp-select-units' : '';
       const dataAttrs = btn.territory ? `data-territory="${btn.territory}"` : '';
+      const chrome = resolveConfirmChrome({
+        disabled: !!btn.disabled,
+        queued: !btn.disabled && isQueuedConfirmAction(btn.action),
+        selectUnits: !!btn.selectUnits,
+      });
 
       html += `
-        <button class="pp-confirm-btn ${disabledClass} ${attackClass} ${undoableClass} ${selectUnitsClass}"
-                data-action="${btn.action}" ${dataAttrs} ${btn.disabled ? 'disabled' : ''}>
+        <button class="pp-confirm-btn ${disabledClass} ${attackClass} ${undoableClass} ${selectUnitsClass} ${confirmChromeClass(chrome)}"
+                data-action="${btn.action}" data-chrome="${chrome}" ${dataAttrs} ${btn.disabled ? 'disabled' : ''}>
           ${btn.label}
         </button>`;
     }

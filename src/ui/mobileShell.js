@@ -162,9 +162,16 @@ export function phoneMenuHomeActions() {
     { action: 'menu-tab', tab: 'stats', label: 'Players', meta: '›' },
     { action: 'menu-tab', tab: 'territory', label: 'Territory', meta: '›' },
     { action: 'menu-tab', tab: 'log', label: 'Log', meta: '›' },
+    { action: 'phase-tips', label: 'Phase tips', meta: '›' },
     { action: 'rules', label: 'Game Rules', meta: '›' },
     { action: 'exit-lobby', label: 'Save & Exit', meta: '›' },
   ];
+}
+
+// Resize / orientationchange only re-applies chrome (mobile-shell class +
+// camera fit). Never construct or reset GameState from that path.
+export function shouldResetGameOnOrientationChange() {
+  return false;
 }
 
 export function isPhoneMenuResignFirst(actions = phoneMenuHomeActions()) {
@@ -1153,6 +1160,7 @@ export function initMobileShell() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
   const apply = () => {
+    // Chrome only. Orientation must not reset game state (SCHEMA 11).
     const active = applyMobileShellClass(window.innerWidth, document.documentElement, window.innerHeight);
     notify(active);
   };

@@ -10,6 +10,7 @@ export class HUD {
     this.gameState = null;
     this.onNextPhase = null;
     this.onRulesToggle = null;
+    this.onPhaseTips = null;
     this.onExitToLobby = null;
     this.onResign = null;
     this.menuOpen = false;
@@ -67,6 +68,10 @@ export class HUD {
     this.onRulesToggle = callback;
   }
 
+  setOnPhaseTips(callback) {
+    this.onPhaseTips = callback;
+  }
+
   setOnExitToLobby(callback) {
     this.onExitToLobby = callback;
   }
@@ -115,6 +120,10 @@ export class HUD {
           <span class="hud-menu-icon">☰</span>
         </button>
         <div class="hud-menu-dropdown ${this.menuOpen ? 'open' : ''}">
+          <button class="hud-menu-item" data-action="phase-tips">
+            <span class="hud-menu-item-icon">ⓘ</span>
+            <span>Phase tips</span>
+          </button>
           <button class="hud-menu-item" data-action="rules">
             <span class="hud-menu-item-icon">📖</span>
             <span>Game Rules</span>
@@ -441,6 +450,13 @@ export class HUD {
         this.menuTab = btn.dataset.tab;
         this._render();
       });
+    });
+
+    const phaseTipsItem = this.el.querySelector('[data-action="phase-tips"]');
+    phaseTipsItem?.addEventListener('click', () => {
+      this.menuOpen = false;
+      this._updateMenuState();
+      if (this.onPhaseTips) this.onPhaseTips();
     });
 
     // Rules menu item (desktop dropdown or phone sheet row)

@@ -38,6 +38,12 @@ import { TechUI } from './ui/techUI.js';
 import { PlacementUI } from './ui/placementUI.js';
 import { MobilizeUI } from './ui/mobilizeUI.js';
 import { RulesPanel } from './ui/rulesPanel.js';
+import { PhaseGuide } from './ui/phaseGuide.js';
+import {
+  dismissStartupLoader,
+  reportStartupError,
+  reportStartupStatus,
+} from './ui/startupLoader.js';
 import { HUD } from './ui/hud.js';
 import { Minimap } from './ui/minimap.js';
 import { Lobby } from './ui/lobby.js';
@@ -384,6 +390,8 @@ async function init() {
 
   // Rules Panel
   const rulesPanel = new RulesPanel();
+  const phaseGuide = new PhaseGuide();
+  reportStartupStatus('Loading map data…', 48);
 
   // Bug Tracker
   const bugTracker = new BugTracker();
@@ -1587,6 +1595,12 @@ async function init() {
     hud.setOnRulesToggle(() => {
       rulesPanel.toggle();
     });
+    hud.setOnPhaseTips(() => {
+      phaseGuide.reopen();
+    });
+    phaseGuide.setGameState(gameState);
+    reportStartupStatus('Board ready…', 92);
+    dismissStartupLoader();
 
     const leaveToLobby = () => {
       document.title = 'Tactical Risk';
@@ -2035,6 +2049,9 @@ async function init() {
       requestAnimationFrame(fitPhoneCamera);
     }
   }, handlePlayOnline);
+  lobby.setOnRulesToggle(() => {
+    rulesPanel.show();
+  });
 
   onMobileShellChange(() => {
     if (lobby && !lobby.el?.classList.contains('hidden')) lobby._render();
@@ -2044,6 +2061,10 @@ async function init() {
   const lastAtBoot = readLastMatch();
   if (lastAtBoot?.gameId || lastAtBoot?.lobbyCode) {
     lobby.hide();
+    reportStartupStatus('Rejoining match…', 70);
+  } else {
+    reportStartupStatus('Home ready', 100);
+    dismissStartupLoader();
   }
 
   // Load map tiles
@@ -3052,6 +3073,17 @@ async function init() {
   }
 
   requestAnimationFrame(render);
+
+  if (!lastAtBoot?.gameId && !lastAtBoot?.lobbyCode) {
+    reportStartupStatus('Home ready', 100);
+    dismissStartupLoader();
+  } else if (!resumedLastMatch) {
+    reportStartupStatus('Ready', 100);
+    dismissStartupLoader();
+  }
 }
 
-init().catch(err => console.error('Failed to initialize:', err));
+init().catch((err) => {
+  console.error('Failed to initialize:', err);
+  reportStartupError('Could not start Tactical Risk. Local saves and in-progress games stay on this device.');
+});
