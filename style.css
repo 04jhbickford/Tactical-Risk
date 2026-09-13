@@ -18716,18 +18716,32 @@ iframe[title="Vercel Live Feedback"] {
     white-space: nowrap;
   }
 
+  /* Phone combat is a full sheet (head + scroll + sticky CTA), not a 42dvh
+     packed modal. 42dvh on a 390-tall landscape iPhone is ~164px — hero +
+     force rows + Roll/Auto/Retreat cannot fit, so Confirm/dice chop. */
   html.mobile-shell .combat-popup,
   html.mobile-shell .combat-popup.combat-popup--phone {
-    top: auto;
+    top: var(--mobile-top-bar, 48px);
     left: 0;
     right: 0;
     bottom: 0;
     transform: none;
     width: 100%;
     max-width: none;
-    max-height: 42dvh;
+    max-height: none;
+    height: auto;
     border-radius: 14px 14px 0 0;
-    overflow-y: auto;
+    overflow: hidden;
+  }
+
+  html.mobile-shell .combat-popup:not(.hidden),
+  html.mobile-shell .combat-popup.combat-popup--phone:not(.hidden) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  html.mobile-shell .combat-popup.hidden {
+    display: none;
   }
 
   html.mobile-shell .combat-popup--phone .combat-forces-expanded,
@@ -18737,6 +18751,120 @@ iframe[title="Vercel Live Feedback"] {
   html.mobile-shell .combat-popup--phone .left-modal-minimize-btn,
   html.mobile-shell .combat-popup--phone .combat-header {
     display: none;
+  }
+
+  html.mobile-shell .phone-combat-sheet {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  html.mobile-shell .phone-combat-head {
+    flex: 0 0 auto;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  html.mobile-shell .phone-combat-head-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  html.mobile-shell .phone-combat-kicker {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  html.mobile-shell .phone-combat-page {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+  }
+
+  html.mobile-shell .phone-combat-land {
+    margin: 4px 0 8px;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #f8fafc;
+  }
+
+  html.mobile-shell .phone-combat-steps {
+    display: flex;
+    gap: 6px;
+  }
+
+  html.mobile-shell .phone-combat-chip {
+    flex: 1 1 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.06);
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  html.mobile-shell .phone-combat-chip.is-current {
+    border-color: rgba(253, 230, 138, 0.7);
+    background: rgba(253, 230, 138, 0.14);
+    color: #fde68a;
+  }
+
+  html.mobile-shell .phone-combat-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 14px 12px;
+  }
+
+  html.mobile-shell .phone-combat-blurb {
+    margin: 0 0 10px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #cbd5e1;
+  }
+
+  html.mobile-shell .phone-combat-cta {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(25, 25, 50, 0.98);
+  }
+
+  html.mobile-shell .phone-combat-cta-secondary {
+    display: flex;
+    gap: 8px;
+  }
+
+  html.mobile-shell .phone-combat-cta-secondary .combat-btn {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+
+  html.mobile-shell .phone-combat-cta-hint {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fde68a;
+    text-align: center;
   }
 
   html.mobile-shell .phone-combat-summary {
@@ -18841,6 +18969,16 @@ iframe[title="Vercel Live Feedback"] {
     line-height: 1.35;
   }
 
+  html.mobile-shell .phone-combat-body .casualty-selection-split {
+    flex-direction: column;
+  }
+
+  html.mobile-shell .phone-combat-body .retreat-dest-btn,
+  html.mobile-shell .phone-combat-body .combat-btn.submerge {
+    min-height: 44px;
+    width: 100%;
+  }
+
   html.mobile-shell .combat-popup--phone .combat-actions {
     position: sticky;
     bottom: 0;
@@ -18850,9 +18988,55 @@ iframe[title="Vercel Live Feedback"] {
 
   html.mobile-shell .combat-popup--phone .combat-btn.confirm,
   html.mobile-shell .combat-popup--phone .combat-btn.roll,
-  html.mobile-shell .combat-popup--phone .combat-btn.next {
+  html.mobile-shell .combat-popup--phone .combat-btn.next,
+  html.mobile-shell .phone-combat-cta .combat-btn.confirm,
+  html.mobile-shell .phone-combat-cta .combat-btn.roll,
+  html.mobile-shell .phone-combat-cta .combat-btn.next {
     min-height: 48px;
     width: 100%;
+  }
+
+  html.mobile-shell .phone-combat-compact .phone-combat-hero,
+  html.mobile-shell .phone-combat-hero--compact {
+    padding: 2px 8px 4px;
+    gap: 0;
+  }
+
+  html.mobile-shell .phone-combat-compact .phone-combat-hero-pct,
+  html.mobile-shell .phone-combat-hero--compact .phone-combat-hero-pct {
+    font-size: 28px;
+  }
+
+  html.mobile-shell .phone-combat-compact .phone-combat-land {
+    margin: 2px 0 6px;
+    font-size: 15px;
+  }
+
+  html.mobile-shell .phone-combat-compact .phone-combat-next {
+    display: none;
+  }
+
+  @media (max-height: 500px) {
+    html.mobile-shell .phone-combat-hero-pct {
+      font-size: 28px;
+    }
+
+    html.mobile-shell .phone-combat-hero {
+      padding: 2px 8px 4px;
+    }
+
+    html.mobile-shell .phone-combat-land {
+      margin: 2px 0 6px;
+      font-size: 15px;
+    }
+
+    html.mobile-shell .phone-combat-next {
+      display: none;
+    }
+
+    html.mobile-shell .phone-combat-row {
+      min-height: 40px;
+    }
   }
 
   html.mobile-shell .phone-peek-tech-count {

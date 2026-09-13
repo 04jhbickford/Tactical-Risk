@@ -20,6 +20,9 @@ Do **not** treat a single screenshot as a pass.
 4. **390 + 500 viewports** — Phone shell at ~390 CSS-px and ~500 CSS-px. Primary
    Resign / Confirm / Max / phase CTAs stay ≥44pt, do not overlap, and clear
    `safe-area-inset-*` (home indicator / notch). Cancel / Undo / Reset stay reachable.
+   Combat / attack is a full sheet with Odds → Select → Resolve chips and a
+   sticky safe-area CTA — not a packed modal that clips Roll / Confirm on
+   ~390-tall landscape.
 5. **Console clean** — No uncaught errors on cold start, home, or the Confirm path.
 6. **Orientation no state reset** — Rotate portrait ↔ landscape mid-setup or mid-turn.
    `GameState` must not re-init; capitals, queues, and the current phase stay.
@@ -109,6 +112,14 @@ except when a sheet owns its own buttons (combat / purchase / tech).
 are the **Combat** phase. One-job: tap stack → tap highlighted land → Confirm.
 Fortify is Non-Combat Move on your lands. Place / Deploy keep land → unit →
 Confirm (SILO).
+
+**Phone combat sheet.** Attack/combat is not one packed `42dvh` modal. On
+`html.mobile-shell` the popup is a full sheet from `--mobile-top-bar` to the
+home indicator: step chips (Odds → Select → Resolve), a scrolling body, and a
+sticky CTA band (`padding-bottom: safe-area-inset-bottom`). Roll / Confirm /
+Continue / Next stay painted in that band on ~390-tall landscape. Battle-odds
+hero stays 40px on tall phones and compact (28px) at `max-height: 500px`.
+Confirm grammar and SCHEMA 11 are unchanged. Pattern only — no parchment.
 
 Phase-guide card sits at z-index **75**, above the peek tray (60) but inset
 above `--mobile-cta` so thumb Confirm is never covered. When the guide is

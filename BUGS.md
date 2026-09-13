@@ -8,7 +8,8 @@ James he-corrects after rejoin PR 34. Shipped with V2.81.44 in the same window.
 SCHEMA 11. Tips stay; they stop auto-showing after PLAYING `round > 1`. Never
 show this again persists on `tacticalRisk_phaseGuides`. One phone bottom surface
 when a guide/sheet/menu is open. Combat Move naming honesty; land→unit→Confirm
-SILO held for Place/Deploy. Tesla branding off. No lobby/voice.
+SILO held for Place/Deploy. Phone combat is a full sheet (odds / select /
+resolve + sticky safe-area CTA), not a 42dvh clip. Tesla branding off. No lobby/voice.
 
 ### Smoke (this PR)
 
@@ -18,6 +19,7 @@ SILO held for Place/Deploy. Tesla branding off. No lobby/voice.
 - [ ] Menu → Phase tips still works after Got it (unless Never).
 - [ ] 390 + 500: guide/sheet/menu never stacks on peek chips; Confirm/Resign/Max stay ≥44pt above the home indicator.
 - [ ] Combat Move HUD/tip says Combat Move (not Attack); stack → highlighted land → Confirm.
+- [ ] 390 portrait + ~844×390 landscape: combat sheet shows Odds / Select / Resolve; Roll / Confirm / Continue / Retreat stay fully on screen above the home indicator.
 
 ---
 

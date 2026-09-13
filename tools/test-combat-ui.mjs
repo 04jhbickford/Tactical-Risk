@@ -63,6 +63,10 @@ const {
   shouldUsePhoneCombatSummary,
   phoneCombatAttackerWinPercent,
   formatPhoneCombatHeroOdds,
+  resolvePhoneCombatStep,
+  phoneCombatStepIndex,
+  shouldCompactPhoneCombatHero,
+  PHONE_COMBAT_STEPS,
 } = await import(pathToFileURL(join(root, 'src/ui/combatUI.js')));
 
 const unitDefs = {
@@ -341,6 +345,79 @@ console.log('=== V2.81.36 phone combat summary ===');
     && formatPhoneCombatHeroOdds({
       phase: 'resolved', winner: 'attacker', territoryName: 'Karelia S.S.R.',
     }).text === '100%');
+  document.documentElement.classList.remove('mobile-shell');
+}
+
+console.log('=== V2.81.45 phone combat sheet (odds / select / resolve) ===');
+{
+  check('phone steps are odds → select → resolve',
+    PHONE_COMBAT_STEPS.join(',') === 'odds,select,resolve'
+    && resolvePhoneCombatStep('ready') === 'odds'
+    && resolvePhoneCombatStep('aaFire') === 'odds'
+    && resolvePhoneCombatStep('selectCasualties') === 'select'
+    && resolvePhoneCombatStep('airLanding') === 'select'
+    && resolvePhoneCombatStep('rolling') === 'resolve'
+    && resolvePhoneCombatStep(AA_RESULT_PHASE) === 'resolve'
+    && resolvePhoneCombatStep('resolved') === 'resolve'
+    && phoneCombatStepIndex('odds') === 1
+    && phoneCombatStepIndex('resolve') === 3);
+  check('short viewports compact the 40px hero',
+    shouldCompactPhoneCombatHero({ viewportHeight: 390 }) === true
+    && shouldCompactPhoneCombatHero({ viewportHeight: 844 }) === false
+    && shouldCompactPhoneCombatHero({ viewportHeight: 0 }) === false);
+  const game = makeGame({
+    attackers: [{ type: 'infantry', owner: 'p1', quantity: 4 }, { type: 'armour', owner: 'p1', quantity: 2 }],
+    defenders: [{ type: 'infantry', owner: 'p2', quantity: 3 }],
+  });
+  document.documentElement.classList.add('mobile-shell');
+  const prevHeight = globalThis.window?.innerHeight;
+  globalThis.window = { ...(globalThis.window || {}), innerHeight: 390 };
+  const ui = makeUI(game);
+  ui.showNextCombat();
+  const readyHtml = ui.el.innerHTML;
+  const ctaAt = readyHtml.indexOf('phone-combat-cta');
+  const bodyAt = readyHtml.indexOf('phone-combat-body');
+  const rollAt = readyHtml.indexOf('data-action="roll"');
+  check('ready paints sheet chips + sticky Roll (not a packed dump)',
+    /phone-combat-sheet/.test(readyHtml)
+    && /data-combat-step="odds"/.test(readyHtml)
+    && /data-combat-step="select"/.test(readyHtml)
+    && /data-combat-step="resolve"/.test(readyHtml)
+    && /phone-combat-chip is-current/.test(readyHtml)
+    && bodyAt >= 0 && ctaAt > bodyAt
+    && rollAt > ctaAt
+    && /Roll Dice/.test(readyHtml)
+    && /Auto Battle/.test(readyHtml)
+    && /Retreat/.test(readyHtml)
+    && ui.el.classList.contains('phone-combat-compact'));
+  ui.combatState.phase = 'selectCasualties';
+  ui.combatState.pendingAttackerCasualties = 1;
+  ui.combatState.pendingDefenderCasualties = 1;
+  ui.combatState.selectedAttackerCasualties = {};
+  ui.combatState.selectedDefenderCasualties = {};
+  ui._render();
+  const selectHtml = ui.el.innerHTML;
+  const confirmAt = selectHtml.indexOf('data-action="confirm-casualties"');
+  const selectCta = selectHtml.indexOf('phone-combat-cta');
+  check('select step puts Confirm Casualties in the sticky CTA',
+    /Assign hits, then Confirm/.test(selectHtml)
+    && /casualty-selection-split/.test(selectHtml)
+    && confirmAt > selectCta
+    && /Confirm Casualties/.test(selectHtml));
+  ui.combatState.phase = 'resolved';
+  ui.combatState.winner = 'attacker';
+  ui.combatState.totalAttackerLosses = {};
+  ui.combatState.totalDefenderLosses = {};
+  ui.combatState.initialAttackers = ui.combatState.attackers;
+  ui.combatState.initialDefenders = ui.combatState.defenders;
+  ui._render();
+  const resolveHtml = ui.el.innerHTML;
+  check('resolve step keeps End Combat Phase in the sticky CTA',
+    /data-combat-step="resolve"/.test(resolveHtml)
+    && resolveHtml.indexOf('data-action="next"') > resolveHtml.indexOf('phone-combat-cta')
+    && /End Combat Phase/.test(resolveHtml));
+  if (prevHeight === undefined) delete globalThis.window.innerHeight;
+  else globalThis.window.innerHeight = prevHeight;
   document.documentElement.classList.remove('mobile-shell');
 }
 

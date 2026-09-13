@@ -2112,6 +2112,21 @@ console.log('=== V2.81.40 phone battle odds hero ===');
     && /combat-popup--phone \.combat-header \{/.test(phoneBlock));
 }
 
+console.log('=== V2.81.45 phone combat sheet (no 42dvh clip) ===');
+{
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  const { phoneBlock } = phoneCssParts(css);
+  const combatRule = phoneBlock.match(/html\.mobile-shell \.combat-popup\.combat-popup--phone \{[^}]+\}/);
+  check('phone combat sheet is full-height flex, not a 42dvh clip',
+    !!combatRule
+    && !/max-height:\s*42dvh/.test(combatRule[0])
+    && /overflow:\s*hidden/.test(combatRule[0])
+    && /phone-combat-sheet/.test(phoneBlock)
+    && /phone-combat-cta/.test(phoneBlock)
+    && /safe-area-inset-bottom/.test(phoneBlock)
+    && /max-height:\s*500px/.test(phoneBlock));
+}
+
 console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===');
 {
   const rendererSrc = readFileSync(join(root, 'src/map/territoryRenderer.js'), 'utf8');
