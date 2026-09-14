@@ -2,6 +2,33 @@
 
 ---
 
+## 9.14.26 — V2.81.46 My Games Leave was a dead control (SCHEMA 11)
+
+James / Robert: My Active Games rows showed RESUME + red-outline Leave. Leave
+did nothing — no confirm, no remove, no error.
+
+Cause: B23 gated the Leave handler on `shouldOpenLeaveConfirm({ eventTarget:
+e.target })`. Tapping the word “Leave” can target a Text node with no
+`.closest`, so the handler returned silently after stopPropagation. A second
+trap: `mergeMyActiveGames` re-listed a game via `startedBy` after the seater
+was removed from `playerUserIds`, so a successful leave could still keep the
+row.
+
+Fix: resolve Text nodes to their parent; treat `[data-role="leave-game"]` /
+`[data-leave-game]` / `[data-leave-lobby]` as Leave; one delegated click on
+the My Games overlay calls `leaveGame` / `leaveListedLobby` (same resign /
+lobby-leave path as in-game). Confirm, then refresh the list. Starter-only
+rows drop after Leave. SCHEMA 11. GAME_VERSION V2.81.46.
+
+### Smoke (this PR)
+
+- [ ] My Games Leave opens “Leave this game?” then the row disappears (or an error).
+- [ ] RESUME still opens the match.
+- [ ] Waiting-to-start rows also Leave (removed from lobby, not a wipe of all games).
+- [ ] In-game Resign / host handoff / all-resign delete unchanged.
+
+---
+
 ## 9.13.26 — V2.81.45 tutorial lifecycle + HUD stack + Combat Move (SCHEMA 11)
 
 James he-corrects after rejoin PR 34. Shipped with V2.81.44 in the same window.

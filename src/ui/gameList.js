@@ -15,6 +15,7 @@ import { getAuthManager } from '../multiplayer/auth.js';
 import { getLobbyManager } from '../multiplayer/lobbyManager.js';
 import { leaveGame, isAllResignDeleteFailure, retryDeleteFinishedGame } from '../multiplayer/surrender.js';
 import {
+  closestLeaveControl,
   mergeMyActiveGames,
   shouldAbortMyGamesOnTokenHiccup,
   shouldJoinGameFromRowClick,
@@ -74,6 +75,13 @@ export class GameList {
     this.el = document.createElement('div');
     this.el.id = 'game-list';
     this.el.className = 'lobby-overlay modern';
+    // One delegated handler for every Leave/Abandon control on My Games.
+    // Re-renders replace innerHTML; this listener stays on the overlay.
+    this.el.addEventListener('click', (e) => {
+      const control = closestLeaveControl(e.target);
+      if (!control || !this.el.contains(control)) return;
+      this._onLeaveControlClick(e, control);
+    });
     document.body.appendChild(this.el);
   }
 
@@ -123,7 +131,7 @@ export class GameList {
         return { id: d.id, ...data };
       });
       const byStarter = starterSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      this.games = mergeMyActiveGames({ bySeat, byStarter });
+      this.games = mergeMyActiveGames({ bySeat, byStarter, userId });
       let lastGame = null;
       let lastMatchMissing = false;
       if (remembered?.gameId && !this.games.some(g => g.id === remembered.gameId)) {
@@ -220,13 +228,16 @@ export class GameList {
         <div class="mp-games-list">
           ${this.waitingLobbies.map(lobby => `
             <div class="mp-game-row own-lobby">
-              <button class="mp-game-item" data-lobby-code="${lobby.code}">
+              <button type="button" class="mp-game-item" data-lobby-code="${lobby.code}" data-role="join-game">
                 <div class="mp-game-info">
                   <span class="mp-game-name">${lobby.name}</span>
                   <span class="mp-game-details">${lobby.players.length}/${lobby.settings?.maxPlayers || '?'} players · Code ${lobby.code}</span>
                 </div>
                 <div class="mp-game-status"><span class="mp-waiting">In lobby</span></div>
               </button>
+              <div class="mp-game-row-actions">
+                <button type="button" class="mp-leave-game" data-leave-lobby="${lobby.id}" data-role="leave-game" title="Leave this lobby">Leave</button>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -398,7 +409,7 @@ export class GameList {
     // Game items - click to join
     this.el.querySelectorAll('.mp-game-item[data-game-id]').forEach(item => {
       item.addEventListener('click', async (e) => {
-        if (e.target.closest('[data-leave-game]')) return;
+        if (closestLeaveControl(e.target) || closestLeaveControl(e.currentTarget)) return;
         if (shouldOpenLeaveConfirm({ clickOnLeaveControl: false, eventTarget: e.target })) return;
         if (!shouldJoinGameFromRowClick({ eventTarget: e.target })) return;
         const gameId = item.dataset.gameId;
@@ -422,46 +433,6 @@ export class GameList {
       });
     });
 
-    // Leave game (surrender) buttons
-    this.el.querySelectorAll('[data-leave-game]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: e.target })) return;
-        const gameId = btn.dataset.leaveGame;
-        const game = this.games.find(g => g.id === gameId);
-        const isStarted = game?.stateVersion > 0;
-
-        const message = isStarted
-          ? 'Leave this game? You will surrender: your territories become neutral, your units are removed, and the game continues without you. This cannot be undone.'
-          : 'Leave this game? It has not started yet — you will simply be removed from it.';
-        if (!confirm(message)) return;
-
-        btn.disabled = true;
-        const userId = this.authManager.getUserId();
-        let result = await leaveGame(gameId, userId);
-        if (result.success && isAllResignDeleteFailure(result)) {
-          const retry = confirm('Could not remove the finished game. Retry delete?');
-          if (retry) {
-            result = await retryDeleteFinishedGame(gameId);
-          }
-          if (!result?.deleted) {
-            alert('Game is finished but could not be removed. Refresh My Games — it is not playable.');
-          }
-        }
-        if (result.success || result.deleted || result.shouldDelete) {
-          const remembered = readLastMatch();
-          if (remembered?.gameId === gameId) forgetLastMatch();
-          await this._loadGames();
-          this._render();
-        } else {
-          btn.disabled = false;
-          alert('Failed to leave game: ' + (result.error || 'unknown error'));
-        }
-      });
-    });
-
     // Admin delete buttons
     this.el.querySelectorAll('.mp-admin-delete').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -478,5 +449,61 @@ export class GameList {
         }
       });
     });
+  }
+
+  async _onLeaveControlClick(e, btn) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    const control = closestLeaveControl(btn) || closestLeaveControl(e.currentTarget) || closestLeaveControl(e.target);
+    if (!shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: control || btn })) return;
+
+    const gameId = control?.dataset?.leaveGame || btn.dataset.leaveGame;
+    const lobbyId = control?.dataset?.leaveLobby || btn.dataset.leaveLobby;
+    const game = gameId ? this.games.find(g => g.id === gameId) : null;
+    const lobby = lobbyId ? this.waitingLobbies.find(l => l.id === lobbyId) : null;
+    const isStarted = !!(game && (game.stateVersion > 0 || game.state));
+
+    const message = gameId
+      ? (isStarted
+        ? 'Leave this game? You will surrender: your territories become neutral, your units are removed, and the game continues without you. This cannot be undone.'
+        : 'Leave this game? It has not started yet — you will simply be removed from it.')
+      : 'Leave this game? It has not started yet — you will be removed from the lobby.';
+    if (!confirm(message)) return;
+
+    btn.disabled = true;
+    const userId = this.authManager.getUserId();
+    let result;
+    try {
+      if (gameId) {
+        result = await leaveGame(gameId, userId);
+        if (result.success && isAllResignDeleteFailure(result)) {
+          const retry = confirm('Could not remove the finished game. Retry delete?');
+          if (retry) {
+            result = await retryDeleteFinishedGame(gameId);
+          }
+          if (!result?.deleted) {
+            alert('Game is finished but could not be removed. Refresh My Games — it is not playable.');
+          }
+        }
+      } else if (lobbyId) {
+        result = await this.lobbyManager.leaveListedLobby(lobby || { id: lobbyId });
+      } else {
+        result = { success: false, error: 'No game or lobby on this Leave control' };
+      }
+    } catch (err) {
+      result = { success: false, error: err?.message || String(err) };
+    }
+
+    if (result?.success || result?.deleted || result?.shouldDelete) {
+      const remembered = readLastMatch();
+      if (gameId && remembered?.gameId === gameId) forgetLastMatch();
+      if (lobby && remembered?.lobbyCode && remembered.lobbyCode === lobby.code) forgetLastMatch();
+      await this._loadGames();
+      this._render();
+    } else {
+      btn.disabled = false;
+      alert('Failed to leave game: ' + (result?.error || 'unknown error'));
+    }
   }
 }

@@ -161,11 +161,28 @@ export function shouldAbortMyGamesOnTokenHiccup({
   return !tokenValid;
 }
 
-export function mergeMyActiveGames({ bySeat = [], byStarter = [] } = {}) {
+// startedBy is a B25 fallback when playerUserIds is missing/empty. After an
+// explicit Leave, playerUserIds is a non-empty array without this user —
+// do not put that game back on My Games just because they created it.
+export function shouldListStarterGameOnMyGames({ game = null, userId = null } = {}) {
+  if (!game?.id) return false;
+  if (!isMyGamesActiveStatus(game.status)) return false;
+  const ids = game.playerUserIds;
+  if (userId && Array.isArray(ids) && ids.length > 0 && !ids.includes(userId)) {
+    return false;
+  }
+  return true;
+}
+
+export function mergeMyActiveGames({ bySeat = [], byStarter = [], userId = null } = {}) {
   const byId = new Map();
-  for (const game of [...bySeat, ...byStarter]) {
+  for (const game of bySeat) {
     if (!game?.id) continue;
     if (!isMyGamesActiveStatus(game.status)) continue;
+    byId.set(game.id, game);
+  }
+  for (const game of byStarter) {
+    if (!shouldListStarterGameOnMyGames({ game, userId })) continue;
     byId.set(game.id, game);
   }
   return [...byId.values()];
@@ -230,11 +247,29 @@ export function shouldDeleteLobbyOnHostLeave({ lobbyStatus, remainingHumans = 0 
   return remainingHumans <= 0;
 }
 
+const LEAVE_CONTROL_SELECTOR =
+  '[data-leave-game], [data-leave-lobby], [data-role="leave-game"], [data-action="leave-game"]';
+
+// Clicking the word "Leave" can target a Text node (no .closest). Walk up
+// so My Games Leave never silently no-ops.
+export function resolveEventElement(eventTarget) {
+  if (!eventTarget) return null;
+  if (typeof eventTarget.closest === 'function') return eventTarget;
+  const parent = eventTarget.parentElement || eventTarget.parentNode;
+  if (parent && typeof parent.closest === 'function') return parent;
+  return null;
+}
+
+export function closestLeaveControl(eventTarget) {
+  const el = resolveEventElement(eventTarget);
+  if (!el) return null;
+  return el.closest(LEAVE_CONTROL_SELECTOR);
+}
+
 // Surrender is an explicit Leave control. A game-row / join tap / title
 // tap must never open the leave confirm (B23).
 export function isLeaveControlTarget(eventTarget) {
-  if (!eventTarget || typeof eventTarget.closest !== 'function') return false;
-  return !!eventTarget.closest('[data-leave-game]');
+  return !!closestLeaveControl(eventTarget);
 }
 
 export function shouldOpenLeaveConfirm({
