@@ -236,6 +236,7 @@ export class LobbyManager {
       let games = mergeMyActiveGames({
         bySeat: seatSnap.docs.map(d => ({ id: d.id, ...d.data() })),
         byStarter: starterSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+        userId: user.id,
       });
       const remembered = readLastMatch();
       let lastGame = null;
@@ -375,6 +376,36 @@ export class LobbyManager {
     }
   }
 
+  // Leave a waiting lobby from My Games without joining it first.
+  async leaveListedLobby(lobbyOrId) {
+    const lobbyId = typeof lobbyOrId === 'string' ? lobbyOrId : lobbyOrId?.id;
+    if (!lobbyId) return { success: false, error: 'Lobby not found' };
+    let lobby = typeof lobbyOrId === 'object' && lobbyOrId?.players ? lobbyOrId : null;
+    if (!lobby) {
+      try {
+        const snap = await getDoc(doc(this.db, 'lobbies', lobbyId));
+        if (!snap.exists()) return { success: true };
+        lobby = { id: snap.id, ...snap.data() };
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    }
+    const result = await this._removeUserFromLobbyDoc(lobby);
+    if (result.success && this.currentLobby?.id === lobbyId) {
+      if (this.lobbyUnsubscribe) {
+        this.lobbyUnsubscribe();
+        this.lobbyUnsubscribe = null;
+      }
+      this.currentLobby = null;
+      this._notifyListeners();
+    }
+    const remembered = readLastMatch();
+    if (result.success && remembered?.lobbyCode && remembered.lobbyCode === lobby.code) {
+      forgetLastMatch();
+    }
+    return result;
+  }
+
   // Leave current lobby
   async leaveLobby() {
     if (!this.currentLobby) return { success: true };
@@ -382,7 +413,6 @@ export class LobbyManager {
     const user = this.authManager.getUser();
     if (!user) return { success: false, error: 'Not logged in' };
 
-    const lobbyId = this.currentLobby.id;
     const lobby = this.currentLobby;
 
     // Unsubscribe first
@@ -393,10 +423,22 @@ export class LobbyManager {
     this.currentLobby = null;
     forgetLastMatch();
 
+    const result = await this._removeUserFromLobbyDoc(lobby);
+    this._notifyListeners();
+    return result;
+  }
+
+  async _removeUserFromLobbyDoc(lobby) {
+    const user = this.authManager.getUser();
+    if (!user) return { success: false, error: 'Not logged in' };
+    if (!lobby?.id) return { success: false, error: 'Lobby not found' };
+
+    const lobbyId = lobby.id;
+    const players = lobby.players || [];
+
     // If host, delete lobby or transfer host
     if (lobby.hostId === user.id) {
-      // Filter out leaving player and find next human player for host
-      const remainingPlayers = lobby.players.filter(p => p.oderId !== user.id);
+      const remainingPlayers = players.filter(p => p.oderId !== user.id);
       const nextHumanPlayer = remainingPlayers.find(p => !p.isAI);
 
       if (remainingPlayers.length === 0 || !nextHumanPlayer) {
@@ -410,9 +452,9 @@ export class LobbyManager {
           await deleteDoc(doc(this.db, 'lobbies', lobbyId));
         } catch (error) {
           console.error('Error deleting lobby:', error);
+          return { success: false, error: error.message };
         }
       } else {
-        // Transfer host to next human player
         const newPlayers = remainingPlayers.map(p => ({
           ...p,
           isHost: p.oderId === nextHumanPlayer.oderId
@@ -425,11 +467,11 @@ export class LobbyManager {
           });
         } catch (error) {
           console.error('Error transferring host:', error);
+          return { success: false, error: error.message };
         }
       }
     } else {
-      // Remove self from players
-      const currentPlayer = lobby.players.find(p => p.oderId === user.id);
+      const currentPlayer = players.find(p => p.oderId === user.id);
       if (currentPlayer) {
         try {
           await updateDoc(doc(this.db, 'lobbies', lobbyId), {
@@ -438,11 +480,11 @@ export class LobbyManager {
           });
         } catch (error) {
           console.error('Error leaving lobby:', error);
+          return { success: false, error: error.message };
         }
       }
     }
 
-    this._notifyListeners();
     return { success: true };
   }
 

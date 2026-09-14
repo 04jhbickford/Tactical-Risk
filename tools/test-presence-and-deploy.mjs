@@ -64,11 +64,14 @@ const {
   isSeatedInStartedGame,
   shouldAbortMyGamesOnTokenHiccup,
   mergeMyActiveGames,
+  shouldListStarterGameOnMyGames,
   isMyGamesActiveStatus,
   resolvePresenceState,
   shouldOpenLeaveConfirm,
   shouldJoinGameFromRowClick,
   isLeaveControlTarget,
+  resolveEventElement,
+  closestLeaveControl,
   shouldReplaceSnapshotListener,
   shouldResumeSnapshots,
   shouldAccumulateHostOfflineMs,
@@ -164,7 +167,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.45', GAME_VERSION === 'V2.81.45');
+check('GAME_VERSION is V2.81.46', GAME_VERSION === 'V2.81.46');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -324,6 +327,21 @@ console.log('=== B25: session-lost host can still find ZUJMNP ===');
       bySeat: [{ id: 'a', status: 'active' }, { id: 'done', status: 'finished' }],
       byStarter: [{ id: 'a', status: 'active' }, { id: 'b', status: 'starting' }],
     }).map((g) => g.id).sort().join(',') === 'a,b');
+  check('Leave does not relist a startedBy game the user is no longer seated in',
+    shouldListStarterGameOnMyGames({
+      game: { id: 'left', status: 'active', playerUserIds: ['other'], startedBy: 'host' },
+      userId: 'host',
+    }) === false
+    && mergeMyActiveGames({
+      bySeat: [],
+      byStarter: [{ id: 'left', status: 'active', playerUserIds: ['other'], startedBy: 'host' }],
+      userId: 'host',
+    }).length === 0);
+  check('B25 empty playerUserIds still lists via startedBy',
+    shouldListStarterGameOnMyGames({
+      game: { id: 'g-zuj', status: 'active', playerUserIds: [], startedBy: 'host' },
+      userId: 'host',
+    }) === true);
   check('My Games status filter is client-side (no compound in)',
     isMyGamesActiveStatus('active') && isMyGamesActiveStatus('starting')
     && isMyGamesActiveStatus('finished') === false);
@@ -531,7 +549,7 @@ console.log('=== James lock: if it can look broken, it is broken ===');
     placementBudgetCopy({ deployedThisRound: 2, limit: 6, poolRemaining: 19 })
       .remainingLabel === 'Remaining in your pool');
   const titleEl = { closest: (sel) => sel === '[data-role="join-game"]' ? titleEl : null };
-  const leaveEl = { closest: (sel) => sel === '[data-leave-game]' ? leaveEl : null };
+  const leaveEl = { closest: (sel) => String(sel).includes('[data-leave-game]') ? leaveEl : null };
   check('row title resumes; it does not open surrender',
     shouldJoinGameFromRowClick({ eventTarget: titleEl }) === true
     && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: titleEl }) === false);
@@ -700,13 +718,23 @@ check('Leave control still opens confirm',
   shouldOpenLeaveConfirm({ clickOnLeaveControl: true }) === true);
 {
   const title = { closest: (sel) => sel === '.mp-game-name' ? title : null };
-  const leaveBtn = { closest: (sel) => sel === '[data-leave-game]' ? leaveBtn : null };
+  const leaveBtn = { closest: (sel) => String(sel).includes('[data-leave-game]') ? leaveBtn : null };
   check('B23: row title is not a leave control',
     isLeaveControlTarget(title) === false
     && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: title }) === false);
   check('B23: only the Leave button opens surrender',
     isLeaveControlTarget(leaveBtn) === true
     && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: leaveBtn }) === true);
+  const leaveText = { parentElement: leaveBtn };
+  check('Leave text-node tap still opens confirm (not a silent no-op)',
+    resolveEventElement(leaveText) === leaveBtn
+    && closestLeaveControl(leaveText) === leaveBtn
+    && isLeaveControlTarget(leaveText) === true
+    && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: leaveText }) === true);
+  const roleLeave = { closest: (sel) => String(sel).includes('data-role="leave-game"') ? roleLeave : null };
+  check('data-role=leave-game is a Leave control on My Games',
+    isLeaveControlTarget(roleLeave) === true
+    && shouldOpenLeaveConfirm({ clickOnLeaveControl: true, eventTarget: roleLeave }) === true);
 }
 
 console.log('=== B13–B17 deploy batch / cap / undo / paint ===');
