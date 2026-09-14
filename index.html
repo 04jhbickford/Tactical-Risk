@@ -21,8 +21,9 @@
     .tr-loader-recover[hidden]{display:none}
     .tr-loader-recover p{margin:0 0 8px;font-size:14px;color:#e8dcc4}
     .tr-loader-safe{color:#9aa3b5!important;font-size:13px!important}
-    #startup-reload{min-height:44px;min-width:120px;margin-top:8px;padding:0 18px;border:1px solid #c9a44a;border-radius:8px;background:#2a2438;color:#f4ead4;font-size:15px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
-    #startup-reload:focus-visible{outline:2px solid #c9a44a;outline-offset:3px}
+    #startup-continue,#startup-reload{min-height:44px;min-width:120px;margin:8px 6px 0;padding:0 18px;border:1px solid #c9a44a;border-radius:8px;background:#2a2438;color:#f4ead4;font-size:15px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    #startup-continue{background:transparent}
+    #startup-continue:focus-visible,#startup-reload:focus-visible{outline:2px solid #c9a44a;outline-offset:3px}
     @media (prefers-reduced-motion:no-preference){
       html:not([data-motion="reduced"]) .tr-loader-fill{transition:width .6s ease}
       html:not([data-motion="reduced"]) #startup-loader:not(.is-done){animation:tr-loader-fade .25s ease}
@@ -48,6 +49,7 @@
       <div class="tr-loader-recover" id="startup-loader-recover" hidden>
         <p>Taking a little longer than usual.</p>
         <p class="tr-loader-safe">Local saves and in-progress games stay on this device.</p>
+        <button type="button" id="startup-continue">Continue</button>
         <button type="button" id="startup-reload">Reload</button>
       </div>
     </div>
@@ -72,6 +74,7 @@
       var recover = document.getElementById('startup-loader-recover');
       var loader = document.getElementById('startup-loader');
       var reload = document.getElementById('startup-reload');
+      var cont = document.getElementById('startup-continue');
       var started = Date.now();
       var dismissed = false;
       function setFill(n) {
@@ -100,6 +103,7 @@
         loader.setAttribute('aria-busy', 'false');
       }
       if (reload) reload.addEventListener('click', function () { location.reload(); });
+      if (cont) cont.addEventListener('click', function () { dismiss(); });
       setFill(18);
       var timers = [
         setTimeout(function () { if (!dismissed) setStatus('Loading the front…', 42); }, 2500),

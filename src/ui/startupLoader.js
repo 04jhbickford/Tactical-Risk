@@ -3,6 +3,11 @@
 
 export const STARTUP_LOADER_ID = 'startup-loader';
 export const STARTUP_RECOVERY_MS = 16000;
+// lastMatch resume / auth / tile fetches must not pin the branded loader.
+export const STARTUP_AUTH_TIMEOUT_MS = 6000;
+export const STARTUP_MAP_LOAD_TIMEOUT_MS = 10000;
+export const STARTUP_RESUME_TIMEOUT_MS = 8000;
+export const STARTUP_TILE_TIMEOUT_MS = 4000;
 
 export function getStartupLoaderApi(win = globalThis) {
   return win?.__trStartupLoader || null;
@@ -55,6 +60,21 @@ export function shouldShowStartupRecovery({
   recoveryMs = STARTUP_RECOVERY_MS,
 } = {}) {
   return Number(elapsedMs) >= Number(recoveryMs);
+}
+
+// A remembered last match must not hold the loader across map tiles +
+// Firebase restore. Paint reconnect / home, then resume in a budget.
+export function shouldHoldLoaderForLastMatchResume() {
+  return false;
+}
+
+export function resolveStartupAfterHang({
+  lastMatch = null,
+  resumed = false,
+} = {}) {
+  if (resumed) return 'game';
+  if (lastMatch?.gameId || lastMatch?.lobbyCode) return 'reconnect';
+  return 'home';
 }
 
 export function startupSavesAreSafeCopy() {

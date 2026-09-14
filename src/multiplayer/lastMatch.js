@@ -198,6 +198,12 @@ export function shouldAutoResumeLastMatch({
   return !!(lastMatch?.gameId || lastMatch?.lobbyCode);
 }
 
+// Remembered last match is a resume hint, not a reason to pin the
+// branded loader across tile fetches + Firebase restore (boot hang).
+export function shouldHoldLoaderForLastMatchResume() {
+  return false;
+}
+
 // Failed resume of a live code must not dump to Create Game (B38/B40).
 // A waiting lobby (B41 / 6V9ZXK) restores the room, not home.
 export function resolveResumeFailureView({
