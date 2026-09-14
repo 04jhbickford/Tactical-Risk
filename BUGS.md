@@ -2,6 +2,32 @@
 
 ---
 
+## 9.14.26 — V2.81.47 boot hang + My Games Leave (SCHEMA 11)
+
+Robert Chrome Mac: live cold/return load stuck on the branded loader — gold
+bar ~full, “Still loading…”, then “Taking a little longer…” + Reload only.
+Same session as the dead My Games Leave control.
+
+Cause (boot): lastMatch from the live games held `dismissStartupLoader` until
+`mapRenderer.load()` (Image() never times out) + `auth.whenReady()` +
+`startMultiplayerGame({ id, lobbyCode })` (no players/state → Error 3 or a
+hung getDoc). The 16s recovery still required Reload. Leave-dead kept
+lastMatch set, so every return-to-site took this path.
+
+Fix: never pin the loader on lastMatch — paint reconnect and dismiss, then
+resume in a timeout budget. Tile / auth / getGame / resume use `withTimeout`.
+Recovery has Continue (dismiss) plus Reload. Leave fix from V2.81.46 stays.
+SCHEMA 11. GAME_VERSION V2.81.47.
+
+### Smoke (this PR)
+
+- [ ] Cold load reaches home/setup without Reload.
+- [ ] Return-to-site with a last match shows reconnect or the game, not a stuck bar.
+- [ ] Continue dismisses the loader; Reload still works.
+- [ ] My Games Leave still confirms and removes the row.
+
+---
+
 ## 9.14.26 — V2.81.46 My Games Leave was a dead control (SCHEMA 11)
 
 James / Robert: My Active Games rows showed RESUME + red-outline Leave. Leave

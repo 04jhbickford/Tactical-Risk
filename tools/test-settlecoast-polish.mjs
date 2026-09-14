@@ -27,10 +27,14 @@ const {
 const {
   shouldShowStartupRecovery,
   STARTUP_RECOVERY_MS,
+  shouldHoldLoaderForLastMatchResume,
+  resolveStartupAfterHang,
   startupSavesAreSafeCopy,
   dismissStartupLoader,
   reportStartupError,
 } = await import(pathToFileURL(join(root, 'src/ui/startupLoader.js')));
+const { withTimeout, isTimeoutError } =
+  await import(pathToFileURL(join(root, 'src/utils/timeout.js')));
 const {
   resolvePhaseGuideId,
   shouldShowPhaseGuide,
@@ -77,7 +81,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version + schema ===');
-check('GAME_VERSION is V2.81.46', GAME_VERSION === 'V2.81.46');
+check('GAME_VERSION is V2.81.47', GAME_VERSION === 'V2.81.47');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== B — paint-first loader ===');
@@ -97,6 +101,20 @@ check('recovery copy + Reload after ~15–20s',
   && /id="startup-reload"/.test(html)
   && shouldShowStartupRecovery({ elapsedMs: 15999 }) === false
   && shouldShowStartupRecovery({ elapsedMs: 16000 }) === true);
+check('recovery Continue dismisses without Reload',
+  /id="startup-continue"/.test(html)
+  && /startup-continue/.test(html)
+  && /cont\.addEventListener/.test(html));
+check('lastMatch resume does not hold the branded loader',
+  shouldHoldLoaderForLastMatchResume() === false
+  && resolveStartupAfterHang({ lastMatch: { gameId: 'g1' } }) === 'reconnect'
+  && resolveStartupAfterHang({}) === 'home');
+check('withTimeout fails soft',
+  await withTimeout(Promise.resolve(1), 50, 'ok') === 1
+  && await withTimeout(new Promise(() => {}), 20, 'hang').then(
+    () => false,
+    (err) => isTimeoutError(err) === true
+  ));
 check('error path reassures local saves',
   /Local saves/.test(html)
   && /stay on this device/.test(startupSavesAreSafeCopy()));
