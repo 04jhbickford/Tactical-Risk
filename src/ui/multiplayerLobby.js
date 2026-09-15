@@ -7,6 +7,7 @@ import { GAME_VERSION } from './lobby.js';
 import { possessivePhrase } from '../utils/possessive.js';
 import {
   readLastMatch,
+  forgetLastMatch,
   resolveMenuCardAction,
   shouldOpenJoinByCode,
   shouldOpenMyGames,
@@ -17,6 +18,8 @@ import {
   resolveLobbyViewAfterLoss,
   shouldBlockCompetingEntryForms,
   resolveRejoinRecoveryUi,
+  resolveReconnectCopy,
+  shouldForgetLastMatchOnDismissRejoin,
 } from '../multiplayer/lastMatch.js';
 import { resolveHostLobbyPrimaryCta } from '../multiplayer/lobbyStart.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
@@ -308,6 +311,12 @@ export class MultiplayerLobby {
   }
 
   _renderReconnect(user) {
+    const last = readLastMatch();
+    const copy = resolveReconnectCopy({
+      signedIn: !!user,
+      resumeInFlight: !!this._resumeInFlight,
+      lobbyCode: last?.lobbyCode || null,
+    });
     const ui = resolveRejoinRecoveryUi({
       rejoinRequired: true,
       dismissed: !!this._rejoinDismissed,
@@ -319,12 +328,13 @@ export class MultiplayerLobby {
     ].join('');
     return `
       <div class="mp-identity-box">
-        <p class="mp-welcome">Still in the match</p>
+        <p class="mp-welcome">${copy.title}</p>
         <p class="mp-identity-details">
-          Sign-in dropped. Rejoin the live game — do not start a new one.
+          ${copy.detail}
         </p>
       </div>
       ${ui.showRejoinCta ? this._renderLastMatchBanner() : ''}
+      <div class="mp-error ${this._rejoinError ? '' : 'hidden'}" id="rejoin-error">${this._rejoinError || ''}</div>
       ${competing}
       ${ui.showDismissEscape ? `
       <div class="mp-footer-actions mp-rejoin-escape">
@@ -592,6 +602,61 @@ export class MultiplayerLobby {
     });
   }
 
+  _showRejoinError(message) {
+    this._rejoinError = message || 'Could not rejoin the live match.';
+    const errorEl = this.el?.querySelector('#rejoin-error');
+    if (errorEl) {
+      errorEl.textContent = this._rejoinError;
+      errorEl.classList.remove('hidden');
+      return;
+    }
+    if (this.mode === 'reconnect') this._render();
+  }
+
+  async _handleRejoinLast() {
+    if (this._rejoining) return false;
+    this._rejoining = true;
+    this._rejoinError = '';
+    try {
+      if (!this.authManager.isAuthReady()) {
+        await this.authManager.whenReady();
+      }
+      if (!this.authManager.isLoggedIn()) {
+        if (this.onBack) this.onBack('rejoin-auth');
+        return false;
+      }
+      const last = readLastMatch();
+      const hydrated = await this.lobbyManager.hydrateLastMatch(last);
+      if (hydrated.kind === 'wait-auth' || hydrated.kind === 'show-auth') {
+        if (this.onBack) this.onBack('rejoin-auth');
+        return false;
+      }
+      if (hydrated.kind === 'game' && hydrated.game && this.onStart) {
+        this.hide();
+        this.onStart(hydrated.gameId || hydrated.game.id, hydrated.game);
+        return true;
+      }
+      if (hydrated.kind === 'lobby') {
+        this.mode = 'lobby';
+        this._render();
+        return true;
+      }
+      if (hydrated.kind === 'finished' || hydrated.kind === 'missing') {
+        forgetLastMatch();
+        this._showRejoinError(hydrated.error || 'That game is no longer active.');
+        return false;
+      }
+      this._showRejoinError(hydrated.error || 'Could not rejoin. Try again.');
+      return false;
+    } catch (err) {
+      console.warn('[MultiplayerLobby] Rejoin failed', err);
+      this._showRejoinError(err?.message || 'Could not rejoin. Try again.');
+      return false;
+    } finally {
+      this._rejoining = false;
+    }
+  }
+
   async _restoreLiveLobby() {
     if (this._restoringLobby) return false;
     this._restoringLobby = true;
@@ -601,27 +666,27 @@ export class MultiplayerLobby {
         currentLobby: this.lobbyManager.getLobby(),
         lastMatch: last,
       });
-      if (view === 'game' && last?.gameId && this.onStart) {
-        this.hide();
-        this.onStart(last.gameId, { id: last.gameId, lobbyCode: last.lobbyCode });
-        return true;
-      }
-      if ((view === 'lobby' || view === 'game') && last?.lobbyCode) {
-        const result = await this.lobbyManager.joinLobby(last.lobbyCode, null);
-        if (result.success && result.isGame && this.onStart) {
+      if (view === 'game' || view === 'lobby' || view === 'reconnect') {
+        const hydrated = await this.lobbyManager.hydrateLastMatch(last);
+        if (hydrated.kind === 'game' && hydrated.game && this.onStart) {
           this.hide();
-          this.onStart(result.gameId, result.game);
+          this.onStart(hydrated.gameId || hydrated.game.id, hydrated.game);
           return true;
         }
-        if (result.success) {
+        if (hydrated.kind === 'lobby') {
           this.mode = 'lobby';
           this._render();
           return true;
         }
-      }
-      if (view === 'reconnect') {
-        this.showReconnectOnly();
-        return true;
+        if (hydrated.kind === 'wait-auth' || hydrated.kind === 'show-auth') {
+          if (this.onBack) this.onBack('rejoin-auth');
+          return true;
+        }
+        if (view === 'reconnect' || hydrated.kind === 'error') {
+          this.showReconnectOnly();
+          if (hydrated.error) this._showRejoinError(hydrated.error);
+          return true;
+        }
       }
       this._render();
       return false;
@@ -810,31 +875,15 @@ export class MultiplayerLobby {
     this.el.querySelector('[data-action="dismiss-rejoin"]')?.addEventListener('click', () => {
       this._rejoinDismissed = true;
       this._fromReconnect = false;
+      if (shouldForgetLastMatchOnDismissRejoin({ confirmedLeave: true })) {
+        forgetLastMatch();
+      }
       this.mode = 'menu';
       this._render();
     });
 
     this.el.querySelector('[data-action="rejoin-last"]')?.addEventListener('click', async () => {
-      const last = readLastMatch();
-      if (last?.lobbyCode) {
-        const result = await this.lobbyManager.joinLobby(last.lobbyCode, null);
-        if (result.success && result.isGame) {
-          this.hide();
-          if (this.onStart) this.onStart(result.gameId, result.game);
-          return;
-        }
-        if (result.success) {
-          this.mode = 'lobby';
-          this._render();
-          return;
-        }
-      }
-      if (last?.gameId && this.onStart) {
-        this.hide();
-        this.onStart(last.gameId, { id: last.gameId, lobbyCode: last.lobbyCode });
-        return;
-      }
-      if (this.onBack) this.onBack('rejoin');
+      await this._handleRejoinLast();
     });
 
     this.el.querySelector('[data-action="refresh-browse"]')?.addEventListener('click', () => {

@@ -23,6 +23,7 @@ import {
   mergeMyActiveGames,
   resolveJoinByCode,
   shouldDeleteLobbyOnHostLeave,
+  shouldReconnectToGame,
 } from './presencePolicy.js';
 import {
   lastMatchForJoinCode,
@@ -33,6 +34,8 @@ import {
   resolveJoinNotFoundError,
   shouldClearLobbyOnSnapshotError,
   shouldKeepLastKnownLobby,
+  hasHydratePayload,
+  resolveRejoinHydratePlan,
 } from './lastMatch.js';
 import { resolveStartGameTarget } from './lobbyStart.js';
 
@@ -171,15 +174,83 @@ export class LobbyManager {
   }
 
   async getGameById(gameId) {
-    if (!this.db || !gameId) return null;
+    const result = await this._loadGameById(gameId);
+    return result.game || null;
+  }
+
+  async _loadGameById(gameId) {
+    if (!this.db || !gameId) return { game: null, missing: !gameId };
     try {
       const snap = await getDoc(doc(this.db, 'games', gameId));
-      if (!snap.exists()) return null;
-      return { id: snap.id, ...snap.data() };
+      if (!snap.exists()) return { game: null, missing: true };
+      return { game: { id: snap.id, ...snap.data() }, missing: false };
     } catch (error) {
       console.error('Error loading game by id:', error);
-      return null;
+      return { game: null, missing: false, error: error.message };
     }
+  }
+
+  // Boot / Rejoin / Play Online: fetch a live doc, never start from a stub.
+  async hydrateLastMatch(lastMatch = readLastMatch()) {
+    const user = this.authManager.getUser();
+    const plan = resolveRejoinHydratePlan({
+      signedIn: !!user,
+      authReady: this.authManager.isAuthReady(),
+      lastMatch,
+    });
+    if (plan.action === 'wait-auth' || plan.action === 'show-auth' || plan.action === 'none') {
+      return { kind: plan.action };
+    }
+
+    let fetchedGame = null;
+    let fetchedMissing = false;
+    if (lastMatch?.gameId) {
+      const loaded = await this._loadGameById(lastMatch.gameId);
+      fetchedGame = loaded.game;
+      fetchedMissing = loaded.missing === true;
+      if (!fetchedGame && !fetchedMissing && loaded.error) {
+        if (lastMatch.lobbyCode) {
+          fetchedGame = await this.findGameByCode(lastMatch.lobbyCode);
+        }
+        if (!fetchedGame) {
+          return { kind: 'error', error: loaded.error || 'Could not load the live match.' };
+        }
+      }
+    }
+    if (!fetchedGame && lastMatch?.lobbyCode) {
+      fetchedGame = await this.findGameByCode(lastMatch.lobbyCode);
+      if (fetchedGame) fetchedMissing = false;
+    }
+
+    if (fetchedGame) {
+      if (fetchedGame.status && !shouldReconnectToGame({
+        exists: true,
+        status: fetchedGame.status,
+      })) {
+        return { kind: 'finished', game: fetchedGame, error: 'That game is no longer active.' };
+      }
+      return { kind: 'game', gameId: fetchedGame.id, game: fetchedGame };
+    }
+
+    if (lastMatch?.lobbyCode) {
+      const result = await this.joinLobby(lastMatch.lobbyCode, null);
+      if (result.success && result.isGame) {
+        if (!hasHydratePayload(result.game) && result.gameId) {
+          const again = await this.getGameById(result.gameId);
+          if (again) {
+            return { kind: 'game', gameId: again.id, game: again };
+          }
+        }
+        return { kind: 'game', gameId: result.gameId, game: result.game };
+      }
+      if (result.success) return { kind: 'lobby' };
+      return { kind: 'error', error: result.error || 'Could not rejoin.' };
+    }
+
+    if (fetchedMissing) {
+      return { kind: 'missing', error: 'Could not find the live match.' };
+    }
+    return { kind: 'error', error: 'Could not rejoin the live match.' };
   }
 
   // Get all open public lobbies (no password, waiting status)
@@ -294,7 +365,11 @@ export class LobbyManager {
       rememberedGameId: remembered?.gameId || null,
     });
     if (resolved.kind === 'game') {
-      return { success: true, isGame: true, gameId: resolved.game.id, game: resolved.game };
+      let gameDoc = resolved.game;
+      if (!hasHydratePayload(gameDoc) && gameDoc?.id) {
+        gameDoc = await this.getGameById(gameDoc.id) || gameDoc;
+      }
+      return { success: true, isGame: true, gameId: gameDoc.id, game: gameDoc };
     }
     if (resolved.kind === 'started-lobby') {
       if (!game && resolved.lobby?.gameId) {
@@ -307,6 +382,10 @@ export class LobbyManager {
     }
     if (resolved.kind === 'not-found') {
       if (remembered?.gameId) {
+        const fetched = await this.getGameById(remembered.gameId);
+        if (fetched) {
+          return { success: true, isGame: true, gameId: fetched.id, game: fetched };
+        }
         return {
           success: true,
           isGame: true,

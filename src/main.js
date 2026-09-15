@@ -147,7 +147,11 @@ import {
   shouldHoldLoaderForLastMatchResume,
   resolveResumeFailureView,
   shouldNavigateToHome,
-  resolveLobbyViewAfterLoss,
+  hasHydratePayload,
+  shouldFetchGameDocBeforeStart,
+  shouldShowReconnectAfterResumeAttempt,
+  shouldForgetLastMatchOnHydrateFailure,
+  shouldReuseInFlightMultiplayerStart,
 } from './multiplayer/lastMatch.js';
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
@@ -941,6 +945,7 @@ async function init() {
   let gameListUI = null;
   let currentGameCode = null;
   let lastTurnNoticeSeatId = null;
+  let mpStartGameId = null;
 
   const notifyTurnSwap = (prevPlayer, nextPlayer) => {
     const nextId = nextPlayer?.oderId || nextPlayer?.id || null;
@@ -987,8 +992,30 @@ async function init() {
   }
 
   // Function to start a multiplayer game
-  const startMultiplayerGame = async (gameId, lobbyData) => {
+  const startMultiplayerGame = async (gameId, incomingLobbyData) => {
+    if (shouldReuseInFlightMultiplayerStart({
+      startingGameId: mpStartGameId,
+      requestedGameId: gameId,
+      alreadyInGame: !!(gameState?.isMultiplayer && gameState?.players?.length),
+      seatedGameId: syncManager?.gameId || null,
+    })) {
+      if (multiplayerLobby) multiplayerLobby.hide();
+      if (gameListUI) gameListUI.hide();
+      return;
+    }
+
+    mpStartGameId = gameId;
     try {
+      let lobbyData = incomingLobbyData;
+      if (shouldFetchGameDocBeforeStart({ game: lobbyData, gameId })) {
+        const code = resolveLobbyCodeFromGameDoc(lobbyData) || resolveLobbyCodeFromGameDoc({
+          lobbyCode: lobbyData?.lobbyCode,
+          code: lobbyData?.code,
+        });
+        const fetched = await lobbyManager.getGameById(gameId)
+          || (code ? await lobbyManager.findGameByCode(code) : null);
+        if (fetched) lobbyData = fetched;
+      }
       console.log('[MP] startMultiplayerGame called with:', { gameId, lobbyData });
       currentGameCode = resolveLobbyCodeFromGameDoc(lobbyData) || resolveLobbyCodeFromGameDoc({
         lobbyCode: lobbyData?.lobbyCode,
@@ -1134,7 +1161,8 @@ async function init() {
       const stateLoaded = await syncManager.startSync();
       if (!stateLoaded) {
         console.error('[MP] Failed to load existing game state');
-        forgetLastMatch();
+        ensureMultiplayerLobby();
+        multiplayerLobby.showReconnectOnly();
         alert('Error 1: Failed to rejoin game. Could not load game state.');
         return;
       }
@@ -1184,8 +1212,12 @@ async function init() {
       await syncManager.startSync();
       console.log('[MP] Game initialized successfully. isActivePlayer:', syncManager.checkIsActivePlayer());
     } else if (!playersData) {
-      // No player data available
+      // Stub / fetch miss — keep lastMatch so Rejoin can retry.
       console.error('[MP] No player data available');
+      if (!hasHydratePayload(lobbyData)) {
+        ensureMultiplayerLobby();
+        multiplayerLobby.showReconnectOnly();
+      }
       alert('Error 3: Failed to start game. No player data found.');
       return;
     } else {
@@ -1508,6 +1540,8 @@ async function init() {
     } catch (error) {
       console.error('[MP] Error starting multiplayer game:', error);
       alert('Error starting game: ' + error.message);
+    } finally {
+      if (mpStartGameId === gameId) mpStartGameId = null;
     }
   };
 
@@ -1917,6 +1951,8 @@ async function init() {
           }
           multiplayerLobby.hide();
           gameListUI.show();
+        } else if (action === 'rejoin-auth') {
+          showRejoinAuth();
         } else if (action === 'signout' || shouldNavigateToHome({
           explicitExit: true,
           confirmedSignOut: action === 'signout',
@@ -1932,34 +1968,82 @@ async function init() {
     return multiplayerLobby;
   };
 
+  const showRejoinAuth = () => {
+    const afterAuth = (user) => {
+      if (user) void resumeLastMatch({ interactive: true });
+    };
+    if (!authScreen) authScreen = new AuthScreen(afterAuth);
+    else authScreen.onComplete = afterAuth;
+    authScreen.show();
+  };
+
+  const resumeLastMatch = async ({ interactive = false } = {}) => {
+    if (gameState?.isMultiplayer && gameState?.players?.length && syncManager?.gameId) {
+      if (multiplayerLobby) multiplayerLobby.hide();
+      if (gameListUI) gameListUI.hide();
+      lobby.hide();
+      return true;
+    }
+    if (multiplayerLobby) multiplayerLobby._resumeInFlight = true;
+    try {
+      if (!authManager.isAuthReady()) {
+        try {
+          await withTimeout(authManager.whenReady(), STARTUP_AUTH_TIMEOUT_MS, 'auth-ready');
+        } catch (err) {
+          console.warn('[Main] Auth restore timed out — using current session if any', err);
+        }
+      }
+      const user = authManager.getUser();
+      const last = readLastMatch();
+      if (!user) {
+        if (interactive) showRejoinAuth();
+        return false;
+      }
+      if (!shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last }) && !last) {
+        return false;
+      }
+      if (!last?.gameId && !last?.lobbyCode) return false;
+
+      const hydrated = await withTimeout(
+        lobbyManager.hydrateLastMatch(last),
+        STARTUP_RESUME_TIMEOUT_MS,
+        'hydrate-last-match'
+      );
+      if (hydrated.kind === 'wait-auth' || hydrated.kind === 'show-auth') {
+        if (interactive) showRejoinAuth();
+        return false;
+      }
+      if (hydrated.kind === 'game' && hydrated.game) {
+        await startMultiplayerGame(hydrated.gameId || hydrated.game.id, hydrated.game);
+        return !!(gameState?.players?.length);
+      }
+      if (hydrated.kind === 'lobby') {
+        ensureMultiplayerLobby();
+        multiplayerLobby.mode = 'lobby';
+        multiplayerLobby.show();
+        return true;
+      }
+      if (
+        (hydrated.kind === 'finished' || hydrated.kind === 'missing')
+        && shouldForgetLastMatchOnHydrateFailure({
+          gameMissing: hydrated.kind === 'missing',
+          gameFinished: hydrated.kind === 'finished',
+        })
+      ) {
+        forgetLastMatch();
+      }
+      return false;
+    } finally {
+      if (multiplayerLobby) multiplayerLobby._resumeInFlight = false;
+    }
+  };
+
   const restoreLiveLobbyOrGame = async () => {
     const last = readLastMatch();
-    const view = resolveLobbyViewAfterLoss({ lastMatch: last });
     ensureMultiplayerLobby();
     lobby.hide();
-    if (view === 'game' && last?.gameId) {
-      await startMultiplayerGame(last.gameId, {
-        id: last.gameId,
-        lobbyCode: last.lobbyCode,
-      });
-      if (gameState?.players?.length) return true;
-    }
-    if ((view === 'lobby' || view === 'game') && last?.lobbyCode) {
-      try {
-        const result = await lobbyManager.joinLobby(last.lobbyCode, null);
-        if (result.success && result.isGame) {
-          await startMultiplayerGame(result.gameId, result.game);
-          return !!(gameState?.players?.length);
-        }
-        if (result.success) {
-          multiplayerLobby.mode = 'lobby';
-          multiplayerLobby.show();
-          return true;
-        }
-      } catch (err) {
-        console.warn('[Main] Restore live lobby failed — staying off home', err);
-      }
-    }
+    const restored = await resumeLastMatch({ interactive: false });
+    if (restored) return true;
     if (last?.gameId || last?.lobbyCode) {
       multiplayerLobby.showReconnectOnly();
       return true;
@@ -1980,15 +2064,8 @@ async function init() {
     if (authManager.isLoggedIn()) {
       if (authScreen) authScreen.hide();
       const last = readLastMatch();
-      if (shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last }) && last?.gameId) {
-        await startMultiplayerGame(last.gameId, {
-          id: last.gameId,
-          lobbyCode: last.lobbyCode,
-        });
-        if (gameState?.players?.length) return;
-      }
-      if (shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last }) && last?.lobbyCode) {
-        const restored = await restoreLiveLobbyOrGame();
+      if (shouldAutoResumeLastMatch({ signedIn: true, lastMatch: last })) {
+        const restored = await resumeLastMatch({ interactive: true });
         if (restored) return;
       }
       ensureMultiplayerLobby();
@@ -2093,63 +2170,17 @@ async function init() {
 
   let resumedLastMatch = false;
   if (isFirebaseConfigured() && (lastAtBoot?.gameId || lastAtBoot?.lobbyCode)) {
-    const resumeWork = async () => {
-      let user = null;
-      try {
-        user = await withTimeout(authManager.whenReady(), STARTUP_AUTH_TIMEOUT_MS, 'auth-ready');
-      } catch (err) {
-        console.warn('[Main] Auth restore timed out — using current session if any', err);
-        user = authManager.getUser();
-      }
-      if (!shouldAutoResumeLastMatch({ signedIn: !!user, lastMatch: lastAtBoot })) return;
-      if (lastAtBoot.gameId) {
-        let gameDoc = null;
-        try {
-          gameDoc = await withTimeout(
-            lobbyManager.getGameById(lastAtBoot.gameId),
-            STARTUP_RESUME_TIMEOUT_MS,
-            'get-game'
-          );
-        } catch (err) {
-          console.warn('[Main] getGameById timed out — reconnect UI stays', err);
-        }
-        if (gameDoc && (gameDoc.state || gameDoc.lobbyData?.players || gameDoc.players)) {
-          await withTimeout(
-            startMultiplayerGame(lastAtBoot.gameId, gameDoc),
-            STARTUP_RESUME_TIMEOUT_MS,
-            'resume-game'
-          );
-          resumedLastMatch = !!(gameState && gameState.players?.length);
-        }
-        return;
-      }
-      if (lastAtBoot.lobbyCode) {
-        const result = await withTimeout(
-          lobbyManager.joinLobby(lastAtBoot.lobbyCode, null),
-          STARTUP_RESUME_TIMEOUT_MS,
-          'join-lobby'
-        );
-        if (result.success && result.isGame) {
-          await withTimeout(
-            startMultiplayerGame(result.gameId, result.game),
-            STARTUP_RESUME_TIMEOUT_MS,
-            'resume-game'
-          );
-          resumedLastMatch = !!(gameState && gameState.players?.length);
-        } else if (result.success) {
-          ensureMultiplayerLobby();
-          multiplayerLobby.mode = 'lobby';
-          multiplayerLobby.show();
-          resumedLastMatch = true;
-        }
-      }
-    };
     try {
-      await withTimeout(resumeWork(), STARTUP_AUTH_TIMEOUT_MS + STARTUP_RESUME_TIMEOUT_MS, 'last-match-resume');
+      resumedLastMatch = await resumeLastMatch({ interactive: false });
     } catch (err) {
       console.warn('[Main] Auto-resume last match failed — not dumping to home', err);
     }
-    if (!resumedLastMatch) {
+    if (shouldShowReconnectAfterResumeAttempt({
+      resumed: resumedLastMatch,
+      resumeInFlight: !!mpStartGameId,
+      alreadyInGame: !!(gameState?.players?.length),
+      lastMatch: lastAtBoot,
+    })) {
       const view = resolveStartupAfterHang({
         lastMatch: lastAtBoot,
         resumed: false,
@@ -2157,17 +2188,16 @@ async function init() {
         resumed: false,
         lastMatch: lastAtBoot,
       });
-      if (view === 'reconnect') {
-        ensureMultiplayerLobby();
-        multiplayerLobby.showReconnectOnly();
-      } else if (view === 'lobby') {
+      if (view === 'lobby') {
         await restoreLiveLobbyOrGame();
-      } else if (shouldNavigateToHome({ lastMatch: lastAtBoot })) {
-        lobby.show();
-      } else {
+      } else if (view === 'reconnect' || !shouldNavigateToHome({ lastMatch: lastAtBoot })) {
         ensureMultiplayerLobby();
         multiplayerLobby.showReconnectOnly();
+      } else {
+        lobby.show();
       }
+    } else if (resumedLastMatch && multiplayerLobby) {
+      multiplayerLobby.hide();
     }
     dismissStartupLoader();
   }

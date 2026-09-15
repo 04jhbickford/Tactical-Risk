@@ -114,6 +114,14 @@ const {
   shouldListGameInMyGames,
   shouldJoinListedGame,
   shouldForgetLastMatchAfterLookup,
+  hasHydratePayload,
+  shouldFetchGameDocBeforeStart,
+  shouldShowReconnectAfterResumeAttempt,
+  shouldForgetLastMatchOnDismissRejoin,
+  shouldForgetLastMatchOnHydrateFailure,
+  resolveReconnectCopy,
+  resolveRejoinHydratePlan,
+  shouldReuseInFlightMultiplayerStart,
 } = await import(pathToFileURL(join(root, 'src/multiplayer/lastMatch.js')));
 const { resolveHostLobbyPrimaryCta, resolveStartGameTarget, shouldCreateNewGameOnResume } =
   await import(pathToFileURL(join(root, 'src/multiplayer/lobbyStart.js')));
@@ -168,7 +176,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.47', GAME_VERSION === 'V2.81.47');
+check('GAME_VERSION is V2.81.48', GAME_VERSION === 'V2.81.48');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1404,7 +1412,8 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
   const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
   check('B38: boot path calls shouldAutoResumeLastMatch',
     mainSrc.includes('shouldAutoResumeLastMatch')
-    && mainSrc.includes('startMultiplayerGame(lastAtBoot.gameId'));
+    && mainSrc.includes('resumeLastMatch')
+    && mainSrc.includes('hydrateLastMatch'));
   check('boot hang: lastMatch does not pin the branded loader',
     shouldHoldLoaderForLastMatchResume() === false
     && mainSrc.includes('dismissStartupLoader()')
@@ -1576,6 +1585,113 @@ console.log('=== V2.81.42 My Games hygiene + presence comments ===');
     shouldAccumulateHostOfflineMs({ hostPresence: 'idle' }) === false
     && shouldStartHostFailover({ hostPresence: 'idle', offlineForMs: 120000 }) === false
     && shouldStartHostFailover({ hostPresence: 'offline', offlineForMs: 90000 }) === true);
+}
+
+console.log('=== V2.81.48 rejoin hydrate — no stub start, Leave clears lastMatch ===');
+{
+  const mainSrc48 = readFileSync(join(root, 'src/main.js'), 'utf8');
+  const lobbySrc48 = readFileSync(join(root, 'src/ui/multiplayerLobby.js'), 'utf8');
+  const lobbyMgrSrc48 = readFileSync(join(root, 'src/multiplayer/lobbyManager.js'), 'utf8');
+
+  check('stub {id, lobbyCode} is not a hydrate payload',
+    hasHydratePayload({ id: 'game_3rv', lobbyCode: '3RVNJU' }) === false
+    && hasHydratePayload(null) === false
+    && shouldFetchGameDocBeforeStart({
+      game: { id: 'game_3rv', lobbyCode: '3RVNJU' },
+      gameId: 'game_3rv',
+    }) === true);
+  check('live doc with state or lobby players is enough to start',
+    hasHydratePayload({ id: 'g1', state: { players: [{}] } }) === true
+    && hasHydratePayload({ id: 'g1', lobbyData: { players: [{ oderId: 'u1' }] } }) === true
+    && shouldFetchGameDocBeforeStart({
+      game: { id: 'g1', state: { players: [{}] } },
+      gameId: 'g1',
+    }) === false);
+  check('reconnect overlay is not painted over an in-flight or seated resume',
+    shouldShowReconnectAfterResumeAttempt({
+      lastMatch: { gameId: 'g1', lobbyCode: '3RVNJU' },
+      resumeInFlight: true,
+    }) === false
+    && shouldShowReconnectAfterResumeAttempt({
+      lastMatch: { gameId: 'g1' },
+      alreadyInGame: true,
+    }) === false
+    && shouldShowReconnectAfterResumeAttempt({
+      lastMatch: { gameId: 'g1', lobbyCode: '3RVNJU' },
+      resumed: false,
+    }) === true);
+  check('Leave this match clears lastMatch; cancel does not',
+    shouldForgetLastMatchOnDismissRejoin({ confirmedLeave: true }) === true
+    && shouldForgetLastMatchOnDismissRejoin({ confirmedLeave: false }) === false);
+  check('transient hydrate miss keeps lastMatch; gone/finished forgets',
+    shouldForgetLastMatchOnHydrateFailure({}) === false
+    && shouldForgetLastMatchOnHydrateFailure({ gameMissing: true }) === true
+    && shouldForgetLastMatchOnHydrateFailure({ gameFinished: true }) === true);
+  check('Sign-in dropped copy only when actually signed out',
+    /Sign-in dropped/.test(resolveReconnectCopy({ signedIn: false }).detail) === true
+    && /Sign-in dropped/.test(resolveReconnectCopy({
+      signedIn: true,
+      lobbyCode: '3RVNJU',
+    }).detail) === false
+    && /3RVNJU/.test(resolveReconnectCopy({ signedIn: true, lobbyCode: '3RVNJU' }).detail)
+    && /Rejoining/.test(resolveReconnectCopy({
+      signedIn: true,
+      resumeInFlight: true,
+      lobbyCode: '3RVNJU',
+    }).detail));
+  check('rejoin plan waits for auth, never starts from a stub',
+    resolveRejoinHydratePlan({
+      signedIn: false,
+      authReady: false,
+      lastMatch: { gameId: 'g1', lobbyCode: '3RVNJU' },
+    }).action === 'wait-auth'
+    && resolveRejoinHydratePlan({
+      signedIn: false,
+      authReady: true,
+      lastMatch: { gameId: 'g1', lobbyCode: '3RVNJU' },
+    }).action === 'show-auth'
+    && resolveRejoinHydratePlan({
+      signedIn: true,
+      lastMatch: { gameId: 'g1', lobbyCode: '3RVNJU' },
+    }).action === 'fetch-game'
+    && resolveRejoinHydratePlan({
+      signedIn: true,
+      lastMatch: { gameId: 'g1', lobbyCode: '3RVNJU' },
+      fetchedGame: { id: 'g1', status: 'active', state: { players: [{}] } },
+    }).action === 'start-game'
+    && resolveRejoinHydratePlan({
+      signedIn: true,
+      lastMatch: { gameId: 'g1' },
+      fetchedMissing: true,
+    }).action === 'forget');
+  check('same game already starting or seated is reused',
+    shouldReuseInFlightMultiplayerStart({
+      startingGameId: 'g1',
+      requestedGameId: 'g1',
+    }) === true
+    && shouldReuseInFlightMultiplayerStart({
+      alreadyInGame: true,
+      seatedGameId: 'g1',
+      requestedGameId: 'g1',
+    }) === true
+    && shouldReuseInFlightMultiplayerStart({
+      requestedGameId: 'g2',
+      seatedGameId: 'g1',
+      alreadyInGame: true,
+    }) === false);
+  check('Rejoin / boot hydrate through lobbyManager, not a stub onStart',
+    lobbySrc48.includes('hydrateLastMatch')
+    && lobbySrc48.includes('_handleRejoinLast')
+    && /forgetLastMatch\(\)/.test(lobbySrc48)
+    && !/onStart\(last\.gameId,\s*\{\s*id:\s*last\.gameId/.test(lobbySrc48)
+    && lobbyMgrSrc48.includes('hydrateLastMatch')
+    && mainSrc48.includes('hydrateLastMatch')
+    && mainSrc48.includes('shouldFetchGameDocBeforeStart')
+    && !/startMultiplayerGame\(\s*last\.gameId,\s*\{\s*id:\s*last\.gameId/.test(mainSrc48)
+    && !/startMultiplayerGame\(\s*lastAtBoot\.gameId,\s*\{\s*id:\s*lastAtBoot/.test(mainSrc48));
+  check('dismiss-rejoin is confirmed Leave that forgets lastMatch',
+    /data-action="dismiss-rejoin"/.test(lobbySrc48)
+    && /shouldForgetLastMatchOnDismissRejoin\(\{\s*confirmedLeave:\s*true\s*\}\)/.test(lobbySrc48));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);
