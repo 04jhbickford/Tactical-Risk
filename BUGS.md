@@ -2,6 +2,52 @@
 
 ---
 
+## 9.15.26 — V2.81.48 stuck Rejoin / Sign-in-dropped loop (SCHEMA 11)
+
+Robert (via James): every return to the site while still in an online match
+shows ONLINE MULTIPLAYER → “Still in the match” → “Sign-in dropped” → gold
+“You were away — still in 3RVNJU” → Rejoin → Leave this match. Workaround
+was Leave → sign out → sign in. Desired: return / Rejoin restores the live
+match. Any player, any live code.
+
+Cause (generic, not 3RVNJU-only):
+1. V2.81.47 paints reconnect immediately on lastMatch so the branded loader
+   cannot hang — but `_renderReconnect` always said “Sign-in dropped” even
+   when Firebase still had a user. lastMatch itself is correct sticky state.
+2. Rejoin / restore / Play Online called `startMultiplayerGame(id, { id,
+   lobbyCode })` — a stub with no `state` / players. That is Error 3 or a
+   silent bounce back to reconnect. Auth flicker makes `joinLobby` fail
+   with “Not logged in” and the handler then started from that stub.
+3. Boot wrapped resume in a 14s outer timeout shorter than auth + getDoc +
+   start (6+8+8). The timeout set `resumedLastMatch = false` and called
+   `showReconnectOnly()` on top of an in-flight or finished hydrate.
+4. “Leave this match” only set `_rejoinDismissed`; it did not
+   `forgetLastMatch()`, so the next visit showed the same screen.
+
+Discarded: a one-off for 3RVNJU; lastMatch being “too sticky” as the
+primary bug (it is the resume hint); requiring a full auth cycle to
+hydrate. Auth drop is real when IndexedDB restore is late — Rejoin now
+waits for `whenReady` and opens Sign In only then.
+
+Fix: one hydrate plan (auth ready → fetch live game doc by id or code →
+start only with state/players). Rejoin / boot / Play Online share
+`hydrateLastMatch`. Stub payloads fetch before start. Leave on the
+reconnect screen clears lastMatch. Reconnect copy is “Sign-in dropped”
+only when signed out. Boot does not repaint reconnect over an in-flight
+or seated resume. SCHEMA 11. GAME_VERSION V2.81.48.
+
+### Smoke (this PR)
+
+- [ ] Return-to-site while in a live match auto-resumes into the board, or
+      Rejoin does, without Leave → sign out → sign in.
+- [ ] Rejoin with a late/restored session still hydrates (no Error 3 stub).
+- [ ] Leave this match clears the sticky banner; next visit is the normal
+      menu, not reconnect.
+- [ ] Finished / deleted lastMatch is forgotten, not stubbed as Join.
+- [ ] Cold load still reaches home/setup without the branded loader hang.
+
+---
+
 ## 9.14.26 — V2.81.47 boot hang + My Games Leave (SCHEMA 11)
 
 Robert Chrome Mac: live cold/return load stuck on the branded loader — gold

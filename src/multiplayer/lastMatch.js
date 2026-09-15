@@ -324,3 +324,130 @@ export function resolveRejoinRecoveryUi({
     showDismissEscape: !!rejoinRequired && !dismissed,
   };
 }
+
+// A lastMatch stub { id, lobbyCode } cannot hydrate. startMultiplayerGame
+// with only those fields is Error 3 / a silent bounce back to reconnect.
+export function hasHydratePayload(gameOrLobby = null) {
+  if (!gameOrLobby || typeof gameOrLobby !== 'object') return false;
+  if (gameOrLobby.state) return true;
+  const players = gameOrLobby.lobbyData?.players || gameOrLobby.players;
+  return Array.isArray(players) && players.length > 0;
+}
+
+export function shouldFetchGameDocBeforeStart({
+  game = null,
+  gameId = null,
+} = {}) {
+  if (!gameId && !game?.id) return false;
+  return !hasHydratePayload(game);
+}
+
+// Boot timeout / Rejoin miss must not paint reconnect on top of a live
+// hydrate. In-flight or already-seated is "still joining", not failure.
+export function shouldShowReconnectAfterResumeAttempt({
+  resumed = false,
+  resumeInFlight = false,
+  alreadyInGame = false,
+  lastMatch = null,
+} = {}) {
+  if (resumed || resumeInFlight || alreadyInGame) return false;
+  return !!(lastMatch?.gameId || lastMatch?.lobbyCode);
+}
+
+// "Leave this match" is confirmed Leave — clear the sticky hint.
+// Dismissing without confirmation keeps lastMatch (back / cancel).
+export function shouldForgetLastMatchOnDismissRejoin({
+  confirmedLeave = false,
+} = {}) {
+  return confirmedLeave === true;
+}
+
+// Transient getDoc / token flicker must keep lastMatch so Rejoin retries.
+// Forget only when the live doc is gone or no longer joinable.
+export function shouldForgetLastMatchOnHydrateFailure({
+  gameMissing = false,
+  gameFinished = false,
+} = {}) {
+  return gameMissing === true || gameFinished === true;
+}
+
+export function resolveReconnectCopy({
+  signedIn = false,
+  resumeInFlight = false,
+  lobbyCode = null,
+} = {}) {
+  const code = lobbyCode || 'the match';
+  if (resumeInFlight) {
+    return {
+      title: 'Still in the match',
+      detail: `Rejoining ${code}…`,
+    };
+  }
+  if (!signedIn) {
+    return {
+      title: 'Still in the match',
+      detail: 'Sign-in dropped. Rejoin the live game — do not start a new one.',
+    };
+  }
+  return {
+    title: 'Still in the match',
+    detail: `You are still in ${code}. Rejoin to continue — do not start a new one.`,
+  };
+}
+
+// One rejoin plan for boot, Rejoin tap, and Play Online. Never start from
+// a stub; never treat auth-not-ready as a dead match.
+export function resolveRejoinHydratePlan({
+  signedIn = false,
+  authReady = true,
+  lastMatch = null,
+  fetchedGame = null,
+  fetchedMissing = false,
+  joinResult = null,
+} = {}) {
+  if (!authReady) return { action: 'wait-auth' };
+  if (!signedIn) return { action: 'show-auth' };
+  if (!lastMatch?.gameId && !lastMatch?.lobbyCode) return { action: 'none' };
+
+  if (fetchedGame) {
+    const status = fetchedGame.status;
+    if (status && status !== 'active' && status !== 'starting') {
+      return { action: 'forget', reason: 'finished' };
+    }
+    if (hasHydratePayload(fetchedGame) || fetchedGame.id) {
+      return { action: 'start-game', gameId: fetchedGame.id };
+    }
+  }
+
+  if (joinResult?.kind === 'game' && (hasHydratePayload(joinResult.game) || joinResult.gameId)) {
+    return { action: 'start-game', gameId: joinResult.gameId || joinResult.game?.id };
+  }
+  if (joinResult?.kind === 'lobby') return { action: 'show-lobby' };
+  if (joinResult?.kind === 'error') {
+    return { action: 'error', reason: joinResult.error || 'could-not-hydrate' };
+  }
+
+  if (lastMatch.gameId && !fetchedMissing && fetchedGame === null) {
+    return { action: 'fetch-game' };
+  }
+  if (lastMatch.lobbyCode && !joinResult) return { action: 'join-by-code' };
+  if (fetchedMissing && lastMatch.lobbyCode && !joinResult) {
+    return { action: 'join-by-code' };
+  }
+  if (fetchedMissing && !lastMatch.lobbyCode) {
+    return { action: 'forget', reason: 'missing' };
+  }
+  return { action: 'error', reason: 'could-not-hydrate' };
+}
+
+// Same game already hydrating or seated — do not construct a second GameState.
+export function shouldReuseInFlightMultiplayerStart({
+  startingGameId = null,
+  requestedGameId = null,
+  alreadyInGame = false,
+  seatedGameId = null,
+} = {}) {
+  if (!requestedGameId) return false;
+  if (alreadyInGame && seatedGameId === requestedGameId) return true;
+  return startingGameId === requestedGameId;
+}
