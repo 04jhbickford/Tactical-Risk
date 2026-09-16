@@ -135,6 +135,8 @@ const {
   shouldApplyQueueGesture,
   shouldBeginNewQueueGesture,
   shouldCommitOverlayGesture,
+  shouldAllowPlaceQueueTypeSwitch,
+  resetPlaceQueueGestureState,
   resolveQueueUnitType,
   pickPanelHitFromStack,
   isPointInPanelRect,
@@ -176,7 +178,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.48', GAME_VERSION === 'V2.81.48');
+check('GAME_VERSION is V2.81.49', GAME_VERSION === 'V2.81.49');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1079,6 +1081,61 @@ console.log('=== B26–B30 James client: join bind, stay in view, deploy, Max, +
   });
   check('B30: Destroyer + does not increment Transport',
     q.destroyer === 1 && q.transport === 4);
+
+  // Robert/Sean 16 Sep: leftover last-row lock after Confirm looked like
+  // a B30 retarget (elapsed refreshed to 0) and blocked every other type
+  // until refresh. Empty-place is the same lock once type A is exhausted.
+  check('V2.81.49: leftover last-row lock after Confirm is the live bug',
+    shouldIgnoreQueueRetarget({
+      lockedType: 'infantry',
+      incomingType: 'tanks',
+      elapsedMs: 0,
+    }) === true);
+  check('V2.81.49: after Confirm (queue empty) type B is not a retarget',
+    shouldIgnoreQueueRetarget({
+      lockedType: 'infantry',
+      incomingType: 'tanks',
+      elapsedMs: 0,
+      committed: true,
+    }) === false
+    && shouldIgnoreQueueRetarget({
+      lockedType: 'infantry',
+      incomingType: 'tanks',
+      elapsedMs: 50,
+      newGesture: true,
+    }) === false);
+  check('V2.81.49: type switch after Confirm is allowed (same land or type B)',
+    shouldAllowPlaceQueueTypeSwitch({
+      incomingType: 'tanks',
+      lastQueueUnitType: 'infantry',
+      queueEmpty: true,
+      committed: true,
+      currentGestureLockType: null,
+    }) === true);
+  check('V2.81.49: mixed stack before Confirm is still allowed on a new +',
+    shouldAllowPlaceQueueTypeSwitch({
+      incomingType: 'tanks',
+      lastQueueUnitType: 'infantry',
+      queueEmpty: false,
+      currentGestureLockType: 'tanks',
+    }) === true);
+  check('V2.81.49: B30 mid-gesture retarget still blocked',
+    shouldAllowPlaceQueueTypeSwitch({
+      incomingType: 'transport',
+      lastQueueUnitType: 'destroyer',
+      queueEmpty: false,
+      currentGestureLockType: 'destroyer',
+    }) === false);
+  const cleared = resetPlaceQueueGestureState();
+  check('V2.81.49: Confirm resets leftover type lock',
+    cleared.lastQueueUnitType === null
+    && cleared.queueLockType === null
+    && cleared.queueGestureApplied === false
+    && cleared.lastQueueGestureAt === 0);
+  check('V2.81.49: caller uses this-pointer lock, not last-row type',
+    panelSrc.includes('shouldAllowPlaceQueueTypeSwitch')
+    && panelSrc.includes('_resetPlaceQueueGestureAfterConfirm')
+    && /shouldIgnoreQueueRetarget\(\{\s*lockedType: this\._queueLockType/.test(panelSrc));
 }
 
 console.log('=== B31 Max/panel hit-test: not the map, not LOG ===');

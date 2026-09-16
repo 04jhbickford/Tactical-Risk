@@ -64,6 +64,8 @@ import {
   shouldApplyQueueGesture,
   shouldBeginNewQueueGesture,
   shouldCommitOverlayGesture,
+  shouldAllowPlaceQueueTypeSwitch,
+  resetPlaceQueueGestureState,
   resolveQueueUnitType,
   pickPanelHitFromStack,
   pointHitsPlayerPanel,
@@ -605,6 +607,7 @@ export class PlayerPanel {
     this.el.addEventListener('pointerdown', (e) => this._onPanelPointerDown(e), { capture: true, passive: true });
     this.contentEl.addEventListener('pointercancel', () => {
       this._pointerLock = capturePanelPointerLock({ action: 'ignore-cancel', disabled: true });
+      this._queueLockType = null;
     });
     this.contentEl.addEventListener('pointerup', () => this._clearHeldChrome());
     this.contentEl.addEventListener('pointerleave', () => this._clearHeldChrome());
@@ -649,6 +652,9 @@ export class PlayerPanel {
       elapsedMs: Date.now() - (this._lastQueueGestureAt || 0),
     })) {
       this._queueGestureApplied = false;
+      // Leftover last-row lock is not this pointer. A new + / Max on
+      // type B must not resolve back onto type A (Confirm leftover).
+      this._queueLockType = null;
     }
     this._panelPointerAt = Date.now();
     this._markHeldChrome(e.target);
@@ -1061,6 +1067,7 @@ export class PlayerPanel {
       territory: dest.name,
       unitTypes,
     });
+    this._resetPlaceQueueGestureAfterConfirm();
     const left = this._phoneDeployRemainingOfType(unitType);
     if (shouldClearPhoneIconAfterExhausted({ unitType, remainingOfType: left })) {
       this._clearPhoneIconType();
@@ -1109,6 +1116,7 @@ export class PlayerPanel {
     if (shouldClearPhoneIconAfterExhausted({ unitType, remainingOfType: left })) {
       this._clearPhoneIconType();
     }
+    this._resetPlaceQueueGestureAfterConfirm();
   }
 
   _phoneMoveDests(from, player, isCombatMove) {
@@ -1292,6 +1300,15 @@ export class PlayerPanel {
     return false;
   }
 
+  _resetPlaceQueueGestureAfterConfirm() {
+    const cleared = resetPlaceQueueGestureState();
+    this._lastQueueUnitType = cleared.lastQueueUnitType;
+    this._queueLockType = cleared.queueLockType;
+    this._queueGestureApplied = cleared.queueGestureApplied;
+    this._lastQueueGestureAt = cleared.lastQueueGestureAt;
+    this._pointerLock = null;
+  }
+
   _commitStagedMobilize() {
     if (!this.onAction) return false;
     const dest = this._phoneDeployDest();
@@ -1306,6 +1323,7 @@ export class PlayerPanel {
     this.placementQueue = {};
     this.selectedTerritory = dest;
     this._phoneDeployLandName = dest.name;
+    this._resetPlaceQueueGestureAfterConfirm();
     this._scheduleRender();
     return true;
   }
@@ -1325,6 +1343,12 @@ export class PlayerPanel {
       this.placementQueue = queueAfterDeployAttempt({ queueBefore: queue, placed });
       this.selectedTerritory = keepTerritory;
       this._phoneDeployLandName = keepTerritory.name;
+      // Queue empty after a real place — leftover type lock must not
+      // pin the next Confirm (same land or type B). Failed Deploy keeps
+      // the queue (B24) and therefore the current-gesture lock.
+      if (queuedCount(this.placementQueue) === 0) {
+        this._resetPlaceQueueGestureAfterConfirm();
+      }
       this._scheduleRender();
     };
     const ret = this.onAction('place-units-batch', {
@@ -4631,10 +4655,22 @@ export class PlayerPanel {
             lockedType: this._queueLockType,
             incomingType: incoming,
           });
+          const queueEmpty = queuedCount(this.placementQueue || {}) === 0;
+          if (!shouldAllowPlaceQueueTypeSwitch({
+            incomingType: incoming,
+            lastQueueUnitType: this._lastQueueUnitType,
+            queueEmpty,
+            committed: queueEmpty,
+            currentGestureLockType: this._queueLockType,
+          })) {
+            return;
+          }
           if (shouldIgnoreQueueRetarget({
-            lockedType: this._lastQueueUnitType,
-            incomingType: unitType,
+            lockedType: this._queueLockType,
+            incomingType: incoming,
             elapsedMs: Date.now() - (this._lastQueueGestureAt || 0),
+            committed: queueEmpty,
+            newGesture: !this._queueLockType,
           })) {
             return;
           }
@@ -4664,10 +4700,22 @@ export class PlayerPanel {
             lockedType: this._queueLockType,
             incomingType: incoming,
           });
+          const queueEmpty = queuedCount(this.placementQueue || {}) === 0;
+          if (!shouldAllowPlaceQueueTypeSwitch({
+            incomingType: incoming,
+            lastQueueUnitType: this._lastQueueUnitType,
+            queueEmpty,
+            committed: queueEmpty,
+            currentGestureLockType: this._queueLockType,
+          })) {
+            return;
+          }
           if (shouldIgnoreQueueRetarget({
-            lockedType: this._lastQueueUnitType,
-            incomingType: unitType,
+            lockedType: this._queueLockType,
+            incomingType: incoming,
             elapsedMs: Date.now() - (this._lastQueueGestureAt || 0),
+            committed: queueEmpty,
+            newGesture: !this._queueLockType,
           })) {
             return;
           }
