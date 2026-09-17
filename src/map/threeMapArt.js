@@ -1,22 +1,19 @@
-// Canvas-SoT map art + wrap helpers for the ?three=1 preview.
-// Reuses map/smallMap.jpeg and base+relief tiles. Does not replace live Canvas.
+// Canvas-SoT geography + wrap helpers for the ?three=1 preview.
+// Bone plates + hairline/foam. Does not replace live Canvas.
 
 import * as THREE from 'three';
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
+import { applyPaperUVs } from './threeMapPalette.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
 export const WORLD_H = MAP_HEIGHT * SCALE;
-// Low plates — tall extrude walls were the "random color rectangles"
-// James saw (south faces of Africa/Egypt reading as solid quads).
-export const BASE_LAND = 0.42;
-export const MT_LAND = 0.72;
+export const BASE_LAND = 0.72;
+export const MT_LAND = 1.18;
 export const WRAP_COPIES = [-1, 0, 1];
-export const OCEAN_HEX = 0x1c4549;
-export const OCEAN_CSS = '#1c4549';
 
 const TILE_SIZE = 256;
 const TILE_COLS = 14;
@@ -109,11 +106,13 @@ async function mapPool(items, limit, worker) {
 }
 
 export async function bakeWorldTexture() {
+  // Kept for debug / fallback. Preview board no longer composites this
+  // atlas onto a full-map quad (that was the neon-teal + tile rectangles).
   const canvas = document.createElement('canvas');
   canvas.width = BAKE_W;
   canvas.height = BAKE_H;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = OCEAN_CSS;
+  ctx.fillStyle = '#152228';
   ctx.fillRect(0, 0, BAKE_W, BAKE_H);
 
   const small = await loadImageTimeout('map/smallMap.jpeg', 8000);
@@ -164,7 +163,6 @@ export async function bakeWorldTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
-  tex.flipY = true;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
@@ -178,9 +176,7 @@ export function applyWorldUVs(geometry) {
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) / SCALE;
     const wy = -pos.getZ(i) / SCALE;
-    const u = Math.min(1, Math.max(0, wx / MAP_WIDTH));
-    const v = Math.min(1, Math.max(0, 1 - wy / MAP_HEIGHT));
-    uv.setXY(i, u, v);
+    uv.setXY(i, wx / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
   }
   uv.needsUpdate = true;
 }
@@ -254,6 +250,14 @@ export function territoryCenter(territory) {
 }
 
 export function landHeightFor(territory, center) {
+  const area = center?.area || 0;
+  let h = BASE_LAND;
+  if (area > 9000) h = 0.9;
+  else if (area > 3500) h = 0.8;
+  else if (area < 700) h = 0.5;
+  const continent = territory.continent || '';
+  if (continent === 'Europe' || continent === 'Asia') h += 0.1;
+  if (continent === 'Africa') h += 0.04;
   let hash = 0;
   const str = territory.name || '';
   for (let i = 0; i < str.length; i++) {
@@ -261,45 +265,9 @@ export function landHeightFor(territory, center) {
     hash |= 0;
   }
   hash = Math.abs(hash);
-  if ((center?.area || 0) > 3500 && hash % 3 === 0) return MT_LAND;
-  if (hash % 3 === 1) return BASE_LAND + 0.22;
-  return BASE_LAND;
-}
-
-export function assignTopSideGroups(geometry) {
-  const pos = geometry.attributes.position;
-  const idx = geometry.index;
-  if (!pos || !idx) return;
-  const top = [];
-  const side = [];
-  const a = new THREE.Vector3();
-  const b = new THREE.Vector3();
-  const c = new THREE.Vector3();
-  const ab = new THREE.Vector3();
-  const ac = new THREE.Vector3();
-  const n = new THREE.Vector3();
-  for (let i = 0; i < idx.count; i += 3) {
-    const i0 = idx.getX(i);
-    const i1 = idx.getX(i + 1);
-    const i2 = idx.getX(i + 2);
-    a.fromBufferAttribute(pos, i0);
-    b.fromBufferAttribute(pos, i1);
-    c.fromBufferAttribute(pos, i2);
-    ab.subVectors(b, a);
-    ac.subVectors(c, a);
-    n.crossVectors(ab, ac);
-    if (n.y > 0 && Math.abs(n.y) >= Math.abs(n.x) && Math.abs(n.y) >= Math.abs(n.z)) {
-      top.push(i0, i1, i2);
-    } else {
-      side.push(i0, i1, i2);
-    }
-  }
-  const merged = top.concat(side);
-  idx.set(merged);
-  idx.needsUpdate = true;
-  geometry.clearGroups();
-  if (top.length) geometry.addGroup(0, top.length, 0);
-  if (side.length) geometry.addGroup(top.length, side.length, 1);
+  if (area > 2800 && hash % 5 === 0) return Math.min(MT_LAND, h + 0.32);
+  if (hash % 3 === 1) return h + 0.08;
+  return h;
 }
 
 export function makeLandMesh(territory, materials, height) {
@@ -320,28 +288,31 @@ export function makeLandMesh(territory, materials, height) {
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
     bevelEnabled: true,
-    bevelThickness: 0.04,
-    bevelSize: 0.03,
-    bevelSegments: 1,
-    curveSegments: 1,
+    bevelThickness: 0.14,
+    bevelSize: 0.11,
+    bevelSegments: 3,
+    curveSegments: 2,
   });
   geom.rotateX(-Math.PI / 2);
-  applyWorldUVs(geom);
-  assignTopSideGroups(geom);
-  const mesh = new THREE.Mesh(geom, [materials.top, materials.side]);
+  geom.computeVertexNormals();
+  applyPaperUVs(geom);
+  const mesh = new THREE.Mesh(geom, [materials.side, materials.top, materials.bottom || materials.side]);
   mesh.userData.territory = territory;
   mesh.userData.landHeight = height;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   return mesh;
 }
 
-export function makeLineMat(color, linewidth) {
+export function makeLineMat(color, linewidth, opacity = 0.72) {
   return new LineMaterial({
     color,
     linewidth,
     worldUnits: false,
     transparent: true,
-    opacity: 0.9,
+    opacity,
     depthTest: true,
+    depthWrite: false,
   });
 }
 
@@ -366,8 +337,28 @@ export function addTerritoryInk(group, territory, material, y) {
     if (!ring) continue;
     const line = makeBorderLine(ring, y, material);
     line.userData.territory = territory;
+    line.renderOrder = 2;
     group.add(line);
   }
+}
+
+export function addFoamCoast(group, territory, material, y = 0.03) {
+  if (territory.isWater) return;
+  for (const poly of territory.polygons || []) {
+    const ring = simplifyRing(poly);
+    if (!ring) continue;
+    const line = makeBorderLine(ring, y, material);
+    line.userData.territory = territory;
+    line.userData.kind = 'foam';
+    line.renderOrder = 1;
+    group.add(line);
+  }
+}
+
+export function makeBoardTexturePlane() {
+  // Intentionally empty — a full-map textured quad was the neon-teal
+  // rectangle / ghost-tile artifact. Ocean is a scene-level plane now.
+  return null;
 }
 
 export function createWrapGroups(parent) {
@@ -402,7 +393,7 @@ export function visibleCopyRange(camera) {
   if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
     return { start: 0, end: 0, minX: 0, maxX: WORLD_W };
   }
-  const pad = WORLD_W * 0.02;
+  const pad = WORLD_W * 0.01;
   const start = Math.floor((minX - pad) / WORLD_W);
   const end = Math.floor((maxX + pad) / WORLD_W);
   return { start, end, minX, maxX };
@@ -439,9 +430,9 @@ export function wrapPanLikeCanvas(camera, controls) {
 }
 
 export function maxZoomDistance(aspect, fovDeg) {
-  const fov = THREE.MathUtils.degToRad(fovDeg || 42);
+  const fov = THREE.MathUtils.degToRad(fovDeg || 40);
   const wide = Math.max(aspect || 1, 0.55);
-  const wantW = WORLD_W * 1.22;
-  const dist = wantW / (2 * Math.tan(fov / 2) * wide * 1.08);
-  return THREE.MathUtils.clamp(dist, 210, 420);
+  const wantW = WORLD_W * 1.04;
+  const dist = wantW / (2 * Math.tan(fov / 2) * wide * 1.12);
+  return THREE.MathUtils.clamp(dist, 150, 268);
 }

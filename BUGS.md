@@ -2,16 +2,19 @@
 
 ---
 
-## 9.17.26 — V2.81.51-three-polish.4 (preview only, SCHEMA 11)
+## 9.17.26 — V2.81.51-three-polish.5 (preview only, SCHEMA 11)
 
-James lookpass on PR 43 Three preview. SCHEMA 11. Live Canvas untouched.
+James he-corrects + Arc SOTA gap-close on `?three=1` only. Do not merge over live Canvas V2.81.51.
 
-1. North-up — higher/overhead camera, azimuth locked south-of-target so UK/Germany sit above Egypt/Africa on screen (world assert `africaSouthOfEurope` kept).
-2. No color rectangles — dropped the full-map bake quad; land sides are ink, not stretched tile UVs; plates flattened so south walls cannot read as solid blocks.
-3. Calmer palette — deep ocean `#1c4549`, parchment multiply + whisper ownership, muted gold select, less ACES punch.
-4. Confirm CTA — named `Confirm · land` / `Confirm inspect · land` after soft ack. Not Inspect / Noted. inspect ≠ commit. No click-through.
+1. **North-up** — overhead camera, slight south azimuth. Egypt / Africa stay south of Germany / Med (`africaSouthOfEurope`). No south-facing extrusion slabs.
+2. **Zero color rectangles** — removed the full-map bake quad; land walls use ink Standard materials (not Canvas tile UVs). Bake fill is no longer neon `#44C5BD`.
+3. **Palette** — deep desaturated ocean `#152228` + cheap Fresnel shelf; warm bone land + soft faction wash; thin foam coast; hairline borders; gold select ring. Amber reserved for named Confirm.
+4. **Lighting** — soft key + hemisphere, ACES 0.94, smoother bevel (3 segments), lower plates.
+5. **Stacks** — pip+N mid-zoom; expand types on select; labels offset and hide under stacks / select.
+6. **HUD** — L0 thin (☰ · PHASE · seat · IPC); L1 one peek; bottom named Confirm. No Inspect / Noted.
+7. **Chits** — from-scratch INF/TNK/FTR/ship (+ART) glyphs in `assets/three/chits` and `threeMapChits.js`. Faction rim. Readable at 390.
 
-Open: preview + `?three=1`. GAME_VERSION V2.81.51-three-polish.4.
+Open: preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.5. Default `/` stays Canvas lobby. Continues the .4 lookpass (still had tile UVs on tops).
 
 ---
 

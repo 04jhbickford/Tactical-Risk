@@ -1,11 +1,10 @@
 // Timeboxed Three.js map preview. Gated by ?three=1 from main.js.
-// Canvas SoT coords + tiles. Wrap like camera.js. Preview only — do not replace live Canvas.
+// Canvas SoT coords + wrap. Bone/ocean art. Preview only — do not replace live Canvas.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import { TerritoryMap } from './territoryMap.js';
-import { getUnitIconPath, getGenericUnitIconPath } from '../utils/unitIcons.js';
 import {
   WORLD_W,
   WORLD_H,
@@ -14,14 +13,10 @@ import {
   worldToScene,
   sceneToWorld,
   wrapWorldX,
-  mixHex,
-  darkenHex,
-  loadImage,
-  bakeWorldTexture,
   makeLandMesh,
   makeLineMat,
   addTerritoryInk,
-  OCEAN_HEX,
+  addFoamCoast,
   createWrapGroups,
   syncWrapVisibility,
   wrapPanLikeCanvas,
@@ -31,6 +26,8 @@ import {
   simplifyRing,
   makeBorderLine,
 } from './threeMapArt.js';
+import { PALETTE, makeLandMaterials, makeOceanMesh } from './threeMapPalette.js';
+import { makeChitTexture, makePipTexture } from './threeMapChits.js';
 import { injectThreeChrome, shortType } from './threeMapChrome.js';
 import {
   dismissStartupLoader,
@@ -139,100 +136,24 @@ function stackOwner(stacks, territory) {
   return stacks[0]?.owner || territory.originalOwner || 'Russians';
 }
 
-async function makeChitTexture(type, owner, quantity, unitDefs, ownerColor) {
-  const factionImg = await loadImage(getUnitIconPath(type, owner));
-  const genericImg = factionImg ? null : await loadImage(getGenericUnitIconPath(type, unitDefs));
-  const img = factionImg || genericImg;
-  const canvas = document.createElement('canvas');
-  canvas.width = 160;
-  canvas.height = 188;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 160, 188);
-  ctx.fillStyle = ownerColor || '#2a2438';
-  ctx.beginPath();
-  ctx.arc(80, 70, 70, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#f3ead2';
-  ctx.beginPath();
-  ctx.arc(80, 70, 58, 0, Math.PI * 2);
-  ctx.fill();
-  if (img) {
-    ctx.drawImage(img, 18, 8, 124, 124);
-  } else {
-    ctx.fillStyle = '#1a1420';
-    ctx.font = 'bold 40px "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(shortType(type), 80, 70);
-  }
-  ctx.fillStyle = 'rgba(18, 16, 24, 0.92)';
-  ctx.strokeStyle = ownerColor || '#c9a44a';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.roundRect(22, 142, 116, 38, 9);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = '#f4ead4';
-  ctx.font = 'bold 24px "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(shortType(type), 80, 161);
-  if (quantity > 1) {
-    ctx.fillStyle = '#c9a44a';
-    ctx.beginPath();
-    ctx.arc(128, 26, 22, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#1a1420';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.fillStyle = '#1a1420';
-    ctx.font = 'bold 22px "Segoe UI", sans-serif';
-    ctx.fillText(`×${quantity}`, 128, 27);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
-
-function makePipTexture(ownerColor, total) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 128, 128);
-  ctx.fillStyle = ownerColor || '#2a2438';
-  ctx.beginPath();
-  ctx.arc(64, 64, 58, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#f3ead2';
-  ctx.beginPath();
-  ctx.arc(64, 64, 42, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#1a1420';
-  ctx.font = 'bold 42px "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(total), 64, 66);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+function chitTextureFor(type, ownerColor, quantity) {
+  return makeChitTexture(type, ownerColor, quantity, shortType(type));
 }
 
 function makeLabelTexture(name) {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
+  canvas.width = 320;
   canvas.height = 64;
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 256, 64);
-  ctx.font = 'bold 22px "Segoe UI", sans-serif';
+  ctx.clearRect(0, 0, 320, 64);
+  ctx.font = '600 20px "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-  ctx.lineWidth = 5;
-  ctx.strokeText(name, 128, 32);
-  ctx.fillStyle = '#f4ead4';
-  ctx.fillText(name, 128, 32);
+  ctx.strokeStyle = 'rgba(21, 34, 40, 0.72)';
+  ctx.lineWidth = 4;
+  ctx.strokeText(name, 160, 32);
+  ctx.fillStyle = '#efe6d6';
+  ctx.fillText(name, 160, 32);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
@@ -264,13 +185,6 @@ export async function bootThreeMapSpike() {
     return;
   }
 
-  reportStartupStatus('Baking Canvas map tiles…', 48);
-  const baked = await bakeWorldTexture();
-
-  const continentColor = new Map();
-  for (const c of continents) {
-    for (const name of c.territories || []) continentColor.set(name, c.color);
-  }
   const factionColor = new Map();
   for (const f of setup.classic?.factions || setup.factions || []) {
     factionColor.set(f.id, f.color || FACTION_FALLBACK[f.id]);
@@ -305,53 +219,42 @@ export async function bootThreeMapSpike() {
     eastCanada: canadaC,
     africaSouthOfEurope,
     africaNotUnderNA,
-    hasSmallMap: baked.hasSmallMap,
-    tiles: { base: baked.baseCount, relief: baked.reliefCount },
+    continents: continents.length,
+    unitTypes: Object.keys(unitDefs || {}).length,
   });
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x122428);
-  scene.fog = new THREE.Fog(0x122428, 520, 1100);
+  scene.background = new THREE.Color(PALETTE.oceanDeep);
+  scene.fog = new THREE.Fog(PALETTE.oceanFog, 520, 1100);
 
-  const ocean = new THREE.Mesh(
-    new THREE.PlaneGeometry(WORLD_W * 3.2, WORLD_H * 1.25),
-    new THREE.MeshLambertMaterial({ color: OCEAN_HEX }),
-  );
-  ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(WORLD_W / 2, -0.02, -WORLD_H / 2);
+  const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4);
+  ocean.position.set(WORLD_W / 2, -0.08, -WORLD_H / 2);
   scene.add(ocean);
 
   const board = new THREE.Group();
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  const landBorderMat = makeLineMat(0x241c14, 1.15);
-  const waterBorderMat = makeLineMat(0x16383a, 0.55);
-  const selectMat = makeLineMat(0xc4a056, 2.4);
-  lineMats.push(landBorderMat, waterBorderMat, selectMat);
+  const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.58);
+  const waterBorderMat = makeLineMat(PALETTE.waterHair, 0.4, 0.18);
+  const foamMat = makeLineMat(PALETTE.foam, 1.7, 0.28);
+  const selectMat = makeLineMat(PALETTE.select, 1.85, 0.95);
+  const selectSoftMat = makeLineMat(PALETTE.selectSoft, 3.4, 0.28);
+  lineMats.push(landBorderMat, waterBorderMat, foamMat, selectMat, selectSoftMat);
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
-    const ownerHex = factionColor.get(owner) || continentColor.get(land.name) || '#7a8b6f';
-    landMats.set(land.name, {
-      top: new THREE.MeshLambertMaterial({
-        map: baked.texture,
-        color: mixHex(ownerHex, '#e6dcc4', 0.84),
-        emissive: mixHex('#000000', ownerHex, 0.045),
-      }),
-      side: new THREE.MeshLambertMaterial({
-        color: darkenHex(mixHex(ownerHex, '#2a241c', 0.55), 0.28),
-      }),
-    });
+    const ownerHex = factionColor.get(owner) || FACTION_FALLBACK[owner] || PALETTE.landBone;
+    landMats.set(land.name, makeLandMaterials(ownerHex));
   }
 
   const textureCache = new Map();
-  async function chitTexture(type, owner, quantity) {
+  function chitTexture(type, owner, quantity) {
     const key = `chit|${owner}|${type}|${quantity}`;
     if (!textureCache.has(key)) {
       textureCache.set(
         key,
-        makeChitTexture(type, owner, quantity, unitDefs, factionColor.get(owner) || FACTION_FALLBACK[owner]),
+        chitTextureFor(type, factionColor.get(owner) || FACTION_FALLBACK[owner], quantity),
       );
     }
     return textureCache.get(key);
@@ -359,17 +262,17 @@ export async function bootThreeMapSpike() {
   function pipTexture(owner, total) {
     const key = `pip|${owner}|${total}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, Promise.resolve(makePipTexture(factionColor.get(owner) || FACTION_FALLBACK[owner], total)));
+      textureCache.set(key, makePipTexture(factionColor.get(owner) || FACTION_FALLBACK[owner], total));
     }
     return textureCache.get(key);
   }
   function labelTexture(name) {
     const key = `label|${name}`;
-    if (!textureCache.has(key)) textureCache.set(key, Promise.resolve(makeLabelTexture(name)));
+    if (!textureCache.has(key)) textureCache.set(key, makeLabelTexture(name));
     return textureCache.get(key);
   }
 
-  reportStartupStatus('Building Three.js board…', 72);
+  reportStartupStatus('Building Three.js board…', 62);
   for (const group of wrapGroups) {
     for (const land of lands) {
       const center = territoryCenter(land);
@@ -379,10 +282,11 @@ export async function bootThreeMapSpike() {
       if (!mesh) continue;
       group.add(mesh);
       pickables.push(mesh);
-      addTerritoryInk(group, land, landBorderMat, height + 0.12);
+      addFoamCoast(group, land, foamMat, 0.03);
+      addTerritoryInk(group, land, landBorderMat, height + 0.06);
     }
     for (const water of waters) {
-      addTerritoryInk(group, water, waterBorderMat, 0.05);
+      addTerritoryInk(group, water, waterBorderMat, 0.04);
     }
   }
 
@@ -402,7 +306,7 @@ export async function bootThreeMapSpike() {
       const tokenH = 10.8;
       for (let i = 0; i < stacks.length; i++) {
         const stack = stacks[i];
-        const tex = await chitTexture(stack.type, stack.owner, stack.quantity);
+        const tex = chitTexture(stack.type, stack.owner, stack.quantity);
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
@@ -426,7 +330,7 @@ export async function bootThreeMapSpike() {
         expanded.push(sprite);
       }
 
-      const pipTex = await pipTexture(owner, total);
+      const pipTex = pipTexture(owner, total);
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
@@ -443,17 +347,17 @@ export async function bootThreeMapSpike() {
 
       let label = null;
       if (!t.isWater) {
-        const labTex = await labelTexture(t.name);
+        const labTex = labelTexture(t.name);
         label = new THREE.Sprite(new THREE.SpriteMaterial({
           map: labTex,
           transparent: true,
           depthTest: false,
           depthWrite: false,
         }));
-        const lo = LABEL_OFFSETS[t.name] || { x: 0, y: -22 };
+        const lo = LABEL_OFFSETS[t.name] || { x: 0, y: -36 };
         const lp = worldToScene(center.x + lo.x, center.y + lo.y);
-        label.scale.set(22, 5.5, 1);
-        label.position.set(lp.x, height + 8.6, lp.z);
+        label.scale.set(24, 4.8, 1);
+        label.position.set(lp.x, height + 3.2, lp.z);
         label.renderOrder = 6;
         label.userData.territory = t;
         label.userData.kind = 'label';
@@ -471,19 +375,19 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(0xe7eef2, 0x3d3830, 0.95));
-  const sun = new THREE.DirectionalLight(0xfff4e4, 0.38);
-  sun.position.set(40, 220, -30);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 0.92));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.48);
+  sun.position.set(40, 220, 18);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xb7c4c8, 0.16);
-  fill.position.set(-80, 90, -40);
+  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.14);
+  fill.position.set(-90, 90, -40);
   scene.add(fill);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.86;
+  renderer.toneMappingExposure = 0.94;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -500,9 +404,9 @@ export async function bootThreeMapSpike() {
   controls.touches.ONE = THREE.TOUCH.PAN;
   controls.touches.TWO = THREE.TOUCH.DOLLY;
   controls.minDistance = 38;
-  controls.maxDistance = 320;
-  controls.minPolarAngle = 0.18;
-  controls.maxPolarAngle = 0.72;
+  controls.maxDistance = 268;
+  controls.minPolarAngle = 0.08;
+  controls.maxPolarAngle = 0.42;
   controls.minAzimuthAngle = Math.PI;
   controls.maxAzimuthAngle = Math.PI;
   controls.zoomSpeed = isCoarsePointer() ? 1.15 : 0.95;
@@ -520,12 +424,13 @@ export async function bootThreeMapSpike() {
 
   function frameEuropeAfrica() {
     const phone = isCoarsePointer();
-    // Europe / Med, slightly north of the old 920 focus so Africa is south
-    // on screen instead of a near-camera wall.
-    const focus = worldToScene(1080, 760);
-    camera.fov = phone ? 40 : 36;
+    // Med / Egypt / Germany. Overhead so south walls are not camera-facing slabs.
+    const focus = worldToScene(1160, 860);
+    camera.fov = phone ? 42 : 36;
     camera.updateProjectionMatrix();
-    camera.position.set(focus.x, phone ? 228 : 205, focus.z - (phone ? 34 : 30));
+    const lift = phone ? 196 : 176;
+    const south = phone ? 26 : 20;
+    camera.position.set(focus.x, lift, focus.z - south);
     controls.target.set(focus.x, 0, focus.z);
     applyZoomCap();
     controls.update();
@@ -535,10 +440,10 @@ export async function bootThreeMapSpike() {
     const phone = isCoarsePointer();
     const cx = WORLD_W / 2;
     const cz = -WORLD_H / 2;
-    camera.fov = phone ? 40 : 36;
+    camera.fov = phone ? 42 : 36;
     camera.updateProjectionMatrix();
     const cap = maxZoomDistance(camera.aspect, camera.fov);
-    camera.position.set(cx, Math.min(cap * 0.88, phone ? 250 : 230), cz - Math.min(cap * 0.16, phone ? 42 : 36));
+    camera.position.set(cx, Math.min(cap * 0.86, phone ? 220 : 200), cz - Math.min(cap * 0.14, phone ? 32 : 24));
     controls.target.set(cx, 0, cz);
     applyZoomCap();
     controls.update();
@@ -645,10 +550,13 @@ export async function bootThreeMapSpike() {
       for (const poly of territory.polygons || []) {
         const ring = simplifyRing(poly);
         if (!ring) continue;
+        const soft = makeBorderLine(ring, y - 0.02, selectSoftMat);
+        soft.renderOrder = 3;
         const line = makeBorderLine(ring, y, selectMat);
-        line.renderOrder = 3;
+        line.renderOrder = 4;
+        group.add(soft);
         group.add(line);
-        selectInk.push(line);
+        selectInk.push(soft, line);
       }
     }
   }
@@ -664,9 +572,13 @@ export async function bootThreeMapSpike() {
     if (!force && next === denseMode) {
       for (const rec of unitRecords) {
         const expand = rec.territory.name === selectedName || !next;
-        if (rec.label) rec.label.visible = !rec.territory.isWater && rec.territory.name !== selectedName;
         rec.pip.visible = !expand;
         for (const s of rec.expanded) s.visible = expand;
+        if (rec.label) {
+          rec.label.visible = !rec.territory.isWater
+            && rec.territory.name !== selectedName
+            && !expand;
+        }
       }
       return;
     }
@@ -675,7 +587,11 @@ export async function bootThreeMapSpike() {
       const expand = rec.territory.name === selectedName || !denseMode;
       rec.pip.visible = !expand;
       for (const s of rec.expanded) s.visible = expand;
-      if (rec.label) rec.label.visible = !rec.territory.isWater && rec.territory.name !== selectedName;
+      if (rec.label) {
+        rec.label.visible = !rec.territory.isWater
+          && rec.territory.name !== selectedName
+          && !expand;
+      }
     }
   }
 
@@ -685,7 +601,7 @@ export async function bootThreeMapSpike() {
     if (hover) {
       if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x000000);
       hoveredName = next && !next.isWater ? next.name : null;
-      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x1c1810);
+        if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x1a1408);
       renderer.domElement.classList.toggle('is-hovering', !!next);
       return;
     }
@@ -696,7 +612,7 @@ export async function bootThreeMapSpike() {
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
     confirmed = false;
-    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x1a1408);
+    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x161008);
     drawSelectInk(next && !next.isWater ? next : null);
     syncDensity();
     chrome.paintSelection({
@@ -774,6 +690,9 @@ export async function bootThreeMapSpike() {
     applyZoomCap();
     const shown = syncWrapVisibility(wrapGroups, camera);
     syncDensity();
+    if (ocean.material?.uniforms?.uCamera) {
+      ocean.material.uniforms.uCamera.value.copy(camera.position);
+    }
     renderer.domElement.dataset.wrapCopies = String(shown);
     renderer.render(scene, camera);
   }
@@ -795,7 +714,9 @@ export async function bootThreeMapSpike() {
   const ukSY = screenYOf('United Kingdom');
   const africaSouthOnScreen = egyptSY != null && germanySY != null && egyptSY > germanySY;
   const europeNorthOnScreen = ukSY != null && germanySY != null && ukSY < germanySY + 80;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=base${baked.baseCount}/relief${baked.reliefCount}`, {
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=bone-wash ocean=fresnel`, {
+    africaSouthOfEurope,
+    africaNotUnderNA,
     africaSouthOnScreen,
     europeNorthOnScreen,
     germanySY,
@@ -808,26 +729,16 @@ export async function bootThreeMapSpike() {
     WRAP_COPIES,
     screenYOf,
     inspect() {
-      const mesh = pickables[0];
-      const uv = mesh?.geometry?.attributes?.uv;
-      const pos = mesh?.geometry?.attributes?.position;
-      let uMin = 1, uMax = 0, vMin = 1, vMax = 0;
-      if (uv) {
-        for (let i = 0; i < uv.count; i++) {
-          uMin = Math.min(uMin, uv.getX(i));
-          uMax = Math.max(uMax, uv.getX(i));
-          vMin = Math.min(vMin, uv.getY(i));
-          vMax = Math.max(vMax, uv.getY(i));
-        }
-      }
-      const mat = Array.isArray(mesh?.material) ? mesh.material[0] : mesh?.material;
+      const mats = pickables[0]?.material;
+      const list = Array.isArray(mats) ? mats : [mats];
       return {
-        name: mesh?.userData?.territory?.name,
-        verts: pos?.count,
-        uv: uv ? { uMin, uMax, vMin, vMax } : null,
-        hasMap: !!mat?.map,
-        groups: mesh?.geometry?.groups?.length || 0,
+        name: pickables[0]?.userData?.territory?.name,
+        verts: pickables[0]?.geometry?.attributes?.position?.count,
+        materialCount: list.length,
+        hasTileMap: list.some((m) => m?.map && m.map !== list[0]?.map && m.map?.image?.width > 400),
         wrap: renderer.domElement.dataset.wrapCopies,
+        africaSouthOfEurope,
+        africaNotUnderNA,
         africaSouthOnScreen,
         europeNorthOnScreen,
       };

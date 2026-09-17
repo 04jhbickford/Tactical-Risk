@@ -38,7 +38,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
-      background:#122428; overflow:hidden;
+      background:#152228; overflow:hidden;
     }
     html.three-spike #mapCanvas,
     html.three-spike #minimap,
@@ -60,8 +60,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(10px, env(safe-area-inset-left));
       padding-right:max(10px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:linear-gradient(180deg, rgba(12,20,24,0.88) 0%, rgba(12,20,24,0.5) 70%, transparent 100%);
-      color:#f4ead4; font:600 13px/1 "Segoe UI", sans-serif;
+      background:linear-gradient(180deg, rgba(14,20,24,0.82) 0%, rgba(14,20,24,0.28) 72%, transparent 100%);
+      color:#efe6d6; font:600 12px/1 "Segoe UI", sans-serif;
+      letter-spacing:0.06em;
       pointer-events:none;
     }
     #three-l0 button, #three-l0 .three-l0-chip {
@@ -78,7 +79,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       min-height:28px; padding:0 9px; border-radius:999px;
       display:inline-flex; align-items:center; gap:6px;
       background:rgba(20,24,32,0.72);
-      border:1px solid rgba(201,164,74,0.35);
+      border:1px solid rgba(239,230,214,0.16);
       letter-spacing:0.04em;
     }
     #three-l0 .three-l0-seat { margin-left:auto; }
@@ -96,22 +97,25 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;
       pointer-events:none;
-      background:linear-gradient(0deg, rgba(12,20,24,0.78) 0%, transparent 100%);
+      background:linear-gradient(0deg, rgba(14,20,24,0.7) 0%, transparent 100%);
     }
     #three-peek {
       display:none; pointer-events:none;
       min-height:36px; padding:8px 12px; border-radius:10px;
-      background:rgba(16,18,26,0.88); color:#f4ead4;
-      border:1px solid rgba(201,164,74,0.4);
-      font:600 13px/1.3 "Segoe UI", sans-serif;
+      background:rgba(18,22,26,0.88); color:#efe6d6;
+      border:1px solid rgba(239,230,214,0.14);
+      font:500 12px/1.35 "Segoe UI", sans-serif;
     }
     #three-peek.is-on { display:block; }
+    #three-peek strong { display:block; font:700 14px/1.2 "Segoe UI", sans-serif; letter-spacing:0.02em; }
+    #three-peek div { margin-top:3px; font:500 12px/1.3 "Segoe UI", sans-serif; color:#c8c0b0; }
     #three-confirm {
       pointer-events:auto;
       min-height:44px; width:100%;
       border:0; border-radius:12px;
       background:#c9a44a; color:#1a1420;
       font:700 15px/1 "Segoe UI", sans-serif;
+      letter-spacing:0.02em;
       cursor:pointer;
       -webkit-tap-highlight-color:transparent;
     }
