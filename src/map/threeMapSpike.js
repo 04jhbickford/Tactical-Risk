@@ -17,6 +17,7 @@ import {
   makeLandSealMeshes,
   makeLineMat,
   addTerritoryInk,
+  addFoamCoast,
   createWrapGroups,
   syncWrapVisibility,
   wrapPanLikeCanvas,
@@ -26,9 +27,9 @@ import {
   simplifyRing,
   makeBorderLine,
 } from './threeMapArt.js';
-import { PALETTE, makeLandMaterials, makeOceanMesh } from './threeMapPalette.js';
-import { makeChitTexture, makePipTexture } from './threeMapChits.js';
-import { injectThreeChrome, shortType } from './threeMapChrome.js';
+import { PALETTE, makeLandMaterials, makeOceanMesh, loadBoardTextures, factionRim } from './threeMapPalette.js';
+import { loadUnitAtlas, makeAtlasChitTexture, makeAtlasPipTexture, packOffsets, paintAtlasStrip } from './threeUnitAtlas.js';
+import { injectThreeChrome } from './threeMapChrome.js';
 import {
   dismissStartupLoader,
   reportStartupError,
@@ -136,8 +137,10 @@ function stackOwner(stacks, territory) {
   return stacks[0]?.owner || territory.originalOwner || 'Russians';
 }
 
-function chitTextureFor(type, ownerColor, quantity) {
-  return makeChitTexture(type, ownerColor, quantity, shortType(type));
+function lodBand(dist) {
+  if (dist > 118) return 'far';
+  if (dist > 62) return 'mid';
+  return 'near';
 }
 
 function makeLabelTexture(name) {
@@ -167,21 +170,27 @@ export async function bootThreeMapSpike() {
   let continents;
   let setup;
   let unitDefs;
+  let atlas;
+  let boardTex;
   try {
-    const [tRes, cRes, sRes, uRes] = await Promise.all([
+    const [tRes, cRes, sRes, uRes, loadedAtlas, loadedBoard] = await Promise.all([
       fetch('data/territories.json'),
       fetch('data/continents.json'),
       fetch('data/setup.json'),
       fetch('data/units.json'),
+      loadUnitAtlas(),
+      loadBoardTextures(),
     ]);
     if (!tRes.ok || !cRes.ok || !sRes.ok || !uRes.ok) throw new Error('map data fetch failed');
     territories = await tRes.json();
     continents = await cRes.json();
     setup = await sRes.json();
     unitDefs = await uRes.json();
+    atlas = loadedAtlas;
+    boardTex = loadedBoard;
   } catch (err) {
     console.error(err);
-    reportStartupError('Three.js spike could not load territory data.');
+    reportStartupError('Three.js spike could not load territory data or Arc unit atlas.');
     return;
   }
 
@@ -226,7 +235,7 @@ export async function bootThreeMapSpike() {
   scene.background = new THREE.Color(PALETTE.oceanDeep);
   scene.fog = new THREE.Fog(PALETTE.oceanFog, 780, 1500);
 
-  const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4);
+  const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4, boardTex.ocean);
   ocean.position.set(WORLD_W / 2, -0.2, -WORLD_H / 2);
   scene.add(ocean);
 
@@ -236,29 +245,30 @@ export async function bootThreeMapSpike() {
 
   const landBorderMat = makeLineMat(PALETTE.border, 0.7, 0.5);
   const selectMat = makeLineMat(PALETTE.select, 1.55, 0.92);
-  lineMats.push(landBorderMat, selectMat);
+  const foamMat = makeLineMat(PALETTE.foam, 0.85, 0.4);
+  lineMats.push(landBorderMat, selectMat, foamMat);
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
-    const ownerHex = factionColor.get(owner) || FACTION_FALLBACK[owner] || PALETTE.landBone;
-    landMats.set(land.name, makeLandMaterials(ownerHex));
+    const ownerHex = factionRim(owner, factionColor.get(owner) || FACTION_FALLBACK[owner]);
+    landMats.set(land.name, makeLandMaterials(ownerHex, boardTex.parchment));
   }
 
   const textureCache = new Map();
+  function rimOf(owner) {
+    return factionRim(owner, factionColor.get(owner) || FACTION_FALLBACK[owner]);
+  }
   function chitTexture(type, owner, quantity) {
     const key = `chit|${owner}|${type}|${quantity}`;
     if (!textureCache.has(key)) {
-      textureCache.set(
-        key,
-        chitTextureFor(type, factionColor.get(owner) || FACTION_FALLBACK[owner], quantity),
-      );
+      textureCache.set(key, makeAtlasChitTexture(atlas, type, rimOf(owner), quantity));
     }
     return textureCache.get(key);
   }
   function pipTexture(owner, total) {
     const key = `pip|${owner}|${total}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, makePipTexture(factionColor.get(owner) || FACTION_FALLBACK[owner], total));
+      textureCache.set(key, makeAtlasPipTexture(atlas, rimOf(owner), total));
     }
     return textureCache.get(key);
   }
@@ -282,6 +292,7 @@ export async function bootThreeMapSpike() {
         group.add(seal);
       }
       addTerritoryInk(group, land, landBorderMat, height + 0.05);
+      addFoamCoast(group, land, foamMat, 0.04);
     }
   }
 
@@ -296,9 +307,6 @@ export async function bootThreeMapSpike() {
       const owner = stackOwner(stacks, t);
       const total = stackTotal(stacks);
       const expanded = [];
-      const cols = Math.min(t.isWater || stacks.length >= 3 ? 3 : 2, stacks.length);
-      const tokenW = 7.4;
-      const tokenH = 7.4;
       for (let i = 0; i < stacks.length; i++) {
         const stack = stacks[i];
         const tex = chitTexture(stack.type, stack.owner, stack.quantity);
@@ -308,19 +316,13 @@ export async function bootThreeMapSpike() {
           depthTest: true,
           depthWrite: false,
         }));
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const inRow = Math.min(cols, stacks.length - row * cols);
-        sprite.scale.set(tokenW, tokenH, 1);
-        sprite.position.set(
-          x + (col - (inRow - 1) / 2) * (tokenW + 1.6),
-          height + 5.4 + row * 5.2,
-          z + row * 3.2,
-        );
+        sprite.scale.set(5.2, 5.2, 1);
+        sprite.position.set(x, height + 5.2, z);
         sprite.renderOrder = 4;
         sprite.userData.territory = t;
         sprite.userData.unitType = stack.type;
         sprite.userData.kind = 'chit';
+        sprite.visible = false;
         group.add(sprite);
         expanded.push(sprite);
       }
@@ -366,6 +368,9 @@ export async function bootThreeMapSpike() {
         pip,
         label,
         center,
+        x,
+        z,
+        height,
       });
     }
   }
@@ -431,6 +436,41 @@ export async function bootThreeMapSpike() {
     controls.update();
   }
 
+  function frameEuropeMid() {
+    const phone = isCoarsePointer();
+    const focus = worldToScene(1160, 700);
+    camera.fov = phone ? 42 : 36;
+    camera.updateProjectionMatrix();
+    camera.position.set(focus.x, phone ? 92 : 84, focus.z - (phone ? 14 : 12));
+    controls.target.set(focus.x, 0, focus.z);
+    applyZoomCap();
+    controls.update();
+    syncDensity(true);
+  }
+
+  function frameEuropeNear() {
+    const phone = isCoarsePointer();
+    const g = germanyC || { x: 1160, y: 620 };
+    const focus = worldToScene(g.x, g.y);
+    camera.fov = phone ? 42 : 36;
+    camera.updateProjectionMatrix();
+    camera.position.set(focus.x, phone ? 46 : 42, focus.z - (phone ? 8 : 6));
+    controls.target.set(focus.x, 0, focus.z);
+    applyZoomCap();
+    controls.update();
+    syncDensity(true);
+  }
+
+  function frameAtlasClose() {
+    frameEuropeNear();
+  }
+
+  const atlasCanvas = document.createElement('canvas');
+  atlasCanvas.id = 'three-atlas-sheet';
+  atlasCanvas.style.cssText = 'display:none;position:absolute;left:8px;top:56px;z-index:50;width:min(374px,96vw);height:auto;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.35)';
+  paintAtlasStrip(atlas, atlasCanvas, factionRim('Russians'));
+  document.body.appendChild(atlasCanvas);
+
   function frameWorld() {
     const phone = isCoarsePointer();
     const cx = WORLD_W / 2;
@@ -491,6 +531,7 @@ export async function bootThreeMapSpike() {
   let gesturePinch = false;
   let maxPointers = 0;
   let denseMode = null;
+  let lastLod = null;
 
   function setPointerFromEvent(e) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -553,17 +594,42 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  function isDense() {
-    const dist = camera.position.distanceTo(controls.target);
-    return dist > 72;
+  function layoutRecord(rec, lod) {
+    const selected = rec.territory.name === selectedName;
+    const expand = lod !== 'far' || selected;
+    rec.pip.visible = !expand;
+    for (const s of rec.expanded) s.visible = expand;
+    if (rec.label) {
+      rec.label.visible = !rec.territory.isWater
+        && rec.territory.name !== selectedName
+        && rec.stacks.length === 0;
+    }
+    if (!expand) return;
+    const near = lod === 'near' || selected;
+    const n = rec.expanded.length;
+    const size = near ? (n >= 5 ? 6.0 : 6.8) : (n >= 5 ? 4.4 : 5.0);
+    const gap = near ? 2.6 : 1.7;
+    const offsets = packOffsets(n, size + gap);
+    for (let i = 0; i < n; i++) {
+      const sprite = rec.expanded[i];
+      sprite.scale.set(size, size, 1);
+      sprite.position.set(
+        rec.x + offsets[i].dx,
+        rec.height + 5.2,
+        rec.z + offsets[i].dz,
+      );
+    }
   }
 
-  function syncDensity() {
-    const next = isDense();
-    const force = denseMode === null;
-    if (!force && next === denseMode) {
+  function syncDensity(forceLayout = false) {
+    const dist = camera.position.distanceTo(controls.target);
+    const lod = lodBand(dist);
+    const force = forceLayout || lastLod === null || lod !== lastLod;
+    lastLod = lod;
+    denseMode = lod === 'far';
+    if (!force) {
       for (const rec of unitRecords) {
-        const expand = rec.territory.name === selectedName || !next;
+        const expand = rec.territory.name === selectedName || lod !== 'far';
         rec.pip.visible = !expand;
         for (const s of rec.expanded) s.visible = expand;
         if (rec.label) {
@@ -574,17 +640,7 @@ export async function bootThreeMapSpike() {
       }
       return;
     }
-    denseMode = next;
-    for (const rec of unitRecords) {
-      const expand = rec.territory.name === selectedName || !denseMode;
-      rec.pip.visible = !expand;
-      for (const s of rec.expanded) s.visible = expand;
-      if (rec.label) {
-          rec.label.visible = !rec.territory.isWater
-            && rec.territory.name !== selectedName
-            && rec.stacks.length === 0;
-      }
-    }
+    for (const rec of unitRecords) layoutRecord(rec, lod);
   }
 
   function paintSelection(picked, { hover = false } = {}) {
@@ -606,7 +662,7 @@ export async function bootThreeMapSpike() {
     confirmed = false;
     if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x161008);
     drawSelectInk(next && !next.isWater ? next : null);
-    syncDensity();
+    syncDensity(true);
     chrome.paintSelection({
       land: next,
       stacks: next ? stacksFor(next.name, placements) : [],
@@ -715,7 +771,7 @@ export async function bootThreeMapSpike() {
   const europeNorthOnScreen = ukXY && germanyXY && ukXY.y < germanyXY.y + 80;
   const ukWestOfGermany = ukXY && germanyXY && ukXY.x < germanyXY.x;
   const westEuropeWestOfGermany = westEuropeXY && germanyXY && westEuropeXY.x < germanyXY.x;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=sand-plate ocean=quiet`, {
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=parchment atlas=${atlas.types.length}`, {
     africaSouthOfEurope,
     africaNotUnderNA,
     africaSouthOnScreen,
@@ -728,7 +784,15 @@ export async function bootThreeMapSpike() {
   });
   window.__threeSpike = {
     frameEuropeAfrica,
+    frameEuropeMid,
+    frameEuropeNear,
+    frameAtlasClose,
     frameWorld,
+    showAtlas(on = true) {
+      atlasCanvas.style.display = on ? 'block' : 'none';
+    },
+    lodBand,
+    atlasTypes: atlas.types,
     WRAP_COPIES,
     screenYOf,
     screenXYOf,
@@ -748,9 +812,11 @@ export async function bootThreeMapSpike() {
         ukWestOfGermany,
         westEuropeWestOfGermany,
         waterInk: false,
-        foam: false,
+        foam: true,
         bevel: false,
         landSeal: true,
+        atlas: atlas.types.length,
+        lod: lastLod,
       };
     },
   };

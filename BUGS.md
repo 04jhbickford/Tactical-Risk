@@ -2,6 +2,18 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.9 (preview only, SCHEMA 11)
+
+Arc cream-chit atlas + A&A printed-board tiles on `?three=1`. Do not merge over live Canvas V2.81.51.
+
+1. **Unit art** — slices `assets/three/units/units-land-air-cream.png` (INF/TNK/FTR/BMB) and `units-naval-cream.png` (BB/CV/SS/TR). Faction = rim tint only. FAC/AA/ART stamp relief on a blank disc cloned from the sheets. DD/CA alias BB; TAC aliases FTR. No grey scrap icons or text pills.
+2. **LOD** — far pip+N; mid clustered cream chits with grid collision; near typed chits with more spacing. Labels hide under stacks.
+3. **Palette** — parchment land tile + muted ocean tile; hex lock from `briefs/2026-09-17-three-art-gap/AA-PALETTE.md`. Soft foam hairline. Land-seal kept (no Egypt teal).
+
+Named Confirm, north-up, no debug quads. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.9.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.8 (preview only, SCHEMA 11)
 
 Ocean-mask finish on `?three=1`. Land plates get an inflated opaque sand seal under every territory so ocean cannot show through Egypt / N. Africa (bevel already off; tile bake no longer composites teal). Preview only. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.8.
