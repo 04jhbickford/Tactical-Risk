@@ -2,6 +2,19 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.11 (preview only, SCHEMA 11)
+
+James HARD he-correct on polish.10: no texture, no continent colors, cream discs, washed icons, placement breaks. Preview `?three=1` only. Do not merge over live Canvas. Tesla off.
+
+1. **Board** — visible cardboard grain + continent washes (Europe olive, USSR tan, Africa ochre, Asia/Americas green). Match `aa-board-continents.png`.
+2. **Units** — faction molded A&A plastic (DE grey / SU green / UK tan / US olive / JP orange-red), thick dark outline + shadow. Cream discs killed.
+3. **STACK-LOD** — mid = one pip+N; near = ≤3–4 typed + `+K`; screen-space clamp; no dual systems.
+4. **Select** — gold/amber `#C4A35A` only. Peek = icon+count row. Frosted iPhone L0/Confirm per THREE-IPHONE-UI.md.
+
+Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.11.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.10 (preview only, SCHEMA 11)
 
 Viz AA-PALETTE P0 lock on `?three=1`. Do not merge over live Canvas V2.81.51. Tesla off.

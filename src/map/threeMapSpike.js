@@ -34,16 +34,32 @@ import {
   makeOceanMesh,
   loadBoardTextures,
   factionWash,
+  regionWashFor,
+  plasticColor,
 } from './threeMapPalette.js';
-import { loadUnitAtlases, makeChitTexture, makePipTexture } from './threeMapChits.js';
+import {
+  loadUnitAtlases,
+  makeChitTexture,
+  makePipTexture,
+  makeOverflowTexture,
+} from './threeMapChits.js';
 import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
   isSupportType,
-  tokenSizeFor,
-  hexPack,
+  spiralPack,
   separatePoints,
   isDenseBand,
+  nearLayout,
+  shouldCollapse,
+  worldSizeFromScreen,
+  PIP_PX,
+  PIECE_PX,
+  PIP_MIN_PX,
+  PIP_MAX_PX,
+  PIECE_MIN_PX,
+  PIECE_MAX_PX,
+  GAP_PX,
 } from './threeMapDensity.js';
 import {
   dismissStartupLoader,
@@ -146,8 +162,8 @@ function stackOwner(stacks, territory) {
   return stacks[0]?.owner || territory.originalOwner || 'Russians';
 }
 
-function ownerRim(owner) {
-  return factionWash(owner) || FACTION_FALLBACK[owner] || PALETTE.landInk;
+function ownerPlastic(owner) {
+  return plasticColor(owner);
 }
 
 function chitTextureFor(type, ownerColor, quantity) {
@@ -217,7 +233,7 @@ export async function bootThreeMapSpike() {
   const unitRecords = [];
 
   const russians = setup.classic?.factions?.find((f) => f.id === 'Russians');
-  chrome.setSeat('Russians', factionWash('Russians') || russians?.color || FACTION_FALLBACK.Russians);
+  chrome.setSeat('Russians', plasticColor('Russians') || russians?.color || FACTION_FALLBACK.Russians);
   chrome.setIpc(russians?.startingPUs || 24);
 
   const egypt = lands.find((t) => t.name === 'Anglo Sudan Egypt');
@@ -239,8 +255,8 @@ export async function bootThreeMapSpike() {
   });
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(PALETTE.oceanDeep);
-  scene.fog = new THREE.Fog(PALETTE.oceanFog, 980, 1900);
+  scene.background = new THREE.Color(PALETTE.oceanShelf);
+  scene.fog = new THREE.Fog(PALETTE.oceanFog, 1100, 2100);
 
   const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4);
   ocean.position.set(WORLD_W / 2, -0.2, -WORLD_H / 2);
@@ -257,23 +273,28 @@ export async function bootThreeMapSpike() {
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
-    const ownerHex = factionColor.get(owner) || FACTION_FALLBACK[owner] || PALETTE.landBone;
-    landMats.set(land.name, makeLandMaterials(ownerHex));
+    const ownerHex = factionColor.get(owner) || FACTION_FALLBACK[owner] || null;
+    landMats.set(land.name, makeLandMaterials(regionWashFor(land), ownerHex));
   }
 
   const textureCache = new Map();
   function chitTexture(type, owner, quantity) {
     const key = `chit|${owner}|${type}|${quantity}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, chitTextureFor(type, ownerRim(owner), quantity));
+      textureCache.set(key, chitTextureFor(type, ownerPlastic(owner), quantity));
     }
     return textureCache.get(key);
   }
-  function pipTexture(owner, total) {
-    const key = `pip|${owner}|${total}`;
+  function pipTexture(owner, total, types) {
+    const key = `pip|${owner}|${total}|${(types || []).join(',')}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, makePipTexture(ownerRim(owner), total));
+      textureCache.set(key, makePipTexture(ownerPlastic(owner), total, types));
     }
+    return textureCache.get(key);
+  }
+  function overflowTexture(plus) {
+    const key = `plus|${plus}`;
+    if (!textureCache.has(key)) textureCache.set(key, makeOverflowTexture(plus));
     return textureCache.get(key);
   }
   function labelTexture(name) {
@@ -331,7 +352,7 @@ export async function bootThreeMapSpike() {
         expanded.push(sprite);
       }
 
-      const pipTex = pipTexture(owner, total);
+      const pipTex = pipTexture(owner, total, stacks.map((s) => s.type));
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
@@ -345,6 +366,20 @@ export async function bootThreeMapSpike() {
       pip.userData.kind = 'pip';
       pip.visible = false;
       group.add(pip);
+
+      const overflow = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: overflowTexture(1),
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+      }));
+      overflow.scale.set(4.2, 4.2, 1);
+      overflow.position.set(x, height + 5.0, z);
+      overflow.renderOrder = 5;
+      overflow.userData.territory = t;
+      overflow.userData.kind = 'overflow';
+      overflow.visible = false;
+      group.add(overflow);
 
       let label = null;
       if (!t.isWater) {
@@ -370,6 +405,7 @@ export async function bootThreeMapSpike() {
         stacks,
         expanded,
         pip,
+        overflow,
         label,
         center,
         homeX: x,
@@ -380,11 +416,11 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.12));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.55);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.05));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.42);
   sun.position.set(30, 240, 12);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.18);
+  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.16);
   fill.position.set(-90, 90, -40);
   scene.add(fill);
 
@@ -392,7 +428,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.16;
+  renderer.toneMappingExposure = 1.04;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -527,7 +563,7 @@ export async function bootThreeMapSpike() {
     setPointerFromEvent(e);
     raycaster.setFromCamera(pointer, camera);
     const spriteHits = raycaster.intersectObjects(
-      unitRecords.flatMap((r) => [...r.expanded, r.pip].filter((s) => s.visible)),
+      unitRecords.flatMap((r) => [...r.expanded, r.pip, r.overflow].filter((s) => s?.visible)),
       false,
     );
     if (spriteHits[0]?.object?.userData?.territory) {
@@ -551,7 +587,30 @@ export async function bootThreeMapSpike() {
 
   function setLandEmissive(name, hex) {
     const mats = landMats.get(name);
+    // Gold/amber select language only — never a blue glow ring.
     if (mats?.top?.emissive) mats.top.emissive.setHex(hex);
+  }
+
+  function screenScale(kind) {
+    const dist = camera.position.distanceTo(controls.target);
+    const h = renderer.domElement.clientHeight || window.innerHeight || 844;
+    if (kind === 'pip') {
+      return worldSizeFromScreen(PIP_PX, dist, camera.fov, h, {
+        minPx: PIP_MIN_PX, maxPx: PIP_MAX_PX, maxWorld: 8.5,
+      });
+    }
+    return worldSizeFromScreen(PIECE_PX, dist, camera.fov, h, {
+      minPx: PIECE_MIN_PX, maxPx: PIECE_MAX_PX, maxWorld: 9.5,
+    });
+  }
+
+  function screenGap(tokenWorld) {
+    const dist = camera.position.distanceTo(controls.target);
+    const h = renderer.domElement.clientHeight || window.innerHeight || 844;
+    const gap = worldSizeFromScreen(GAP_PX, dist, camera.fov, h, {
+      minPx: 4, maxPx: 8, maxWorld: 2.4, minWorld: 0.35,
+    });
+    return tokenWorld + gap;
   }
 
   function clearSelectInk() {
@@ -588,34 +647,55 @@ export async function bootThreeMapSpike() {
       if (!copies.has(rec.copy)) copies.set(rec.copy, []);
       copies.get(rec.copy).push(rec);
     }
+    const pipS = screenScale('pip');
+    const pieceS = screenScale('piece');
+    const minSep = screenGap(band === 'near' ? pieceS : pipS);
     for (const recs of copies.values()) {
       const movers = [];
-      let minSep = 5.8;
       for (const rec of recs) {
         const selected = rec.territory.name === selectedName;
-        const expand = !isDenseBand(band) || selected;
-        const size = tokenSizeFor(band, selected);
-        if (expand) minSep = Math.max(minSep, size * 1.42);
-        rec.pip.visible = !expand;
-        rec.pip.scale.set(6.2, 6.2, 1);
-        const shown = [];
+        // STACK-LOD: mid/far = ONE pip+N. Near = typed ≤3–4 +K.
+        // Select does not parade types on the map (roster lives in peek).
+        // Never show pip and typed pieces together.
+        const dense = isDenseBand(band);
+        const plan = nearLayout(rec.stacks);
+        const tokens = plan.shown.length + (plan.overflowQty > 0 ? 1 : 0);
+        const collapse = dense || shouldCollapse(tokens, minSep, selected ? 16 : 13);
+        rec.pip.visible = collapse;
+        rec.pip.scale.set(pipS, pipS, 1);
+        rec.pip.position.set(rec.homeX, rec.height + 4.8, rec.homeZ);
+        const shownTypes = new Set((collapse ? [] : plan.shown).map((s) => s.type));
         for (const sprite of rec.expanded) {
-          sprite.visible = expand;
-          sprite.scale.set(size, size, 1);
-          if (expand) shown.push(sprite);
+          const on = !collapse && shownTypes.has(sprite.userData.unitType);
+          sprite.visible = on;
+          sprite.scale.set(pieceS, pieceS, 1);
         }
-        const spots = hexPack(shown.length, size * 1.22);
-        shown.forEach((sprite, i) => {
-          movers.push({
-            sprite,
-            x: rec.homeX + spots[i].x,
-            z: rec.homeZ + spots[i].z,
-            homeX: rec.homeX,
-            homeZ: rec.homeZ,
-            maxDrift: selected || band === 'near' ? 15 : 14,
-            y: rec.height + (selected || band === 'near' ? 5.6 : 4.6),
+        if (rec.overflow) {
+          const plus = !collapse && plan.overflowQty > 0;
+          rec.overflow.visible = plus;
+          if (plus) {
+            rec.overflow.material.map = overflowTexture(plan.overflowQty);
+            rec.overflow.material.map.needsUpdate = true;
+            rec.overflow.material.needsUpdate = true;
+          }
+          rec.overflow.scale.set(pieceS * 0.72, pieceS * 0.72, 1);
+        }
+        if (!collapse) {
+          const shown = rec.expanded.filter((s) => s.visible);
+          if (rec.overflow?.visible) shown.push(rec.overflow);
+          const spots = spiralPack(shown.length, minSep);
+          shown.forEach((sprite, i) => {
+            movers.push({
+              sprite,
+              x: rec.homeX + spots[i].x,
+              z: rec.homeZ + spots[i].z,
+              homeX: rec.homeX,
+              homeZ: rec.homeZ,
+              maxDrift: 14,
+              y: rec.height + 5.2,
+            });
           });
-        });
+        }
         if (rec.label) {
           const hide = rec.territory.isWater
             || selected
@@ -623,8 +703,7 @@ export async function bootThreeMapSpike() {
           rec.label.visible = !hide;
           const lo = LABEL_OFFSETS[rec.territory.name] || { x: 0, y: 28 };
           const lp = worldToScene(rec.center.x + lo.x, rec.center.y + lo.y);
-          const south = shown.length ? size * 0.72 + 3.1 : 3.4;
-          rec.label.position.set(lp.x, rec.height + 2.7, lp.z - south);
+          rec.label.position.set(lp.x, rec.height + 2.7, lp.z - 3.4);
         }
       }
       separatePoints(movers, minSep);
@@ -636,7 +715,6 @@ export async function bootThreeMapSpike() {
 
   function syncDensity() {
     const band = currentBand();
-    if (band === lodMode && selectedName === lastSelectForLod) return;
     lodMode = band;
     lastSelectForLod = selectedName;
     relayoutUnits(band);
@@ -648,7 +726,6 @@ export async function bootThreeMapSpike() {
     if (hover) {
       if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x000000);
       hoveredName = next && !next.isWater ? next.name : null;
-      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x1a1408);
       renderer.domElement.classList.toggle('is-hovering', !!next);
       return;
     }
@@ -659,7 +736,6 @@ export async function bootThreeMapSpike() {
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
     confirmed = false;
-    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x161008);
     drawSelectInk(next && !next.isWater ? next : null);
     syncDensity();
     chrome.paintSelection({
@@ -813,8 +889,11 @@ export async function bootThreeMapSpike() {
         bevel: false,
         landSeal: true,
         atlas: true,
-        palette: 'aa-p0',
+        palette: 'aa-hecorrect-11',
         lod: lodMode,
+        regionWash: true,
+        plastic: true,
+        stackLod: true,
       };
     },
   };

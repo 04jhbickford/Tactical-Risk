@@ -1,5 +1,6 @@
-// Preview-only Three.js palette. A&A printed-board lock (AA-PALETTE.md).
-// Not Canvas live art. No neon teal / cyan coast bloom.
+// Preview-only Three.js palette. A&A printed board (AA-HECORRECT-11).
+// Continent washes + visible cardboard grain. Not Canvas live art.
+// Ink Blue is money-only — never recolor this war board.
 
 import * as THREE from 'three';
 
@@ -22,13 +23,13 @@ function mixHex(hex, toward, t) {
 export const PALETTE = {
   landBase: '#C4B896',
   landBone: '#C4B896',
-  landShadow: '#8F8468',
+  landShadow: '#8A7A58',
   landGrain: '#B7AA82',
   landInk: '#3A3428',
-  landBevel: '#8F8468',
-  oceanDeep: '#3D5A66',
-  oceanShelf: '#4F6E78',
-  oceanFog: '#3D5A66',
+  landBevel: '#8A7A58',
+  oceanDeep: '#7A90A0',
+  oceanShelf: '#8AA0AE',
+  oceanFog: '#7A90A0',
   foam: '#D9D2C0',
   border: '#3A3428',
   waterHair: '#3A3428',
@@ -39,22 +40,56 @@ export const PALETTE = {
   boneText: '#E8E2D4',
   hud: '#1E2420',
   hudInk: '#E8E2D4',
-  sky: '#E8E0D0',
-  ground: '#8F8468',
-  key: '#FFF1DC',
-  fill: '#B7AA82',
+  sky: '#F0E8D4',
+  ground: '#8A7A58',
+  key: '#FFF6E4',
+  fill: '#D4C8A4',
+};
+
+// Soft but unmistakable region washes — match refs/aa-board-continents.png.
+export const REGION_WASH = {
+  Europe: '#8C9A52',
+  USSR: '#C4A06A',
+  Africa: '#D6B85C',
+  'Middle East': '#D4BC68',
+  Asia: '#8EAE6A',
+  'North America': '#86A85E',
+  'South America': '#6F9848',
+  Oceania: '#A3B06A',
+};
+
+export const USSR_LANDS = new Set([
+  'Russia',
+  'Karelia S.S.R.',
+  'Ukraine S.S.R.',
+  'Novosibirsk',
+  'Evenki National Okrug',
+  'Soviet Far East',
+  'Mongolia',
+]);
+
+// Molded A&A plastic body colors (refs/aa-plastic-units.png).
+export const PLASTIC = {
+  Germans: '#8E8F8C',
+  Russians: '#3F6E38',
+  British: '#C6B17A',
+  Americans: '#556B2F',
+  Japanese: '#C45C32',
 };
 
 export const FACTION_WASH = {
-  Russians: '#8B3A3A',
-  Germans: '#5A5A52',
-  British: '#4A5C7A',
+  Russians: '#6B8B4A',
+  Germans: '#7A7A72',
+  British: '#6A7A8A',
   Americans: '#5C6B4A',
-  Japanese: '#8A6B3A',
+  Japanese: '#A87A48',
 };
 
-export const OCEAN_DEEP = 0x3d5a66;
-export const OCEAN_SHELF = 0x4f6e78;
+export const OCEAN_DEEP = 0x7a90a0;
+export const OCEAN_SHELF = 0x8aa0ae;
+export const PAPER_UV = 15;
+export const OCEAN_UV = 18;
+export const GRAIN_STRENGTH = 0.62;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -77,35 +112,78 @@ function loadImage(src) {
   });
 }
 
+function addSpeckle(ctx, size, count, alpha) {
+  for (let i = 0; i < count; i++) {
+    const x = ((Math.sin(i * 12.9898) * 43758.5453) % 1);
+    const y = ((Math.sin(i * 78.233) * 93721.1947) % 1);
+    const px = Math.abs(x) * size;
+    const py = Math.abs(y) * size;
+    const shade = i % 4 === 0 ? 255 : 0;
+    ctx.fillStyle = `rgba(${shade},${shade},${shade},${i % 5 === 0 ? alpha : alpha * 0.55})`;
+    ctx.fillRect(px, py, i % 9 === 0 ? 2.1 : 1.15, i % 11 === 0 ? 2.1 : 1.15);
+  }
+}
+
+function contrastGrain(ctx, size, amount) {
+  const img = ctx.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const l = 0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+    const v = Math.max(0, Math.min(255, 128 + (l - 128) * amount));
+    d[i] = v;
+    d[i + 1] = v;
+    d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function bakeParchment(img) {
+  const size = 512;
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
+  canvas.width = size;
+  canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = PALETTE.landBase;
-  ctx.fillRect(0, 0, 512, 512);
+  ctx.fillStyle = '#D8CDA8';
+  ctx.fillRect(0, 0, size, size);
   if (img) {
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.11;
-    ctx.drawImage(img, 0, 0, 512, 512);
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = GRAIN_STRENGTH;
+    ctx.drawImage(img, 0, 0, size, size);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-  } else {
-    for (let i = 0; i < 4200; i++) {
-      const x = (Math.sin(i * 12.9898) * 43758.5453) % 1;
-      const y = (Math.sin(i * 78.233) * 93721.1947) % 1;
-      const px = Math.abs(x) * 512;
-      const py = Math.abs(y) * 512;
-      const shade = i % 5 === 0 ? 255 : 0;
-      ctx.fillStyle = `rgba(${shade},${shade},${shade},${i % 7 === 0 ? 0.045 : 0.028})`;
-      ctx.fillRect(px, py, 1.2, 1.2);
-    }
   }
+  addSpeckle(ctx, size, 7200, 0.085);
+  contrastGrain(ctx, size, 2.35);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
+  return tex;
+}
+
+function bakeOcean(img) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PALETTE.oceanShelf;
+  ctx.fillRect(0, 0, size, size);
+  if (img) {
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = 0.70;
+    ctx.drawImage(img, 0, 0, size, size);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  addSpeckle(ctx, size, 4800, 0.06);
+  contrastGrain(ctx, size, 1.85);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -131,24 +209,35 @@ export function applyPaperUVs(geometry) {
   const uv = geometry.attributes.uv;
   if (!pos || !uv) return;
   for (let i = 0; i < pos.count; i++) {
-    uv.setXY(i, pos.getX(i) / 34, -pos.getZ(i) / 34);
+    uv.setXY(i, pos.getX(i) / PAPER_UV, -pos.getZ(i) / PAPER_UV);
   }
   uv.needsUpdate = true;
 }
 
-export function landWashHex(ownerHex) {
-  if (!ownerHex) return PALETTE.landBase;
-  return `#${mixHex(PALETTE.landBase, ownerHex, 0.18).toString(16).padStart(6, '0')}`;
+export function regionWashFor(territory) {
+  if (!territory) return REGION_WASH.Europe;
+  if (USSR_LANDS.has(territory.name)) return REGION_WASH.USSR;
+  return REGION_WASH[territory.continent] || PALETTE.landBase;
+}
+
+export function landWashHex(ownerHex, regionHex) {
+  const base = regionHex || PALETTE.landBase;
+  if (!ownerHex) return base;
+  return `#${mixHex(base, ownerHex, 0.12).toString(16).padStart(6, '0')}`;
 }
 
 export function factionWash(owner) {
   return FACTION_WASH[owner] || null;
 }
 
-export function makeLandMaterials(ownerHex) {
-  // Paper bake is already --land-base. Wash tints white so hex stays exact.
-  const wash = ownerHex ? mixHex('#FFFFFF', ownerHex, 0.18) : 0xffffff;
-  const side = hexColor(PALETTE.landShadow);
+export function plasticColor(owner) {
+  return PLASTIC[owner] || '#8E8F8C';
+}
+
+export function makeLandMaterials(regionHex, ownerHex) {
+  const region = regionHex || PALETTE.landBase;
+  const wash = ownerHex ? mixHex(region, ownerHex, 0.12) : hexColor(region);
+  const side = mixHex(region, PALETTE.landShadow, 0.45);
   const paper = makePaperTexture();
   const top = new THREE.MeshLambertMaterial({
     map: paper,
@@ -163,7 +252,8 @@ export function makeLandMaterials(ownerHex) {
     transparent: false,
     side: THREE.DoubleSide,
   });
-  const seal = new THREE.MeshBasicMaterial({
+  const seal = new THREE.MeshLambertMaterial({
+    map: paper,
     color: wash,
     side: THREE.DoubleSide,
     transparent: false,
@@ -172,33 +262,11 @@ export function makeLandMaterials(ownerHex) {
   return { top, side: wall, bottom: wall, seal };
 }
 
-function bakeOcean(img) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = PALETTE.oceanShelf;
-  ctx.fillRect(0, 0, 512, 512);
-  if (img) {
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.12;
-    ctx.drawImage(img, 0, 0, 512, 512);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
-  return tex;
-}
-
 export function makeOceanMaterial() {
   if (oceanMap) {
     return new THREE.MeshLambertMaterial({
       map: oceanMap,
-      color: 0xffffff,
+      color: 0xc8d4dc,
       transparent: false,
     });
   }
@@ -215,7 +283,7 @@ export function makeOceanMesh(width, height) {
   const uv = geo.attributes.uv;
   if (pos && uv) {
     for (let i = 0; i < pos.count; i++) {
-      uv.setXY(i, pos.getX(i) / 42, -pos.getZ(i) / 42);
+      uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
     }
     uv.needsUpdate = true;
   }
@@ -231,3 +299,5 @@ export function makeOceanMesh(width, height) {
 export function hexColorInt(hex) {
   return hexColor(hex);
 }
+
+export { hexColor, mixHex };

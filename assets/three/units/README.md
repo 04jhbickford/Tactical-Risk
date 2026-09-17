@@ -1,10 +1,12 @@
-# Three preview unit atlases (cream molded)
+# Three preview unit atlases (molded plastic)
 
-Preview only (`?three=1`). Faction identity is the rim tint; keep the cream face.
+Preview only (`?three=1`). Faction identity is the **plastic body color**.
+Kill cream discs. Runtime tints these grayscale molds.
 
 | File | Grid | Cells |
 |---|---|---|
-| `units-land-air-cream.png` | 2×2 | INF, TNK / FTR, BMB |
-| `units-naval-cream.png` | 2×2 | BB, CV / SS, TR |
+| `units-land-plastic.png` | 4×2 | INF, TNK, ART, FTR / BMB, AA, FAC |
+| `units-naval-plastic.png` | 2×2 | BB, CV / SS, TR |
 
-Regenerate from James uploads with `python3 tools/prep-three-aa-art.py` if the source JPEGs change.
+Regenerate with `python3 tools/gen-three-plastic-units.py`.
+Ref: `briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png`.
