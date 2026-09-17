@@ -60,8 +60,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(10px, env(safe-area-inset-left));
       padding-right:max(10px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:linear-gradient(180deg, rgba(14,20,24,0.82) 0%, rgba(14,20,24,0.28) 72%, transparent 100%);
-      color:#efe6d6; font:600 12px/1 "Segoe UI", sans-serif;
+      background:linear-gradient(180deg, rgba(30,36,32,0.88) 0%, rgba(30,36,32,0.28) 72%, transparent 100%);
+      color:#E8E2D4; font:600 12px/1 "Segoe UI", sans-serif;
       letter-spacing:0.06em;
       pointer-events:none;
     }
@@ -102,7 +102,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek {
       display:none; pointer-events:none;
       min-height:36px; padding:8px 12px; border-radius:10px;
-      background:rgba(18,22,26,0.88); color:#efe6d6;
+      background:rgba(30,36,32,0.88); color:#E8E2D4;
       border:1px solid rgba(239,230,214,0.14);
       font:500 12px/1.35 "Segoe UI", sans-serif;
     }

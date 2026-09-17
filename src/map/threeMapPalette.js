@@ -1,5 +1,5 @@
-// Preview-only Three.js palette. Arc A&A printed-board lock (AA-PALETTE.md).
-// Parchment land + muted sea tiles. No neon teal. Not live Canvas.
+// Preview-only Three.js palette. Viz AA-PALETTE.md hex lock is SoT.
+// Do not freestyle. Not live Canvas.
 
 import * as THREE from 'three';
 
@@ -19,10 +19,6 @@ function mixHex(hex, toward, t) {
   return (mix(16) << 16) | (mix(8) << 8) | mix(0);
 }
 
-function darkenHex(hex, amt) {
-  return mixHex(hex, '#000000', amt);
-}
-
 export const PALETTE = {
   oceanDeep: '#3D5A66',
   oceanShelf: '#4F6E78',
@@ -37,10 +33,14 @@ export const PALETTE = {
   select: '#C4A35A',
   selectSoft: '#C4A35A',
   confirm: '#C4A35A',
+  chitFace: '#F0E6D2',
+  chitGlyph: '#2C2820',
+  hudPanel: '#1E2420',
+  hudInk: '#E8E2D4',
   boneText: '#E8E2D4',
   sky: '#E8E2D4',
-  ground: '#3A3428',
-  key: '#F3E6C8',
+  ground: '#8F8468',
+  key: '#F0E6D2',
   fill: '#8F8468',
 };
 
@@ -52,6 +52,8 @@ export const FACTION_WASH = {
   Japanese: '#8A6B3A',
 };
 
+export const WASH_T = 0.18;
+export const GRAIN_T = 0.11;
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
 
@@ -67,7 +69,7 @@ function loadImage(src) {
   });
 }
 
-function cropCenterCanvas(img, frac = 0.58, size = 512, lift = 1) {
+function cropCenter(img, frac, size) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -75,20 +77,45 @@ function cropCenterCanvas(img, frac = 0.58, size = 512, lift = 1) {
   const sw = img.width * frac;
   const sh = img.height * frac;
   ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, size, size);
-  if (lift !== 1) {
-    const imgData = ctx.getImageData(0, 0, size, size);
-    const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      d[i] = Math.min(255, d[i] * lift);
-      d[i + 1] = Math.min(255, d[i + 1] * lift);
-      d[i + 2] = Math.min(255, d[i + 2] * lift);
-    }
-    ctx.putImageData(imgData, 0, 0);
-  }
   return canvas;
 }
 
-function canvasTex(canvas) {
+function bakeLandGrain(parchmentImg) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PALETTE.landBone;
+  ctx.fillRect(0, 0, size, size);
+  if (parchmentImg) {
+    const src = cropCenter(parchmentImg, 0.56, size);
+    ctx.globalAlpha = GRAIN_T;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(src, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  } else {
+    ctx.fillStyle = PALETTE.landGrain;
+    ctx.globalAlpha = GRAIN_T;
+    for (let i = 0; i < 3800; i++) {
+      const x = Math.abs((Math.sin(i * 12.9898) * 43758.5453) % 1) * size;
+      const y = Math.abs((Math.sin(i * 78.233) * 93721.1947) % 1) * size;
+      ctx.fillRect(x, y, 1.2, 1.2);
+    }
+    ctx.globalAlpha = 1;
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+function bakeOceanNoise(oceanImg) {
+  if (!oceanImg) return null;
+  const canvas = cropCenter(oceanImg, 0.62, 512);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
@@ -106,27 +133,15 @@ export async function loadBoardTextures() {
     loadImage(OCEAN_SRC),
   ]);
   boardCache = {
-    parchment: canvasTex(cropCenterCanvas(parchmentImg, 0.56, 512, 1.18)),
-    ocean: canvasTex(cropCenterCanvas(oceanImg, 0.62, 512, 1.08)),
+    parchment: bakeLandGrain(parchmentImg),
+    ocean: bakeOceanNoise(oceanImg),
   };
   return boardCache;
 }
 
 export function makePaperTexture() {
   if (boardCache?.parchment) return boardCache.parchment;
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = PALETTE.landBone;
-  ctx.fillRect(0, 0, 256, 256);
-  for (let i = 0; i < 4200; i++) {
-    const x = (Math.sin(i * 12.9898) * 43758.5453) % 1;
-    const y = (Math.sin(i * 78.233) * 93721.1947) % 1;
-    ctx.fillStyle = `rgba(80,70,40,${i % 7 === 0 ? 0.05 : 0.03})`;
-    ctx.fillRect(Math.abs(x) * 256, Math.abs(y) * 256, 1.2, 1.2);
-  }
-  return canvasTex(canvas);
+  return bakeLandGrain(null);
 }
 
 export function applyPaperUVs(geometry) {
@@ -141,7 +156,7 @@ export function applyPaperUVs(geometry) {
 
 export function landWashHex(ownerHex) {
   if (!ownerHex) return PALETTE.landBone;
-  return `#${mixHex(PALETTE.landBone, ownerHex, 0.18).toString(16).padStart(6, '0')}`;
+  return `#${mixHex(PALETTE.landBone, ownerHex, WASH_T).toString(16).padStart(6, '0')}`;
 }
 
 export function factionRim(ownerId, fallbackHex) {
@@ -149,21 +164,19 @@ export function factionRim(ownerId, fallbackHex) {
 }
 
 export function makeLandMaterials(ownerHex, parchment) {
-  // Parchment tile already carries #C4B896 khaki. Multiply with a light
-  // wash so grain stays readable (not muddy brown × ACES).
-  const wash = mixHex('#FFFFFF', ownerHex || PALETTE.landBone, 0.12);
-  const side = darkenHex(PALETTE.landBevel, 0.08);
   const paper = parchment || makePaperTexture();
+  const tint = ownerHex ? mixHex('#FFFFFF', ownerHex, WASH_T) : 0xffffff;
+  const wash = ownerHex ? mixHex(PALETTE.landBone, ownerHex, WASH_T) : hexColor(PALETTE.landBone);
   const top = new THREE.MeshLambertMaterial({
     map: paper,
-    color: wash,
+    color: tint,
     emissive: 0x000000,
     transparent: false,
     side: THREE.DoubleSide,
   });
   const wall = new THREE.MeshStandardMaterial({
-    color: side,
-    roughness: 0.95,
+    color: hexColor(PALETTE.landBevel),
+    roughness: 0.94,
     metalness: 0,
     emissive: 0x000000,
     transparent: false,
@@ -208,18 +221,17 @@ export function makeOceanMaterial(oceanTile) {
       void main() {
         vec3 viewDir = normalize(uCamera - vWorld);
         float ndv = max(dot(normalize(vN), viewDir), 0.0);
-        float fres = pow(1.0 - ndv, 2.8);
+        float fres = pow(1.0 - ndv, 3.2);
         float depth = clamp((abs(vWorld.z) / 240.0), 0.0, 1.0);
-        vec3 base = mix(uShelf, uDeep, 0.12 + depth * 0.2 + fres * 0.04);
+        vec3 base = mix(uShelf, uDeep, 0.55 + depth * 0.08 + fres * 0.04);
         if (uHasTile > 0.5) {
-          vec3 grain = texture2D(uTile, vWorld.xz * 0.0075).rgb;
-          base = mix(grain, uShelf, 0.18);
-          base = mix(base, uDeep, 0.06 + depth * 0.1);
+          float lum = dot(texture2D(uTile, vWorld.xz * 0.008).rgb, vec3(0.30, 0.59, 0.11));
+          base *= 0.96 + lum * 0.08;
         }
         gl_FragColor = vec4(base, 1.0);
       }
     `,
-    toneMapped: false,
+    toneMapped: true,
   });
 }
 

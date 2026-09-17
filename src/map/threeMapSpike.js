@@ -243,7 +243,7 @@ export async function bootThreeMapSpike() {
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  const landBorderMat = makeLineMat(PALETTE.border, 0.7, 0.5);
+  const landBorderMat = makeLineMat(PALETTE.border, 0.7, 0.62);
   const selectMat = makeLineMat(PALETTE.select, 1.55, 0.92);
   const foamMat = makeLineMat(PALETTE.foam, 0.85, 0.4);
   lineMats.push(landBorderMat, selectMat, foamMat);
@@ -375,8 +375,8 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.05));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.48);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 0.98));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.38);
   sun.position.set(30, 240, 12);
   scene.add(sun);
   const fill = new THREE.DirectionalLight(PALETTE.fill, 0.12);
@@ -387,7 +387,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.14;
+  renderer.toneMappingExposure = 1.0;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -817,6 +817,17 @@ export async function bootThreeMapSpike() {
         landSeal: true,
         atlas: atlas.types.length,
         lod: lastLod,
+        palette: {
+          land: PALETTE.landBone,
+          shadow: PALETTE.landBevel,
+          oceanDeep: PALETTE.oceanDeep,
+          oceanShelf: PALETTE.oceanShelf,
+          foam: PALETTE.foam,
+          select: PALETTE.select,
+          confirm: PALETTE.confirm,
+          chitFace: PALETTE.chitFace,
+          chitGlyph: PALETTE.chitGlyph,
+        },
       };
     },
   };

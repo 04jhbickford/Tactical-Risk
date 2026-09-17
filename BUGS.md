@@ -2,6 +2,12 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.10 (preview only, SCHEMA 11)
+
+Viz AA-PALETTE.md hex lock on `?three=1`. No freestyle. Land `#C4B896` + `#B7AA82` grain @11% + 18% faction wash; walls `#8F8468`. Ocean `#4F6E78`→`#3D5A66` (tile is 5–8% noise only). Foam `#D9D2C0` @40%. Confirm/select `#C4A35A`. Chits `#F0E6D2` / glyph `#2C2820` / rim = faction wash 100%. Arc unit sheets unchanged. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.10.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.9 (preview only, SCHEMA 11)
 
 Arc cream-chit atlas + A&A printed-board tiles on `?three=1`. Do not merge over live Canvas V2.81.51.
