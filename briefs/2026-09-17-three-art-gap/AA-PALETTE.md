@@ -19,11 +19,11 @@ Ink Blue is money-only. Do **not** recolor this war board.
 
 ## Units
 Faction = **molded plastic body color** (kill cream chits / cream-on-sand):
-- Germans grey `#8E8F8C`
-- Russians green `#3F6E38`
-- British tan `#C6B17A`
-- Americans olive `#556B2F`
-- Japanese orange-red `#C45C32`
+- Germans grey `#5A5C59`
+- Russians green `#2F5A28`
+- British tan `#B08948`
+- Americans olive `#3F4F22`
+- Japanese orange-red `#B8441E`
 
 Thick dark outline + drop shadow. INF/TNK/ART/FTR/BMB/AA/FAC/ships.
 

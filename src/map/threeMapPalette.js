@@ -70,11 +70,11 @@ export const USSR_LANDS = new Set([
 
 // Molded A&A plastic body colors (refs/aa-plastic-units.png).
 export const PLASTIC = {
-  Germans: '#8E8F8C',
-  Russians: '#3F6E38',
-  British: '#C6B17A',
-  Americans: '#556B2F',
-  Japanese: '#C45C32',
+  Germans: '#5A5C59',
+  Russians: '#2F5A28',
+  British: '#B08948',
+  Americans: '#3F4F22',
+  Japanese: '#B8441E',
 };
 
 export const FACTION_WASH = {
@@ -87,9 +87,9 @@ export const FACTION_WASH = {
 
 export const OCEAN_DEEP = 0x7a90a0;
 export const OCEAN_SHELF = 0x8aa0ae;
-export const PAPER_UV = 15;
-export const OCEAN_UV = 18;
-export const GRAIN_STRENGTH = 0.62;
+export const PAPER_UV = 11;
+export const OCEAN_UV = 14;
+export const GRAIN_STRENGTH = 0.78;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -152,8 +152,14 @@ function bakeParchment(img) {
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-  addSpeckle(ctx, size, 7200, 0.085);
-  contrastGrain(ctx, size, 2.35);
+  addSpeckle(ctx, size, 9800, 0.12);
+  contrastGrain(ctx, size, 3.15);
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = '#8A7A52';
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;

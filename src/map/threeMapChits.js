@@ -274,9 +274,9 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
   ctx.shadowOffsetY = s * 0.14;
   pathFn(ctx, cx, cy, s);
   const g = ctx.createLinearGradient(cx - s, cy - s, cx + s, cy + s);
-  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.38));
+  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.18));
   g.addColorStop(0.42, color);
-  g.addColorStop(1, mixRgb(color, '#000000', 0.42));
+  g.addColorStop(1, mixRgb(color, '#000000', 0.48));
   ctx.fillStyle = g;
   ctx.fill();
   ctx.restore();
@@ -320,6 +320,11 @@ function drawAtlasTint(ctx, type, cx, cy, s, color) {
   ox.globalCompositeOperation = 'multiply';
   ox.fillStyle = color;
   ox.fillRect(0, 0, 256, 256);
+  ox.globalCompositeOperation = 'source-atop';
+  ox.fillStyle = color;
+  ox.globalAlpha = 0.42;
+  ox.fillRect(0, 0, 256, 256);
+  ox.globalAlpha = 1;
   ox.globalCompositeOperation = 'destination-in';
   ox.drawImage(img, sx, sy, sw, sh, 0, 0, 256, 256);
 
@@ -380,9 +385,9 @@ export function paintPip(ctx, { ownerColor, total, types = [], size = 192 } = {}
   ctx.shadowOffsetX = r * 0.08;
   ctx.shadowOffsetY = r * 0.16;
   const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-  g.addColorStop(0, mixRgb(ownerColor, '#FFFFFF', 0.32));
-  g.addColorStop(0.5, ownerColor);
-  g.addColorStop(1, mixRgb(ownerColor, '#000000', 0.38));
+  g.addColorStop(0, mixRgb(ownerColor, '#FFFFFF', 0.16));
+  g.addColorStop(0.48, ownerColor);
+  g.addColorStop(1, mixRgb(ownerColor, '#000000', 0.42));
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -391,9 +396,17 @@ export function paintPip(ctx, { ownerColor, total, types = [], size = 192 } = {}
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(10, r * 0.16);
+  ctx.lineWidth = Math.max(12, r * 0.2);
   ctx.stroke();
-  drawBadge(ctx, cx, cy, total, size * 1.15);
+  ctx.font = `800 ${Math.round(size * 0.42)}px -apple-system, "SF Pro Text", "Segoe UI", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#1A1610';
+  ctx.lineWidth = Math.max(6, size * 0.045);
+  ctx.strokeText(String(total), cx, cy + 1);
+  ctx.fillStyle = '#F4EFE4';
+  ctx.fillText(String(total), cx, cy + 1);
   if (types.length > 1) {
     const n = Math.min(types.length, 5);
     for (let i = 0; i < n; i++) {

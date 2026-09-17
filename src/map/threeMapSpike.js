@@ -340,6 +340,7 @@ export async function bootThreeMapSpike() {
           transparent: true,
           depthTest: true,
           depthWrite: false,
+          toneMapped: false,
         }));
         sprite.scale.set(5.5, 5.5, 1);
         sprite.position.set(x, height + 5.0, z);
@@ -358,6 +359,7 @@ export async function bootThreeMapSpike() {
         transparent: true,
         depthTest: true,
         depthWrite: false,
+        toneMapped: false,
       }));
       pip.scale.set(6.4, 6.4, 1);
       pip.position.set(x, height + 5.0, z);
@@ -372,6 +374,7 @@ export async function bootThreeMapSpike() {
         transparent: true,
         depthTest: true,
         depthWrite: false,
+        toneMapped: false,
       }));
       overflow.scale.set(4.2, 4.2, 1);
       overflow.position.set(x, height + 5.0, z);

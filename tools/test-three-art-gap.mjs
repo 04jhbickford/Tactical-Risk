@@ -66,13 +66,13 @@ check('plastic atlas cells BMB/AA/FAC + ships',
 check('chit discs killed', !/#F0E6D2/.test(chits) && !/CHIT_FACE/.test(chits));
 check('thick dark outline', /#1A1610/.test(chits) && /lineWidth/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
-  /#8E8F8C/.test(palette) && /#3F6E38/.test(palette) && /#C6B17A/.test(palette)
-  && /#556B2F/.test(palette) && /#C45C32/.test(palette));
+  /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
+  && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
 
 check('continent Europe olive', /Europe: '#8C9A52'/.test(palette));
 check('continent USSR tan', /USSR: '#C4A06A'/.test(palette));
 check('continent Africa ochre', /Africa: '#D6B85C'/.test(palette));
-check('grain strength phone-visible', /GRAIN_STRENGTH = 0\.62/.test(palette));
+check('grain strength phone-visible', /GRAIN_STRENGTH = 0\.78/.test(palette));
 check('no 11% invisible grain', !/globalAlpha = 0\.11/.test(palette));
 check('select gold only', /select: '#C4A35A'/.test(palette));
 check('no neon teal leftover', !/#00ced1/i.test(palette) && !/#44C5BD/.test(palette));
