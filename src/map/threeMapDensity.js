@@ -1,5 +1,5 @@
 // Preview-only stack LOD + collision. No Three import.
-// Far = pip+N. Mid = cream chits with spacing. Near/select = typed chits.
+// Dense mid/far = pip+N. Near/select = typed cream chits spaced.
 
 export const LOD_FAR = 215;
 export const LOD_NEAR = 92;
@@ -14,14 +14,13 @@ export function isSupportType(type) {
   return type === 'factory' || type === 'aaGun';
 }
 
-export function tokenSizeFor(band, selected) {
-  if (band === 'near' || selected) return 7.2;
-  return 4.2;
+export function isDenseBand(band) {
+  return band === 'far' || band === 'mid';
 }
 
-export function midChitCap(stackCount, isWater) {
-  if (isWater) return Math.min(stackCount, 3);
-  return Math.min(stackCount, 2);
+export function tokenSizeFor(band, selected) {
+  if (band === 'near' || selected) return 7.2;
+  return 6.2;
 }
 
 export function hexPack(n, pitch) {

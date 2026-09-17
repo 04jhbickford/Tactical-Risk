@@ -19,10 +19,6 @@ function mixHex(hex, toward, t) {
   return (mix(16) << 16) | (mix(8) << 8) | mix(0);
 }
 
-function darkenHex(hex, amt) {
-  return mixHex(hex, '#000000', amt);
-}
-
 export const PALETTE = {
   landBase: '#C4B896',
   landBone: '#C4B896',
@@ -81,27 +77,16 @@ function loadImage(src) {
   });
 }
 
-function makeRepeatTex(image, colorSpace = THREE.SRGBColorSpace) {
-  const tex = new THREE.Texture(image);
-  tex.colorSpace = colorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  return tex;
-}
-
 function bakeParchment(img) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
-  // Lifted print paper so ACES + matte land still reads khaki, not mud.
-  ctx.fillStyle = '#D2C6A0';
+  ctx.fillStyle = PALETTE.landBase;
   ctx.fillRect(0, 0, 512, 512);
   if (img) {
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.1;
+    ctx.globalAlpha = 0.11;
     ctx.drawImage(img, 0, 0, 512, 512);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -131,7 +116,7 @@ export async function loadBoardTextures() {
     loadImage(BOARD_TEX.ocean),
   ]);
   paperTex = bakeParchment(parchment);
-  oceanMap = ocean ? makeRepeatTex(ocean) : null;
+  oceanMap = bakeOcean(ocean);
   return { paperTex, oceanMap };
 }
 
@@ -161,7 +146,8 @@ export function factionWash(owner) {
 }
 
 export function makeLandMaterials(ownerHex) {
-  const wash = mixHex('#D2C6A0', ownerHex || PALETTE.landBase, 0.16);
+  // Paper bake is already --land-base. Wash tints white so hex stays exact.
+  const wash = ownerHex ? mixHex('#FFFFFF', ownerHex, 0.18) : 0xffffff;
   const side = hexColor(PALETTE.landShadow);
   const paper = makePaperTexture();
   const top = new THREE.MeshLambertMaterial({
@@ -186,11 +172,33 @@ export function makeLandMaterials(ownerHex) {
   return { top, side: wall, bottom: wall, seal };
 }
 
+function bakeOcean(img) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PALETTE.oceanShelf;
+  ctx.fillRect(0, 0, 512, 512);
+  if (img) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.12;
+    ctx.drawImage(img, 0, 0, 512, 512);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 export function makeOceanMaterial() {
   if (oceanMap) {
     return new THREE.MeshLambertMaterial({
       map: oceanMap,
-      color: 0x6e8790,
+      color: 0xffffff,
       transparent: false,
     });
   }

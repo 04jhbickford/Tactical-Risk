@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.9 A&A atlas / palette / LOD lock.
+// V2.81.51-three-polish.10 AA-PALETTE P0 lock.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -17,7 +17,7 @@ const {
   separatePoints,
   isSupportType,
   tokenSizeFor,
-  midChitCap,
+  isDenseBand,
 } = await import(pathToFileURL(join(root, 'src/map/threeMapDensity.js')));
 
 const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
@@ -42,7 +42,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.9', GAME_VERSION === 'V2.81.51-three-polish.9');
+check('GAME_VERSION is V2.81.51-three-polish.10', GAME_VERSION === 'V2.81.51-three-polish.10');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land-air atlas is real PNG', pngOk('assets/three/units/units-land-air-cream.png'));
 check('naval atlas is real PNG', pngOk('assets/three/units/units-naval-cream.png'));
@@ -74,8 +74,13 @@ check('ocean tile wired', /board-ocean-tile/.test(palette));
 check('no neon teal leftover', !/#00ced1/i.test(palette) && !/#44C5BD/.test(palette) && !/#1b2624/.test(palette));
 
 check('LOD far/mid/near', lodBand(240) === 'far' && lodBand(160) === 'mid' && lodBand(80) === 'near');
-check('LOD thresholds', LOD_FAR > LOD_NEAR && tokenSizeFor('near', false) > tokenSizeFor('mid', false));
-check('mid caps land stacks', midChitCap(6, false) === 2 && midChitCap(4, true) === 3);
+check('dense mid is pip band', isDenseBand('mid') && isDenseBand('far') && !isDenseBand('near'));
+check('near tokens larger than pip', tokenSizeFor('near', false) > tokenSizeFor('mid', false));
+check('exact land hex not lifted', /#C4B896/.test(palette) && !/#D2C6A0/.test(palette));
+check('ocean not lifted grey', !/0x6e8790/.test(palette));
+check('grain 8–14%', /globalAlpha = 0\.11/.test(palette));
+check('wash 15–22%', /mixHex\('#FFFFFF', ownerHex, 0\.18\)/.test(palette));
+check('mid expand is near or select only', /isDenseBand\(band\)/.test(spike) && /!isDenseBand\(band\) \|\| selected/.test(spike));
 check('support types are FAC/AA', isSupportType('factory') && isSupportType('aaGun') && !isSupportType('infantry'));
 
 const packed = hexPack(4, 6);

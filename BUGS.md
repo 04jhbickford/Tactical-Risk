@@ -2,6 +2,16 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.10 (preview only, SCHEMA 11)
+
+Viz AA-PALETTE P0 lock on `?three=1`. Do not merge over live Canvas V2.81.51. Tesla off.
+
+Exact hexes: land `#C4B896` / shadow `#8F8468` / 11% parchment grain; ocean `#3D5A66` / `#4F6E78`; foam `#D9D2C0`; cream `#F0E6D2`; select/Confirm `#C4A35A`; faction washes 18%. Dense mid-zoom = pip+N only; near/select = typed cream chits spaced.
+
+Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.10.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.9 (preview only, SCHEMA 11)
 
 James he-correct on `?three=1` only. Do not merge over live Canvas V2.81.51. Tesla off.

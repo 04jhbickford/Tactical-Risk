@@ -43,7 +43,7 @@ import {
   tokenSizeFor,
   hexPack,
   separatePoints,
-  midChitCap,
+  isDenseBand,
 } from './threeMapDensity.js';
 import {
   dismissStartupLoader,
@@ -593,29 +593,16 @@ export async function bootThreeMapSpike() {
       let minSep = 5.8;
       for (const rec of recs) {
         const selected = rec.territory.name === selectedName;
-        const expand = band !== 'far' || selected;
+        const expand = !isDenseBand(band) || selected;
         const size = tokenSizeFor(band, selected);
         if (expand) minSep = Math.max(minSep, size * 1.42);
         rec.pip.visible = !expand;
         rec.pip.scale.set(6.2, 6.2, 1);
-        const combat = rec.expanded
-          .map((sprite, i) => ({ sprite, qty: rec.stacks[i]?.quantity || 0, support: sprite.userData.support }))
-          .filter((row) => !row.support)
-          .sort((a, b) => b.qty - a.qty);
-        const cap = (selected || band === 'near')
-          ? rec.expanded.length
-          : midChitCap(combat.length, rec.territory.isWater);
-        const allow = new Set(
-          (selected || band === 'near')
-            ? rec.expanded
-            : combat.slice(0, cap).map((row) => row.sprite),
-        );
         const shown = [];
         for (const sprite of rec.expanded) {
-          const show = expand && allow.has(sprite);
-          sprite.visible = show;
+          sprite.visible = expand;
           sprite.scale.set(size, size, 1);
-          if (show) shown.push(sprite);
+          if (expand) shown.push(sprite);
         }
         const spots = hexPack(shown.length, size * 1.22);
         shown.forEach((sprite, i) => {
@@ -632,8 +619,7 @@ export async function bootThreeMapSpike() {
         if (rec.label) {
           const hide = rec.territory.isWater
             || selected
-            || band === 'far'
-            || shown.length > 0;
+            || rec.stacks.length > 0;
           rec.label.visible = !hide;
           const lo = LABEL_OFFSETS[rec.territory.name] || { x: 0, y: 28 };
           const lp = worldToScene(rec.center.x + lo.x, rec.center.y + lo.y);
