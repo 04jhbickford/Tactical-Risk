@@ -2,6 +2,18 @@
 
 ---
 
+## 9.17.26 — V2.81.49-three-spike.2 James follow-up (preview only, SCHEMA 11)
+
+James playtest of the Three.js spike: lands read as muddy blobs; no east–west wrap; unit placeholders hid type. Still preview-only — do not merge over Canvas.
+
+1. **Borders / fills:** dark edge ink on land rings + darker extrude walls; flatter lighting so continent fills separate. Faint sea-zone hairlines. Not Settlecoast art.
+2. **Wrap:** three horizontal copies at ±MAP_WIDTH (same as Canvas `translate(copy * MAP_WIDTH)`). Camera recenters only when target leaves `[-W, 2W]` (`camera.js` clamp). Pick wraps X like `wrapX()`.
+3. **Unit types:** classic `unitPlacements` as sprites using `getUnitIconPath` / `assets/units` fallback, with INF/TNK/ART/FTR/ship labels + qty. Land and sea.
+
+Open: preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.49-three-spike.2.
+
+---
+
 ## 9.17.26 — V2.81.49-three-spike (preview only, SCHEMA 11)
 
 James YES for a timeboxed Three.js thin spike. **Not production. Do not merge over Canvas 2D.**
