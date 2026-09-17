@@ -43,6 +43,7 @@ import {
   tokenSizeFor,
   hexPack,
   separatePoints,
+  midChitCap,
 } from './threeMapDensity.js';
 import {
   dismissStartupLoader,
@@ -379,11 +380,11 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 0.9));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.36);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.12));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.55);
   sun.position.set(30, 240, 12);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.1);
+  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.18);
   fill.position.set(-90, 90, -40);
   scene.add(fill);
 
@@ -391,7 +392,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.04;
+  renderer.toneMappingExposure = 1.16;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -428,12 +429,26 @@ export async function bootThreeMapSpike() {
 
   function frameEuropeAfrica() {
     const phone = isCoarsePointer();
-    // Med / Egypt / Germany. Overhead so south walls are not camera-facing slabs.
-    const focus = worldToScene(1160, 860);
+    const names = [
+      'United Kingdom', 'West Europe', 'Germany', 'East Europe',
+      'South Europe', 'Ukraine S.S.R.', 'Anglo Sudan Egypt',
+    ];
+    const pts = [];
+    for (const name of names) {
+      const land = lands.find((t) => t.name === name);
+      const c = land && territoryCenter(land);
+      if (c) pts.push(worldToScene(c.x, c.y));
+    }
+    const focus = pts.length
+      ? {
+        x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+        z: pts.reduce((s, p) => s + p.z, 0) / pts.length,
+      }
+      : worldToScene(1100, 780);
     camera.fov = phone ? 42 : 36;
     camera.updateProjectionMatrix();
-    const lift = phone ? 196 : 176;
-    const south = phone ? 26 : 20;
+    const lift = phone ? 178 : 160;
+    const south = phone ? 22 : 16;
     camera.position.set(focus.x, lift, focus.z - south);
     controls.target.set(focus.x, 0, focus.z);
     applyZoomCap();
@@ -580,17 +595,29 @@ export async function bootThreeMapSpike() {
         const selected = rec.territory.name === selectedName;
         const expand = band !== 'far' || selected;
         const size = tokenSizeFor(band, selected);
-        if (expand) minSep = Math.max(minSep, size * 1.08);
+        if (expand) minSep = Math.max(minSep, size * 1.42);
         rec.pip.visible = !expand;
         rec.pip.scale.set(6.2, 6.2, 1);
+        const combat = rec.expanded
+          .map((sprite, i) => ({ sprite, qty: rec.stacks[i]?.quantity || 0, support: sprite.userData.support }))
+          .filter((row) => !row.support)
+          .sort((a, b) => b.qty - a.qty);
+        const cap = (selected || band === 'near')
+          ? rec.expanded.length
+          : midChitCap(combat.length, rec.territory.isWater);
+        const allow = new Set(
+          (selected || band === 'near')
+            ? rec.expanded
+            : combat.slice(0, cap).map((row) => row.sprite),
+        );
         const shown = [];
         for (const sprite of rec.expanded) {
-          const show = expand && (selected || band === 'near' || !sprite.userData.support);
+          const show = expand && allow.has(sprite);
           sprite.visible = show;
           sprite.scale.set(size, size, 1);
           if (show) shown.push(sprite);
         }
-        const spots = hexPack(shown.length, size * 1.16);
+        const spots = hexPack(shown.length, size * 1.22);
         shown.forEach((sprite, i) => {
           movers.push({
             sprite,
@@ -598,15 +625,15 @@ export async function bootThreeMapSpike() {
             z: rec.homeZ + spots[i].z,
             homeX: rec.homeX,
             homeZ: rec.homeZ,
-            maxDrift: selected || band === 'near' ? 12 : 8.5,
-            y: rec.height + (selected || band === 'near' ? 5.6 : 4.8),
+            maxDrift: selected || band === 'near' ? 15 : 14,
+            y: rec.height + (selected || band === 'near' ? 5.6 : 4.6),
           });
         });
         if (rec.label) {
           const hide = rec.territory.isWater
             || selected
             || band === 'far'
-            || ((selected || band === 'near') && shown.length >= 3);
+            || shown.length > 0;
           rec.label.visible = !hide;
           const lo = LABEL_OFFSETS[rec.territory.name] || { x: 0, y: 28 };
           const lp = worldToScene(rec.center.x + lo.x, rec.center.y + lo.y);
@@ -775,6 +802,11 @@ export async function bootThreeMapSpike() {
     screenYOf,
     screenXYOf,
     lodBand: currentBand,
+    selectLand(name, unitType = null) {
+      const land = territories.find((t) => t.name === name) || null;
+      paintSelection(land ? { territory: land, unitType } : null);
+    },
+    dollyBy,
     inspect() {
       const mats = pickables[0]?.material;
       const list = Array.isArray(mats) ? mats : [mats];

@@ -96,15 +96,13 @@ function bakeParchment(img) {
   canvas.width = 512;
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = PALETTE.landBase;
+  // Lifted print paper so ACES + matte land still reads khaki, not mud.
+  ctx.fillStyle = '#D2C6A0';
   ctx.fillRect(0, 0, 512, 512);
   if (img) {
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.12;
-    ctx.drawImage(img, 0, 0, 512, 512);
     ctx.globalAlpha = 0.1;
-    ctx.fillStyle = PALETTE.landGrain;
-    ctx.fillRect(0, 0, 512, 512);
+    ctx.drawImage(img, 0, 0, 512, 512);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   } else {
@@ -163,23 +161,18 @@ export function factionWash(owner) {
 }
 
 export function makeLandMaterials(ownerHex) {
-  const wash = mixHex(PALETTE.landBase, ownerHex || PALETTE.landBase, 0.18);
-  const side = darkenHex(PALETTE.landShadow, 0.08);
+  const wash = mixHex('#D2C6A0', ownerHex || PALETTE.landBase, 0.16);
+  const side = hexColor(PALETTE.landShadow);
   const paper = makePaperTexture();
-  const top = new THREE.MeshStandardMaterial({
+  const top = new THREE.MeshLambertMaterial({
     map: paper,
     color: wash,
-    roughness: 0.92,
-    metalness: 0,
     emissive: 0x000000,
-    envMapIntensity: 0,
     transparent: false,
     side: THREE.DoubleSide,
   });
-  const wall = new THREE.MeshStandardMaterial({
+  const wall = new THREE.MeshLambertMaterial({
     color: side,
-    roughness: 0.96,
-    metalness: 0,
     emissive: 0x000000,
     transparent: false,
     side: THREE.DoubleSide,
@@ -194,52 +187,30 @@ export function makeLandMaterials(ownerHex) {
 }
 
 export function makeOceanMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uDeep: { value: new THREE.Color(PALETTE.oceanDeep) },
-      uShelf: { value: new THREE.Color(PALETTE.oceanShelf) },
-      uCamera: { value: new THREE.Vector3() },
-      uTex: { value: oceanMap },
-      uHasTex: { value: oceanMap ? 1 : 0 },
-    },
-    vertexShader: `
-      varying vec3 vWorld;
-      varying vec3 vN;
-      void main() {
-        vec4 w = modelMatrix * vec4(position, 1.0);
-        vWorld = w.xyz;
-        vN = normalize(mat3(modelMatrix) * normal);
-        gl_Position = projectionMatrix * viewMatrix * w;
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 uDeep;
-      uniform vec3 uShelf;
-      uniform vec3 uCamera;
-      uniform sampler2D uTex;
-      uniform float uHasTex;
-      varying vec3 vWorld;
-      varying vec3 vN;
-      void main() {
-        vec3 viewDir = normalize(uCamera - vWorld);
-        float ndv = max(dot(normalize(vN), viewDir), 0.0);
-        float fres = pow(1.0 - ndv, 2.6);
-        float depth = clamp((abs(vWorld.z) / 240.0), 0.0, 1.0);
-        vec3 water = mix(uShelf, uDeep, 0.28 + depth * 0.42 + fres * 0.08);
-        if (uHasTex > 0.5) {
-          vec3 grain = texture2D(uTex, vWorld.xz * 0.014).rgb;
-          water = mix(water, water * (grain / vec3(0.52)), 0.26);
-        }
-        gl_FragColor = vec4(water, 1.0);
-      }
-    `,
-    toneMapped: true,
+  if (oceanMap) {
+    return new THREE.MeshLambertMaterial({
+      map: oceanMap,
+      color: 0x6e8790,
+      transparent: false,
+    });
+  }
+  return new THREE.MeshLambertMaterial({
+    color: PALETTE.oceanShelf,
+    transparent: false,
   });
 }
 
 export function makeOceanMesh(width, height) {
-  const geo = new THREE.PlaneGeometry(width, height, 1, 1);
+  const geo = new THREE.PlaneGeometry(width, height, 8, 8);
   geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  const uv = geo.attributes.uv;
+  if (pos && uv) {
+    for (let i = 0; i < pos.count; i++) {
+      uv.setXY(i, pos.getX(i) / 42, -pos.getZ(i) / 42);
+    }
+    uv.needsUpdate = true;
+  }
   const mat = makeOceanMaterial();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = -0.12;

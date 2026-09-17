@@ -15,8 +15,13 @@ export function isSupportType(type) {
 }
 
 export function tokenSizeFor(band, selected) {
-  if (band === 'near' || selected) return 7.4;
-  return 5.5;
+  if (band === 'near' || selected) return 7.2;
+  return 4.2;
+}
+
+export function midChitCap(stackCount, isWater) {
+  if (isWater) return Math.min(stackCount, 3);
+  return Math.min(stackCount, 2);
 }
 
 export function hexPack(n, pitch) {
@@ -46,7 +51,7 @@ export function hexPack(n, pitch) {
   return out;
 }
 
-export function separatePoints(items, minDist, iterations = 16) {
+export function separatePoints(items, minDist, iterations = 28) {
   for (let iter = 0; iter < iterations; iter++) {
     for (let i = 0; i < items.length; i++) {
       for (let j = i + 1; j < items.length; j++) {
@@ -59,7 +64,7 @@ export function separatePoints(items, minDist, iterations = 16) {
           d = Math.hypot(dx, dz);
         }
         if (d >= minDist) continue;
-        const push = (minDist - d) * 0.52;
+        const push = (minDist - d) * 0.62;
         const nx = dx / d;
         const nz = dz / d;
         items[i].x -= nx * push;
@@ -73,12 +78,13 @@ export function separatePoints(items, minDist, iterations = 16) {
       const dz = it.z - it.homeZ;
       const drift = Math.hypot(dx, dz);
       const maxD = it.maxDrift ?? 9;
+      if (iter >= iterations - 8) continue;
       if (drift > maxD && drift > 0) {
         it.x = it.homeX + (dx / drift) * maxD;
         it.z = it.homeZ + (dz / drift) * maxD;
       } else {
-        it.x += (it.homeX - it.x) * 0.05;
-        it.z += (it.homeZ - it.z) * 0.05;
+        it.x += (it.homeX - it.x) * 0.008;
+        it.z += (it.homeZ - it.z) * 0.008;
       }
     }
   }

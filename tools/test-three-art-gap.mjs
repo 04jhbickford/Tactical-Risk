@@ -17,6 +17,7 @@ const {
   separatePoints,
   isSupportType,
   tokenSizeFor,
+  midChitCap,
 } = await import(pathToFileURL(join(root, 'src/map/threeMapDensity.js')));
 
 const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
@@ -74,6 +75,7 @@ check('no neon teal leftover', !/#00ced1/i.test(palette) && !/#44C5BD/.test(pale
 
 check('LOD far/mid/near', lodBand(240) === 'far' && lodBand(160) === 'mid' && lodBand(80) === 'near');
 check('LOD thresholds', LOD_FAR > LOD_NEAR && tokenSizeFor('near', false) > tokenSizeFor('mid', false));
+check('mid caps land stacks', midChitCap(6, false) === 2 && midChitCap(4, true) === 3);
 check('support types are FAC/AA', isSupportType('factory') && isSupportType('aaGun') && !isSupportType('infantry'));
 
 const packed = hexPack(4, 6);
