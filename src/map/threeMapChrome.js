@@ -38,7 +38,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
-      background:#152228; overflow:hidden;
+      background:#1c3840; overflow:hidden;
     }
     html.three-spike #mapCanvas,
     html.three-spike #minimap,
@@ -124,7 +124,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-zoom {
       position:absolute; right:max(10px, env(safe-area-inset-right));
-      bottom:calc(118px + env(safe-area-inset-bottom, 0px));
+      bottom:calc(168px + env(safe-area-inset-bottom, 0px));
       z-index:28; display:flex; flex-direction:column; gap:6px;
     }
     #three-zoom button {

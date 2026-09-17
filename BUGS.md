@@ -2,7 +2,7 @@
 
 ---
 
-## 9.17.26 — V2.81.51-three-polish.5 (preview only, SCHEMA 11)
+## 9.17.26 — V2.81.51-three-polish.6 (preview only, SCHEMA 11)
 
 James he-corrects + Arc SOTA gap-close on `?three=1` only. Do not merge over live Canvas V2.81.51.
 
@@ -14,7 +14,7 @@ James he-corrects + Arc SOTA gap-close on `?three=1` only. Do not merge over liv
 6. **HUD** — L0 thin (☰ · PHASE · seat · IPC); L1 one peek; bottom named Confirm. No Inspect / Noted.
 7. **Chits** — from-scratch INF/TNK/FTR/ship (+ART) glyphs in `assets/three/chits` and `threeMapChits.js`. Faction rim. Readable at 390.
 
-Open: preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.5. Default `/` stays Canvas lobby. Continues the .4 lookpass (still had tile UVs on tops).
+Open: preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.6. Default `/` stays Canvas lobby. Continues the .4 lookpass (still had tile UVs on tops). .6 lifts crushed bone/ocean and hides labels under stacks.
 
 ---
 

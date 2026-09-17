@@ -24,23 +24,23 @@ function darkenHex(hex, amt) {
 }
 
 export const PALETTE = {
-  oceanDeep: '#152228',
-  oceanShelf: '#2a4046',
-  oceanFog: '#152228',
-  foam: '#c5d2cc',
-  landBone: '#d8cfc0',
+  oceanDeep: '#1c3840',
+  oceanShelf: '#3d5c62',
+  oceanFog: '#1a3036',
+  foam: '#d5e0da',
+  landBone: '#ece4d6',
   landInk: '#3a3228',
-  landBevel: '#8d8274',
-  border: '#3d342c',
-  waterHair: '#1c3036',
+  landBevel: '#9a8f80',
+  border: '#4a4036',
+  waterHair: '#244046',
   select: '#d4a84b',
   selectSoft: '#e6c36a',
   confirm: '#c9a44a',
   boneText: '#f3ead6',
-  sky: '#e6ddd0',
-  ground: '#24302c',
-  key: '#fff4e4',
-  fill: '#8ea4ae',
+  sky: '#f2ebe0',
+  ground: '#2c3a36',
+  key: '#fff6ea',
+  fill: '#9ab0b8',
 };
 
 export const OCEAN_DEEP = 0x152228;
@@ -89,15 +89,16 @@ export function landWashHex(ownerHex) {
 }
 
 export function makeLandMaterials(ownerHex) {
-  const wash = mixHex(PALETTE.landBone, ownerHex || PALETTE.landBone, 0.2);
+  const wash = mixHex(PALETTE.landBone, ownerHex || PALETTE.landBone, 0.11);
   const side = darkenHex(`#${wash.toString(16).padStart(6, '0')}`, 0.38);
   const paper = makePaperTexture();
   const top = new THREE.MeshStandardMaterial({
     map: paper,
     color: wash,
-    roughness: 0.86,
+    roughness: 0.78,
     metalness: 0.02,
-    emissive: 0x000000,
+    emissive: 0x1c1810,
+    emissiveIntensity: 0.12,
     envMapIntensity: 0.2,
   });
   const wall = new THREE.MeshStandardMaterial({
@@ -136,7 +137,7 @@ export function makeOceanMaterial() {
         vec3 viewDir = normalize(uCamera - vWorld);
         float ndv = max(dot(normalize(vN), viewDir), 0.0);
         float fres = pow(1.0 - ndv, 2.4);
-        vec3 col = mix(uDeep, uShelf, fres * 0.48);
+        vec3 col = mix(uDeep, uShelf, 0.28 + fres * 0.4);
         gl_FragColor = vec4(col, 1.0);
       }
     `,

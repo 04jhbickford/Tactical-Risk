@@ -225,7 +225,7 @@ export async function bootThreeMapSpike() {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.oceanDeep);
-  scene.fog = new THREE.Fog(PALETTE.oceanFog, 520, 1100);
+  scene.fog = new THREE.Fog(PALETTE.oceanFog, 780, 1500);
 
   const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4);
   ocean.position.set(WORLD_W / 2, -0.08, -WORLD_H / 2);
@@ -237,7 +237,7 @@ export async function bootThreeMapSpike() {
 
   const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.58);
   const waterBorderMat = makeLineMat(PALETTE.waterHair, 0.4, 0.18);
-  const foamMat = makeLineMat(PALETTE.foam, 1.7, 0.28);
+  const foamMat = makeLineMat(PALETTE.foam, 2.15, 0.42);
   const selectMat = makeLineMat(PALETTE.select, 1.85, 0.95);
   const selectSoftMat = makeLineMat(PALETTE.selectSoft, 3.4, 0.28);
   lineMats.push(landBorderMat, waterBorderMat, foamMat, selectMat, selectSoftMat);
@@ -316,7 +316,7 @@ export async function bootThreeMapSpike() {
         const col = i % cols;
         const row = Math.floor(i / cols);
         const inRow = Math.min(cols, stacks.length - row * cols);
-        sprite.scale.set(tokenW, tokenH, 1);
+        sprite.scale.set(tokenW * 1.12, tokenH * 1.12, 1);
         sprite.position.set(
           x + (col - (inRow - 1) / 2) * (tokenW + 1.6),
           height + 5.4 + row * 5.2,
@@ -375,11 +375,11 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 0.92));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.48);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.05));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.62);
   sun.position.set(40, 220, 18);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.14);
+  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.18);
   fill.position.set(-90, 90, -40);
   scene.add(fill);
 
@@ -387,7 +387,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.94;
+  renderer.toneMappingExposure = 1.02;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -577,7 +577,7 @@ export async function bootThreeMapSpike() {
         if (rec.label) {
           rec.label.visible = !rec.territory.isWater
             && rec.territory.name !== selectedName
-            && !expand;
+            && rec.stacks.length === 0;
         }
       }
       return;
@@ -588,9 +588,9 @@ export async function bootThreeMapSpike() {
       rec.pip.visible = !expand;
       for (const s of rec.expanded) s.visible = expand;
       if (rec.label) {
-        rec.label.visible = !rec.territory.isWater
-          && rec.territory.name !== selectedName
-          && !expand;
+          rec.label.visible = !rec.territory.isWater
+            && rec.territory.name !== selectedName
+            && rec.stacks.length === 0;
       }
     }
   }
@@ -601,7 +601,7 @@ export async function bootThreeMapSpike() {
     if (hover) {
       if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x000000);
       hoveredName = next && !next.isWater ? next.name : null;
-        if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x1a1408);
+      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x1a1408);
       renderer.domElement.classList.toggle('is-hovering', !!next);
       return;
     }
