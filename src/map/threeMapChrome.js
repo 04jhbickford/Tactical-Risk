@@ -120,7 +120,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-zoom {
       position:absolute; right:max(10px, env(safe-area-inset-right));
-      top:calc(56px + env(safe-area-inset-top, 0px));
+      bottom:calc(118px + env(safe-area-inset-bottom, 0px));
       z-index:28; display:flex; flex-direction:column; gap:6px;
     }
     #three-zoom button {
@@ -220,9 +220,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     setSheetOpen(open) {
       sheet.classList.toggle('is-open', !!open);
-      if (open) {
-        api.peek.classList.remove('is-on');
-      }
+      if (open) api.peek.classList.remove('is-on');
+      else if (api.peek.textContent) api.peek.classList.add('is-on');
     },
     isSheetOpen() {
       return sheet.classList.contains('is-open');

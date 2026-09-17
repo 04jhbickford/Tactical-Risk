@@ -691,7 +691,7 @@ export async function bootThreeMapSpike() {
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
     confirmed = false;
-    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x5a3a00);
+    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x2a1c08);
     drawSelectInk(next && !next.isWater ? next : null);
     syncDensity();
     chrome.paintSelection({
