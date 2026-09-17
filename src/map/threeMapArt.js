@@ -112,7 +112,7 @@ export async function bakeWorldTexture() {
   canvas.width = BAKE_W;
   canvas.height = BAKE_H;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#e8d4b4';
+  ctx.fillStyle = '#C4B896';
   ctx.fillRect(0, 0, BAKE_W, BAKE_H);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;

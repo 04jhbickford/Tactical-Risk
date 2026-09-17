@@ -2,6 +2,18 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.9 (preview only, SCHEMA 11)
+
+James he-correct on `?three=1` only. Do not merge over live Canvas V2.81.51. Tesla off.
+
+1. **Real unit atlases** — cream molded A&A chits in `assets/three/units/` (INF/TNK/FTR/BMB + BB/CV/SS/TR). Faction is rim tint only; cream face stays. Stick-figure UI glyphs removed. FAC/AA are rim-only cream discs.
+2. **Zoom / density** — far = faction pip + total N; mid = cream chits with collision spacing (no overlap piles); near/select = typed chits. Labels offset or hide under stacks.
+3. **A&A board** — parchment + ocean tiles + AA-PALETTE.md hex lock. Warm khaki land, muted blue-grey sea, paper grain multiply, soft `#D9D2C0` coast hairline. No cyan bloom.
+
+Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.9. Default `/` stays Canvas V2.81.51.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.8 (preview only, SCHEMA 11)
 
 Ocean-mask finish on `?three=1`. Land plates get an inflated opaque sand seal under every territory so ocean cannot show through Egypt / N. Africa (bevel already off; tile bake no longer composites teal). Preview only. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.8.
