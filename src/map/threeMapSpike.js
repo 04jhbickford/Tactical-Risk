@@ -233,7 +233,7 @@ export async function bootThreeMapSpike() {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(PALETTE.oceanDeep);
-  scene.fog = new THREE.Fog(PALETTE.oceanFog, 780, 1500);
+  scene.fog = new THREE.Fog(PALETTE.oceanFog, 1100, 2200);
 
   const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4, boardTex.ocean);
   ocean.position.set(WORLD_W / 2, -0.2, -WORLD_H / 2);
@@ -375,8 +375,8 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 0.95));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.42);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.05));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.48);
   sun.position.set(30, 240, 12);
   scene.add(sun);
   const fill = new THREE.DirectionalLight(PALETTE.fill, 0.12);
@@ -387,7 +387,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 1.14;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 

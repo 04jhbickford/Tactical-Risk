@@ -67,7 +67,7 @@ function loadImage(src) {
   });
 }
 
-function cropCenterCanvas(img, frac = 0.58, size = 512) {
+function cropCenterCanvas(img, frac = 0.58, size = 512, lift = 1) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -75,6 +75,16 @@ function cropCenterCanvas(img, frac = 0.58, size = 512) {
   const sw = img.width * frac;
   const sh = img.height * frac;
   ctx.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, 0, 0, size, size);
+  if (lift !== 1) {
+    const imgData = ctx.getImageData(0, 0, size, size);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] = Math.min(255, d[i] * lift);
+      d[i + 1] = Math.min(255, d[i + 1] * lift);
+      d[i + 2] = Math.min(255, d[i + 2] * lift);
+    }
+    ctx.putImageData(imgData, 0, 0);
+  }
   return canvas;
 }
 
@@ -96,8 +106,8 @@ export async function loadBoardTextures() {
     loadImage(OCEAN_SRC),
   ]);
   boardCache = {
-    parchment: canvasTex(cropCenterCanvas(parchmentImg, 0.56)),
-    ocean: canvasTex(cropCenterCanvas(oceanImg, 0.62)),
+    parchment: canvasTex(cropCenterCanvas(parchmentImg, 0.56, 512, 1.18)),
+    ocean: canvasTex(cropCenterCanvas(oceanImg, 0.62, 512, 1.08)),
   };
   return boardCache;
 }
@@ -139,16 +149,15 @@ export function factionRim(ownerId, fallbackHex) {
 }
 
 export function makeLandMaterials(ownerHex, parchment) {
-  const wash = mixHex(PALETTE.landBone, ownerHex || PALETTE.landBone, 0.18);
-  const side = darkenHex(PALETTE.landBevel, 0.12);
+  // Parchment tile already carries #C4B896 khaki. Multiply with a light
+  // wash so grain stays readable (not muddy brown × ACES).
+  const wash = mixHex('#FFFFFF', ownerHex || PALETTE.landBone, 0.12);
+  const side = darkenHex(PALETTE.landBevel, 0.08);
   const paper = parchment || makePaperTexture();
-  const top = new THREE.MeshStandardMaterial({
+  const top = new THREE.MeshLambertMaterial({
     map: paper,
     color: wash,
-    roughness: 0.92,
-    metalness: 0,
     emissive: 0x000000,
-    envMapIntensity: 0,
     transparent: false,
     side: THREE.DoubleSide,
   });
@@ -201,16 +210,16 @@ export function makeOceanMaterial(oceanTile) {
         float ndv = max(dot(normalize(vN), viewDir), 0.0);
         float fres = pow(1.0 - ndv, 2.8);
         float depth = clamp((abs(vWorld.z) / 240.0), 0.0, 1.0);
-        vec3 base = mix(uShelf, uDeep, 0.28 + depth * 0.42 + fres * 0.08);
+        vec3 base = mix(uShelf, uDeep, 0.12 + depth * 0.2 + fres * 0.04);
         if (uHasTile > 0.5) {
-          vec3 grain = texture2D(uTile, vWorld.xz * 0.011).rgb;
-          base = mix(base, grain * vec3(0.72, 0.82, 0.86), 0.40);
-          base = mix(base, uDeep, 0.18 + depth * 0.22);
+          vec3 grain = texture2D(uTile, vWorld.xz * 0.0075).rgb;
+          base = mix(grain, uShelf, 0.18);
+          base = mix(base, uDeep, 0.06 + depth * 0.1);
         }
         gl_FragColor = vec4(base, 1.0);
       }
     `,
-    toneMapped: true,
+    toneMapped: false,
   });
 }
 
