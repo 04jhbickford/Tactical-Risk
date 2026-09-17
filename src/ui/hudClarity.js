@@ -17,10 +17,10 @@ export function resolveHudPhaseLabel({ phase, turnPhase } = {}) {
 // Combat Move ≠ Combat (dice). Fortify = Non-Combat Move. Copy only.
 export function resolveHudNextStep({ phase, turnPhase } = {}) {
   if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.COMBAT_MOVE) {
-    return 'Combat Move: tap stack → highlighted land → Confirm. Dice are next.';
+    return 'Combat Move: tap stack → units → highlighted land → Confirm. Dice are next.';
   }
   if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
-    return 'Fortify: tap stack → your land → Confirm. No attacks this step.';
+    return 'Fortify: tap stack → units → your land → Confirm. No attacks this step.';
   }
   return null;
 }

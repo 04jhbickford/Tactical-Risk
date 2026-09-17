@@ -67,7 +67,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version + schema ===');
-check('GAME_VERSION is V2.81.50', GAME_VERSION === 'V2.81.50');
+check('GAME_VERSION is V2.81.51', GAME_VERSION === 'V2.81.51');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Store / never / turn gate ===');
@@ -134,21 +134,21 @@ check('Fortify names Non-Combat Move',
 check('HUD chip is Combat Move',
   formatMobilePhaseWord(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Combat Move'
   && formatMobilePhaseWord(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Fortify');
-check('desktop PHASE_HINTS name the stack → land job',
-  PHASE_HINTS[TURN_PHASES.COMBAT_MOVE] === 'Click stack → highlighted land → Confirm'
-  && PHASE_HINTS[TURN_PHASES.NON_COMBAT_MOVE] === 'Click stack → your land → Confirm');
-check('phone peek idle Combat Move is stack-first',
+check('desktop PHASE_HINTS name the stack → units → land job',
+  PHASE_HINTS[TURN_PHASES.COMBAT_MOVE] === 'Click stack → units → highlighted land → Confirm'
+  && PHASE_HINTS[TURN_PHASES.NON_COMBAT_MOVE] === 'Click stack → units → your land → Confirm');
+check('phone peek idle Combat Move is stack-then-units',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE)
-    === 'Tap your stack — legal lands highlight'
+    === 'Tap your stack, then each unit to move'
   && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE)
-    === 'Tap your stack — your lands highlight');
-check('phone peek dest names Confirm',
+    === 'Tap your stack, then each unit to fortify');
+check('phone peek dest names units then Confirm',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, null, {
     territoryName: 'Ukraine S.S.R.',
-  }) === 'Tap a highlighted land, then Confirm'
+  }) === 'Tap each unit, then a highlighted land'
   && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
     territoryName: 'Ukraine S.S.R.', destName: 'West Russia',
-  }) === 'Ukraine S.S.R. → West Russia — Confirm');
+  }) === 'Tap each unit to move · West Russia');
 check('deploy SILO is unchanged',
   resolvePhonePeekHint(GAME_PHASES.UNIT_PLACEMENT, null) === 'Tap land, then unit');
 check('HUD next-step is honest',
