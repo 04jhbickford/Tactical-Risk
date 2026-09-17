@@ -2,6 +2,23 @@
 
 ---
 
+## 9.17.26 — V2.81.50-three-polish (preview only, SCHEMA 11)
+
+30-minute polish blitz on the Three.js spike. Still gated by `?three=1`. Do not merge over Canvas.
+
+Landed:
+1. **Board** — continent fills with Standard materials + bevel, dark ink + inner rim via Line2, gold selection ring, cheap hash-matched mountain cones / extra elevation, deeper teal ocean + shelf.
+2. **Wrap** — still three ±MAP_WIDTH copies; camera recenters like Canvas; light vertical clamp so the board stays framed.
+3. **Units** — circular faction-rim tokens, type chip, qty pip; Canvas sea-zone / land offsets; tighter 3-col grid so stacks do not mud together.
+4. **Mobile** — one-finger pan, two-finger dolly (no rotate), 16px tap slop, pinch does not select, +/−/Fit, phone boot framing, safe-area chrome.
+5. **Light / camera** — hemisphere + key/fill, ACES, fog, north-up south-of-board framing.
+
+Gaps: no MP / Confirm / HUD rewrite; no full 3D unit models; mountain cones are cheap markers not terrain mesh.
+
+Open: preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.50-three-polish.
+
+---
+
 ## 9.17.26 — V2.81.49-three-spike.2 James follow-up (preview only, SCHEMA 11)
 
 James playtest of the Three.js spike: lands read as muddy blobs; no east–west wrap; unit placeholders hid type. Still preview-only — do not merge over Canvas.

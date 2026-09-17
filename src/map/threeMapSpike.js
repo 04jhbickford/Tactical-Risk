@@ -4,6 +4,9 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Line2 } from 'three/addons/lines/Line2.js';
+import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
 import { TerritoryMap } from './territoryMap.js';
@@ -17,10 +20,10 @@ import {
 
 const SCALE = 0.1;
 const WORLD_W = MAP_WIDTH * SCALE;
-const LAND_HEIGHT = 2.4;
-const TAP_PX = 8;
+const WORLD_H = MAP_HEIGHT * SCALE;
+const BASE_LAND = 2.15;
+const MT_LAND = 3.55;
 const WRAP_COPIES = [-1, 0, 1];
-const BORDER_Y = LAND_HEIGHT + 0.12;
 const TYPE_SHORT = {
   infantry: 'INF',
   armour: 'TNK',
@@ -38,12 +41,71 @@ const TYPE_SHORT = {
   aaGun: 'AA',
 };
 
-const landBorderMat = new THREE.LineBasicMaterial({ color: 0x1a1408 });
-const waterBorderMat = new THREE.LineBasicMaterial({ color: 0x0d3f3c });
+const FACTION_FALLBACK = {
+  Russians: '#B22222',
+  Germans: '#4A4A4A',
+  British: '#B8860B',
+  Japanese: '#FF8C00',
+  Americans: '#556B2F',
+};
+
+// Stolen from Canvas UnitRenderer so the spike stays off the MP/gameState path.
+const SEA_ZONE_CENTERS = {
+  'West US Sea Zone': { x: 3078, y: 800 },
+  'West Canada Sea Zone': { x: 2992, y: 462 },
+  'Alaska Sea Zone': { x: 2870, y: 458 },
+  'Soviet Far East Sea Zone': { x: 2558, y: 408 },
+  'Midway Sea Zone': { x: 2918, y: 630 },
+  'Hawaii Sea Zone': { x: 3062, y: 960 },
+  'Wake Island Sea Zone': { x: 2764, y: 1003 },
+  'Okinawa Sea Zone': { x: 2569, y: 943 },
+  'New Zealand Sea Zone': { x: 2964, y: 1658 },
+  'South Pacific Sea Zone': { x: 2992, y: 1314 },
+  'Solomon Islands Sea Zone': { x: 2778, y: 1288 },
+  'Caroline Islands Sea Zone': { x: 2500, y: 1080 },
+  'New Guinea Sea Zone': { x: 2566, y: 1306 },
+  'North Australia Sea Zone': { x: 2574, y: 1516 },
+  'Kwangtung Sea Zone': { x: 2342, y: 862 },
+  'French Indo China Sea Zone': { x: 2163, y: 1201 },
+  'Borneo Sea Zone': { x: 2318, y: 1364 },
+  'East Indies Sea Zone': { x: 1998, y: 1426 },
+  'West Australia Sea Zone': { x: 2094, y: 1520 },
+  'Indian Ocean Sea Zone': { x: 1688, y: 1186 },
+  'Red Sea Zone': { x: 1568, y: 1292 },
+  'Mozambique Sea Zone': { x: 1440, y: 1464 },
+  'Congo Sea Zone': { x: 784, y: 1474 },
+  'Black Sea Zone': { x: 1348, y: 648 },
+  'Caspian Sea Zone': { x: 1512, y: 626 },
+  'East Mediteranean Sea Zone': { x: 1264, y: 832 },
+  'Central Mediteranean Sea Zone': { x: 1132, y: 834 },
+  'West Mediteranean Sea Zone': { x: 912, y: 760 },
+  'North Sea Zone': { x: 668, y: 232 },
+  'Baltic Sea Zone': { x: 1106, y: 342 },
+  'West Spain Sea Zone': { x: 638, y: 614 },
+  'North Atlantic Sea Zone': { x: 472, y: 890 },
+  'West Africa Sea Zone': { x: 624, y: 1236 },
+  'North Brazil Sea Zone': { x: 464, y: 1148 },
+  'Gulf of Mexico Sea Zone': { x: 3452, y: 924 },
+  'Carribean Sea Zone': { x: 266, y: 1086 },
+  'West Panama Sea Zone': { x: 54, y: 1200 },
+};
+
+const LAND_UNIT_OFFSETS = {
+  'Finland Norway': { x: 0, y: -60 },
+  'East Canada': { x: 60, y: 0 },
+};
 
 export function isThreeSpikeRequested(search = typeof location !== 'undefined' ? location.search : '') {
   const v = String(new URLSearchParams(search).get('three') || '').toLowerCase();
   return v === '1' || v === 'true' || v === 'yes';
+}
+
+function isCoarsePointer() {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 720;
+  } catch {
+    return window.innerWidth <= 720;
+  }
 }
 
 function wrapWorldX(x) {
@@ -78,6 +140,15 @@ function darkenHex(hex, amt) {
   return mixHex(hex, '#000000', amt);
 }
 
+function hashName(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
 function perpDist(p, a, b) {
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
@@ -107,7 +178,7 @@ function rdp(points, epsilon) {
 
 function simplifyRing(poly) {
   if (!poly || poly.length < 3) return null;
-  const ring = rdp(poly, 2.4);
+  const ring = rdp(poly, 1.6);
   return ring.length >= 3 ? ring : poly;
 }
 
@@ -142,7 +213,26 @@ function territoryCenter(territory) {
     }
   }
   if (total === 0) return null;
-  return { x: sx / total, y: sy / total };
+  return { x: sx / total, y: sy / total, area: total };
+}
+
+function landHeightFor(territory, center) {
+  const hash = hashName(territory.name);
+  if ((center?.area || 0) > 3500 && hash % 3 === 0) return MT_LAND;
+  if (hash % 3 === 1) return BASE_LAND + 0.35;
+  return BASE_LAND;
+}
+
+function unitAnchor(territory) {
+  const sea = SEA_ZONE_CENTERS[territory.name];
+  if (territory.isWater && sea) return { x: sea.x, y: sea.y, area: 1 };
+  const center = territoryCenter(territory);
+  if (!center) return null;
+  const off = LAND_UNIT_OFFSETS[territory.name];
+  if (off && !territory.isWater) {
+    return { x: center.x + off.x, y: center.y + off.y, area: center.area };
+  }
+  return center;
 }
 
 function loadImage(src) {
@@ -161,7 +251,7 @@ function loadImage(src) {
 function paintHud(selected, stacks) {
   const hud = document.getElementById('hud');
   if (!hud) return;
-  const land = selected?.name || 'none — click a land or sea';
+  const land = selected?.name || 'none — tap a land or sea';
   const owner = selected?.originalOwner && !selected.isWater ? ` · ${selected.originalOwner}` : '';
   const units = (stacks || [])
     .map((s) => `${formatUnitName(s.type)} ×${s.quantity}`)
@@ -173,52 +263,107 @@ function paintHud(selected, stacks) {
     <span class="hud-current-turn" style="margin-left:auto">
       <span class="hud-turn-info">
         <span class="hud-player-name">${land}${owner}</span>
-        <span class="hud-phase-label">${units || `SCHEMA ${SCHEMA_VERSION} · wrap + typed units`}</span>
+        <span class="hud-phase-label">${units || `SCHEMA ${SCHEMA_VERSION} · wrap · typed units`}</span>
       </span>
     </span>
   `;
 }
 
 function injectSpikeChrome() {
+  document.documentElement.classList.add('three-spike');
   const style = document.createElement('style');
   style.textContent = `
     #mapCanvas, #minimap, #sidebar { display:none !important; }
     #threeCanvas {
       position:absolute; inset:0; width:100%; height:100%;
       display:block; touch-action:none; cursor:grab;
+      -webkit-user-select:none; user-select:none;
     }
     #threeCanvas.is-panning { cursor:grabbing; }
     #threeCanvas.is-hovering { cursor:pointer; }
     #three-spike-hint {
-      position:absolute; left:16px; bottom:16px; z-index:12;
-      max-width:min(520px, calc(100vw - 32px));
-      padding:10px 12px; border-radius:8px;
-      background:rgba(20,20,40,0.88); color:#e8dcc4;
-      font-size:13px; line-height:1.4;
+      position:absolute; left:max(12px, env(safe-area-inset-left));
+      bottom:max(12px, env(safe-area-inset-bottom));
+      z-index:12;
+      max-width:min(420px, calc(100vw - 88px));
+      padding:8px 10px; border-radius:8px;
+      background:rgba(16,18,32,0.86); color:#e8dcc4;
+      font-size:12px; line-height:1.35;
       border:1px solid rgba(201,164,74,0.35);
       pointer-events:none;
+    }
+    #three-zoom-controls {
+      position:absolute; right:max(12px, env(safe-area-inset-right));
+      bottom:max(16px, env(safe-area-inset-bottom));
+      z-index:20; display:flex; flex-direction:column; gap:8px;
+    }
+    #three-zoom-controls button {
+      width:44px; height:44px; border-radius:10px;
+      border:1px solid rgba(255,255,255,0.25);
+      background:rgba(20,24,38,0.88); color:#fff;
+      font-size:22px; line-height:1; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    @media (max-width:720px) {
+      #three-spike-hint { font-size:11px; max-width:calc(100vw - 76px); }
     }
   `;
   document.head.appendChild(style);
 
   const hint = document.createElement('div');
   hint.id = 'three-spike-hint';
-  hint.textContent = 'Drag to pan (wraps east–west like Canvas) · wheel / pinch zoom · click a land or sea. Icons are INF / TNK / ART / FTR / ships from classic setup.';
+  hint.textContent = 'Drag / one-finger pan · pinch or +/− zoom · tap land or sea. Wraps east–west like Canvas.';
   document.body.appendChild(hint);
+
+  const zoom = document.createElement('div');
+  zoom.id = 'three-zoom-controls';
+  zoom.innerHTML = `
+    <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
+    <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
+    <button type="button" data-zoom="fit" aria-label="Fit map">Fit</button>
+  `;
+  document.body.appendChild(zoom);
+  return { hint, zoom };
 }
 
-function makeRingLine(ring, y, material) {
+function makeLineMat(color, linewidth) {
+  return new LineMaterial({
+    color,
+    linewidth,
+    worldUnits: false,
+    transparent: true,
+    opacity: 0.96,
+    depthTest: true,
+  });
+}
+
+function makeBorderLine(ring, y, material) {
   const positions = [];
   for (const [wx, wy] of ring) {
     const p = worldToScene(wx, wy);
     positions.push(p.x, y, p.z);
   }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  return new THREE.LineLoop(geo, material);
+  const first = worldToScene(ring[0][0], ring[0][1]);
+  positions.push(first.x, y, first.z);
+  const geo = new LineGeometry();
+  geo.setPositions(positions);
+  const line = new Line2(geo, material);
+  line.computeLineDistances();
+  return line;
 }
 
-function makeLandMesh(territory, colorHex, materials) {
+function addTerritoryInk(group, territory, material, y, offsetX) {
+  for (const poly of territory.polygons || []) {
+    const ring = simplifyRing(poly);
+    if (!ring) continue;
+    const line = makeBorderLine(ring, y, material);
+    line.position.x = offsetX;
+    line.userData.territory = territory;
+    group.add(line);
+  }
+}
+
+function makeLandMesh(territory, materials, height) {
   const shapes = [];
   for (const poly of territory.polygons || []) {
     const ring = simplifyRing(poly);
@@ -234,61 +379,99 @@ function makeLandMesh(territory, colorHex, materials) {
   if (!shapes.length) return null;
 
   const geom = new THREE.ExtrudeGeometry(shapes, {
-    depth: LAND_HEIGHT,
-    bevelEnabled: false,
+    depth: height,
+    bevelEnabled: true,
+    bevelThickness: 0.18,
+    bevelSize: 0.16,
+    bevelSegments: 1,
     curveSegments: 1,
   });
   geom.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(geom, [materials.top, materials.side]);
   mesh.userData.territory = territory;
+  mesh.userData.landHeight = height;
   return mesh;
 }
 
-function addTerritoryInk(group, territory, material, y, offsetX) {
-  for (const poly of territory.polygons || []) {
-    const ring = simplifyRing(poly);
-    if (!ring) continue;
-    const line = makeRingLine(ring, y, material);
-    line.position.x = offsetX;
-    line.userData.territory = territory;
-    group.add(line);
+function addCheapMountains(group, territory, center, height, offsetX, coneGeo, coneMat) {
+  if (!center || center.area < 3500) return;
+  const hash = hashName(territory.name);
+  if (hash % 3 !== 0) return;
+  const count = 2 + (hash % 3);
+  const { x, z } = worldToScene(center.x, center.y);
+  for (let i = 0; i < count; i++) {
+    const cone = new THREE.Mesh(coneGeo, coneMat);
+    const ox = ((hash * (i + 3)) % 70) / 10 - 3.5;
+    const oz = ((hash * (i + 7)) % 50) / 10 - 2.5;
+    const h = 2.4 + (hash % 5) * 0.22;
+    cone.scale.set(0.85 + (i % 2) * 0.25, h / 3.2, 0.85 + (i % 2) * 0.2);
+    cone.position.set(x + offsetX + ox, height + (3.2 * cone.scale.y) / 2, z + oz);
+    cone.userData.territory = territory;
+    group.add(cone);
   }
 }
 
-async function makeUnitTexture(type, owner, quantity, unitDefs) {
+async function makeUnitTexture(type, owner, quantity, unitDefs, ownerColor) {
   const factionImg = await loadImage(getUnitIconPath(type, owner));
   const genericImg = factionImg ? null : await loadImage(getGenericUnitIconPath(type, unitDefs));
   const img = factionImg || genericImg;
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 148;
+  canvas.width = 160;
+  canvas.height = 188;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = 'rgba(12, 14, 24, 0.72)';
-  ctx.strokeStyle = 'rgba(244, 234, 212, 0.55)';
+  ctx.clearRect(0, 0, 160, 188);
+
+  ctx.fillStyle = ownerColor || '#2a2438';
+  ctx.beginPath();
+  ctx.arc(80, 72, 66, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(12, 14, 22, 0.92)';
+  ctx.beginPath();
+  ctx.arc(80, 72, 58, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (img) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(80, 72, 54, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, 26, 18, 108, 108);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#f4ead4';
+    ctx.font = 'bold 34px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(TYPE_SHORT[type] || '?', 80, 72);
+  }
+
+  ctx.fillStyle = 'rgba(16, 18, 28, 0.88)';
+  ctx.strokeStyle = ownerColor || 'rgba(201,164,74,0.7)';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.roundRect(4, 4, 120, 140, 10);
+  ctx.roundRect(28, 146, 104, 32, 8);
   ctx.fill();
   ctx.stroke();
-  if (img) {
-    ctx.drawImage(img, 16, 10, 96, 96);
-  } else {
-    ctx.fillStyle = '#e8dcc4';
-    ctx.font = 'bold 36px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(TYPE_SHORT[type] || '?', 64, 70);
-  }
   ctx.fillStyle = '#f4ead4';
   ctx.font = 'bold 20px "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(TYPE_SHORT[type] || formatUnitName(type), 64, 128);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(TYPE_SHORT[type] || formatUnitName(type), 80, 162);
+
   if (quantity > 1) {
     ctx.fillStyle = '#c9a44a';
-    ctx.font = 'bold 22px "Segoe UI", sans-serif';
-    ctx.fillText(`×${quantity}`, 100, 28);
+    ctx.beginPath();
+    ctx.arc(128, 28, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#1a1420';
+    ctx.font = 'bold 20px "Segoe UI", sans-serif';
+    ctx.fillText(`×${quantity}`, 128, 29);
   }
+
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
   return tex;
 }
 
@@ -298,7 +481,7 @@ function stacksFor(name, placements) {
 
 export async function bootThreeMapSpike() {
   reportStartupStatus('Three.js spike — loading map data…', 30);
-  injectSpikeChrome();
+  const chrome = injectSpikeChrome();
   paintHud(null, []);
 
   let territories;
@@ -329,45 +512,89 @@ export async function bootThreeMapSpike() {
   for (const c of continents) {
     for (const name of c.territories || []) continentColor.set(name, c.color);
   }
+  const factionColor = new Map();
+  for (const f of setup.classic?.factions || setup.factions || []) {
+    factionColor.set(f.id, f.color || FACTION_FALLBACK[f.id]);
+  }
   const placements = setup.classic?.unitPlacements || setup.unitPlacements || {};
   const lands = territories.filter((t) => !t.isWater);
   const waters = territories.filter((t) => t.isWater);
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
+  const landHeights = new Map();
   const pickables = [];
+  const selectInk = [];
+  const lineMats = [];
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x141422);
+  scene.background = new THREE.Color(0x10161c);
+  scene.fog = new THREE.Fog(0x10161c, 520, 1280);
 
   const ocean = new THREE.Mesh(
-    new THREE.PlaneGeometry(WORLD_W * 3.2, MAP_HEIGHT * SCALE * 1.2),
-    new THREE.MeshBasicMaterial({ color: 0x2aa8a1 }),
+    new THREE.PlaneGeometry(WORLD_W * 3.4, WORLD_H * 1.35),
+    new THREE.MeshStandardMaterial({
+      color: 0x17656a,
+      roughness: 0.92,
+      metalness: 0.04,
+    }),
   );
   ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(WORLD_W / 2, 0, -(MAP_HEIGHT * SCALE) / 2);
+  ocean.position.set(WORLD_W / 2, -0.02, -WORLD_H / 2);
   scene.add(ocean);
+
+  const shelf = new THREE.Mesh(
+    new THREE.PlaneGeometry(WORLD_W * 3.05, WORLD_H * 1.02),
+    new THREE.MeshStandardMaterial({
+      color: 0x0f4b50,
+      roughness: 1,
+      metalness: 0,
+    }),
+  );
+  shelf.rotation.x = -Math.PI / 2;
+  shelf.position.set(WORLD_W / 2, 0.01, -WORLD_H / 2);
+  scene.add(shelf);
 
   const board = new THREE.Group();
   scene.add(board);
 
+  const landBorderMat = makeLineMat(0x1a1408, 2.15);
+  const landRimMat = makeLineMat(0x3a2c14, 1.15);
+  const waterBorderMat = makeLineMat(0x0c3c3a, 1.05);
+  const selectMat = makeLineMat(0xe8c35a, 3.4);
+  lineMats.push(landBorderMat, landRimMat, waterBorderMat, selectMat);
+
   for (const land of lands) {
     const fill = continentColor.get(land.name) || '#7a8b6f';
     landMats.set(land.name, {
-      top: new THREE.MeshLambertMaterial({
-        color: hexColor(fill),
+      top: new THREE.MeshStandardMaterial({
+        color: darkenHex(fill, 0.06),
+        roughness: 0.84,
+        metalness: 0.03,
         emissive: 0x000000,
       }),
-      side: new THREE.MeshLambertMaterial({
-        color: darkenHex(fill, 0.42),
+      side: new THREE.MeshStandardMaterial({
+        color: darkenHex(fill, 0.5),
+        roughness: 0.9,
+        metalness: 0.02,
       }),
     });
   }
+
+  const coneGeo = new THREE.ConeGeometry(1.55, 3.2, 5);
+  const coneMat = new THREE.MeshStandardMaterial({
+    color: 0x5c4634,
+    roughness: 0.94,
+    metalness: 0.02,
+  });
 
   const textureCache = new Map();
   async function unitTexture(type, owner, quantity) {
     const key = `${owner}|${type}|${quantity}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, makeUnitTexture(type, owner, quantity, unitDefs));
+      textureCache.set(
+        key,
+        makeUnitTexture(type, owner, quantity, unitDefs, factionColor.get(owner) || FACTION_FALLBACK[owner]),
+      );
     }
     return textureCache.get(key);
   }
@@ -375,28 +602,38 @@ export async function bootThreeMapSpike() {
   for (const copy of WRAP_COPIES) {
     const offsetX = copy * WORLD_W;
     for (const land of lands) {
-      const mats = landMats.get(land.name);
-      const mesh = makeLandMesh(land, continentColor.get(land.name), mats);
+      const center = territoryCenter(land);
+      const height = landHeightFor(land, center);
+      landHeights.set(land.name, height);
+      const mesh = makeLandMesh(land, landMats.get(land.name), height);
       if (!mesh) continue;
       mesh.position.x = offsetX;
       board.add(mesh);
       pickables.push(mesh);
-      addTerritoryInk(board, land, landBorderMat, BORDER_Y, offsetX);
+      addTerritoryInk(board, land, landBorderMat, height + 0.14, offsetX);
+      addTerritoryInk(board, land, landRimMat, height + 0.22, offsetX);
+      addCheapMountains(board, land, center, height, offsetX, coneGeo, coneMat);
     }
     for (const water of waters) {
-      addTerritoryInk(board, water, waterBorderMat, 0.08, offsetX);
+      addTerritoryInk(board, water, waterBorderMat, 0.06, offsetX);
     }
   }
 
+  const unitSprites = [];
   for (const copy of WRAP_COPIES) {
     const offsetX = copy * WORLD_W;
     for (const t of territories) {
       const stacks = stacksFor(t.name, placements);
       if (!stacks.length) continue;
-      const center = territoryCenter(t);
+      const center = unitAnchor(t);
       if (!center) continue;
       const { x, z } = worldToScene(center.x, center.y);
-      const cols = t.isWater ? 3 : Math.min(4, stacks.length);
+      const cols = t.isWater ? Math.min(3, stacks.length) : Math.min(3, stacks.length);
+      const tokenW = t.isWater ? 5.1 : 5.6;
+      const tokenH = t.isWater ? 6.0 : 6.55;
+      const gapX = tokenW + 1.15;
+      const gapZ = 2.4;
+      const height = t.isWater ? 0.4 : (landHeights.get(t.name) || BASE_LAND);
       for (let i = 0; i < stacks.length; i++) {
         const stack = stacks[i];
         const tex = await unitTexture(stack.type, stack.owner, stack.quantity);
@@ -404,56 +641,74 @@ export async function bootThreeMapSpike() {
           map: tex,
           transparent: true,
           depthTest: true,
+          depthWrite: false,
         }));
         const col = i % cols;
         const row = Math.floor(i / cols);
-        sprite.scale.set(8.4, 9.6, 1);
+        const inRow = Math.min(cols, stacks.length - row * cols);
+        sprite.scale.set(tokenW, tokenH, 1);
         sprite.position.set(
-          x + offsetX + (col - (Math.min(cols, stacks.length) - 1) / 2) * 9.2,
-          LAND_HEIGHT + 6.2 + row * 8.5,
-          z + row * 2.2,
+          x + offsetX + (col - (inRow - 1) / 2) * gapX,
+          height + 4.6 + row * 5.1,
+          z + row * gapZ,
         );
+        sprite.renderOrder = 4;
         sprite.userData.territory = t;
         sprite.userData.unitType = stack.type;
+        sprite.userData.baseScale = { x: tokenW, y: tokenH };
         board.add(sprite);
+        unitSprites.push(sprite);
       }
     }
   }
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.92));
-  const sun = new THREE.DirectionalLight(0xfff4d6, 0.38);
-  sun.position.set(90, 160, 50);
+  scene.add(new THREE.HemisphereLight(0xc8d6ea, 0x3a2a18, 0.72));
+  const sun = new THREE.DirectionalLight(0xfff1d0, 0.78);
+  sun.position.set(120, 210, 80);
   scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x8eb4c8, 0.22);
+  fill.position.set(-80, 90, -40);
+  scene.add(fill);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 1, 5000);
-  const cx = WORLD_W / 2;
-  const cz = -(MAP_HEIGHT * SCALE) / 2;
-  camera.position.set(cx, 360, cz - 200);
-  camera.lookAt(cx, 0, cz);
-
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(cx, 0, cz);
   controls.enableDamping = true;
+  controls.dampingFactor = 0.14;
   controls.enablePan = true;
   controls.screenSpacePanning = true;
   controls.enableRotate = false;
   controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+  controls.mouseButtons.RIGHT = THREE.MOUSE.DOLLY;
+  controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
   controls.touches.ONE = THREE.TOUCH.PAN;
-  controls.minDistance = 48;
-  controls.maxDistance = 720;
-  controls.zoomSpeed = 0.9;
+  controls.touches.TWO = THREE.TOUCH.DOLLY;
+  controls.minDistance = 42;
+  controls.maxDistance = 780;
+  controls.zoomSpeed = isCoarsePointer() ? 1.15 : 0.95;
+  controls.panSpeed = isCoarsePointer() ? 1.45 : 1.05;
 
-  const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2();
-  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  let selectedName = null;
-  let hoveredName = null;
-  let pointerDown = null;
+  function frameBoard() {
+    const phone = isCoarsePointer();
+    const cx = WORLD_W / 2;
+    const cz = -WORLD_H / 2;
+    camera.fov = phone ? 50 : 42;
+    camera.updateProjectionMatrix();
+    camera.position.set(cx, phone ? 410 : 355, cz - (phone ? 248 : 198));
+    controls.target.set(cx, 0, cz);
+    controls.update();
+  }
+
+  function resizeLineMats(w, h) {
+    for (const mat of lineMats) mat.resolution.set(w, h);
+  }
 
   function resize() {
     const w = window.innerWidth;
@@ -461,11 +716,14 @@ export async function bootThreeMapSpike() {
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
     renderer.setSize(w, h, false);
+    resizeLineMats(w, h);
+    controls.zoomSpeed = isCoarsePointer() ? 1.15 : 0.95;
+    controls.panSpeed = isCoarsePointer() ? 1.45 : 1.05;
   }
+  frameBoard();
   resize();
   window.addEventListener('resize', resize);
 
-  // Canvas camera.js: no X clamp; renormalize only when x leaves [-W, 2W].
   function wrapPanLikeCanvas() {
     const x = controls.target.x;
     if (x < -WORLD_W || x > WORLD_W * 2) {
@@ -474,7 +732,43 @@ export async function bootThreeMapSpike() {
       controls.target.x += dx;
       camera.position.x += dx;
     }
+    const minZ = -WORLD_H - 10;
+    const maxZ = 10;
+    let dz = 0;
+    if (controls.target.z < minZ) dz = minZ - controls.target.z;
+    else if (controls.target.z > maxZ) dz = maxZ - controls.target.z;
+    if (dz) {
+      controls.target.z += dz;
+      camera.position.z += dz;
+    }
   }
+
+  function dollyBy(factor) {
+    const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
+    const next = dir.multiplyScalar(factor);
+    const dist = next.length();
+    if (dist < controls.minDistance || dist > controls.maxDistance) return;
+    camera.position.copy(controls.target).add(next);
+  }
+
+  chrome.zoom.addEventListener('pointerdown', (e) => e.stopPropagation());
+  chrome.zoom.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.dataset.zoom === 'fit') frameBoard();
+    else if (btn.dataset.zoom === 'in') dollyBy(0.82);
+    else dollyBy(1.22);
+  });
+
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  let selectedName = null;
+  let hoveredName = null;
+  const pointers = new Map();
+  let gesturePinch = false;
+  let maxPointers = 0;
 
   function setPointerFromEvent(e) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -501,44 +795,101 @@ export async function bootThreeMapSpike() {
     if (mats?.top?.emissive) mats.top.emissive.setHex(hex);
   }
 
+  function clearSelectInk() {
+    for (const line of selectInk.splice(0)) {
+      board.remove(line);
+      line.geometry?.dispose?.();
+    }
+  }
+
+  function drawSelectInk(territory) {
+    clearSelectInk();
+    if (!territory || territory.isWater) return;
+    const y = (landHeights.get(territory.name) || BASE_LAND) + 0.38;
+    for (const copy of WRAP_COPIES) {
+      const offsetX = copy * WORLD_W;
+      for (const poly of territory.polygons || []) {
+        const ring = simplifyRing(poly);
+        if (!ring) continue;
+        const line = makeBorderLine(ring, y, selectMat);
+        line.position.x = offsetX;
+        line.renderOrder = 3;
+        board.add(line);
+        selectInk.push(line);
+      }
+    }
+  }
+
+  function pulseUnits(name, on) {
+    for (const sprite of unitSprites) {
+      const base = sprite.userData.baseScale;
+      if (!base) continue;
+      const match = sprite.userData.territory?.name === name;
+      const s = on && match ? 1.08 : 1;
+      sprite.scale.set(base.x * s, base.y * s, 1);
+    }
+  }
+
   function paintSelection(next, { hover = false } = {}) {
     if (hover) {
       if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x000000);
       hoveredName = next && !next.isWater ? next.name : null;
-      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x2a2410);
+      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x2f2610);
       renderer.domElement.classList.toggle('is-hovering', !!next);
       return;
     }
     if (selectedName) setLandEmissive(selectedName, 0x000000);
+    pulseUnits(selectedName, false);
     selectedName = next && !next.isWater ? next.name : null;
-    if (selectedName) setLandEmissive(selectedName, 0x5a3d00);
+    if (selectedName) setLandEmissive(selectedName, 0x6a4300);
+    pulseUnits(selectedName, true);
+    drawSelectInk(next && !next.isWater ? next : null);
     paintHud(next, next ? stacksFor(next.name, placements) : []);
   }
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 && e.pointerType !== 'touch') return;
-    pointerDown = { x: e.clientX, y: e.clientY };
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
+    maxPointers = Math.max(maxPointers, pointers.size);
+    if (pointers.size >= 2) gesturePinch = true;
     renderer.domElement.classList.add('is-panning');
   });
 
-  renderer.domElement.addEventListener('pointerup', (e) => {
-    renderer.domElement.classList.remove('is-panning');
-    if (!pointerDown) return;
-    const dx = e.clientX - pointerDown.x;
-    const dy = e.clientY - pointerDown.y;
-    pointerDown = null;
-    if (dx * dx + dy * dy > TAP_PX * TAP_PX) return;
-    paintSelection(pickTerritory(e));
-  });
-
-  renderer.domElement.addEventListener('pointercancel', () => {
-    pointerDown = null;
-    renderer.domElement.classList.remove('is-panning');
-  });
-
   renderer.domElement.addEventListener('pointermove', (e) => {
-    if (pointerDown) return;
-    paintSelection(pickTerritory(e), { hover: true });
+    const rec = pointers.get(e.pointerId);
+    if (rec) {
+      rec.x = e.clientX;
+      rec.y = e.clientY;
+      return;
+    }
+    if (!isCoarsePointer()) paintSelection(pickTerritory(e), { hover: true });
+  });
+
+  function endPointer(e) {
+    const start = pointers.get(e.pointerId);
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) renderer.domElement.classList.remove('is-panning');
+    if (!start) return;
+    const slop = e.pointerType === 'touch' ? 16 : 8;
+    const dx = e.clientX - start.sx;
+    const dy = e.clientY - start.sy;
+    const pinched = gesturePinch || maxPointers >= 2;
+    if (pointers.size === 0) {
+      const allowTap = !pinched && (dx * dx + dy * dy) <= slop * slop;
+      gesturePinch = false;
+      maxPointers = 0;
+      if (allowTap) paintSelection(pickTerritory(e));
+    }
+  }
+
+  renderer.domElement.addEventListener('pointerup', endPointer);
+  renderer.domElement.addEventListener('pointercancel', (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) {
+      gesturePinch = false;
+      maxPointers = 0;
+      renderer.domElement.classList.remove('is-panning');
+    }
   });
 
   function tick() {
@@ -551,5 +902,5 @@ export async function bootThreeMapSpike() {
 
   reportStartupStatus('Three.js spike ready', 100);
   dismissStartupLoader();
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=3`);
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=3 polish`);
 }
