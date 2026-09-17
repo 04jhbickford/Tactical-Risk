@@ -306,6 +306,7 @@ export async function bootThreeMapSpike() {
     africaSouthOfEurope,
     africaNotUnderNA,
     hasSmallMap: baked.hasSmallMap,
+    tiles: { base: baked.baseCount, relief: baked.reliefCount },
   });
 
   const scene = new THREE.Scene();
@@ -332,19 +333,14 @@ export async function bootThreeMapSpike() {
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
     const ownerHex = factionColor.get(owner) || continentColor.get(land.name) || '#7a8b6f';
-    const tint = mixHex('#ffffff', ownerHex, 0.28);
     landMats.set(land.name, {
-      top: new THREE.MeshStandardMaterial({
+      top: new THREE.MeshLambertMaterial({
         map: baked.texture,
-        color: tint,
-        roughness: 0.88,
-        metalness: 0.02,
-        emissive: 0x000000,
+        color: mixHex('#f4ead4', ownerHex, 0.16),
+        emissive: mixHex('#000000', ownerHex, 0.12),
       }),
-      side: new THREE.MeshStandardMaterial({
-        color: darkenHex(ownerHex, 0.55),
-        roughness: 0.92,
-        metalness: 0,
+      side: new THREE.MeshLambertMaterial({
+        color: darkenHex(ownerHex, 0.48),
       }),
     });
   }
@@ -780,7 +776,7 @@ export async function bootThreeMapSpike() {
 
   reportStartupStatus('Three.js spike ready', 100);
   dismissStartupLoader();
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=${baked.hasSmallMap ? 'tiles' : 'ocean-fallback'}`);
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=base${baked.baseCount}/relief${baked.reliefCount}`);
   window.__threeSpike = {
     frameEuropeAfrica,
     frameWorld,

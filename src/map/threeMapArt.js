@@ -65,7 +65,7 @@ export function loadImage(src) {
   });
 }
 
-function loadImageTimeout(src, timeoutMs = 4000) {
+function loadImageTimeout(src, timeoutMs = 20000) {
   return new Promise((resolve) => {
     if (!src) {
       resolve(null);
@@ -91,6 +91,19 @@ function loadImageTimeout(src, timeoutMs = 4000) {
   });
 }
 
+async function mapPool(items, limit, worker) {
+  const out = new Array(items.length);
+  let i = 0;
+  async function run() {
+    while (i < items.length) {
+      const idx = i++;
+      out[idx] = await worker(items[idx], idx);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+  return out;
+}
+
 export async function bakeWorldTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = BAKE_W;
@@ -104,39 +117,43 @@ export async function bakeWorldTexture() {
 
   const sx = BAKE_W / MAP_WIDTH;
   const sy = BAKE_H / MAP_HEIGHT;
-  const jobs = [];
+  const keys = [];
   for (let col = 0; col < TILE_COLS; col++) {
     for (let row = 0; row < TILE_ROWS; row++) {
-      const key = `${col}_${row}`;
-      jobs.push(
-        loadImageTimeout(`map/baseTiles/${key}.png`).then((img) => ({ kind: 'base', col, row, img })),
-      );
-      jobs.push(
-        loadImageTimeout(`map/reliefTiles/${key}.png`).then((img) => ({ kind: 'relief', col, row, img })),
-      );
+      keys.push({ col, row, key: `${col}_${row}` });
     }
   }
-  const tiles = await Promise.all(jobs);
+  const tiles = await mapPool(keys, 12, async ({ col, row, key }) => {
+    const [base, relief] = await Promise.all([
+      loadImageTimeout(`map/baseTiles/${key}.png`),
+      loadImageTimeout(`map/reliefTiles/${key}.png`),
+    ]);
+    return { col, row, base, relief };
+  });
+  let baseCount = 0;
+  let reliefCount = 0;
   for (const tile of tiles) {
-    if (!tile.img || tile.kind !== 'base') continue;
+    if (!tile.base) continue;
     ctx.drawImage(
-      tile.img,
+      tile.base,
       tile.col * TILE_SIZE * sx,
       tile.row * TILE_SIZE * sy,
       TILE_SIZE * sx,
       TILE_SIZE * sy,
     );
+    baseCount += 1;
   }
-  ctx.globalAlpha = 0.5;
+  ctx.globalAlpha = 0.62;
   for (const tile of tiles) {
-    if (!tile.img || tile.kind !== 'relief') continue;
+    if (!tile.relief) continue;
     ctx.drawImage(
-      tile.img,
+      tile.relief,
       tile.col * TILE_SIZE * sx,
       tile.row * TILE_SIZE * sy,
       TILE_SIZE * sx,
       TILE_SIZE * sy,
     );
+    reliefCount += 1;
   }
   ctx.globalAlpha = 1;
 
@@ -146,7 +163,7 @@ export async function bakeWorldTexture() {
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
-  return { texture: tex, hasSmallMap: !!small };
+  return { texture: tex, hasSmallMap: !!small, baseCount, reliefCount };
 }
 
 export function applyWorldUVs(geometry) {
@@ -320,10 +337,9 @@ export function makeBoardTexturePlane(texture) {
     uv.setXY(i, u, v);
   }
   uv.needsUpdate = true;
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = new THREE.MeshLambertMaterial({
     map: texture,
-    roughness: 0.95,
-    metalness: 0,
+    color: 0xffffff,
   });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.set(WORLD_W / 2, 0.02, -WORLD_H / 2);
