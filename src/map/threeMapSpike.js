@@ -336,8 +336,8 @@ export async function bootThreeMapSpike() {
     landMats.set(land.name, {
       top: new THREE.MeshLambertMaterial({
         map: baked.texture,
-        color: mixHex('#f4ead4', ownerHex, 0.16),
-        emissive: mixHex('#000000', ownerHex, 0.12),
+        color: 0xffffff,
+        emissive: mixHex('#000000', ownerHex, 0.1),
       }),
       side: new THREE.MeshLambertMaterial({
         color: darkenHex(ownerHex, 0.48),
@@ -781,5 +781,26 @@ export async function bootThreeMapSpike() {
     frameEuropeAfrica,
     frameWorld,
     WRAP_COPIES,
+    inspect() {
+      const mesh = pickables[0];
+      const uv = mesh?.geometry?.attributes?.uv;
+      const pos = mesh?.geometry?.attributes?.position;
+      let uMin = 1, uMax = 0, vMin = 1, vMax = 0;
+      if (uv) {
+        for (let i = 0; i < uv.count; i++) {
+          uMin = Math.min(uMin, uv.getX(i));
+          uMax = Math.max(uMax, uv.getX(i));
+          vMin = Math.min(vMin, uv.getY(i));
+          vMax = Math.max(vMax, uv.getY(i));
+        }
+      }
+      return {
+        name: mesh?.userData?.territory?.name,
+        verts: pos?.count,
+        uv: uv ? { uMin, uMax, vMin, vMax } : null,
+        hasMap: !!mesh?.material?.map,
+        wrap: renderer.domElement.dataset.wrapCopies,
+      };
+    },
   };
 }

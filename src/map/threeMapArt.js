@@ -284,7 +284,10 @@ export function makeLandMesh(territory, materials, height) {
   });
   geom.rotateX(-Math.PI / 2);
   applyWorldUVs(geom);
-  const mesh = new THREE.Mesh(geom, [materials.top, materials.side]);
+  const count = geom.index ? geom.index.count : geom.attributes.position.count;
+  geom.clearGroups();
+  geom.addGroup(0, count, 0);
+  const mesh = new THREE.Mesh(geom, materials.top);
   mesh.userData.territory = territory;
   mesh.userData.landHeight = height;
   return mesh;
