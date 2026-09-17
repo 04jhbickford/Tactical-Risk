@@ -245,15 +245,15 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.peek.innerHTML = `<strong>${land.name}</strong>${owner ? ` · ${owner}` : ''}${unitBit ? `<div>${unitBit}</div>` : ''}`;
       if (!api.isSheetOpen()) api.peek.classList.add('is-on');
       api.confirm.disabled = false;
-      if (confirmed) {
-        api.confirm.textContent = `Noted · ${land.name}`;
-        return;
-      }
+      // Named Confirm grammar. inspect ≠ commit is still a soft ack —
+      // tap does not write gameState. Never "Inspect" / "Noted".
       if (unitType) {
         const qty = stacks.find((s) => s.type === unitType)?.quantity || 1;
         api.confirm.textContent = `Confirm ${shortType(unitType)} ×${qty} · ${land.name}`;
       } else {
-        api.confirm.textContent = `Inspect ${land.name}`;
+        api.confirm.textContent = confirmed
+          ? `Confirm inspect · ${land.name}`
+          : `Confirm · ${land.name}`;
       }
     },
   };

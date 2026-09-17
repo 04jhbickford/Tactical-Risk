@@ -2,6 +2,12 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.3 (preview only, SCHEMA 11)
+
+PR 43 wording lock: Three `?three=1` bottom ≥44pt CTA is named Confirm (`Confirm · Germany` / `Confirm inspect · Germany` after soft ack). Not Inspect / Noted. inspect ≠ commit stub unchanged; no map click-through. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.3.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.2 (preview only, SCHEMA 11)
 
 Continue PR 43 Three.js `?three=1` rebuild. Do not merge over Canvas. SCHEMA 11.
