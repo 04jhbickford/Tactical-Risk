@@ -3172,7 +3172,19 @@ async function init() {
   dismissStartupLoader();
 }
 
-init().catch((err) => {
-  console.error('Failed to initialize:', err);
-  reportStartupError('Could not start Tactical Risk. Local saves and in-progress games stay on this device.');
-});
+function wantsThreeSpike(search = location.search) {
+  const v = String(new URLSearchParams(search).get('three') || '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
+if (wantsThreeSpike()) {
+  import('./map/threeMapSpike.js').then((mod) => mod.bootThreeMapSpike()).catch((err) => {
+    console.error('Failed to start Three.js spike:', err);
+    reportStartupError('Could not start the Three.js spike. Canvas 2D is unchanged at /');
+  });
+} else {
+  init().catch((err) => {
+    console.error('Failed to initialize:', err);
+    reportStartupError('Could not start Tactical Risk. Local saves and in-progress games stay on this device.');
+  });
+}

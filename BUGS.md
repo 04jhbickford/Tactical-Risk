@@ -2,6 +2,32 @@
 
 ---
 
+## 9.17.26 — V2.81.49-three-spike.2 James follow-up (preview only, SCHEMA 11)
+
+James playtest of the Three.js spike: lands read as muddy blobs; no east–west wrap; unit placeholders hid type. Still preview-only — do not merge over Canvas.
+
+1. **Borders / fills:** dark edge ink on land rings + darker extrude walls; flatter lighting so continent fills separate. Faint sea-zone hairlines. Not Settlecoast art.
+2. **Wrap:** three horizontal copies at ±MAP_WIDTH (same as Canvas `translate(copy * MAP_WIDTH)`). Camera recenters only when target leaves `[-W, 2W]` (`camera.js` clamp). Pick wraps X like `wrapX()`.
+3. **Unit types:** classic `unitPlacements` as sprites using `getUnitIconPath` / `assets/units` fallback, with INF/TNK/ART/FTR/ship labels + qty. Land and sea.
+
+Open: preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.49-three-spike.2.
+
+---
+
+## 9.17.26 — V2.81.49-three-spike (preview only, SCHEMA 11)
+
+James YES for a timeboxed Three.js thin spike. **Not production. Do not merge over Canvas 2D.**
+
+Open: preview URL + `?three=1` (also `three=true` / `three=yes`). Default `/` stays Canvas 2D.
+
+Reused: `data/territories.json` land polygons, `data/continents.json` fill colors, `TerritoryMap` click fallback, existing `#hud` chrome slot, `GAME_VERSION` / `SCHEMA_VERSION` (schema stays 11).
+
+Stubbed: units are box/cylinder placeholders (1–3 per land, colored by `originalOwner`); no game rules, no MP, no Confirm, no HUD rewrite, no map tiles.
+
+Playtest: pan (drag), zoom (wheel / pinch), click or tap a land — name should land in the HUD. Phone / iPhone not a goal; if janky vs Canvas, kill the spike.
+
+---
+
 ## 9.16.26 — V2.81.49 deploy locks after one unit type (SCHEMA 11)
 
 Robert Watts + Sean Benson on live V2.81.48 (16 Sep ~3:37pm PT): during
