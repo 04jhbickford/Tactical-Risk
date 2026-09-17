@@ -264,8 +264,8 @@ export async function bootThreeMapSpike() {
   const camera = new THREE.PerspectiveCamera(42, 1, 1, 4000);
   const cx = (MAP_WIDTH * SCALE) / 2;
   const cz = -(MAP_HEIGHT * SCALE) / 2;
-  // Light tilt, whole board in frame. Rotate stays off so drag is pan-only.
-  camera.position.set(cx, 310, cz + 248);
+  // North is +Z (world Y=0). Stand south of the board, light tilt, north-up.
+  camera.position.set(cx, 360, cz - 200);
   camera.lookAt(cx, 0, cz);
 
   const controls = new OrbitControls(camera, renderer.domElement);
