@@ -2,6 +2,20 @@
 
 ---
 
+## 9.17.26 — V2.81.49-three-spike (preview only, SCHEMA 11)
+
+James YES for a timeboxed Three.js thin spike. **Not production. Do not merge over Canvas 2D.**
+
+Open: preview URL + `?three=1` (also `three=true` / `three=yes`). Default `/` stays Canvas 2D.
+
+Reused: `data/territories.json` land polygons, `data/continents.json` fill colors, `TerritoryMap` click fallback, existing `#hud` chrome slot, `GAME_VERSION` / `SCHEMA_VERSION` (schema stays 11).
+
+Stubbed: units are box/cylinder placeholders (1–3 per land, colored by `originalOwner`); no game rules, no MP, no Confirm, no HUD rewrite, no map tiles.
+
+Playtest: pan (drag), zoom (wheel / pinch), click or tap a land — name should land in the HUD. Phone / iPhone not a goal; if janky vs Canvas, kill the spike.
+
+---
+
 ## 9.16.26 — V2.81.49 deploy locks after one unit type (SCHEMA 11)
 
 Robert Watts + Sean Benson on live V2.81.48 (16 Sep ~3:37pm PT): during
