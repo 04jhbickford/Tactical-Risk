@@ -117,7 +117,10 @@ check('chrome frosted + SF + 44pt',
   /backdrop-filter:blur\(24px\)/.test(chrome)
   && /-apple-system/.test(chrome)
   && /min-height:50px/.test(chrome)
-  && /width:44px; height:44px/.test(chrome));
+  && /width:44px; height:44px/.test(chrome)
+  && /min-height:44px/.test(chrome)
+  && /THREE-IPHONE-UI\.md/.test(chrome));
+check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',
   /three-peek-unit/.test(chrome) && /pieceIconDataUrl/.test(chrome));
 check('idle Confirm is Select a territory', /Select a territory/.test(chrome));

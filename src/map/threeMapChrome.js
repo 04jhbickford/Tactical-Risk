@@ -1,5 +1,5 @@
-// L0 / L1 / Confirm chrome — THREE-IPHONE-UI.md lock.
-// Frosted iPhone game HUD. Board is the product. Preview only.
+// Canonical chrome: briefs/2026-09-17-three-art-gap/THREE-IPHONE-UI.md
+// Frosted iPhone HUD. Board stays AA-HECORRECT / STACK-LOD. Preview only.
 
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import { formatUnitName } from '../utils/unitNames.js';
@@ -91,7 +91,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       -webkit-tap-highlight-color:transparent;
     }
     #three-l0 .three-l0-chip {
-      min-height:28px; padding:0 10px; border-radius:999px;
+      min-height:44px; padding:0 12px; border-radius:999px;
       display:inline-flex; align-items:center; gap:6px;
       background:rgba(255,255,255,0.06);
       border:1px solid rgba(232,226,212,0.12);
@@ -158,8 +158,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-confirm {
       pointer-events:auto;
       min-height:50px; height:50px; width:100%;
-      border:0; border-radius:14px;
-      background:rgba(80,86,96,0.62); color:#c5c9d4;
+      border:1px solid rgba(255,255,255,0.08); border-radius:14px;
+      background:rgba(30,36,32,0.72); color:#c5c9d4;
+      -webkit-backdrop-filter:blur(24px) saturate(1.15);
+      backdrop-filter:blur(24px) saturate(1.15);
       font:600 17px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:-0.01em;
       cursor:default;
@@ -167,12 +169,19 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-confirm.is-ready {
       background:#C4A35A; color:#1E2420; cursor:pointer;
+      border-color:transparent;
+      -webkit-backdrop-filter:none;
+      backdrop-filter:none;
     }
     #three-zoom {
       position:absolute; right:max(12px, env(safe-area-inset-right));
-      bottom:calc(132px + env(safe-area-inset-bottom, 0px));
+      bottom:calc(76px + env(safe-area-inset-bottom, 0px));
       z-index:28; display:flex; flex-direction:column; gap:8px;
     }
+    html.three-spike.has-l1 #three-zoom {
+      bottom:calc(208px + env(safe-area-inset-bottom, 0px));
+    }
+    html.three-spike.has-l2 #three-zoom { display:none; }
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.14);
@@ -273,10 +282,17 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     setIpc(n) {
       api.ipcEl.textContent = `IPC ${n}`;
     },
+    syncLayers() {
+      const l2 = sheet.classList.contains('is-open');
+      const l1 = !l2 && api.peek.classList.contains('is-on');
+      document.documentElement.classList.toggle('has-l1', l1);
+      document.documentElement.classList.toggle('has-l2', l2);
+    },
     setSheetOpen(open) {
       sheet.classList.toggle('is-open', !!open);
       if (open) api.peek.classList.remove('is-on');
       else if (api.peek.textContent) api.peek.classList.add('is-on');
+      api.syncLayers();
     },
     isSheetOpen() {
       return sheet.classList.contains('is-open');
@@ -291,6 +307,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         api.confirm.disabled = true;
         api.confirm.classList.remove('is-ready');
         api.confirm.textContent = 'Select a territory';
+        api.syncLayers();
         return;
       }
       const owner = stacks[0]?.owner || (!land.isWater ? land.originalOwner : '');
@@ -301,6 +318,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         <div class="three-peek-meta">${[owner, unitLine].filter(Boolean).join(' · ')}</div>
         ${iconRowHtml(stacks)}`;
       if (!api.isSheetOpen()) api.peek.classList.add('is-on');
+      api.syncLayers();
       api.confirm.disabled = false;
       api.confirm.classList.add('is-ready');
       if (unitType) {
