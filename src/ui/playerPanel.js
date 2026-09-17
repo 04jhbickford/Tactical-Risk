@@ -28,6 +28,9 @@ import {
   shouldHidePhonePairConfirm,
   phoneIconCommitCount,
   canNamePhoneMoveDest,
+  shouldStagePhoneMoveIcon,
+  remainingUnstagedOfType,
+  nextStagedCount,
 } from './mobileShell.js';
 import { knownUnitsToPlace } from '../state/placementPass.js';
 import {
@@ -78,9 +81,9 @@ export const PHASE_HINTS = {
   [GAME_PHASES.UNIT_PLACEMENT]: 'Click to place units',
   [TURN_PHASES.DEVELOP_TECH]: '',
   [TURN_PHASES.PURCHASE]: '',
-  [TURN_PHASES.COMBAT_MOVE]: 'Click stack → highlighted land → Confirm',
+  [TURN_PHASES.COMBAT_MOVE]: 'Click stack → units → highlighted land → Confirm',
   [TURN_PHASES.COMBAT]: '',
-  [TURN_PHASES.NON_COMBAT_MOVE]: 'Click stack → your land → Confirm',
+  [TURN_PHASES.NON_COMBAT_MOVE]: 'Click stack → units → your land → Confirm',
   [TURN_PHASES.MOBILIZE]: '',
   [TURN_PHASES.COLLECT_INCOME]: '',
 };
@@ -292,12 +295,12 @@ export function resolvePhonePeekHint(phase, turnPhase, selectedUnitType, opts = 
     const mix = opts.selectedSummary || '';
     const combat = turnPhase === TURN_PHASES.COMBAT_MOVE;
     if (land && dest && mix) return `${land} → ${dest} · ${mix}`;
-    if (land && dest) return `${land} → ${dest} — Confirm`;
+    if (land && dest) return `Tap each unit to move · ${dest}`;
     if (land && mix) return `Tap a highlighted land · ${mix}`;
-    if (land) return 'Tap a highlighted land, then Confirm';
+    if (land) return 'Tap each unit, then a highlighted land';
     return combat
-      ? 'Tap your stack — legal lands highlight'
-      : 'Tap your stack — your lands highlight';
+      ? 'Tap your stack, then each unit to move'
+      : 'Tap your stack, then each unit to fortify';
   }
   const base = resolvePhaseHint(phase, turnPhase);
   if (base) return base;
@@ -343,15 +346,16 @@ export function resolvePhoneTechCta({ diceCount } = {}) {
 }
 
 export function resolvePhoneMoveCta({ destName, isAttack = false, selectedSummary = '' } = {}) {
-  if (!destName || !selectedSummary) return null;
+  if (!destName) return null;
+  const ready = !!selectedSummary;
   return {
     action: 'confirm-move',
-    label: isAttack
-      ? `Confirm attack · ${selectedSummary}`
-      : `Confirm move · ${selectedSummary}`,
-    disabled: false,
+    label: isAttack ? `Attack ${destName}` : `Move to ${destName}`,
+    disabled: !ready,
+    selectUnits: !ready,
     primary: true,
     isAttack: !!isAttack,
+    undoable: ready && !isAttack,
   };
 }
 
@@ -953,7 +957,8 @@ export class PlayerPanel {
     if (this._shouldStagePhonePairLand(territory)) {
       this._phoneDeployLandName = territory.name;
     }
-    // Land tap names the eligible tile only. Icon taps commit one (V2.81.38).
+    // Land tap names the eligible tile only. Deploy / mobilize icon taps
+    // still commit. Combat / Fortify icon taps stage; Confirm moves.
     if (immediate) this.flushRender();
     else this._scheduleRender();
   }
@@ -1021,7 +1026,11 @@ export class PlayerPanel {
     if (phase === GAME_PHASES.PLAYING
       && (turnPhase === TURN_PHASES.COMBAT_MOVE || turnPhase === TURN_PHASES.NON_COMBAT_MOVE)) {
       const unit = this._phoneMoveUnitMatch(unitType, this._phoneDeployDest(), player);
-      return remainingEligibleOfType({ available: unit?.quantity || 0 });
+      const unitKey = unit
+        ? (unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type))
+        : unitType;
+      const staged = Number(this.moveSelectedUnits?.[unitKey]) || 0;
+      return remainingUnstagedOfType({ available: unit?.quantity || 0, staged });
     }
     return 1;
   }
@@ -1146,53 +1155,35 @@ export class PlayerPanel {
     if (!isMobileShell() || !this.selectedUnitType) return;
     const from = this._phoneDeployDest();
     const player = this.gameState?.currentPlayer;
-    const destName = this.movePendingDest;
     const unit = this._phoneMoveUnitMatch(this.selectedUnitType, from, player);
-    const remaining = remainingEligibleOfType({ available: unit?.quantity || 0 });
+    if (!from || !player || !unit) return;
+    const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
+    const available = remainingEligibleOfType({ available: unit.quantity || 0 });
+    const current = Number(this.moveSelectedUnits?.[unitKey]) || 0;
+    const leftover = remainingUnstagedOfType({ available, staged: current });
     if (shouldClearPhoneIconAfterExhausted({
       unitType: this.selectedUnitType,
-      remainingOfType: remaining,
+      remainingOfType: leftover,
     })) {
       this._clearPhoneIconType();
       return;
     }
-    if (!shouldCommitPhoneIconTap({
-      hasNamedDest: !!destName,
+    if (!shouldStagePhoneMoveIcon({
+      hasSource: !!from,
       unitType: this.selectedUnitType,
-      remainingOfType: remaining,
+      remainingOfType: leftover,
     })) return;
-    if (!from || !player || !unit) return;
-    const unitKey = unit.isCargo ? unit.cargoKey : (unit.isIndividual ? `ship:${unit.id}` : unit.type);
-    const count = phoneIconCommitCount({
-      remainingOfType: remaining,
-      dumpRemaining,
-    });
-    if (count <= 0) {
+    const next = dumpRemaining
+      ? available
+      : nextStagedCount({ current, available });
+    if (next <= current) {
       this._clearPhoneIconType();
       return;
     }
-    const turnPhase = this.gameState?.turnPhase;
-    this.moveSelectedUnits = { [unitKey]: count };
-    const dests = this._phoneMoveDests(from, player, turnPhase === TURN_PHASES.COMBAT_MOVE);
-    if (!dests.some((d) => d.name === destName)) {
-      this.moveSelectedUnits = {};
-      return;
-    }
-    this.moveSelectedUnits = { [unitKey]: count };
+    this.moveSelectedUnits = { ...this.moveSelectedUnits, [unitKey]: next };
     this.selectedTerritory = from;
     this._phoneDeployLandName = from.name;
-    this._executePhoneIconMove(from, destName, unitKey, count, unit);
-    this.moveSelectedUnits = {};
-    this.selectedTerritory = from;
-    this._phoneDeployLandName = from.name;
-    this.movePendingDest = destName;
-    const leftUnit = this._phoneMoveUnitMatch(unitKey, from, player);
-    const left = remainingEligibleOfType({ available: leftUnit?.quantity || 0 });
-    if (shouldClearPhoneIconAfterExhausted({ unitType: unitKey, remainingOfType: left })) {
-      this.selectedUnitType = null;
-    } else {
-      this.selectedUnitType = unitKey;
-    }
+    this.selectedUnitType = unitKey;
   }
 
   _executePhoneIconMove(from, destName, unitKey, count, unit) {
@@ -1668,7 +1659,8 @@ export class PlayerPanel {
         primary: true
       });
     }
-    // Movement confirm — desktop / tablet only. Phone icon path commits now.
+    // Movement confirm — desktop always. Phone Combat / Fortify use the
+    // same named Confirm (Move to X / Attack X). Deploy still icon-commits.
     else if (this.movePendingDest && (this.activeTab === 'actions' || isMobileShell())
       && !shouldHidePhonePairConfirm({
         mobile: isMobileShell(),
@@ -1677,6 +1669,8 @@ export class PlayerPanel {
           phase,
           turnPhase,
         }),
+        phase,
+        turnPhase,
       })) {
       const destOwner = this.gameState.getOwner(this.movePendingDest);
       const isAttack = destOwner && destOwner !== player.id && !this.gameState.areAllies(player.id, destOwner);
@@ -1686,14 +1680,7 @@ export class PlayerPanel {
         isAttack,
         selectedSummary,
       });
-      buttons.push(named || {
-        action: 'confirm-move',
-        label: isAttack ? 'Confirm Attack' : 'Confirm Move',
-        disabled: false,
-        primary: true,
-        isAttack,
-        undoable: !isAttack,
-      });
+      if (named) buttons.push(named);
     }
     // Capital placement — 22d4b13 tray. Own-land tap peeks; Confirm is
     // the only commit. Mount from selected land or the peeked name.
@@ -1719,6 +1706,8 @@ export class PlayerPanel {
           phase,
           turnPhase,
         }),
+        phase,
+        turnPhase,
       });
 
       if (totalQueued > 0 && isValidPlacement && !hidePairConfirm) {
@@ -1758,6 +1747,8 @@ export class PlayerPanel {
         pairGrammar: shouldUsePhonePairGrammar({
           mobile: true, phase, turnPhase,
         }),
+        phase,
+        turnPhase,
       })) {
       const dest = this._phoneDeployDest();
       const unitType = this.selectedUnitType
@@ -1777,16 +1768,19 @@ export class PlayerPanel {
       }
     }
 
-    // End Phase button (always visible during PLAYING phase, unless in special modes).
-    // Phone icon path names dest without Confirm — keep End Phase available.
+    // End Phase stays up unless Combat / Fortify already named a dest
+    // (ghost Select-units or ready Move to X owns the thumb).
     const phonePairHidesMoveConfirm = shouldHidePhonePairConfirm({
       mobile: isMobileShell(),
       pairGrammar: shouldUsePhonePairGrammar({
         mobile: isMobileShell(), phase, turnPhase,
       }),
+      phase,
+      turnPhase,
     });
+    const hasNamedMoveCta = !!this.movePendingDest && !phonePairHidesMoveConfirm;
     if (phase === GAME_PHASES.PLAYING && !this.isAirLandingActive()
-      && (!this.movePendingDest || phonePairHidesMoveConfirm)) {
+      && !hasNamedMoveCta) {
       const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
         this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
 
@@ -2189,8 +2183,8 @@ export class PlayerPanel {
           html += this._renderInlineMovement(player, turnPhase);
         } else {
           html += `<div class="pp-hint">${turnPhase === TURN_PHASES.COMBAT_MOVE
-            ? 'Combat Move: click your stack, then a highlighted land, then Confirm. Dice are the next phase.'
-            : 'Fortify: click your stack, then a highlighted friendly land, then Confirm. No attacks this step.'}</div>`;
+            ? 'Combat Move: click your stack, click each unit, then a highlighted land, then Confirm. Dice are the next phase.'
+            : 'Fortify: click your stack, click each unit, then a highlighted friendly land, then Confirm. No attacks this step.'}</div>`;
         }
 
         // Show rockets option during combat move phase (if player has tech)
@@ -3188,12 +3182,17 @@ export class PlayerPanel {
         if (seen.has(unitKey)) continue;
         seen.add(unitKey);
         const imageSrc = getUnitIconPath(unit.type, player.id);
-        const selected = this.selectedUnitType === unitKey
+        const staged = Number(this.moveSelectedUnits?.[unitKey]) || 0;
+        const selected = staged > 0
+          || this.selectedUnitType === unitKey
           || this.selectedUnitType === unit.type
           ? ' selected' : '';
-        const qty = remainingEligibleOfType({ available: unit.quantity });
+        const hasQty = staged > 0 ? ' has-qty' : '';
+        const qty = staged > 0
+          ? staged
+          : remainingEligibleOfType({ available: unit.quantity });
         chips += `
-          <button type="button" class="phone-peek-chip${selected}" data-action="phone-select-unit" data-unit="${unitKey}" aria-label="${formatUnitName(unit.type)}">
+          <button type="button" class="phone-peek-chip${selected}${hasQty}" data-action="phone-select-unit" data-unit="${unitKey}" aria-label="${formatUnitName(unit.type)}">
             ${imageSrc ? `<img src="${imageSrc}" alt="" class="phone-peek-icon">` : ''}
             <span class="phone-peek-count">${qty}</span>
           </button>`;
@@ -4930,9 +4929,13 @@ export class PlayerPanel {
                 cargoUnloads,
                 isAmphibiousUnload
               });
-              // Reset movement state after confirming
+              // Reset staged units and dest. Keep the from stack named
+              // so the next wave can tap units → dest → Confirm again.
               this.moveSelectedUnits = {};
               this.movePendingDest = null;
+              if (this.selectedTerritory?.name) {
+                this._phoneDeployLandName = this.selectedTerritory.name;
+              }
             }
           }
           return;

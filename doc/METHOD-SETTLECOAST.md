@@ -41,8 +41,8 @@ Do not un-split China / polygon merges.
 | How to Play (guest) | Rules open, no sign-in | same | same | same | Rules readable |
 | Place Capital | peek land → Confirm | same + 44pt Confirm | same | state kept on rotate | Confirm chrome visible |
 | Initial Deploy | land → unit → Confirm; Max still needs Confirm | same | same | state kept | queued / held / unavailable |
-| Combat Move | stack → highlighted land → Confirm | same | same | state kept | phase tip once (round 1) |
-| Fortify | stack → own land → Confirm | same | same | state kept | phase tip once (round 1) |
+| Combat Move | stack → units → highlighted land → Confirm | same | same | state kept | phase tip once (round 1) |
+| Fortify | stack → units → own land → Confirm | same | same | state kept | phase tip once (round 1) |
 | Re-open tips | Menu → Phase tips | ⋯ → Phase tips | ⋯ → Phase tips | same | card, no motion; blocked if Never |
 
 Phase-tip storage key: `tacticalRisk_phaseGuides`. Auto-show during setup and
@@ -109,9 +109,10 @@ except when a sheet owns its own buttons (combat / purchase / tech).
 | 2000 | critical banners |
 
 **Combat Move vs Attack.** The HUD chip is **Combat Move**, not Attack. Dice
-are the **Combat** phase. One-job: tap stack → tap highlighted land → Confirm.
-Fortify is Non-Combat Move on your lands. Place / Deploy keep land → unit →
-Confirm (SILO).
+are the **Combat** phase. One-job: tap stack → tap each unit → tap highlighted
+land → named Confirm (`Move to X` / `Attack X`). Same purchase-class grammar
+as Buy / Deploy. Fortify is Non-Combat Move on your lands. Place / Deploy keep
+land → unit → Confirm (SILO).
 
 **Phone combat sheet.** Attack/combat is not one packed `42dvh` modal. On
 `html.mobile-shell` the popup is a full sheet from `--mobile-top-bar` to the

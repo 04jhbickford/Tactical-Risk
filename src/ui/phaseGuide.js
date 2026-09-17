@@ -53,14 +53,14 @@ export const PHASE_GUIDES = {
   [PHASE_GUIDE_IDS.ATTACK]: {
     id: PHASE_GUIDE_IDS.ATTACK,
     title: 'Combat Move',
-    job: 'This is Combat Move, not Combat. Position stacks for later battle — dice happen next. Tap your stack, tap a highlighted land, then Confirm.',
-    next: 'Legal lands already glow on the map. Stack → highlighted land → Confirm.',
+    job: 'This is Combat Move, not Combat. Position stacks for later battle — dice happen next. Tap your stack, tap each unit, tap a highlighted land, then Confirm (Move to …).',
+    next: 'Legal lands already glow on the map. Stack → units → highlighted land → Confirm.',
   },
   [PHASE_GUIDE_IDS.FORTIFY]: {
     id: PHASE_GUIDE_IDS.FORTIFY,
     title: 'Fortify',
-    job: 'This is Non-Combat Move (Fortify). Tap your stack, tap a highlighted friendly land, then Confirm. No attacks this step.',
-    next: 'Only your lands highlight. Stack → your land → Confirm.',
+    job: 'This is Non-Combat Move (Fortify). Tap your stack, tap each unit, tap a highlighted friendly land, then Confirm (Move to …). No attacks this step.',
+    next: 'Only your lands highlight. Stack → units → your land → Confirm.',
   },
 };
 

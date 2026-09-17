@@ -83,6 +83,8 @@ const {
   shouldCommitPhoneIconTap,
   shouldClearPhoneIconAfterExhausted,
   shouldHidePhonePairConfirm,
+  shouldStagePhoneMoveIcon,
+  remainingUnstagedOfType,
   phoneIconCommitCount,
   canNamePhoneMoveDest,
   shouldUsePhonePairGrammar,
@@ -198,7 +200,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.50', GAME_VERSION === 'V2.81.50');
+check('GAME_VERSION is V2.81.51', GAME_VERSION === 'V2.81.51');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -332,8 +334,8 @@ check('setup phase keeps its name',
 console.log('=== V2.63 tray peek PHASE_HINTS + visible IPC/OUT ===');
 check('combat-move hint is the existing PHASE_HINTS line',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === PHASE_HINTS[TURN_PHASES.COMBAT_MOVE]);
-check('hint text is stack → highlighted land → Confirm',
-  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Click stack → highlighted land → Confirm');
+check('hint text is stack → units → highlighted land → Confirm',
+  resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Click stack → units → highlighted land → Confirm');
 check('purchase phase hint may be empty (still a legal peek)',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
 check('IPC is visible, not title-only',
@@ -741,11 +743,11 @@ check('phone air-landing keeps the body up; dest-pending combat stays peeked',
   && shouldPeekPhoneTray({ mobile: true, movePending: true }) === true);
 check('desktop purchase hint stays empty (PHASE_HINTS frozen)',
   resolvePhaseHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === '');
-check('phone peek hint keeps deploy SILO; Combat Move is stack-first',
+check('phone peek hint keeps deploy SILO; Combat Move is stack-then-units',
   resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.PURCHASE) === 'Tap a unit to buy'
   && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE) === 'Tap land, then unit'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap your stack — legal lands highlight'
-  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap your stack — your lands highlight');
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE) === 'Tap your stack, then each unit to move'
+  && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.NON_COMBAT_MOVE) === 'Tap your stack, then each unit to fortify');
 {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   const { beforePhone } = phoneCssParts(css);
@@ -1624,7 +1626,7 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
       mobile: true, phase: GAME_PHASES.CAPITAL_PLACEMENT,
       hasNamedLand: true, hasUnitType: false,
     }) === false);
-  check('mobilize / move share land-then-unit hint; phone icon commits now',
+  check('mobilize / move share land-then-unit hint; move Confirm is named',
     resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.MOBILIZE, null, {
       territoryName: 'Ukraine S.S.R.',
     }) === 'Tap a unit · Ukraine S.S.R.'
@@ -1633,10 +1635,11 @@ console.log('=== V2.81.17 James lock — one grammar across land+unit phases ===
     }) === 'To Ukraine S.S.R.'
     && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
       territoryName: 'Ukraine S.S.R.', destName: 'West Russia',
-    }) === 'Ukraine S.S.R. → West Russia — Confirm'
+    }) === 'Tap each unit to move · West Russia'
     && /_commitPhoneIconMobilize/.test(panelSrc)
     && /_commitPhoneIconMove/.test(panelSrc)
-    && /shouldHidePhonePairConfirm/.test(panelSrc));
+    && /shouldHidePhonePairConfirm/.test(panelSrc)
+    && /shouldStagePhoneMoveIcon/.test(panelSrc));
   check('peek row / hint / CTA accept touch without eating named-land taps',
     /player-panel--peek \.phone-peek-row[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
     && /player-panel--peek \.phone-peek-pair-hint[\s\S]*?pointer-events:\s*auto/.test(phoneBlock)
@@ -2080,7 +2083,9 @@ console.log('=== V2.81.38 auto-place icon + type cap + Resign ===');
     && remainingEligibleOfType({ available: 1 }) === 1
     && canNamePhoneMoveDest({ hasSource: true, destIsLegal: true }) === true
     && canNamePhoneMoveDest({ hasSource: true, destIsLegal: false }) === false
-    && shouldHidePhonePairConfirm({ mobile: true, pairGrammar: true }) === true
+    && shouldHidePhonePairConfirm({
+      mobile: true, pairGrammar: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+    }) === true
     && /Land tap names the eligible tile only/.test(panelSrc)
     && /_commitPhoneIconDeploy/.test(panelSrc)
     && /keepPhonePair/.test(panelSrc)
@@ -2164,7 +2169,7 @@ console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===')
       destName: 'West Russia',
       isAttack: true,
       selectedSummary: '4 infantry · 2 tank · 1 fighter',
-    })?.label === 'Confirm attack · 4 infantry · 2 tank · 1 fighter'
+    })?.label === 'Attack West Russia'
     && resolvePhonePeekHint(GAME_PHASES.PLAYING, TURN_PHASES.COMBAT_MOVE, 'infantry', {
       territoryName: 'Ukraine S.S.R.',
       destName: 'West Russia',
@@ -2172,7 +2177,9 @@ console.log('=== V2.81.36 sea hairline + tech Confirm + mixed-stack select ===')
     }) === 'Ukraine S.S.R. → West Russia · 4 infantry · 2 tank'
     && /pp-move-selected-summary/.test(panelSrc)
     && /remainingEligibleOfType/.test(panelSrc)
-    && shouldHidePhonePairConfirm({ mobile: true, pairGrammar: true }) === true
+    && shouldHidePhonePairConfirm({
+      mobile: true, pairGrammar: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+    }) === true
     && shouldHidePhonePairConfirm({ mobile: false, pairGrammar: true }) === false);
 }
 
@@ -2301,6 +2308,65 @@ console.log('=== V2.81.42 peek flush + thumb CTA safe-area ===');
   check('phone ⋯ Resign stays pinned above the scrolling list',
     /\.phone-menu-home \.phone-menu-resign \{[\s\S]*?flex:\s*0 0 auto/.test(phoneBlock)
     && /\.phone-menu-list \{[\s\S]*?overflow-y:\s*auto/.test(phoneBlock));
+}
+
+console.log('=== V2.81.51 combat / fortify purchase-class Confirm ===');
+{
+  const panelSrc = readFileSync(join(root, 'src/ui/playerPanel.js'), 'utf8');
+  check('Deploy / mobilize still hide Confirm; combat / fortify do not',
+    shouldHidePhonePairConfirm({
+      mobile: true, pairGrammar: true, phase: GAME_PHASES.UNIT_PLACEMENT,
+    }) === true
+    && shouldHidePhonePairConfirm({
+      mobile: true, pairGrammar: true,
+      phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.MOBILIZE,
+    }) === true
+    && shouldHidePhonePairConfirm({
+      mobile: true, pairGrammar: true,
+      phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.COMBAT_MOVE,
+    }) === false
+    && shouldHidePhonePairConfirm({
+      mobile: true, pairGrammar: true,
+      phase: GAME_PHASES.PLAYING, turnPhase: TURN_PHASES.NON_COMBAT_MOVE,
+    }) === false
+    && shouldHidePhonePairConfirm({ mobile: false, pairGrammar: true }) === false);
+  check('unit taps stage leftover of that type; dest is not required',
+    shouldStagePhoneMoveIcon({
+      hasSource: true, unitType: 'infantry', remainingOfType: 3,
+    }) === true
+    && shouldStagePhoneMoveIcon({
+      hasSource: true, unitType: 'infantry', remainingOfType: 0,
+    }) === false
+    && shouldStagePhoneMoveIcon({
+      hasSource: false, unitType: 'infantry', remainingOfType: 2,
+    }) === false
+    && remainingUnstagedOfType({ available: 4, staged: 1 }) === 3
+    && remainingUnstagedOfType({ available: 2, staged: 2 }) === 0
+    && nextStagedCount({ current: 0, available: 3 }) === 1
+    && nextStagedCount({ current: 2, available: 3 }) === 3);
+  check('named Confirm is Move to / Attack dest; ghost until units stage',
+    resolvePhoneMoveCta({ destName: 'West Russia' })?.label === 'Move to West Russia'
+    && resolvePhoneMoveCta({ destName: 'West Russia' })?.selectUnits === true
+    && resolvePhoneMoveCta({ destName: 'West Russia' })?.disabled === true
+    && resolvePhoneMoveCta({
+      destName: 'West Russia',
+      selectedSummary: '2 infantry',
+    })?.label === 'Move to West Russia'
+    && resolvePhoneMoveCta({
+      destName: 'West Russia',
+      selectedSummary: '2 infantry',
+    })?.disabled === false
+    && resolvePhoneMoveCta({
+      destName: 'West Russia',
+      isAttack: true,
+      selectedSummary: '2 infantry · 1 tank',
+    })?.label === 'Attack West Russia'
+    && resolvePhoneMoveCta({}) === null);
+  check('phone move icon path stages instead of execute-move',
+    /shouldStagePhoneMoveIcon/.test(panelSrc)
+    && /remainingUnstagedOfType/.test(panelSrc)
+    && /Move to \$\{destName\}/.test(panelSrc)
+    && /Attack \$\{destName\}/.test(panelSrc));
 }
 
 if (failures) {

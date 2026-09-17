@@ -254,9 +254,35 @@ export function phoneIconCommitCount({
   return Math.min(1, typeLeft, slots);
 }
 
-/** Phone unit-icon path commits immediately — no Deploy / Confirm-move thumb. */
-export function shouldHidePhonePairConfirm({ mobile = false, pairGrammar = false } = {}) {
-  return !!mobile && !!pairGrammar;
+/** Deploy / mobilize icon path still commits immediately (no thumb Confirm).
+ *  Combat Move / Fortify keep purchase-class named Confirm: tap units to
+ *  stage, then Move to X / Attack X. Generic: icon-commit is placement
+ *  only, not movement. */
+export function shouldHidePhonePairConfirm({
+  mobile = false,
+  pairGrammar = false,
+  phase = null,
+  turnPhase = null,
+} = {}) {
+  if (!mobile || !pairGrammar) return false;
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return true;
+  if (phase === GAME_PHASES.PLAYING && turnPhase === TURN_PHASES.MOBILIZE) return true;
+  return false;
+}
+
+/** Combat / Fortify icon taps stage a count. Confirm commits the move. */
+export function shouldStagePhoneMoveIcon({
+  hasSource = false,
+  unitType = null,
+  remainingOfType = 0,
+} = {}) {
+  return !!hasSource && !!unitType
+    && remainingEligibleOfType({ available: remainingOfType }) > 0;
+}
+
+/** Leftover of THIS type after already-staged count. */
+export function remainingUnstagedOfType({ available = 0, staged = 0 } = {}) {
+  return Math.max(0, remainingEligibleOfType({ available }) - Math.max(0, Number(staged) || 0));
 }
 
 export function canNamePhoneMoveDest({ hasSource = false, destIsLegal = false } = {}) {
@@ -360,7 +386,8 @@ export function shouldUsePhonePairGrammar({ mobile, phase, turnPhase } = {}) {
   return false;
 }
 
-// Pair-path Max dumps remaining of THAT type now (no Confirm).
+// Pair-path Max: Deploy / mobilize dump-and-commit that type (no Confirm).
+// Combat / Fortify Max only fills the staged count; named Confirm moves.
 // Tech Max still only fills the count; Confirm spends. Purchase Max
 // does not need a named land.
 export function shouldShowPhonePeekMax({

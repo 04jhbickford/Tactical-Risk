@@ -2,6 +2,40 @@
 
 ---
 
+## 9.17.26 — V2.81.51 mobile combat-move Confirm (SCHEMA 11)
+
+Sean Benson + Robert Watts (iMessage 17 Sep ~1:11pm PT): Sean was not sure
+how to do combat movement on mobile. Robert wanted two steps like purchase:
+tap territory, tap each unit, then an explicit Deploy / named Confirm.
+He figured it out, but the flow was not purchase-class.
+
+Cause (generic, not one stack / one dest): phone pair grammar hid Confirm
+(`shouldHidePhonePairConfirm`) and `_commitPhoneIconMove` executed on the
+unit-icon tap once a dest was named. Copy / tips still said “then Confirm”.
+Purchase and Place Capital stage then name the thumb; combat / fortify did
+not. Dest-first + silent commit, or unit taps that staged nothing until a
+dest existed, made the phase look broken.
+
+Fix: Combat Move / Fortify (same path) stage on unit tap / Max, then a
+≥44pt named Confirm (`Move to X` / `Attack X`). Deploy / mobilize still
+icon-commit. One bottom surface. No rule / map / schema change.
+SCHEMA 11. GAME_VERSION V2.81.51. Draft only — not production.
+
+Discarded: restoring Confirm on deploy (V2.81.38 icon-commit stays);
+auto-move on dest tap; a second body Confirm; changing dest legality.
+
+### Smoke (this PR)
+
+- [ ] Phone Combat Move: tap stack → tap units (they stage) → tap
+      highlighted dest → Confirm reads Move to / Attack that land.
+- [ ] Mixed stack: tap infantry then tank, one Confirm moves both.
+- [ ] Max fills that type only; Confirm still required.
+- [ ] Fortify / non-combat move uses the same named Confirm.
+- [ ] Deploy / Place Capital / purchase Confirm grammar unchanged.
+- [ ] 390 + 500: one bottom surface; Confirm ≥44pt above the home indicator.
+
+---
+
 ## 9.17.26 — V2.81.50 MP seat-loss / Easy Bot replace (SCHEMA 11)
 
 Live Canvas multiplayer (~V2.81.49): Sean Benson appeared skipped in turn
