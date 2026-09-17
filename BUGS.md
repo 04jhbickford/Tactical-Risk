@@ -2,6 +2,20 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.7 (preview only, SCHEMA 11)
+
+ART-GAP P0 lock on `?three=1`. Do not merge over live Canvas V2.81.51. Write-up: `briefs/2026-09-17-three-ux-ia/ART-CRITIQUE.md`.
+
+1. **No placeholder quads** — sea-zone Line2 boxes and foam coasts removed (those were the royal/blue translucent rects). Land plates DoubleSide, no bevel inset, so ocean cannot bleed through Egypt / N. Africa.
+2. **North-up SoT** — UK west / Africa south asserts (`ukWestOfGermany`, `africaSouthOnScreen`).
+3. **Palette** — warm sand land + soft faction wash; deep desaturated ocean with quiet depth falloff; no cyan bloom.
+4. **Dense stacks** — mid-zoom pip+N only (`dist > 72`); type glyphs on select or close zoom.
+5. **Cream chits** — cream disc + faction rim + ink glyph. No black text pills.
+
+Named Confirm kept. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.7.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.6 (preview only, SCHEMA 11)
 
 James he-corrects + Arc SOTA gap-close on `?three=1` only. Do not merge over live Canvas V2.81.51.

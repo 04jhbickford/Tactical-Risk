@@ -16,7 +16,6 @@ import {
   makeLandMesh,
   makeLineMat,
   addTerritoryInk,
-  addFoamCoast,
   createWrapGroups,
   syncWrapVisibility,
   wrapPanLikeCanvas,
@@ -192,7 +191,6 @@ export async function bootThreeMapSpike() {
   const owners = setup.classic?.territoryOwners || {};
   const placements = setup.classic?.unitPlacements || setup.unitPlacements || {};
   const lands = territories.filter((t) => !t.isWater);
-  const waters = territories.filter((t) => t.isWater);
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
   const landHeights = new Map();
@@ -235,12 +233,9 @@ export async function bootThreeMapSpike() {
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.58);
-  const waterBorderMat = makeLineMat(PALETTE.waterHair, 0.4, 0.18);
-  const foamMat = makeLineMat(PALETTE.foam, 2.15, 0.42);
-  const selectMat = makeLineMat(PALETTE.select, 1.85, 0.95);
-  const selectSoftMat = makeLineMat(PALETTE.selectSoft, 3.4, 0.28);
-  lineMats.push(landBorderMat, waterBorderMat, foamMat, selectMat, selectSoftMat);
+  const landBorderMat = makeLineMat(PALETTE.border, 0.7, 0.5);
+  const selectMat = makeLineMat(PALETTE.select, 1.55, 0.92);
+  lineMats.push(landBorderMat, selectMat);
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
@@ -282,11 +277,7 @@ export async function bootThreeMapSpike() {
       if (!mesh) continue;
       group.add(mesh);
       pickables.push(mesh);
-      addFoamCoast(group, land, foamMat, 0.03);
-      addTerritoryInk(group, land, landBorderMat, height + 0.06);
-    }
-    for (const water of waters) {
-      addTerritoryInk(group, water, waterBorderMat, 0.04);
+      addTerritoryInk(group, land, landBorderMat, height + 0.05);
     }
   }
 
@@ -302,8 +293,8 @@ export async function bootThreeMapSpike() {
       const total = stackTotal(stacks);
       const expanded = [];
       const cols = Math.min(t.isWater || stacks.length >= 3 ? 3 : 2, stacks.length);
-      const tokenW = 9.2;
-      const tokenH = 10.8;
+      const tokenW = 7.4;
+      const tokenH = 7.4;
       for (let i = 0; i < stacks.length; i++) {
         const stack = stacks[i];
         const tex = chitTexture(stack.type, stack.owner, stack.quantity);
@@ -316,7 +307,7 @@ export async function bootThreeMapSpike() {
         const col = i % cols;
         const row = Math.floor(i / cols);
         const inRow = Math.min(cols, stacks.length - row * cols);
-        sprite.scale.set(tokenW * 1.12, tokenH * 1.12, 1);
+        sprite.scale.set(tokenW, tokenH, 1);
         sprite.position.set(
           x + (col - (inRow - 1) / 2) * (tokenW + 1.6),
           height + 5.4 + row * 5.2,
@@ -375,11 +366,11 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.05));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.62);
-  sun.position.set(40, 220, 18);
+  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 0.95));
+  const sun = new THREE.DirectionalLight(PALETTE.key, 0.42);
+  sun.position.set(30, 240, 12);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.18);
+  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.12);
   fill.position.set(-90, 90, -40);
   scene.add(fill);
 
@@ -550,20 +541,17 @@ export async function bootThreeMapSpike() {
       for (const poly of territory.polygons || []) {
         const ring = simplifyRing(poly);
         if (!ring) continue;
-        const soft = makeBorderLine(ring, y - 0.02, selectSoftMat);
-        soft.renderOrder = 3;
         const line = makeBorderLine(ring, y, selectMat);
         line.renderOrder = 4;
-        group.add(soft);
         group.add(line);
-        selectInk.push(soft, line);
+        selectInk.push(line);
       }
     }
   }
 
   function isDense() {
     const dist = camera.position.distanceTo(controls.target);
-    return dist > 108;
+    return dist > 72;
   }
 
   function syncDensity() {
@@ -698,36 +686,48 @@ export async function bootThreeMapSpike() {
   }
   tick();
 
-  function screenYOf(name) {
+  function screenXYOf(name) {
     const t = lands.find((l) => l.name === name);
     const c = t && territoryCenter(t);
     if (!c) return null;
     const p = worldToScene(c.x, c.y);
     const v = new THREE.Vector3(p.x, 0.5, p.z).project(camera);
-    return (1 - v.y) * 0.5 * window.innerHeight;
+    return {
+      x: (v.x * 0.5 + 0.5) * window.innerWidth,
+      y: (1 - v.y) * 0.5 * window.innerHeight,
+    };
+  }
+  function screenYOf(name) {
+    return screenXYOf(name)?.y ?? null;
   }
 
   reportStartupStatus('Three.js spike ready', 100);
   dismissStartupLoader();
-  const germanySY = screenYOf('Germany');
-  const egyptSY = screenYOf('Anglo Sudan Egypt');
-  const ukSY = screenYOf('United Kingdom');
-  const africaSouthOnScreen = egyptSY != null && germanySY != null && egyptSY > germanySY;
-  const europeNorthOnScreen = ukSY != null && germanySY != null && ukSY < germanySY + 80;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=bone-wash ocean=fresnel`, {
+  const germanyXY = screenXYOf('Germany');
+  const egyptXY = screenXYOf('Anglo Sudan Egypt');
+  const ukXY = screenXYOf('United Kingdom');
+  const westEuropeXY = screenXYOf('West Europe');
+  const africaSouthOnScreen = egyptXY && germanyXY && egyptXY.y > germanyXY.y;
+  const europeNorthOnScreen = ukXY && germanyXY && ukXY.y < germanyXY.y + 80;
+  const ukWestOfGermany = ukXY && germanyXY && ukXY.x < germanyXY.x;
+  const westEuropeWestOfGermany = westEuropeXY && germanyXY && westEuropeXY.x < germanyXY.x;
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=sand-plate ocean=quiet`, {
     africaSouthOfEurope,
     africaNotUnderNA,
     africaSouthOnScreen,
     europeNorthOnScreen,
-    germanySY,
-    egyptSY,
-    ukSY,
+    ukWestOfGermany,
+    westEuropeWestOfGermany,
+    germanyXY,
+    egyptXY,
+    ukXY,
   });
   window.__threeSpike = {
     frameEuropeAfrica,
     frameWorld,
     WRAP_COPIES,
     screenYOf,
+    screenXYOf,
     inspect() {
       const mats = pickables[0]?.material;
       const list = Array.isArray(mats) ? mats : [mats];
@@ -741,6 +741,11 @@ export async function bootThreeMapSpike() {
         africaNotUnderNA,
         africaSouthOnScreen,
         europeNorthOnScreen,
+        ukWestOfGermany,
+        westEuropeWestOfGermany,
+        waterInk: false,
+        foam: false,
+        bevel: false,
       };
     },
   };

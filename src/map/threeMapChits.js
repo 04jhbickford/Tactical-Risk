@@ -175,61 +175,45 @@ export function glyphKey(type) {
   return GLYPH[type] || 'inf';
 }
 
-export function paintChit(ctx, { type, ownerColor, quantity, shortLabel, w = 160, h = 188 } = {}) {
+export function paintChit(ctx, { type, ownerColor, quantity, w = 160, h = 160 } = {}) {
   const cx = w / 2;
-  const faceY = h * 0.38;
-  const r = Math.min(w, h) * 0.36;
+  const cy = h / 2;
+  const r = Math.min(w, h) * 0.46;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = ownerColor || '#3a3228';
+  ctx.fillStyle = ownerColor || '#4a3d2e';
   ctx.beginPath();
-  ctx.arc(cx, faceY, r, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(243,234,214,0.55)';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = '#efe6d6';
+  ctx.fillStyle = '#f3e6cf';
   ctx.beginPath();
-  ctx.arc(cx, faceY, r * 0.78, 0, Math.PI * 2);
+  ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
   ctx.fill();
   const draw = DRAW[glyphKey(type)] || drawInf;
-  draw(ctx, cx, faceY, r * 1.15);
-  ctx.fillStyle = 'rgba(22, 18, 14, 0.9)';
-  ctx.beginPath();
-  ctx.roundRect(w * 0.14, h * 0.74, w * 0.72, h * 0.2, 8);
-  ctx.fill();
-  ctx.strokeStyle = ownerColor || '#c9a44a';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = '#f3ead6';
-  ctx.font = `700 ${Math.round(h * 0.11)}px "Segoe UI", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(shortLabel || glyphKey(type).toUpperCase(), cx, h * 0.84);
+  draw(ctx, cx, cy, r * 1.05);
   if (quantity > 1) {
-    ctx.fillStyle = '#1c1812';
+    ctx.fillStyle = ownerColor || '#4a3d2e';
     ctx.beginPath();
-    ctx.arc(w * 0.8, h * 0.14, 18, 0, Math.PI * 2);
+    ctx.arc(w * 0.78, h * 0.22, r * 0.22, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#f3ead6';
-    ctx.font = '700 18px "Segoe UI", sans-serif';
-    ctx.fillText(`×${quantity}`, w * 0.8, h * 0.145);
+    ctx.fillStyle = '#f3e6cf';
+    ctx.font = `700 ${Math.round(h * 0.16)}px "Segoe UI", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(quantity), w * 0.78, h * 0.225);
   }
 }
 
 export function paintPip(ctx, { ownerColor, total, size = 128 } = {}) {
   ctx.clearRect(0, 0, size, size);
-  ctx.fillStyle = ownerColor || '#3a3228';
+  ctx.fillStyle = ownerColor || '#4a3d2e';
   ctx.beginPath();
   ctx.arc(size / 2, size / 2, size * 0.46, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(243,234,214,0.5)';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.fillStyle = '#efe6d6';
+  ctx.fillStyle = '#f3e6cf';
   ctx.beginPath();
   ctx.arc(size / 2, size / 2, size * 0.32, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#1c1812';
+  ctx.fillStyle = '#2a2218';
   ctx.font = `700 ${Math.round(size * 0.34)}px "Segoe UI", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -239,8 +223,8 @@ export function paintPip(ctx, { ownerColor, total, size = 128 } = {}) {
 export function makeChitTexture(type, ownerColor, quantity, shortLabel) {
   const canvas = document.createElement('canvas');
   canvas.width = 160;
-  canvas.height = 188;
-  paintChit(canvas.getContext('2d'), { type, ownerColor, quantity, shortLabel });
+  canvas.height = 160;
+  paintChit(canvas.getContext('2d'), { type, ownerColor, quantity });
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;

@@ -38,7 +38,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
-      background:#1c3840; overflow:hidden;
+      background:#1b2624; overflow:hidden;
     }
     html.three-spike #mapCanvas,
     html.three-spike #minimap,

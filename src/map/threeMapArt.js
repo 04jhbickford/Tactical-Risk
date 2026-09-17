@@ -208,9 +208,9 @@ function rdp(points, epsilon) {
   return [points[0], points[end]];
 }
 
-export function simplifyRing(poly) {
+export function simplifyRing(poly, epsilon = 0.7) {
   if (!poly || poly.length < 3) return null;
-  const ring = rdp(poly, 1.6);
+  const ring = rdp(poly, epsilon);
   return ring.length >= 3 ? ring : poly;
 }
 
@@ -285,35 +285,50 @@ export function makeLandMesh(territory, materials, height) {
   }
   if (!shapes.length) return null;
 
+  // No bevel inset — bevelSize punched coast holes so ocean showed
+  // through Egypt / N. Africa as teal/purple plates.
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
-    bevelEnabled: true,
-    bevelThickness: 0.14,
-    bevelSize: 0.11,
-    bevelSegments: 3,
-    curveSegments: 2,
+    bevelEnabled: false,
+    curveSegments: 1,
   });
   geom.rotateX(-Math.PI / 2);
   geom.computeVertexNormals();
   applyPaperUVs(geom);
-  const mesh = new THREE.Mesh(geom, [materials.side, materials.top, materials.bottom || materials.side]);
+  const mats = [materials.side, materials.top, materials.bottom || materials.side];
+  for (const mat of mats) {
+    if (!mat) continue;
+    mat.side = THREE.DoubleSide;
+    mat.transparent = false;
+    mat.depthWrite = true;
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -1;
+    mat.polygonOffsetUnits = -1;
+  }
+  const mesh = new THREE.Mesh(geom, mats);
   mesh.userData.territory = territory;
   mesh.userData.landHeight = height;
+  mesh.renderOrder = 1;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   return mesh;
 }
 
 export function makeLineMat(color, linewidth, opacity = 0.72) {
-  return new LineMaterial({
+  const mat = new LineMaterial({
     color,
     linewidth,
     worldUnits: false,
-    transparent: true,
+    transparent: opacity < 0.99,
     opacity,
     depthTest: true,
     depthWrite: false,
+    dashed: false,
   });
+  if (typeof window !== 'undefined') {
+    mat.resolution.set(window.innerWidth || 1, window.innerHeight || 1);
+  }
+  return mat;
 }
 
 export function makeBorderLine(ring, y, material) {

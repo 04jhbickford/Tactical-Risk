@@ -24,27 +24,27 @@ function darkenHex(hex, amt) {
 }
 
 export const PALETTE = {
-  oceanDeep: '#1c3840',
-  oceanShelf: '#3d5c62',
-  oceanFog: '#1a3036',
-  foam: '#d5e0da',
-  landBone: '#ece4d6',
-  landInk: '#3a3228',
-  landBevel: '#9a8f80',
-  border: '#4a4036',
-  waterHair: '#244046',
-  select: '#d4a84b',
-  selectSoft: '#e6c36a',
+  oceanDeep: '#1b2624',
+  oceanShelf: '#2a3632',
+  oceanFog: '#1b2624',
+  foam: '#cfc6b4',
+  landBone: '#e8d4b4',
+  landInk: '#4a3d2e',
+  landBevel: '#a89274',
+  border: '#5a4c3c',
+  waterHair: '#1b2624',
+  select: '#c9a44a',
+  selectSoft: '#d4b56a',
   confirm: '#c9a44a',
   boneText: '#f3ead6',
-  sky: '#f2ebe0',
-  ground: '#2c3a36',
-  key: '#fff6ea',
-  fill: '#9ab0b8',
+  sky: '#f3ead8',
+  ground: '#3a3228',
+  key: '#fff4e2',
+  fill: '#b8a894',
 };
 
-export const OCEAN_DEEP = 0x152228;
-export const OCEAN_SHELF = 0x2a4046;
+export const OCEAN_DEEP = 0x1b2624;
+export const OCEAN_SHELF = 0x2a3632;
 
 let paperTex = null;
 
@@ -89,23 +89,26 @@ export function landWashHex(ownerHex) {
 }
 
 export function makeLandMaterials(ownerHex) {
-  const wash = mixHex(PALETTE.landBone, ownerHex || PALETTE.landBone, 0.11);
-  const side = darkenHex(`#${wash.toString(16).padStart(6, '0')}`, 0.38);
+  const wash = mixHex(PALETTE.landBone, ownerHex || PALETTE.landBone, 0.08);
+  const side = darkenHex(`#${wash.toString(16).padStart(6, '0')}`, 0.28);
   const paper = makePaperTexture();
   const top = new THREE.MeshStandardMaterial({
     map: paper,
     color: wash,
-    roughness: 0.78,
-    metalness: 0.02,
-    emissive: 0x1c1810,
-    emissiveIntensity: 0.12,
-    envMapIntensity: 0.2,
+    roughness: 0.9,
+    metalness: 0,
+    emissive: 0x000000,
+    envMapIntensity: 0,
+    transparent: false,
+    side: THREE.DoubleSide,
   });
   const wall = new THREE.MeshStandardMaterial({
     color: side,
-    roughness: 0.92,
+    roughness: 0.94,
     metalness: 0,
     emissive: 0x000000,
+    transparent: false,
+    side: THREE.DoubleSide,
   });
   return { top, side: wall, bottom: wall };
 }
@@ -137,7 +140,8 @@ export function makeOceanMaterial() {
         vec3 viewDir = normalize(uCamera - vWorld);
         float ndv = max(dot(normalize(vN), viewDir), 0.0);
         float fres = pow(1.0 - ndv, 2.4);
-        vec3 col = mix(uDeep, uShelf, 0.28 + fres * 0.4);
+        float depth = clamp((abs(vWorld.z) / 220.0), 0.0, 1.0);
+        vec3 col = mix(uShelf, uDeep, 0.35 + depth * 0.45 + fres * 0.12);
         gl_FragColor = vec4(col, 1.0);
       }
     `,
@@ -150,7 +154,8 @@ export function makeOceanMesh(width, height) {
   geo.rotateX(-Math.PI / 2);
   const mat = makeOceanMaterial();
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.y = -0.08;
+  mesh.position.y = -0.12;
+  mesh.renderOrder = 0;
   mesh.receiveShadow = false;
   mesh.userData.kind = 'ocean';
   return mesh;
