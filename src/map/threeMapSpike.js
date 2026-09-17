@@ -21,8 +21,8 @@ import {
 const SCALE = 0.1;
 const WORLD_W = MAP_WIDTH * SCALE;
 const WORLD_H = MAP_HEIGHT * SCALE;
-const BASE_LAND = 2.15;
-const MT_LAND = 3.55;
+const BASE_LAND = 3.4;
+const MT_LAND = 9.2;
 const WRAP_COPIES = [-1, 0, 1];
 const TYPE_SHORT = {
   infantry: 'INF',
@@ -401,10 +401,10 @@ function addCheapMountains(group, territory, center, height, offsetX, coneGeo, c
   const { x, z } = worldToScene(center.x, center.y);
   for (let i = 0; i < count; i++) {
     const cone = new THREE.Mesh(coneGeo, coneMat);
-    const ox = ((hash * (i + 3)) % 70) / 10 - 3.5;
-    const oz = ((hash * (i + 7)) % 50) / 10 - 2.5;
-    const h = 2.4 + (hash % 5) * 0.22;
-    cone.scale.set(0.85 + (i % 2) * 0.25, h / 3.2, 0.85 + (i % 2) * 0.2);
+    const ox = ((hash * (i + 3)) % 90) / 8 - 5.5;
+    const oz = ((hash * (i + 7)) % 70) / 8 - 4;
+    const h = 7.5 + (hash % 5) * 0.7;
+    cone.scale.set(1.6 + (i % 2) * 0.45, h / 3.2, 1.6 + (i % 2) * 0.35);
     cone.position.set(x + offsetX + ox, height + (3.2 * cone.scale.y) / 2, z + oz);
     cone.userData.territory = territory;
     group.add(cone);
@@ -423,50 +423,48 @@ async function makeUnitTexture(type, owner, quantity, unitDefs, ownerColor) {
 
   ctx.fillStyle = ownerColor || '#2a2438';
   ctx.beginPath();
-  ctx.arc(80, 72, 66, 0, Math.PI * 2);
+  ctx.arc(80, 70, 70, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = 'rgba(12, 14, 22, 0.92)';
+  ctx.fillStyle = '#f3ead2';
   ctx.beginPath();
-  ctx.arc(80, 72, 58, 0, Math.PI * 2);
+  ctx.arc(80, 70, 58, 0, Math.PI * 2);
   ctx.fill();
 
   if (img) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(80, 72, 54, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.drawImage(img, 26, 18, 108, 108);
-    ctx.restore();
+    ctx.drawImage(img, 18, 8, 124, 124);
   } else {
-    ctx.fillStyle = '#f4ead4';
-    ctx.font = 'bold 34px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#1a1420';
+    ctx.font = 'bold 40px "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(TYPE_SHORT[type] || '?', 80, 72);
+    ctx.fillText(TYPE_SHORT[type] || '?', 80, 70);
   }
 
-  ctx.fillStyle = 'rgba(16, 18, 28, 0.88)';
-  ctx.strokeStyle = ownerColor || 'rgba(201,164,74,0.7)';
-  ctx.lineWidth = 3;
+  ctx.fillStyle = 'rgba(18, 16, 24, 0.92)';
+  ctx.strokeStyle = ownerColor || '#c9a44a';
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.roundRect(28, 146, 104, 32, 8);
+  ctx.roundRect(22, 142, 116, 38, 9);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = '#f4ead4';
-  ctx.font = 'bold 20px "Segoe UI", sans-serif';
+  ctx.font = 'bold 24px "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(TYPE_SHORT[type] || formatUnitName(type), 80, 162);
+  ctx.fillText(TYPE_SHORT[type] || formatUnitName(type), 80, 161);
 
   if (quantity > 1) {
     ctx.fillStyle = '#c9a44a';
     ctx.beginPath();
-    ctx.arc(128, 28, 20, 0, Math.PI * 2);
+    ctx.arc(128, 26, 22, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = '#1a1420';
+    ctx.lineWidth = 3;
+    ctx.stroke();
     ctx.fillStyle = '#1a1420';
-    ctx.font = 'bold 20px "Segoe UI", sans-serif';
-    ctx.fillText(`×${quantity}`, 128, 29);
+    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    ctx.fillText(`×${quantity}`, 128, 27);
   }
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -628,11 +626,12 @@ export async function bootThreeMapSpike() {
       const center = unitAnchor(t);
       if (!center) continue;
       const { x, z } = worldToScene(center.x, center.y);
-      const cols = t.isWater ? Math.min(3, stacks.length) : Math.min(3, stacks.length);
-      const tokenW = t.isWater ? 5.1 : 5.6;
-      const tokenH = t.isWater ? 6.0 : 6.55;
-      const gapX = tokenW + 1.15;
-      const gapZ = 2.4;
+      const crowded = stacks.length >= 3;
+      const cols = Math.min(t.isWater || crowded ? 3 : 2, stacks.length);
+      const tokenW = crowded ? 8.1 : (t.isWater ? 9.2 : 10.0);
+      const tokenH = crowded ? 9.5 : (t.isWater ? 10.8 : 11.7);
+      const gapX = tokenW + 1.9;
+      const gapZ = crowded ? 4.0 : 3.4;
       const height = t.isWater ? 0.4 : (landHeights.get(t.name) || BASE_LAND);
       for (let i = 0; i < stacks.length; i++) {
         const stack = stacks[i];
@@ -649,7 +648,7 @@ export async function bootThreeMapSpike() {
         sprite.scale.set(tokenW, tokenH, 1);
         sprite.position.set(
           x + offsetX + (col - (inRow - 1) / 2) * gapX,
-          height + 4.6 + row * 5.1,
+          height + 7.2 + row * 6.4,
           z + row * gapZ,
         );
         sprite.renderOrder = 4;
@@ -699,9 +698,9 @@ export async function bootThreeMapSpike() {
     const phone = isCoarsePointer();
     const cx = WORLD_W / 2;
     const cz = -WORLD_H / 2;
-    camera.fov = phone ? 50 : 42;
+    camera.fov = phone ? 46 : 40;
     camera.updateProjectionMatrix();
-    camera.position.set(cx, phone ? 410 : 355, cz - (phone ? 248 : 198));
+    camera.position.set(cx, phone ? 248 : 210, cz - (phone ? 168 : 132));
     controls.target.set(cx, 0, cz);
     controls.update();
   }
@@ -820,12 +819,18 @@ export async function bootThreeMapSpike() {
     }
   }
 
+  function tokenZoom() {
+    const dist = camera.position.distanceTo(controls.target);
+    return THREE.MathUtils.clamp(dist / 210, 0.72, 1.55);
+  }
+
   function pulseUnits(name, on) {
+    const zoom = tokenZoom();
     for (const sprite of unitSprites) {
       const base = sprite.userData.baseScale;
       if (!base) continue;
-      const match = sprite.userData.territory?.name === name;
-      const s = on && match ? 1.08 : 1;
+      const match = on && sprite.userData.territory?.name === name;
+      const s = zoom * (match ? 1.1 : 1);
       sprite.scale.set(base.x * s, base.y * s, 1);
     }
   }
@@ -896,6 +901,7 @@ export async function bootThreeMapSpike() {
     requestAnimationFrame(tick);
     controls.update();
     wrapPanLikeCanvas();
+    pulseUnits(selectedName, true);
     renderer.render(scene, camera);
   }
   tick();
