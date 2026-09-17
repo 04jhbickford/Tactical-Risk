@@ -2,6 +2,31 @@
 
 ---
 
+## 9.16.26 — V2.81.49 deploy locks after one unit type (SCHEMA 11)
+
+Robert Watts + Sean Benson on live V2.81.48 (16 Sep ~3:37pm PT): during
+Initial Deploy / purchase-deploy, after placing **one unit type** they
+could not deploy another type until a full browser refresh. Sometimes they
+could not place anything at all until refresh. Blocked finishing the round.
+
+Cause (generic, not one type / one seat): `shouldIgnoreQueueRetarget` used
+`_lastQueueUnitType` (the previous row) as the lock. Confirm clears the
+queue but left that leftover type. The next + / Max on type B stamped
+`_lastQueueGestureAt = now` and then looked like a B30 mid-render retarget
+(elapsed ≈ 0), so the increment was discarded and the lock window refreshed.
+Type A could still stage (same-type is not a retarget). Exhaust type A
+(or Max it) and every remaining tap is type B → empty place. Refresh was
+the only client reset. Same path for Local and Online; MP sync overwrite
+of the pending queue was checked and is not required for the lock.
+
+Fix: retarget lock is **this pointer** (`_queueLockType`) only. After
+Confirm / a consumed pair, `resetPlaceQueueGestureState` drops leftover
+last-row lock so type B (or the same land) can stage and Confirm again.
+B30 Destroyer→Transport mid-gesture retarget still ignored. Confirm + Max
+grammar unchanged. SCHEMA 11. GAME_VERSION V2.81.49.
+
+---
+
 ## 9.15.26 — V2.81.48 stuck Rejoin / Sign-in-dropped loop (SCHEMA 11)
 
 Robert (via James): every return to the site while still in an online match

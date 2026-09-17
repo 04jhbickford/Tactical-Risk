@@ -19,6 +19,13 @@ if (typeof globalThis.localStorage === 'undefined') {
 const { GameState, RISK_STARTING_UNITS } = await import(pathToFileURL(join(root, 'src/state/gameState.js')));
 const { computeInitialPlacementUX, resolvePhoneStickyUnitType } =
   await import(pathToFileURL(join(root, 'src/ui/playerPanel.js')));
+const {
+  shouldIgnoreQueueRetarget,
+  shouldAllowPlaceQueueTypeSwitch,
+  resetPlaceQueueGestureState,
+} = await import(pathToFileURL(join(root, 'src/ui/panelClickLock.js')));
+const { applyPlaceQueueDelta, queuedCount } =
+  await import(pathToFileURL(join(root, 'src/state/placeQueue.js')));
 const { GAME_VERSION, SCHEMA_VERSION } =
   await import(pathToFileURL(join(root, 'src/version.js')));
 const { canFinishPlacementRound, knownUnitsToPlace, onlyNavalRemaining } =
@@ -39,7 +46,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.48', GAME_VERSION === 'V2.81.48');
+check('GAME_VERSION is V2.81.49', GAME_VERSION === 'V2.81.49');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== computeInitialPlacementUX: land selected, only naval remain, valid sea exists ===');
@@ -387,6 +394,39 @@ console.log('=== B19-James: 1/6 naval-only on a legal sea can Done/skip ===');
   const pass = gs.finishPlacementRound(seaDefs, { allowNavalSkip: true });
   check('James seat advances after skip at 1/6',
     pass.ok === true && gs.currentPlayer?.id === 'p2');
+}
+
+console.log('=== V2.81.49 after Confirm, next type / same land is a new gesture ===');
+{
+  // Land → infantry + → Confirm. Queue empty. Tank + must apply without refresh.
+  let queue = applyPlaceQueueDelta({
+    queue: {}, unitType: 'infantry', delta: 1, available: 8, slotsRemaining: 6,
+  });
+  check('stage type A', queue.infantry === 1 && queuedCount(queue) === 1);
+  queue = {}; // Confirm commits and clears (queueAfterDeployAttempt placed>0)
+  check('Confirm empties the queue', queuedCount(queue) === 0);
+  check('type B after Confirm is not a leftover retarget',
+    shouldIgnoreQueueRetarget({
+      lockedType: 'infantry',
+      incomingType: 'tanks',
+      elapsedMs: 0,
+      committed: true,
+    }) === false);
+  check('type B after Confirm is allowed',
+    shouldAllowPlaceQueueTypeSwitch({
+      incomingType: 'tanks',
+      lastQueueUnitType: 'infantry',
+      queueEmpty: true,
+      committed: true,
+    }) === true);
+  queue = applyPlaceQueueDelta({
+    queue, unitType: 'tanks', delta: 1, available: 4, slotsRemaining: 5,
+  });
+  check('same land can stage type B after Confirm without refresh',
+    queue.tanks === 1 && !queue.infantry);
+  const reset = resetPlaceQueueGestureState();
+  check('empty-place leftover lock clears on the same reset',
+    reset.lastQueueUnitType === null && reset.queueLockType === null);
 }
 
 console.log(failures === 0 ? '\nALL PLACEMENT UX CHECKS PASS' : `\n${failures} FAILURES`);

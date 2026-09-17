@@ -201,15 +201,48 @@ export function isQueueGestureAction(action) {
 
 // One gesture changes one unitType. A mid-render retarget onto Transport
 // after Destroyer + must be ignored (B30 / B14 family).
+//
+// This lock is THIS pointer only. After Confirm the queue is empty — a
+// later type-B + is a new gesture, not a retarget. Using last-row type
+// across gestures locked every other type until refresh (Robert/Sean
+// 16 Sep: "one type at a time" / "couldn't place until refreshing").
 export function shouldIgnoreQueueRetarget({
   lockedType = null,
   incomingType = null,
   elapsedMs = 0,
   windowMs = PANEL_QUEUE_GUARD_MS,
+  committed = false,
+  newGesture = false,
 } = {}) {
+  if (committed || newGesture) return false;
   if (!lockedType || !incomingType) return false;
   if (lockedType === incomingType) return false;
   return Number(elapsedMs) >= 0 && Number(elapsedMs) < Number(windowMs);
+}
+
+// After Confirm / a consumed pair, leftover last-row lock cannot pin
+// the next type (any deploy round, any type switch, Local or Online).
+export function shouldAllowPlaceQueueTypeSwitch({
+  incomingType = null,
+  lastQueueUnitType = null,
+  queueEmpty = false,
+  committed = false,
+  currentGestureLockType = null,
+} = {}) {
+  if (!incomingType) return false;
+  if (committed || queueEmpty) return true;
+  if (!lastQueueUnitType || incomingType === lastQueueUnitType) return true;
+  if (currentGestureLockType && currentGestureLockType !== incomingType) return false;
+  return true;
+}
+
+export function resetPlaceQueueGestureState() {
+  return {
+    lastQueueUnitType: null,
+    queueLockType: null,
+    queueGestureApplied: false,
+    lastQueueGestureAt: 0,
+  };
 }
 
 export function resolveQueueUnitType({
