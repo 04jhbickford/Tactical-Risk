@@ -274,6 +274,8 @@ export async function bootThreeMapSpike() {
   controls.enablePan = true;
   controls.screenSpacePanning = true;
   controls.enableRotate = false;
+  controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+  controls.touches.ONE = THREE.TOUCH.PAN;
   controls.minDistance = 48;
   controls.maxDistance = 620;
   controls.zoomSpeed = 0.9;
