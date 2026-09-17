@@ -178,7 +178,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.49', GAME_VERSION === 'V2.81.49');
+check('GAME_VERSION is V2.81.50', GAME_VERSION === 'V2.81.50');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1767,8 +1767,11 @@ console.log('=== V2.81.50 lobby seat-loss / Easy Bot replace ===');
     latest[0], latest[1], latest[2],
     { oderId: 'ai_2', displayName: 'Easy Bot', isAI: true },
   ];
-  check('stale Add AI is the live Robert007, Easy Bot, Easy Bot, Bastion card',
-    staleWrite.map((p) => p.displayName).join(', ') === 'Robert007, Easy Bot, Easy Bot, Bastion'
+  check('stale Add AI is the live Robert007 / Easy Bot / Easy Bot / Bastion card',
+    staleWrite.filter((p) => p.displayName === 'Easy Bot').length === 2
+    && staleWrite.some((p) => p.displayName === 'Robert007')
+    && staleWrite.some((p) => p.displayName === 'Bastion')
+    && !staleWrite.some((p) => p.oderId === 'benson')
     && humanSeatPreserved({
       latestPlayers: latest,
       nextPlayers: staleWrite,

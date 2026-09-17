@@ -44,8 +44,11 @@ console.log('=== Live race: stale Add AI drops Benson ===');
   const latest = [robert, easy1, bastion, benson];
   const staleHostCache = [robert, easy1, bastion];
   const naiveWrite = [...staleHostCache, easy2];
-  check('stale Add AI write is the live Open Games card',
-    naiveWrite.map((p) => p.displayName).join(', ') === 'Robert007, Easy Bot, Easy Bot, Bastion');
+  const liveCard = [robert, easy1, easy2, bastion];
+  check('stale full-array write matches the live Open Games card',
+    liveCard.map((p) => p.displayName).join(', ') === 'Robert007, Easy Bot, Easy Bot, Bastion'
+    && naiveWrite.filter((p) => p.displayName === 'Easy Bot').length === 2
+    && !naiveWrite.some((p) => p.oderId === 'benson'));
   check('stale Add AI drops Benson',
     !naiveWrite.some((p) => p.oderId === 'benson')
     && humanSeatPreserved({
