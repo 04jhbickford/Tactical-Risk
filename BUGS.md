@@ -2,6 +2,19 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.4 (preview only, SCHEMA 11)
+
+James lookpass on PR 43 Three preview. SCHEMA 11. Live Canvas untouched.
+
+1. North-up — higher/overhead camera, azimuth locked south-of-target so UK/Germany sit above Egypt/Africa on screen (world assert `africaSouthOfEurope` kept).
+2. No color rectangles — dropped the full-map bake quad; land sides are ink, not stretched tile UVs; plates flattened so south walls cannot read as solid blocks.
+3. Calmer palette — deep ocean `#1c4549`, parchment multiply + whisper ownership, muted gold select, less ACES punch.
+4. Confirm CTA — named `Confirm · land` / `Confirm inspect · land` after soft ack. Not Inspect / Noted. inspect ≠ commit. No click-through.
+
+Open: preview + `?three=1`. GAME_VERSION V2.81.51-three-polish.4.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.3 (preview only, SCHEMA 11)
 
 PR 43 wording lock: Three `?three=1` bottom ≥44pt CTA is named Confirm (`Confirm · Germany` / `Confirm inspect · Germany` after soft ack). Not Inspect / Noted. inspect ≠ commit stub unchanged; no map click-through. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.3.

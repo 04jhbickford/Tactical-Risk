@@ -10,9 +10,13 @@ import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
 export const WORLD_H = MAP_HEIGHT * SCALE;
-export const BASE_LAND = 1.55;
-export const MT_LAND = 2.65;
+// Low plates — tall extrude walls were the "random color rectangles"
+// James saw (south faces of Africa/Egypt reading as solid quads).
+export const BASE_LAND = 0.42;
+export const MT_LAND = 0.72;
 export const WRAP_COPIES = [-1, 0, 1];
+export const OCEAN_HEX = 0x1c4549;
+export const OCEAN_CSS = '#1c4549';
 
 const TILE_SIZE = 256;
 const TILE_COLS = 14;
@@ -109,7 +113,7 @@ export async function bakeWorldTexture() {
   canvas.width = BAKE_W;
   canvas.height = BAKE_H;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#44C5BD';
+  ctx.fillStyle = OCEAN_CSS;
   ctx.fillRect(0, 0, BAKE_W, BAKE_H);
 
   const small = await loadImageTimeout('map/smallMap.jpeg', 8000);
@@ -160,6 +164,7 @@ export async function bakeWorldTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
+  tex.flipY = true;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
@@ -173,7 +178,9 @@ export function applyWorldUVs(geometry) {
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) / SCALE;
     const wy = -pos.getZ(i) / SCALE;
-    uv.setXY(i, wx / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
+    const u = Math.min(1, Math.max(0, wx / MAP_WIDTH));
+    const v = Math.min(1, Math.max(0, 1 - wy / MAP_HEIGHT));
+    uv.setXY(i, u, v);
   }
   uv.needsUpdate = true;
 }
@@ -259,6 +266,42 @@ export function landHeightFor(territory, center) {
   return BASE_LAND;
 }
 
+export function assignTopSideGroups(geometry) {
+  const pos = geometry.attributes.position;
+  const idx = geometry.index;
+  if (!pos || !idx) return;
+  const top = [];
+  const side = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  const ab = new THREE.Vector3();
+  const ac = new THREE.Vector3();
+  const n = new THREE.Vector3();
+  for (let i = 0; i < idx.count; i += 3) {
+    const i0 = idx.getX(i);
+    const i1 = idx.getX(i + 1);
+    const i2 = idx.getX(i + 2);
+    a.fromBufferAttribute(pos, i0);
+    b.fromBufferAttribute(pos, i1);
+    c.fromBufferAttribute(pos, i2);
+    ab.subVectors(b, a);
+    ac.subVectors(c, a);
+    n.crossVectors(ab, ac);
+    if (n.y > 0 && Math.abs(n.y) >= Math.abs(n.x) && Math.abs(n.y) >= Math.abs(n.z)) {
+      top.push(i0, i1, i2);
+    } else {
+      side.push(i0, i1, i2);
+    }
+  }
+  const merged = top.concat(side);
+  idx.set(merged);
+  idx.needsUpdate = true;
+  geometry.clearGroups();
+  if (top.length) geometry.addGroup(0, top.length, 0);
+  if (side.length) geometry.addGroup(top.length, side.length, 1);
+}
+
 export function makeLandMesh(territory, materials, height) {
   const shapes = [];
   for (const poly of territory.polygons || []) {
@@ -277,17 +320,15 @@ export function makeLandMesh(territory, materials, height) {
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
     bevelEnabled: true,
-    bevelThickness: 0.1,
-    bevelSize: 0.08,
+    bevelThickness: 0.04,
+    bevelSize: 0.03,
     bevelSegments: 1,
     curveSegments: 1,
   });
   geom.rotateX(-Math.PI / 2);
   applyWorldUVs(geom);
-  const count = geom.index ? geom.index.count : geom.attributes.position.count;
-  geom.clearGroups();
-  geom.addGroup(0, count, 0);
-  const mesh = new THREE.Mesh(geom, materials.top);
+  assignTopSideGroups(geom);
+  const mesh = new THREE.Mesh(geom, [materials.top, materials.side]);
   mesh.userData.territory = territory;
   mesh.userData.landHeight = height;
   return mesh;
@@ -327,27 +368,6 @@ export function addTerritoryInk(group, territory, material, y) {
     line.userData.territory = territory;
     group.add(line);
   }
-}
-
-export function makeBoardTexturePlane(texture) {
-  const geo = new THREE.PlaneGeometry(WORLD_W, WORLD_H, 1, 1);
-  geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const uv = geo.attributes.uv;
-  for (let i = 0; i < pos.count; i++) {
-    const u = (pos.getX(i) + WORLD_W / 2) / WORLD_W;
-    const v = 0.5 + pos.getZ(i) / WORLD_H;
-    uv.setXY(i, u, v);
-  }
-  uv.needsUpdate = true;
-  const mat = new THREE.MeshLambertMaterial({
-    map: texture,
-    color: 0xffffff,
-  });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(WORLD_W / 2, 0.02, -WORLD_H / 2);
-  mesh.receiveShadow = false;
-  return mesh;
 }
 
 export function createWrapGroups(parent) {

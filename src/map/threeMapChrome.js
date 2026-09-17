@@ -38,7 +38,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
-      background:#0c1418; overflow:hidden;
+      background:#122428; overflow:hidden;
     }
     html.three-spike #mapCanvas,
     html.three-spike #minimap,
@@ -60,7 +60,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(10px, env(safe-area-inset-left));
       padding-right:max(10px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:linear-gradient(180deg, rgba(10,14,18,0.88) 0%, rgba(10,14,18,0.55) 70%, transparent 100%);
+      background:linear-gradient(180deg, rgba(12,20,24,0.88) 0%, rgba(12,20,24,0.5) 70%, transparent 100%);
       color:#f4ead4; font:600 13px/1 "Segoe UI", sans-serif;
       pointer-events:none;
     }
@@ -96,7 +96,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;
       pointer-events:none;
-      background:linear-gradient(0deg, rgba(10,14,18,0.78) 0%, transparent 100%);
+      background:linear-gradient(0deg, rgba(12,20,24,0.78) 0%, transparent 100%);
     }
     #three-peek {
       display:none; pointer-events:none;

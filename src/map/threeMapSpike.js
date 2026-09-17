@@ -21,7 +21,7 @@ import {
   makeLandMesh,
   makeLineMat,
   addTerritoryInk,
-  makeBoardTexturePlane,
+  OCEAN_HEX,
   createWrapGroups,
   syncWrapVisibility,
   wrapPanLikeCanvas,
@@ -310,24 +310,24 @@ export async function bootThreeMapSpike() {
   });
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0c1418);
-  scene.fog = new THREE.Fog(0x0c1418, 420, 980);
+  scene.background = new THREE.Color(0x122428);
+  scene.fog = new THREE.Fog(0x122428, 520, 1100);
 
   const ocean = new THREE.Mesh(
     new THREE.PlaneGeometry(WORLD_W * 3.2, WORLD_H * 1.25),
-    new THREE.MeshStandardMaterial({ color: 0x17656a, roughness: 0.95, metalness: 0 }),
+    new THREE.MeshLambertMaterial({ color: OCEAN_HEX }),
   );
   ocean.rotation.x = -Math.PI / 2;
-  ocean.position.set(WORLD_W / 2, -0.04, -WORLD_H / 2);
+  ocean.position.set(WORLD_W / 2, -0.02, -WORLD_H / 2);
   scene.add(ocean);
 
   const board = new THREE.Group();
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  const landBorderMat = makeLineMat(0x1a1408, 1.55);
-  const waterBorderMat = makeLineMat(0x0c3c3a, 0.7);
-  const selectMat = makeLineMat(0xe8c35a, 3.2);
+  const landBorderMat = makeLineMat(0x241c14, 1.15);
+  const waterBorderMat = makeLineMat(0x16383a, 0.55);
+  const selectMat = makeLineMat(0xc4a056, 2.4);
   lineMats.push(landBorderMat, waterBorderMat, selectMat);
 
   for (const land of lands) {
@@ -336,11 +336,11 @@ export async function bootThreeMapSpike() {
     landMats.set(land.name, {
       top: new THREE.MeshLambertMaterial({
         map: baked.texture,
-        color: 0xffffff,
-        emissive: mixHex('#000000', ownerHex, 0.1),
+        color: mixHex(ownerHex, '#e6dcc4', 0.84),
+        emissive: mixHex('#000000', ownerHex, 0.045),
       }),
       side: new THREE.MeshLambertMaterial({
-        color: darkenHex(ownerHex, 0.48),
+        color: darkenHex(mixHex(ownerHex, '#2a241c', 0.55), 0.28),
       }),
     });
   }
@@ -371,7 +371,6 @@ export async function bootThreeMapSpike() {
 
   reportStartupStatus('Building Three.js board…', 72);
   for (const group of wrapGroups) {
-    group.add(makeBoardTexturePlane(baked.texture));
     for (const land of lands) {
       const center = territoryCenter(land);
       const height = landHeightFor(land, center);
@@ -472,19 +471,19 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(0xd0dce8, 0x2a2418, 0.78));
-  const sun = new THREE.DirectionalLight(0xfff4de, 0.7);
-  sun.position.set(90, 180, 70);
+  scene.add(new THREE.HemisphereLight(0xe7eef2, 0x3d3830, 0.95));
+  const sun = new THREE.DirectionalLight(0xfff4e4, 0.38);
+  sun.position.set(40, 220, -30);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x8eb4c8, 0.2);
-  fill.position.set(-70, 80, -30);
+  const fill = new THREE.DirectionalLight(0xb7c4c8, 0.16);
+  fill.position.set(-80, 90, -40);
   scene.add(fill);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 0.86;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -502,6 +501,10 @@ export async function bootThreeMapSpike() {
   controls.touches.TWO = THREE.TOUCH.DOLLY;
   controls.minDistance = 38;
   controls.maxDistance = 320;
+  controls.minPolarAngle = 0.18;
+  controls.maxPolarAngle = 0.72;
+  controls.minAzimuthAngle = Math.PI;
+  controls.maxAzimuthAngle = Math.PI;
   controls.zoomSpeed = isCoarsePointer() ? 1.15 : 0.95;
   controls.panSpeed = isCoarsePointer() ? 1.45 : 1.05;
 
@@ -517,10 +520,12 @@ export async function bootThreeMapSpike() {
 
   function frameEuropeAfrica() {
     const phone = isCoarsePointer();
-    const focus = worldToScene(1080, 920);
-    camera.fov = phone ? 46 : 40;
+    // Europe / Med, slightly north of the old 920 focus so Africa is south
+    // on screen instead of a near-camera wall.
+    const focus = worldToScene(1080, 760);
+    camera.fov = phone ? 40 : 36;
     camera.updateProjectionMatrix();
-    camera.position.set(focus.x, phone ? 168 : 148, focus.z - (phone ? 102 : 88));
+    camera.position.set(focus.x, phone ? 228 : 205, focus.z - (phone ? 34 : 30));
     controls.target.set(focus.x, 0, focus.z);
     applyZoomCap();
     controls.update();
@@ -530,10 +535,10 @@ export async function bootThreeMapSpike() {
     const phone = isCoarsePointer();
     const cx = WORLD_W / 2;
     const cz = -WORLD_H / 2;
-    camera.fov = phone ? 46 : 40;
+    camera.fov = phone ? 40 : 36;
     camera.updateProjectionMatrix();
     const cap = maxZoomDistance(camera.aspect, camera.fov);
-    camera.position.set(cx, Math.min(cap * 0.72, phone ? 210 : 190), cz - Math.min(cap * 0.42, phone ? 120 : 100));
+    camera.position.set(cx, Math.min(cap * 0.88, phone ? 250 : 230), cz - Math.min(cap * 0.16, phone ? 42 : 36));
     controls.target.set(cx, 0, cz);
     applyZoomCap();
     controls.update();
@@ -680,7 +685,7 @@ export async function bootThreeMapSpike() {
     if (hover) {
       if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x000000);
       hoveredName = next && !next.isWater ? next.name : null;
-      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x2f2610);
+      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x1c1810);
       renderer.domElement.classList.toggle('is-hovering', !!next);
       return;
     }
@@ -691,7 +696,7 @@ export async function bootThreeMapSpike() {
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
     confirmed = false;
-    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x2a1c08);
+    if (selectedName && !next?.isWater) setLandEmissive(selectedName, 0x1a1408);
     drawSelectInk(next && !next.isWater ? next : null);
     syncDensity();
     chrome.paintSelection({
@@ -774,13 +779,34 @@ export async function bootThreeMapSpike() {
   }
   tick();
 
+  function screenYOf(name) {
+    const t = lands.find((l) => l.name === name);
+    const c = t && territoryCenter(t);
+    if (!c) return null;
+    const p = worldToScene(c.x, c.y);
+    const v = new THREE.Vector3(p.x, 0.5, p.z).project(camera);
+    return (1 - v.y) * 0.5 * window.innerHeight;
+  }
+
   reportStartupStatus('Three.js spike ready', 100);
   dismissStartupLoader();
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=base${baked.baseCount}/relief${baked.reliefCount}`);
+  const germanySY = screenYOf('Germany');
+  const egyptSY = screenYOf('Anglo Sudan Egypt');
+  const ukSY = screenYOf('United Kingdom');
+  const africaSouthOnScreen = egyptSY != null && germanySY != null && egyptSY > germanySY;
+  const europeNorthOnScreen = ukSY != null && germanySY != null && ukSY < germanySY + 80;
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=base${baked.baseCount}/relief${baked.reliefCount}`, {
+    africaSouthOnScreen,
+    europeNorthOnScreen,
+    germanySY,
+    egyptSY,
+    ukSY,
+  });
   window.__threeSpike = {
     frameEuropeAfrica,
     frameWorld,
     WRAP_COPIES,
+    screenYOf,
     inspect() {
       const mesh = pickables[0];
       const uv = mesh?.geometry?.attributes?.uv;
@@ -794,12 +820,16 @@ export async function bootThreeMapSpike() {
           vMax = Math.max(vMax, uv.getY(i));
         }
       }
+      const mat = Array.isArray(mesh?.material) ? mesh.material[0] : mesh?.material;
       return {
         name: mesh?.userData?.territory?.name,
         verts: pos?.count,
         uv: uv ? { uMin, uMax, vMin, vMax } : null,
-        hasMap: !!mesh?.material?.map,
+        hasMap: !!mat?.map,
+        groups: mesh?.geometry?.groups?.length || 0,
         wrap: renderer.domElement.dataset.wrapCopies,
+        africaSouthOnScreen,
+        europeNorthOnScreen,
       };
     },
   };
