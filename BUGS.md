@@ -2,6 +2,18 @@
 
 ---
 
+## 9.17.26 — V2.81.49-three-spike.3 blitz polish (preview only, SCHEMA 11)
+
+James ~30min HARD STOP polish on the Three.js spike. Preview only — do not merge.
+
+Shipped: continent elevation + cheap mountain cones; gold select ink; classic one-world at distance (wrap copies only when zoomed near Pacific seam — Africa-under-NA); tighter typed sprites with faction pip + HUD chips; phone-first pan/pinch/tap, no hover-select, safe-area HUD; hemisphere + ACES lighting.
+
+Gaps: no full terrain DEM; some stack overlap on dense seas; wrap still a 3-copy trick not a shader torus; phone not device-tested this run.
+
+Open: `?three=1`. SCHEMA 11. GAME_VERSION V2.81.49-three-spike.3.
+
+---
+
 ## 9.17.26 — V2.81.49-three-spike.2 James follow-up (preview only, SCHEMA 11)
 
 James playtest of the Three.js spike: lands read as muddy blobs; no east–west wrap; unit placeholders hid type. Still preview-only — do not merge over Canvas.
