@@ -178,7 +178,7 @@ const unitDefs = {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.49', GAME_VERSION === 'V2.81.49');
+check('GAME_VERSION is V2.81.50', GAME_VERSION === 'V2.81.50');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Presence: background must not delete or go offline ===');
@@ -1448,7 +1448,9 @@ console.log('=== B38–B40 first host turn: panel, deploy pool, Start Game, relo
     && lobbySrc.includes('Start Game'));
   const lobbyMgrSrc = readFileSync(join(root, 'src/multiplayer/lobbyManager.js'), 'utf8');
   check('B40: Start publishes an unpublished 2/2 lobby',
-    lobbyMgrSrc.includes('if (!this.currentLobby.isPublished)'));
+    lobbyMgrSrc.includes('if (!live.isPublished)')
+    && lobbyMgrSrc.includes('lobbyUpdate.isPublished = true')
+    && lobbyMgrSrc.includes('runTransaction'));
 
   check('B38: signed-in reload with last match auto-resumes',
     shouldAutoResumeLastMatch({
@@ -1749,6 +1751,45 @@ console.log('=== V2.81.48 rejoin hydrate — no stub start, Leave clears lastMat
   check('dismiss-rejoin is confirmed Leave that forgets lastMatch',
     /data-action="dismiss-rejoin"/.test(lobbySrc48)
     && /shouldForgetLastMatchOnDismissRejoin\(\{\s*confirmedLeave:\s*true\s*\}\)/.test(lobbySrc48));
+}
+
+console.log('=== V2.81.50 lobby seat-loss / Easy Bot replace ===');
+{
+  const { addLobbyAISeat, humanSeatPreserved, startGameRoster } =
+    await import(pathToFileURL(join(root, 'src/multiplayer/lobbySeats.js')));
+  const latest = [
+    { oderId: 'robert', displayName: 'Robert007' },
+    { oderId: 'ai_1', displayName: 'Easy Bot', isAI: true },
+    { oderId: 'bastion', displayName: 'Bastion' },
+    { oderId: 'benson', displayName: 'Sean Benson' },
+  ];
+  const staleWrite = [
+    latest[0], latest[1], latest[2],
+    { oderId: 'ai_2', displayName: 'Easy Bot', isAI: true },
+  ];
+  check('stale Add AI is the live Robert007 / Easy Bot / Easy Bot / Bastion card',
+    staleWrite.filter((p) => p.displayName === 'Easy Bot').length === 2
+    && staleWrite.some((p) => p.displayName === 'Robert007')
+    && staleWrite.some((p) => p.displayName === 'Bastion')
+    && !staleWrite.some((p) => p.oderId === 'benson')
+    && humanSeatPreserved({
+      latestPlayers: latest,
+      nextPlayers: staleWrite,
+      humanId: 'benson',
+    }) === false);
+  check('transactional Add AI on a full 4-max keeps Benson',
+    addLobbyAISeat({
+      players: latest,
+      aiPlayer: { oderId: 'ai_2', displayName: 'Easy Bot', isAI: true },
+      maxPlayers: 4,
+    }).ok === false
+    && startGameRoster(latest).playerUserIds.includes('benson'));
+  const lobbyMgrSrc50 = readFileSync(join(root, 'src/multiplayer/lobbyManager.js'), 'utf8');
+  check('lobby writers use runTransaction + latest-seat transforms',
+    lobbyMgrSrc50.includes('runTransaction')
+    && lobbyMgrSrc50.includes('addLobbyAISeat')
+    && lobbyMgrSrc50.includes('startGameRoster')
+    && !/lobbyData:\s*\{\s*players:\s*this\.currentLobby\.players/.test(lobbyMgrSrc50));
 }
 
 console.log(failures === 0 ? '\nALL PRESENCE-AND-DEPLOY CHECKS PASS' : `\n${failures} FAILURES`);

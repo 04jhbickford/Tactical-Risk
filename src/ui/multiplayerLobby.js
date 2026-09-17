@@ -22,6 +22,7 @@ import {
   shouldForgetLastMatchOnDismissRejoin,
 } from '../multiplayer/lastMatch.js';
 import { resolveHostLobbyPrimaryCta } from '../multiplayer/lobbyStart.js';
+import { seatNamesForOpenGameCard } from '../multiplayer/lobbySeats.js';
 import { resolveHostAwayBanner } from '../ui/hudClarity.js';
 
 // Available factions (should match setup data)
@@ -485,7 +486,11 @@ export class MultiplayerLobby {
           <div class="mp-games-list">
             ${myGames.map(game => {
               const players = game.lobbyData?.players || [];
-              const playerNames = players.map(p => p.displayName).join(', ');
+              const seatNames = seatNamesForOpenGameCard({
+                lobbyPlayers: players,
+                statePlayers: game.state?.players || [],
+              });
+              const playerNames = seatNames.join(', ');
               const isMyTurn = game.currentPlayerId === user?.id;
               const round = game.state?.round || 1;
               const isStarting = game.status === 'starting';
@@ -494,7 +499,7 @@ export class MultiplayerLobby {
                   <button class="mp-game-item ${isMyTurn ? 'my-turn' : ''}" data-resume-game-id="${game.id}">
                     <div class="mp-game-info">
                       <span class="mp-game-name">${playerNames || 'Game in progress'}</span>
-                      <span class="mp-game-details">${isStarting ? 'Starting' : `Round ${round}`} · ${players.length} players</span>
+                      <span class="mp-game-details">${isStarting ? 'Starting' : `Round ${round}`} · ${seatNames.length || players.length} players</span>
                     </div>
                     <span class="mp-game-join">${isMyTurn ? 'Your Turn!' : 'Resume'}</span>
                   </button>
@@ -761,7 +766,7 @@ export class MultiplayerLobby {
                     </div>
                   </div>
                   ${isAI && isHost ? `
-                    <button class="mp-remove-btn" data-action="remove-ai" data-index="${index}" title="Remove AI">×</button>
+                    <button class="mp-remove-btn" data-action="remove-ai" data-index="${index}" data-oder-id="${player.oderId || ''}" title="Remove AI">×</button>
                   ` : ''}
                 </div>
               `;
@@ -1036,8 +1041,11 @@ export class MultiplayerLobby {
     this.el.querySelectorAll('[data-action="remove-ai"]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        const index = parseInt(btn.dataset.index);
-        await this.lobbyManager.removeAIPlayer(index);
+        const index = parseInt(btn.dataset.index, 10);
+        await this.lobbyManager.removeAIPlayer({
+          index: Number.isInteger(index) ? index : null,
+          oderId: btn.dataset.oderId || null,
+        });
       });
     });
 

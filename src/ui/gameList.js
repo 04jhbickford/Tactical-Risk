@@ -29,6 +29,7 @@ import {
   shouldForgetLastMatchAfterLookup,
   shouldJoinListedGame,
 } from '../multiplayer/lastMatch.js';
+import { seatNamesForOpenGameCard } from '../multiplayer/lobbySeats.js';
 
 export { shouldOpenLeaveConfirm };
 
@@ -326,8 +327,12 @@ export class GameList {
     // Get round info from state
     const round = game.state?.round || 1;
 
-    // Player names list
-    const playerNames = players.map(p => p.displayName).join(', ');
+    // Player names list — prefer live state seats if lobbyData lost a joiner
+    const seatNames = seatNamesForOpenGameCard({
+      lobbyPlayers: players,
+      statePlayers: game.state?.players || [],
+    });
+    const playerNames = seatNames.join(', ');
 
     // Status display
     let statusHtml;
@@ -345,7 +350,7 @@ export class GameList {
           <div class="mp-game-info">
             <span class="mp-game-name">${playerNames}</span>
             <span class="mp-game-details">
-              ${isStarting ? 'Starting' : `Round ${round}`} · ${players.length} players · ${lastUpdated}
+              ${isStarting ? 'Starting' : `Round ${round}`} · ${seatNames.length || players.length} players · ${lastUpdated}
             </span>
           </div>
           <div class="mp-game-status">

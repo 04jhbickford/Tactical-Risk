@@ -13,8 +13,7 @@ import {
   query,
   where,
   serverTimestamp,
-  arrayUnion,
-  arrayRemove
+  runTransaction
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { getFirebaseDb } from './firebase.js';
 import { getAuthManager } from './auth.js';
@@ -38,6 +37,15 @@ import {
   resolveRejoinHydratePlan,
 } from './lastMatch.js';
 import { resolveStartGameTarget } from './lobbyStart.js';
+import {
+  addLobbyAISeat,
+  joinLobbySeat,
+  patchLobbySeat,
+  removeLobbyAISeat,
+  removeLobbyHumanSeat,
+  startGameRoster,
+  transferLobbyHost,
+} from './lobbySeats.js';
 
 // Generate a random 6-character lobby code
 function generateLobbyCode() {
@@ -438,13 +446,48 @@ export class LobbyManager {
     });
 
     try {
-      await updateDoc(doc(this.db, 'lobbies', lobby.id), {
-        players: arrayUnion(newPlayer),
-        updatedAt: serverTimestamp()
+      const lobbyRef = doc(this.db, 'lobbies', lobby.id);
+      const outcome = await runTransaction(this.db, async (transaction) => {
+        const snap = await transaction.get(lobbyRef);
+        if (!snap.exists()) return { success: false, error: 'Lobby not found' };
+        const live = snap.data();
+        if (live.status && live.status !== 'waiting') {
+          return { success: false, started: true, gameId: live.gameId || null };
+        }
+        const seated = joinLobbySeat({
+          players: live.players,
+          newPlayer,
+          maxPlayers: live.settings?.maxPlayers,
+        });
+        if (!seated.ok) return { success: false, error: seated.error };
+        if (!seated.alreadySeated) {
+          transaction.update(lobbyRef, {
+            players: seated.players,
+            updatedAt: serverTimestamp(),
+          });
+        }
+        return {
+          success: true,
+          players: seated.players,
+          code: live.code,
+          hostName: seated.players.find((p) => p.isHost)?.displayName || null,
+        };
       });
+      if (outcome?.started) {
+        let game = outcome.gameId ? await this.getGameById(outcome.gameId) : null;
+        if (!game) game = await this.findGameByCode(code);
+        if (game) {
+          return { success: true, isGame: true, gameId: game.id, game };
+        }
+        return { success: false, error: 'Game already started' };
+      }
+      if (!outcome?.success) {
+        return { success: false, error: outcome?.error || 'Could not join lobby' };
+      }
+      this._patchCurrentLobby(lobby.id, { players: outcome.players });
       rememberLastMatch({
-        lobbyCode: lobby.code || code,
-        hostName: lobby.players?.find((p) => p.isHost)?.displayName || null,
+        lobbyCode: outcome.code || lobby.code || code,
+        hostName: outcome.hostName || lobby.players?.find((p) => p.isHost)?.displayName || null,
       });
       this._subscribeToLobby(lobby.id);
       console.log('[LobbyManager] Player successfully joined lobby');
@@ -513,58 +556,54 @@ export class LobbyManager {
     if (!lobby?.id) return { success: false, error: 'Lobby not found' };
 
     const lobbyId = lobby.id;
-    const players = lobby.players || [];
+    const lobbyRef = doc(this.db, 'lobbies', lobbyId);
 
-    // If host, delete lobby or transfer host
-    if (lobby.hostId === user.id) {
-      const remainingPlayers = players.filter(p => p.oderId !== user.id);
-      const nextHumanPlayer = remainingPlayers.find(p => !p.isAI);
+    try {
+      const outcome = await runTransaction(this.db, async (transaction) => {
+        const snap = await transaction.get(lobbyRef);
+        if (!snap.exists()) return { success: true, missing: true };
+        const live = snap.data();
+        const isHost = live.hostId === user.id;
 
-      if (remainingPlayers.length === 0 || !nextHumanPlayer) {
-        if (!shouldDeleteLobbyOnHostLeave({
-          lobbyStatus: lobby.status,
-          remainingHumans: nextHumanPlayer ? 1 : 0,
-        })) {
-          return { success: true };
-        }
-        try {
-          await deleteDoc(doc(this.db, 'lobbies', lobbyId));
-        } catch (error) {
-          console.error('Error deleting lobby:', error);
-          return { success: false, error: error.message };
-        }
-      } else {
-        const newPlayers = remainingPlayers.map(p => ({
-          ...p,
-          isHost: p.oderId === nextHumanPlayer.oderId
-        }));
-        try {
-          await updateDoc(doc(this.db, 'lobbies', lobbyId), {
-            hostId: nextHumanPlayer.oderId,
-            players: newPlayers,
-            updatedAt: serverTimestamp()
+        if (isHost) {
+          const transferred = transferLobbyHost({
+            players: live.players,
+            leavingUserId: user.id,
           });
-        } catch (error) {
-          console.error('Error transferring host:', error);
-          return { success: false, error: error.message };
-        }
-      }
-    } else {
-      const currentPlayer = players.find(p => p.oderId === user.id);
-      if (currentPlayer) {
-        try {
-          await updateDoc(doc(this.db, 'lobbies', lobbyId), {
-            players: arrayRemove(currentPlayer),
-            updatedAt: serverTimestamp()
+          if (!transferred.nextHost) {
+            if (!shouldDeleteLobbyOnHostLeave({
+              lobbyStatus: live.status,
+              remainingHumans: 0,
+            })) {
+              return { success: true };
+            }
+            transaction.delete(lobbyRef);
+            return { success: true, deleted: true };
+          }
+          transaction.update(lobbyRef, {
+            hostId: transferred.nextHost.oderId,
+            players: transferred.players,
+            updatedAt: serverTimestamp(),
           });
-        } catch (error) {
-          console.error('Error leaving lobby:', error);
-          return { success: false, error: error.message };
+          return { success: true, players: transferred.players };
         }
-      }
+
+        const remaining = removeLobbyHumanSeat({
+          players: live.players,
+          userId: user.id,
+        });
+        transaction.update(lobbyRef, {
+          players: remaining.players,
+          updatedAt: serverTimestamp(),
+        });
+        return { success: true, players: remaining.players };
+      });
+      if (outcome?.players) this._patchCurrentLobby(lobbyId, { players: outcome.players });
+      return { success: true };
+    } catch (error) {
+      console.error('Error leaving lobby:', error);
+      return { success: false, error: error.message };
     }
-
-    return { success: true };
   }
 
   // Update player settings (faction, color, ready status)
@@ -574,21 +613,27 @@ export class LobbyManager {
     const user = this.authManager.getUser();
     if (!user) return { success: false, error: 'Not logged in' };
 
-    const players = [...this.currentLobby.players];
-    const playerIndex = players.findIndex(p => p.oderId === user.id);
-    if (playerIndex === -1) return { success: false, error: 'Not in lobby' };
-
-    // Update player data
-    players[playerIndex] = {
-      ...players[playerIndex],
-      ...updates
-    };
+    const lobbyId = this.currentLobby.id;
+    const lobbyRef = doc(this.db, 'lobbies', lobbyId);
 
     try {
-      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
-        players,
-        updatedAt: serverTimestamp()
+      const outcome = await runTransaction(this.db, async (transaction) => {
+        const snap = await transaction.get(lobbyRef);
+        if (!snap.exists()) return { success: false, error: 'Lobby not found' };
+        const patched = patchLobbySeat({
+          players: snap.data().players,
+          userId: user.id,
+          updates,
+        });
+        if (!patched.ok) return { success: false, error: patched.error };
+        transaction.update(lobbyRef, {
+          players: patched.players,
+          updatedAt: serverTimestamp(),
+        });
+        return { success: true, players: patched.players };
       });
+      if (!outcome?.success) return { success: false, error: outcome?.error || 'Not in lobby' };
+      this._patchCurrentLobby(lobbyId, { players: outcome.players });
       return { success: true };
     } catch (error) {
       console.error('Error updating player:', error);
@@ -650,10 +695,6 @@ export class LobbyManager {
       return { success: false, error: 'Only host can add AI' };
     }
 
-    if (this.currentLobby.players.length >= this.currentLobby.settings.maxPlayers) {
-      return { success: false, error: 'Lobby is full' };
-    }
-
     const aiId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const difficultyNames = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
@@ -669,13 +710,33 @@ export class LobbyManager {
       joinedAt: Date.now()
     };
 
-    const players = [...this.currentLobby.players, aiPlayer];
+    const lobbyId = this.currentLobby.id;
+    const lobbyRef = doc(this.db, 'lobbies', lobbyId);
 
     try {
-      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
-        players,
-        updatedAt: serverTimestamp()
+      const outcome = await runTransaction(this.db, async (transaction) => {
+        const snap = await transaction.get(lobbyRef);
+        if (!snap.exists()) return { success: false, error: 'Lobby not found' };
+        const live = snap.data();
+        if (live.hostId !== user.id) {
+          return { success: false, error: 'Only host can add AI' };
+        }
+        const added = addLobbyAISeat({
+          players: live.players,
+          aiPlayer,
+          maxPlayers: live.settings?.maxPlayers,
+        });
+        if (!added.ok) return { success: false, error: added.error };
+        transaction.update(lobbyRef, {
+          players: added.players,
+          updatedAt: serverTimestamp(),
+        });
+        return { success: true, players: added.players };
       });
+      if (!outcome?.success) {
+        return { success: false, error: outcome?.error || 'Could not add AI' };
+      }
+      this._patchCurrentLobby(lobbyId, { players: outcome.players });
       return { success: true };
     } catch (error) {
       console.error('Error adding AI player:', error);
@@ -684,7 +745,7 @@ export class LobbyManager {
   }
 
   // Remove AI player (host only)
-  async removeAIPlayer(index) {
+  async removeAIPlayer(indexOrOpts) {
     if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
 
     const user = this.authManager.getUser();
@@ -692,18 +753,37 @@ export class LobbyManager {
       return { success: false, error: 'Only host can remove AI' };
     }
 
-    const player = this.currentLobby.players[index];
-    if (!player || !player.isAI) {
-      return { success: false, error: 'Not an AI player' };
-    }
+    const opts = (typeof indexOrOpts === 'object' && indexOrOpts)
+      ? indexOrOpts
+      : { index: indexOrOpts };
 
-    const players = this.currentLobby.players.filter((_, i) => i !== index);
+    const lobbyId = this.currentLobby.id;
+    const lobbyRef = doc(this.db, 'lobbies', lobbyId);
 
     try {
-      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
-        players,
-        updatedAt: serverTimestamp()
+      const outcome = await runTransaction(this.db, async (transaction) => {
+        const snap = await transaction.get(lobbyRef);
+        if (!snap.exists()) return { success: false, error: 'Lobby not found' };
+        const live = snap.data();
+        if (live.hostId !== user.id) {
+          return { success: false, error: 'Only host can remove AI' };
+        }
+        const removed = removeLobbyAISeat({
+          players: live.players,
+          oderId: opts.oderId || null,
+          index: Number.isInteger(opts.index) ? opts.index : null,
+        });
+        if (!removed.ok) return { success: false, error: removed.error };
+        transaction.update(lobbyRef, {
+          players: removed.players,
+          updatedAt: serverTimestamp(),
+        });
+        return { success: true, players: removed.players };
       });
+      if (!outcome?.success) {
+        return { success: false, error: outcome?.error || 'Not an AI player' };
+      }
+      this._patchCurrentLobby(lobbyId, { players: outcome.players });
       return { success: true };
     } catch (error) {
       console.error('Error removing AI player:', error);
@@ -777,85 +857,113 @@ export class LobbyManager {
     if (!this.currentLobby) return { success: false, error: 'Not in lobby' };
 
     const user = this.authManager.getUser();
-    const isHost = this.currentLobby.hostId === user.id;
-    const isFull = this.currentLobby.players.length >= this.currentLobby.settings.maxPlayers;
+    if (!user) return { success: false, error: 'Not logged in' };
 
-    // Host can always start, others only when full
-    if (!isHost && !isFull) {
-      return { success: false, error: 'Only host can start before lobby is full' };
-    }
-
-    // Check minimum requirements
-    if (this.currentLobby.players.length < 2) {
-      return { success: false, error: 'Need at least 2 players' };
-    }
-
-    // Check all players have selected factions
-    const playersWithoutFaction = this.currentLobby.players.filter(p => !p.factionId);
-    if (playersWithoutFaction.length > 0) {
-      return { success: false, error: 'All players must select a faction' };
-    }
-
-    const existing = resolveStartGameTarget({
+    const existingCached = resolveStartGameTarget({
       existingGameId: this.currentLobby.gameId,
       lobbyStatus: this.currentLobby.status,
     });
-    if (existing.reuse) {
-      return { success: true, gameId: existing.gameId, reused: true };
+    if (existingCached.reuse) {
+      return { success: true, gameId: existingCached.gameId, reused: true };
     }
 
-    const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const playerUserIds = this.currentLobby.players.map(p => p.oderId);
-
-    // Log players and their oderIds for debugging
-    console.log('[LobbyManager] Starting game with players:');
-    this.currentLobby.players.forEach((p, i) => {
-      console.log(`  [${i}] ${p.displayName}: oderId=${p.oderId}, isAI=${p.isAI || false}`);
-    });
-    console.log('[LobbyManager] playerUserIds array:', playerUserIds);
+    const lobbyId = this.currentLobby.id;
+    const lobbyRef = doc(this.db, 'lobbies', lobbyId);
 
     try {
-      if (!this.currentLobby.isPublished) {
-        await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
-          isPublished: true,
-          updatedAt: serverTimestamp(),
+      const outcome = await runTransaction(this.db, async (transaction) => {
+        const snap = await transaction.get(lobbyRef);
+        if (!snap.exists()) return { success: false, error: 'Lobby not found' };
+        const live = { id: snap.id, ...snap.data() };
+
+        const existing = resolveStartGameTarget({
+          existingGameId: live.gameId,
+          lobbyStatus: live.status,
         });
-        this.currentLobby.isPublished = true;
-      }
-
-      // Create game document
-      // The person who clicks Start becomes the initializer (startedBy)
-      await setDoc(doc(this.db, 'games', gameId), {
-        lobbyId: this.currentLobby.id,
-        lobbyCode: this.currentLobby.code, // Store code for rejoining
-        code: this.currentLobby.code,
-        status: 'starting',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        currentPlayerId: null, // Will be set when game initializes
-        stateVersion: 0,
-        playerUserIds,
-        startedBy: user.id, // Track who started the game (they will initialize)
-        state: null, // Will be populated by starter
-        lobbyData: {
-          players: this.currentLobby.players,
-          settings: this.currentLobby.settings
+        if (existing.reuse) {
+          return { success: true, gameId: existing.gameId, reused: true };
         }
+
+        const isHost = live.hostId === user.id;
+        const isFull = (live.players?.length || 0) >= (live.settings?.maxPlayers || 0);
+        if (!isHost && !isFull) {
+          return { success: false, error: 'Only host can start before lobby is full' };
+        }
+        if ((live.players?.length || 0) < 2) {
+          return { success: false, error: 'Need at least 2 players' };
+        }
+        if (live.players.some((p) => !p.factionId)) {
+          return { success: false, error: 'All players must select a faction' };
+        }
+
+        const roster = startGameRoster(live.players);
+        const gameId = `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const gameRef = doc(this.db, 'games', gameId);
+
+        console.log('[LobbyManager] Starting game with players:');
+        roster.players.forEach((p, i) => {
+          console.log(`  [${i}] ${p.displayName}: oderId=${p.oderId}, isAI=${p.isAI || false}`);
+        });
+        console.log('[LobbyManager] playerUserIds array:', roster.playerUserIds);
+
+        transaction.set(gameRef, {
+          lobbyId: live.id,
+          lobbyCode: live.code,
+          code: live.code,
+          status: 'starting',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          currentPlayerId: null,
+          stateVersion: 0,
+          playerUserIds: roster.playerUserIds,
+          startedBy: user.id,
+          state: null,
+          lobbyData: {
+            players: roster.players,
+            settings: live.settings,
+          },
+        });
+
+        // B40: Start publishes an unpublished 2/2 lobby
+        const lobbyUpdate = {
+          status: 'starting',
+          gameId,
+          startedBy: user.id,
+          updatedAt: serverTimestamp(),
+        };
+        if (!live.isPublished) {
+          lobbyUpdate.isPublished = true;
+        }
+        transaction.update(lobbyRef, lobbyUpdate);
+        return {
+          success: true,
+          gameId,
+          reused: false,
+          players: roster.players,
+          isPublished: true,
+        };
       });
 
-      // Update lobby status (include startedBy so clients know who initializes)
-      await updateDoc(doc(this.db, 'lobbies', this.currentLobby.id), {
+      if (!outcome?.success) {
+        return { success: false, error: outcome?.error || 'Could not start game' };
+      }
+      this._patchCurrentLobby(lobbyId, {
         status: 'starting',
-        gameId,
+        gameId: outcome.gameId,
         startedBy: user.id,
-        updatedAt: serverTimestamp()
+        players: outcome.players || this.currentLobby.players,
+        isPublished: outcome.isPublished ?? this.currentLobby.isPublished,
       });
-
-      return { success: true, gameId };
+      return { success: true, gameId: outcome.gameId, reused: !!outcome.reused };
     } catch (error) {
       console.error('Error starting game:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  _patchCurrentLobby(lobbyId, fields) {
+    if (!lobbyId || this.currentLobby?.id !== lobbyId || !fields) return;
+    this.currentLobby = { ...this.currentLobby, ...fields };
   }
 
   // Subscribe to real-time lobby updates

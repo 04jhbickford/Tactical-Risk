@@ -2,6 +2,40 @@
 
 ---
 
+## 9.17.26 — V2.81.50 MP seat-loss / Easy Bot replace (SCHEMA 11)
+
+Live Canvas multiplayer (~V2.81.49): Sean Benson appeared skipped in turn
+order; Robert got YOUR TURN twice. Open Games card seats were Robert007,
+Easy Bot, Easy Bot, Bastion — Benson missing. Seat-loss / bot-replace, not
+a pure turn-index skip.
+
+Cause: lobby join used `arrayUnion`, but host Add AI / faction patch /
+Start wrote the full `players` array from stale `this.currentLobby`. A
+join that landed after the host's last snapshot was overwritten. Host
+thought the table was 3/4, added Easy Bot, and the game doc was stamped
+with `lobbyData.players` + `playerUserIds` that never included Benson.
+Host then auto-played that Easy Bot seat, so Benson never got a turn and
+the next human (Robert) looked like YOUR TURN twice.
+
+Fix: join / patch / addAI / removeAI / leave / start apply seat transforms
+to the latest lobby doc inside a Firestore transaction. Start copies that
+fresh roster onto the game doc. Open Games / My Games titles prefer live
+`state.players` names when present. SCHEMA 11. GAME_VERSION V2.81.50.
+No Three.js.
+
+### Smoke (this PR)
+
+- [ ] 4-max lobby: human joins the last seat while host Add AI is in
+      flight — joiner stays; Add AI returns "Lobby is full" (no extra Easy Bot).
+- [ ] Host picks a faction after a guest joins — guest remains on the card.
+- [ ] Start after a late join — Open Games / My Games lists the joiner, not
+      a replacement bot. `playerUserIds` includes the joiner.
+- [ ] Two humans + 2 Easy Bots: each human gets a seat in turn order; host
+      AI does not consume a human seat.
+- [ ] Existing 2-human / rejoin / Resign / all-resign delete unchanged.
+
+---
+
 ## 9.16.26 — V2.81.49 deploy locks after one unit type (SCHEMA 11)
 
 Robert Watts + Sean Benson on live V2.81.48 (16 Sep ~3:37pm PT): during
