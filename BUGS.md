@@ -2,6 +2,23 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.2 (preview only, SCHEMA 11)
+
+Continue PR 43 Three.js `?three=1` rebuild. Do not merge over Canvas. SCHEMA 11.
+
+P0 Geography + wrap:
+1. Canvas SoT — same `data/territories.json` world coords; boot frames Europe/Med/Africa (Egypt south of Germany, not under East Canada). Console asserts `africaSouthOfEurope` / `africaNotUnderNA`.
+2. Landform — bake `map/smallMap.jpeg` + base + relief tiles, UV onto extruded lands with light ownership multiply tint. Not continent-only Standard blobs.
+3. Wrap — only show world copies whose X range intersects the camera frustum (Canvas `startCopy`/`endCopy`). Recenter when target leaves `[-W, 2W]`. Cap dolly so 3 ghost continents do not stay on screen.
+
+P1 Units: sparse type-chit + qty + faction rim; mid-zoom (`dist > 108`) collapses to pip+N; selected land expands types; labels offset and hide on select.
+
+P2 390 chrome: L0 ≤48pt (☰ · PHASE · seat · IPC); L1 one peek above named Confirm ≥44pt; L2 one ☰ sheet; no debug ticker / Click landed. Confirm inspect ≠ commit; no map click-through.
+
+Open: preview + `?three=1`. GAME_VERSION V2.81.51-three-polish.2.
+
+---
+
 ## 9.17.26 — V2.81.50-three-polish (preview only, SCHEMA 11)
 
 30-minute polish blitz on the Three.js spike. Still gated by `?three=1`. Do not merge over Canvas.
