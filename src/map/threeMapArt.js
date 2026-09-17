@@ -107,67 +107,16 @@ async function mapPool(items, limit, worker) {
 }
 
 export async function bakeWorldTexture() {
-  // Kept for debug / fallback. Preview board no longer composites this
-  // atlas onto a full-map quad (that was the neon-teal + tile rectangles).
+  // Unused on the preview board. Sand fill only — never neon/tile ocean.
   const canvas = document.createElement('canvas');
   canvas.width = BAKE_W;
   canvas.height = BAKE_H;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#152228';
+  ctx.fillStyle = '#e8d4b4';
   ctx.fillRect(0, 0, BAKE_W, BAKE_H);
-
-  const small = await loadImageTimeout('map/smallMap.jpeg', 8000);
-  if (small) ctx.drawImage(small, 0, 0, BAKE_W, BAKE_H);
-
-  const sx = BAKE_W / MAP_WIDTH;
-  const sy = BAKE_H / MAP_HEIGHT;
-  const keys = [];
-  for (let col = 0; col < TILE_COLS; col++) {
-    for (let row = 0; row < TILE_ROWS; row++) {
-      keys.push({ col, row, key: `${col}_${row}` });
-    }
-  }
-  const tiles = await mapPool(keys, 12, async ({ col, row, key }) => {
-    const [base, relief] = await Promise.all([
-      loadImageTimeout(`map/baseTiles/${key}.png`),
-      loadImageTimeout(`map/reliefTiles/${key}.png`),
-    ]);
-    return { col, row, base, relief };
-  });
-  let baseCount = 0;
-  let reliefCount = 0;
-  for (const tile of tiles) {
-    if (!tile.base) continue;
-    ctx.drawImage(
-      tile.base,
-      tile.col * TILE_SIZE * sx,
-      tile.row * TILE_SIZE * sy,
-      TILE_SIZE * sx,
-      TILE_SIZE * sy,
-    );
-    baseCount += 1;
-  }
-  ctx.globalAlpha = 0.62;
-  for (const tile of tiles) {
-    if (!tile.relief) continue;
-    ctx.drawImage(
-      tile.relief,
-      tile.col * TILE_SIZE * sx,
-      tile.row * TILE_SIZE * sy,
-      TILE_SIZE * sx,
-      TILE_SIZE * sy,
-    );
-    reliefCount += 1;
-  }
-  ctx.globalAlpha = 1;
-
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.wrapS = THREE.ClampToEdgeWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.needsUpdate = true;
-  return { texture: tex, hasSmallMap: !!small, baseCount, reliefCount };
+  return { texture: tex, hasSmallMap: false, baseCount: 0, reliefCount: 0 };
 }
 
 export function applyWorldUVs(geometry) {
@@ -271,18 +220,39 @@ export function landHeightFor(territory, center) {
   return h;
 }
 
+function inflateRing(ring, amt) {
+  let cx = 0;
+  let cy = 0;
+  for (const [x, y] of ring) {
+    cx += x;
+    cy += y;
+  }
+  cx /= ring.length;
+  cy /= ring.length;
+  return ring.map(([x, y]) => {
+    const dx = x - cx;
+    const dy = y - cy;
+    const len = Math.hypot(dx, dy) || 1;
+    return [x + (dx / len) * amt, y + (dy / len) * amt];
+  });
+}
+
+function shapeFromRing(ring) {
+  const shape = new THREE.Shape();
+  shape.moveTo((MAP_WIDTH - ring[0][0]) * SCALE, ring[0][1] * SCALE);
+  for (let i = 1; i < ring.length; i++) {
+    shape.lineTo((MAP_WIDTH - ring[i][0]) * SCALE, ring[i][1] * SCALE);
+  }
+  shape.closePath();
+  return shape;
+}
+
 export function makeLandMesh(territory, materials, height) {
   const shapes = [];
   for (const poly of territory.polygons || []) {
-    const ring = simplifyRing(poly);
+    const ring = simplifyRing(poly, 0.45);
     if (!ring) continue;
-    const shape = new THREE.Shape();
-    shape.moveTo((MAP_WIDTH - ring[0][0]) * SCALE, ring[0][1] * SCALE);
-    for (let i = 1; i < ring.length; i++) {
-      shape.lineTo((MAP_WIDTH - ring[i][0]) * SCALE, ring[i][1] * SCALE);
-    }
-    shape.closePath();
-    shapes.push(shape);
+    shapes.push(shapeFromRing(inflateRing(ring, 1.4)));
   }
   if (!shapes.length) return null;
 
@@ -313,6 +283,27 @@ export function makeLandMesh(territory, materials, height) {
   mesh.castShadow = false;
   mesh.receiveShadow = false;
   return mesh;
+}
+
+export function makeLandSealMeshes(territory, material) {
+  const meshes = [];
+  if (!material) return meshes;
+  material.side = THREE.DoubleSide;
+  material.transparent = false;
+  material.depthWrite = true;
+  for (const poly of territory.polygons || []) {
+    const ring = simplifyRing(poly, 0.35);
+    if (!ring) continue;
+    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 2.4)));
+    geom.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.y = 0.05;
+    mesh.renderOrder = 1;
+    mesh.userData.territory = territory;
+    mesh.userData.kind = 'land-seal';
+    meshes.push(mesh);
+  }
+  return meshes;
 }
 
 export function makeLineMat(color, linewidth, opacity = 0.72) {

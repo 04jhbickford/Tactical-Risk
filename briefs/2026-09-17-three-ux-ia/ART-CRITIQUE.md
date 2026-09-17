@@ -18,7 +18,7 @@ Viz / Arc / James QA of the Three polish frames vs SOTA mobile strategy (Polytop
 - Inspect / Noted wording
 
 ## P0 lock
-1. **Zero placeholder quads.** No water-zone fills or hairboxes. No full-map bake plane. Land plates opaque and DoubleSide so ocean cannot show through Egypt / N. Africa. No bevel inset that punches coast holes.
+1. **Zero placeholder quads.** No water-zone fills or hairboxes. No full-map bake plane. Land plates opaque and DoubleSide so ocean cannot show through Egypt / N. Africa. No bevel inset that punches coast holes. Inflated sand **land-seal** plates punch ocean out under every coast.
 2. **North-up Canvas SoT.** UK west of Germany. Africa / Egypt south of the Med. Same `data/territories.json` politics. Wrap frustum-culled.
 3. **Palette.** Warm bone/sand land. Deep desaturated ocean with quiet depth falloff. Soft faction tint + pip rim. No cyan coast.
 4. **Dense stacks.** Mid-zoom Europe = faction pip + total N only. Type glyphs only on select or close zoom-in.

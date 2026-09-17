@@ -2,6 +2,12 @@
 
 ---
 
+## 9.17.26 — V2.81.51-three-polish.8 (preview only, SCHEMA 11)
+
+Ocean-mask finish on `?three=1`. Land plates get an inflated opaque sand seal under every territory so ocean cannot show through Egypt / N. Africa (bevel already off; tile bake no longer composites teal). Preview only. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.8.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.7 (preview only, SCHEMA 11)
 
 ART-GAP P0 lock on `?three=1`. Do not merge over live Canvas V2.81.51. Write-up: `briefs/2026-09-17-three-ux-ia/ART-CRITIQUE.md`.

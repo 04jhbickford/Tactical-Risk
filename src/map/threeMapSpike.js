@@ -14,6 +14,7 @@ import {
   sceneToWorld,
   wrapWorldX,
   makeLandMesh,
+  makeLandSealMeshes,
   makeLineMat,
   addTerritoryInk,
   createWrapGroups,
@@ -226,7 +227,7 @@ export async function bootThreeMapSpike() {
   scene.fog = new THREE.Fog(PALETTE.oceanFog, 780, 1500);
 
   const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4);
-  ocean.position.set(WORLD_W / 2, -0.08, -WORLD_H / 2);
+  ocean.position.set(WORLD_W / 2, -0.2, -WORLD_H / 2);
   scene.add(ocean);
 
   const board = new THREE.Group();
@@ -277,6 +278,9 @@ export async function bootThreeMapSpike() {
       if (!mesh) continue;
       group.add(mesh);
       pickables.push(mesh);
+      for (const seal of makeLandSealMeshes(land, landMats.get(land.name)?.seal)) {
+        group.add(seal);
+      }
       addTerritoryInk(group, land, landBorderMat, height + 0.05);
     }
   }
@@ -746,6 +750,7 @@ export async function bootThreeMapSpike() {
         waterInk: false,
         foam: false,
         bevel: false,
+        landSeal: true,
       };
     },
   };

@@ -110,7 +110,13 @@ export function makeLandMaterials(ownerHex) {
     transparent: false,
     side: THREE.DoubleSide,
   });
-  return { top, side: wall, bottom: wall };
+  const seal = new THREE.MeshBasicMaterial({
+    color: wash,
+    side: THREE.DoubleSide,
+    transparent: false,
+    depthWrite: true,
+  });
+  return { top, side: wall, bottom: wall, seal };
 }
 
 export function makeOceanMaterial() {
