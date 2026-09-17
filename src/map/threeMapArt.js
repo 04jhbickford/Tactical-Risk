@@ -22,11 +22,12 @@ const BAKE_W = 1750;
 const BAKE_H = 1000;
 
 export function worldToScene(x, y) {
-  return { x: x * SCALE, z: -y * SCALE };
+  // Mirror X so west is left when the camera looks north (UK west of Germany).
+  return { x: (MAP_WIDTH - x) * SCALE, z: -y * SCALE };
 }
 
 export function sceneToWorld(x, z) {
-  return { x: x / SCALE, y: -z / SCALE };
+  return { x: MAP_WIDTH - x / SCALE, y: -z / SCALE };
 }
 
 export function wrapWorldX(x) {
@@ -276,9 +277,9 @@ export function makeLandMesh(territory, materials, height) {
     const ring = simplifyRing(poly);
     if (!ring) continue;
     const shape = new THREE.Shape();
-    shape.moveTo(ring[0][0] * SCALE, ring[0][1] * SCALE);
+    shape.moveTo((MAP_WIDTH - ring[0][0]) * SCALE, ring[0][1] * SCALE);
     for (let i = 1; i < ring.length; i++) {
-      shape.lineTo(ring[i][0] * SCALE, ring[i][1] * SCALE);
+      shape.lineTo((MAP_WIDTH - ring[i][0]) * SCALE, ring[i][1] * SCALE);
     }
     shape.closePath();
     shapes.push(shape);
