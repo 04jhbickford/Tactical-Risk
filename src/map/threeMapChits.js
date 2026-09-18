@@ -420,31 +420,33 @@ function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
   return true;
 }
 
-function drawMolded(ctx, type, cx, cy, s, color) {
-  drawContactShadow(ctx, cx, cy, s);
+function drawMolded(ctx, type, cx, cy, s, color, { shadow = true } = {}) {
+  if (shadow) drawContactShadow(ctx, cx, cy, s);
   const body = plasticBodyColor(color);
   if (!drawPhotorealPlastic(ctx, type, cx, cy, s, body, color)) {
     drawPlasticBody(ctx, PATHS[type] || pathInf, cx, cy, s, body);
   }
 }
 
-export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256 } = {}) {
+export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
   const cx = w / 2;
   const cy = h / 2 - Math.min(w, h) * 0.02;
-  const s = Math.min(w, h) * 0.38;
+  const s = Math.min(w, h) * 0.42;
   ctx.clearRect(0, 0, w, h);
-  drawMolded(ctx, type, cx, cy, s, ownerColor);
-  if (quantity >= 1) drawBadge(ctx, w * 0.80, h * 0.82, quantity, Math.min(w, h));
+  drawMolded(ctx, type, cx, cy, s, ownerColor, { shadow });
+  if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.84, quantity, Math.min(w, h) * 0.85);
 }
 
 export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 256 } = {}) {
   // Mid/far = ONE plastic silhouette + N. Never a numbered coin / disc.
+  // No contact blob at mid — it reads as a black stamp at 390.
   paintPiece(ctx, {
     type: type || 'infantry',
     ownerColor,
     quantity: total,
     w: size,
     h: size,
+    shadow: false,
   });
 }
 

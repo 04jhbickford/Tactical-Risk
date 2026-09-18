@@ -2,6 +2,14 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.20 (preview only, SCHEMA 11)
+
+Fail-closed: .19 cream sculpt is correct at 180px but mid 48px + contact blob still reads stamp. Mid pip 56px; no contact shadow on pips. Preview `?three=1` only.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.20.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.19 (preview only, SCHEMA 11)
 
 Fail-closed: .18 pip paint still averaged RGB 56 (fat atlas outline = black stamp at 390). Strip lum<0.16 halo; cream-lift the sculpt. Preview `?three=1` only.

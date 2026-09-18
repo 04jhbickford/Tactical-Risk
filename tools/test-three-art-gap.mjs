@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.19 strip fat atlas outline; cream sculpt reads at 390.
+// V2.81.51-three-polish.20 larger mid pips; no contact blob at mid.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -48,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.19', GAME_VERSION === 'V2.81.51-three-polish.19');
+check('GAME_VERSION is V2.81.51-three-polish.20', GAME_VERSION === 'V2.81.51-three-polish.20');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -73,7 +73,8 @@ check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F
 check('faction rim on cream plastic', /factionRimFrom/.test(chits));
 check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /lum < 0\.16/.test(chits) && /0\.62 \+ \(lum \*\* 0\.70\)/.test(chits));
 check('faction rim is a ring not a filled blob', /2–3px faction RING/.test(chits) && !/d \* 1\.10/.test(chits));
-check('mid pip large enough to read sculpt', PIP_PX === 48);
+check('mid pip large enough to read sculpt', PIP_PX === 56);
+check('mid pip skips contact blob', /shadow: false/.test(chits));
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
 check('toy sheen on plastic', /soft-light/.test(chits));
