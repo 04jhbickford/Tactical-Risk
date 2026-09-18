@@ -266,7 +266,9 @@ export function makeLandMesh(territory, materials, height) {
   geom.rotateX(-Math.PI / 2);
   geom.computeVertexNormals();
   applyPaperUVs(geom);
-  const mats = [materials.side, materials.top, materials.bottom || materials.side];
+  // r170 ExtrudeGeometry: group 0 = lids (top+bottom), group 1 = walls.
+  // [side, top] painted the cardboard onto 1px edges and left GIS-flat lids.
+  const mats = [materials.top, materials.side];
   for (const mat of mats) {
     if (!mat) continue;
     mat.side = THREE.DoubleSide;

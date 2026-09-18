@@ -6,7 +6,7 @@
 
 James texture lock (JAMES-HECORRECT-TEXTURE.md). Preview `?three=1` only. Do not merge.
 
-1. **Land** — bake `refs/board-parchment-macro-tile.png` as scanned cardboard punch (continent color on top of the blotches).
+1. **Land** — bake `refs/board-parchment-macro-tile.png` as scanned cardboard punch (continent color on top of the blotches). r170 Extrude lids are group 0 — tops now get the wash map, not the flat wall color.
 2. **Ocean** — bake `refs/board-ocean-print-macro-tile.png` as printed muted blue-grey / slate-teal. Not charcoal.
 3. **Units** — bake `refs/units-molded-plastic-atlas-hi.png` into plastic atlases. Kill Lucide/vector + number discs.
 4. **iPhone pinch** — two-finger pinch + pan required. Mid = one plastic+N; near ≤3–4 + `+K`.
