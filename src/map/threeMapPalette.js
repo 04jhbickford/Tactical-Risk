@@ -392,9 +392,9 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sideHex = mixHex(region, PALETTE.landShadow, 0.45);
   const key = continentKey(territory);
   const sheet = washMaps.get(key) || bakeLandSheet(washHex);
-  // Punch continent at 390 (baked wash + soft hex tint). Faction sits on top.
-  const continentTint = mixHex('#ffffff', region, 0.24);
-  const tint = ownerHex ? mixHex(continentTint, ownerHex, OWNER_WASH_STRENGTH) : continentTint;
+  // Faction ownership sits ON the continent wash — never 100% replace it.
+  // Continent punch lives in the baked wash tile (18–28%), not a second hex crush.
+  const tint = ownerHex ? mixHex('#ffffff', ownerHex, OWNER_WASH_STRENGTH) : 0xffffff;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: paperNormal || null,

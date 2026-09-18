@@ -88,7 +88,9 @@ check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /
 check('paper UV offsets break tile seams', /PAPER_UV_SHIFT/.test(palette) && /PAPER_UV = 32/.test(palette));
 check('ocean shelf + print grain', /OCEAN_SHELF|shelf/.test(baker) && /0x4F, 0x6E, 0x78/.test(baker));
 check('gold land select only', /0xC4A35A/.test(spike) && /never a blue glow ring/.test(spike));
-check('land material punches continent tint', /continentTint/.test(palette) && /mixHex\('#ffffff', region, 0\.24\)/.test(palette));
+check('land material does not crush continent with a second hex tint',
+  /Faction ownership sits ON the continent wash/.test(palette)
+  && !/continentTint/.test(palette));
 check('real frost blur on L0', /blur\(40px\)/.test(chrome) && /isolation:isolate/.test(chrome));
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
