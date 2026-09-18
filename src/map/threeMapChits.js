@@ -272,7 +272,7 @@ const PATHS = {
 
 function drawContactShadow(ctx, cx, cy, s) {
   ctx.save();
-  ctx.fillStyle = 'rgba(18, 14, 10, 0.55)';
+  ctx.fillStyle = 'rgba(18, 14, 10, 0.38)';
   ctx.beginPath();
   ctx.ellipse(cx + s * 0.05, cy + s * 0.84, s * 0.82, s * 0.20, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -320,8 +320,8 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
 }
 
 function plasticBodyColor(faction) {
-  // ART-PIPELINE: cream #F0E6D2 plastic body, faction is a dye + rim — not a disc.
-  return mixRgb(CREAM, faction || '#8E8F8C', 0.28);
+  // ART-PIPELINE: cream #F0E6D2 body. Faction is a rim, not a dye that reads black at 390.
+  return mixRgb(CREAM, faction || '#8E8F8C', 0.16);
 }
 
 function tintAtlasCell(img, cell, color) {
@@ -341,32 +341,55 @@ function tintAtlasCell(img, cell, color) {
   const [tr, tg, tb] = hexRgb(color);
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] < 8) continue;
-    const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 168;
-    d[i] = Math.max(0, Math.min(255, tr * lum));
-    d[i + 1] = Math.max(0, Math.min(255, tg * lum));
-    d[i + 2] = Math.max(0, Math.min(255, tb * lum));
+    // Keep baked AO. Lift mid-greys to cream plastic — /168 crushed 390 to black stamps.
+    const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+    const shade = 0.46 + (lum ** 0.82) * 0.72;
+    d[i] = Math.max(0, Math.min(255, tr * shade));
+    d[i + 1] = Math.max(0, Math.min(255, tg * shade));
+    d[i + 2] = Math.max(0, Math.min(255, tb * shade));
   }
   ox.putImageData(pix, 0, 0);
   return off;
 }
 
 function factionRimFrom(tinted, faction) {
+  // 2–3px faction RING, not a filled 1.10× silhouette (that reads as a black stamp at mid).
+  const w = tinted.width;
+  const h = tinted.height;
+  const src = tinted.getContext('2d').getImageData(0, 0, w, h);
   const rim = document.createElement('canvas');
-  rim.width = tinted.width;
-  rim.height = tinted.height;
+  rim.width = w;
+  rim.height = h;
   const rx = rim.getContext('2d');
-  rx.drawImage(tinted, 0, 0);
-  const pix = rx.getImageData(0, 0, rim.width, rim.height);
-  const d = pix.data;
+  const out = rx.createImageData(w, h);
+  const sd = src.data;
+  const od = out.data;
   const [fr, fg, fb] = hexRgb(faction || '#8E8F8C');
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3] < 12) continue;
-    d[i] = fr;
-    d[i + 1] = fg;
-    d[i + 2] = fb;
-    d[i + 3] = 255;
+  const R = 6;
+  const R2 = R * R;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (sd[i + 3] >= 16) continue;
+      let hit = false;
+      for (let dy = -R; dy <= R && !hit; dy++) {
+        for (let dx = -R; dx <= R && !hit; dx++) {
+          if (dx * dx + dy * dy > R2) continue;
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          if (sd[(yy * w + xx) * 4 + 3] >= 16) hit = true;
+        }
+      }
+      if (hit) {
+        od[i] = fr;
+        od[i + 1] = fg;
+        od[i + 2] = fb;
+        od[i + 3] = 255;
+      }
+    }
   }
-  rx.putImageData(pix, 0, 0);
+  rx.putImageData(out, 0, 0);
   return rim;
 }
 
@@ -375,10 +398,9 @@ function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
   const img = cell ? atlases[cell.atlas] : null;
   if (!cell || !img) return false;
   const tinted = tintAtlasCell(img, cell, color);
-  const d = s * 2.28;
+  const d = s * 2.36;
   const rim = factionRimFrom(tinted, faction);
-  const rd = d * 1.10;
-  ctx.drawImage(rim, cx - rd / 2, cy - rd / 2 - s * 0.04, rd, rd);
+  ctx.drawImage(rim, cx - d / 2, cy - d / 2 - s * 0.04, d, d);
   ctx.drawImage(tinted, cx - d / 2, cy - d / 2 - s * 0.04, d, d);
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';

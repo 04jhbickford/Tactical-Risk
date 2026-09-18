@@ -2,6 +2,17 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.18 (preview only, SCHEMA 11)
+
+Fail-closed 390 scorecard vs Poly/Root/TTR. p17 units still read as black SVG stamps. Preview `?three=1` only. Do not merge.
+
+1. **Units** — cream lift on molded atlas (no `/168` crush); faction is a 2–3px ring, not a filled 1.10× blob; mid pip 48px so sculpt reads.
+2. **Keep** — parchment + 18–28% Viz washes, printed ocean, MeshStandard + hemi/key + AO, pinch, STACK-LOD, frost Confirm.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.18.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.17 (preview only, SCHEMA 11)
 
 Viz continent wash hexes LOCKED @ 18–28% over parchment — not solid fills, not candy Risk primaries. Preview `?three=1` only. Do not merge.

@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.17 Viz wash hexes @ 18–28% over parchment.
+// V2.81.51-three-polish.18 cream plastic lift — kill black SVG stamps.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -21,6 +21,7 @@ const {
   shouldCollapse,
   worldSizeFromScreen,
   NEAR_MAX,
+  PIP_PX,
 } = await import(pathToFileURL(join(root, 'src/map/threeMapDensity.js')));
 
 const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
@@ -47,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.17', GAME_VERSION === 'V2.81.51-three-polish.17');
+check('GAME_VERSION is V2.81.51-three-polish.18', GAME_VERSION === 'V2.81.51-three-polish.18');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -70,6 +71,9 @@ check('mid pip is plastic not number-coin',
 check('no cream disc coin', !/drawCreamChit/.test(chits) && !/ctx.arc\(cx, cy/.test(chits));
 check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F0E6D2/.test(chits));
 check('faction rim on cream plastic', /factionRimFrom/.test(chits));
+check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /0\.46 \+ \(lum \*\* 0\.82\)/.test(chits));
+check('faction rim is a ring not a filled blob', /2–3px faction RING/.test(chits) && !/d \* 1\.10/.test(chits));
+check('mid pip large enough to read sculpt', PIP_PX === 48);
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
 check('toy sheen on plastic', /soft-light/.test(chits));

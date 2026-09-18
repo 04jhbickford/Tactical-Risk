@@ -6,12 +6,12 @@ export const LOD_NEAR = 92;
 export const NEAR_MAX = 4;
 export const NEAR_TYPED = 3;
 export const GAP_PX = 5;
-export const PIP_PX = 40;
-export const PIECE_PX = 48;
-export const PIP_MIN_PX = 34;
-export const PIP_MAX_PX = 46;
-export const PIECE_MIN_PX = 40;
-export const PIECE_MAX_PX = 56;
+export const PIP_PX = 48;
+export const PIECE_PX = 54;
+export const PIP_MIN_PX = 42;
+export const PIP_MAX_PX = 56;
+export const PIECE_MIN_PX = 46;
+export const PIECE_MAX_PX = 64;
 
 const TYPE_PRIORITY = [
   'infantry', 'armour', 'fighter', 'bomber', 'artillery',
