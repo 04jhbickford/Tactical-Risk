@@ -11,6 +11,8 @@ James A&A + Risk homage lock. Preview `?three=1` only. Do not merge. Pattern hom
 3. **Units** — molded A&A plastic atlas (cream + faction rim). Keep MeshStandard + hemi/key + AO.
 4. **Light** — slightly cooler key/exposure so ACES does not crush washes back to one khaki planet.
 
+390 mid: Europe olive vs USSR tan vs Africa ochre now split (not one khaki planet). Stills in `qa-p16`.
+
 Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.16.
 
 ---
