@@ -1,0 +1,32 @@
+{
+  "version": "V2.81.51-three-polish.30",
+  "idle": {
+    "confirm": "rgba(30, 36, 32, 0.88)",
+    "copy": "Select a territory",
+    "class": "is-idle"
+  },
+  "zoom": "rgba(30, 36, 32, 0.62)",
+  "place": "rgba(30, 36, 32, 0.42)",
+  "confirmReady": {
+    "background": "rgb(196, 163, 90)",
+    "copy": "Confirm: Germany",
+    "class": "is-ready"
+  },
+  "lod": {
+    "mid": "mid",
+    "near": "near"
+  },
+  "roster": {
+    "germany": { "total": 10, "peekTotal": 10 },
+    "unitedKingdom": { "total": 8, "peekTotal": 8 },
+    "russia": { "total": 9, "peekTotal": 9 }
+  },
+  "peekIcons": "60px molded minis",
+  "parchmentFloor": 0.48,
+  "midLandLuma": {
+    "p29": { "germanyMed": 91.4, "eastEuropeMed": 57.4, "ukraineMed": 56.1, "russiaMed": 56.2, "africaMed": 146.1 },
+    "p30": { "germanyMed": 157.2, "eastEuropeMed": 153.7, "ukraineMed": 154.0, "russiaMed": 145.8, "africaMed": 195.0 }
+  },
+  "liveVersion": "V2.81.51-three-polish.30",
+  "liveUrl": "https://tactical-risk20-i916fhq8e-james-projects-20d8de40.vercel.app/?three=1"
+}

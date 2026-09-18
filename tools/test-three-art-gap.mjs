@@ -428,6 +428,15 @@ check('p30 coast shelf is printed ink not neon turquoise',
   && /color: 0x6a8488/.test(terrain)
   && /opacity: 0\.28/.test(terrain));
 check('p30 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P30.md')));
+check('p30 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p30/SCORE.md')));
+check('p30 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-mid-390.png'));
+check('p30 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-mid-hud-390.png'));
+check('p30 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-near-select-390.png'));
+check('p30 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-near-units-390.png'));
+check('p30 tray still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-near-tray-390.png'));
+check('p30 second faction UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/uk-near-select-390.png'));
+check('p30 third faction SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/russia-near-select-390.png'));
+check('p30 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);
