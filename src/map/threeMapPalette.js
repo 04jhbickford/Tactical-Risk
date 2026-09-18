@@ -54,15 +54,15 @@ export const PALETTE = {
 // Muted print hexes — parchment stain, not candy Risk primaries, not Confirm gold fills.
 // USSR is NOT a bonus continent (Russia/Ukraine/Karelia are Asia).
 export const REGION_WASH = {
-  Europe: '#4E7388',
-  Asia: '#6A8A3C',
-  Africa: '#B08948',
-  'Middle East': '#C4A068',
-  'North America': '#6A8B6E',
-  'South America': '#8A6848',
-  Oceania: '#7A7B8A',
+  Europe: '#7A98A4',
+  Asia: '#8A9A62',
+  Africa: '#C4A878',
+  'Middle East': '#D0B888',
+  'North America': '#8A9E88',
+  'South America': '#A88868',
+  Oceania: '#8A8B98',
   // Leftover tile key only — never remap live bonus groups onto this.
-  USSR: '#8A7355',
+  USSR: '#A09078',
 };
 export const LIVE_CONTINENTS = [
   'Europe',
@@ -73,10 +73,11 @@ export const LIVE_CONTINENTS = [
   'South America',
   'Oceania',
 ];
-export const CONTINENT_WASH_STRENGTH = 0.28;
-// Runtime multiply so Europe/USSR/Africa still split at 390 after lighting.
+export const CONTINENT_WASH_STRENGTH = 0.12;
+// Runtime tint so bonus groups still split at 390 after lighting.
 // P23: punch is LOD-invariant — hold at near; do not flatten when dollying in.
-export const CONTINENT_CHROMA_PUNCH = 0.42;
+// P32 HARD: quiet stain under select gold — identity is tint + outline + badge.
+export const CONTINENT_CHROMA_PUNCH = 0.12;
 
 export const USSR_LANDS = new Set([
   'Russia',
@@ -462,8 +463,8 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const world = worldLandMap;
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
-  // light wash. P31: a bit more live-continent chroma so bonus groups read.
-  const continentTint = mixHex('#ffffff', region, world ? 0.24 : CONTINENT_CHROMA_PUNCH);
+  // light wash. P32: quiet continent tint — never a chocolate flood vs select gold.
+  const continentTint = mixHex('#ffffff', region, world ? 0.07 : CONTINENT_CHROMA_PUNCH);
   const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.08 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,

@@ -118,6 +118,21 @@ export const DENSE_LANDS = new Set([
   'Manchuria', 'Borneo Celebes', 'East Indies',
 ]);
 
+// Printed A&A Japan home-island pin (not the bbox centroid, not Japan Sea Zone).
+// Bbox min=286 is the long island chain; the visual mass sits nearer Honshu.
+export const JAPAN_HOME_CENTER = { x: 2594, y: 736 };
+
+export function isDenseLand(name, footprint) {
+  return DENSE_LANDS.has(name) || isSmallLand(name, footprint);
+}
+
+export function denseFootprint(name, footprint) {
+  const min = footprint?.min || 200;
+  if (name === 'Japan') return { ...footprint, min: Math.min(min, 92) };
+  if (DENSE_LANDS.has(name)) return { ...footprint, min: Math.min(min, 118) };
+  return footprint || { min };
+}
+
 export function territoryFootprint(territory) {
   let minX = Infinity;
   let minY = Infinity;
@@ -142,9 +157,11 @@ export function isSmallLand(name, footprint) {
   return (footprint?.min || 999) < 140;
 }
 
-export function footprintPiecePx(footprint, band, selected, typeCount = 1) {
-  const min = footprint?.min || 200;
+export function footprintPiecePx(footprint, band, selected, typeCount = 1, name = '') {
+  const min = denseFootprint(name, footprint)?.min || footprint?.min || 200;
+  const japan = name === 'Japan';
   if (band === 'near' || selected) {
+    if (japan) return typeCount >= 3 ? 52 : 58;
     if (min < 80) return 52;
     if (min < 140) return 62;
     if (typeCount >= 4 && min < 320) return 70;
@@ -156,10 +173,12 @@ export function footprintPiecePx(footprint, band, selected, typeCount = 1) {
   return PIP_PX;
 }
 
-export function pieceWorldCap(baseWorld, footprint, n) {
-  const minWorld = Math.max(8, (footprint?.min || 200) * 0.1);
-  const cap = (minWorld * 0.55) / Math.max(1, Math.sqrt(Math.max(1, n)));
-  return Math.max(3.6, Math.min(baseWorld, cap));
+export function pieceWorldCap(baseWorld, footprint, n, name = '') {
+  const min = denseFootprint(name, footprint)?.min || footprint?.min || 200;
+  const japan = name === 'Japan';
+  const minWorld = Math.max(japan ? 5.2 : 8, min * (japan ? 0.072 : 0.1));
+  const cap = (minWorld * (japan ? 0.40 : 0.55)) / Math.max(1, Math.sqrt(Math.max(1, n)));
+  return Math.max(japan ? 3.05 : 3.6, Math.min(baseWorld, cap));
 }
 
 export function clusterPack(n, pitch) {
@@ -189,10 +208,12 @@ export function clusterPack(n, pitch) {
   return spiralPack(n, pitch * 0.78);
 }
 
-export function packPitchFor(n, pieceWorld, footprint) {
-  const minWorld = Math.max(8, (footprint?.min || 200) * 0.1);
-  const budget = Math.max(minWorld * 0.36, pieceWorld * 0.50);
-  return Math.min(pieceWorld * 0.58, budget / Math.max(1, Math.sqrt(n)));
+export function packPitchFor(n, pieceWorld, footprint, name = '') {
+  const japan = name === 'Japan';
+  const min = denseFootprint(name, footprint)?.min || footprint?.min || 200;
+  const minWorld = Math.max(japan ? 5.2 : 8, min * (japan ? 0.072 : 0.1));
+  const budget = Math.max(minWorld * (japan ? 0.26 : 0.36), pieceWorld * (japan ? 0.40 : 0.50));
+  return Math.min(pieceWorld * (japan ? 0.46 : 0.58), budget / Math.max(1, Math.sqrt(n)));
 }
 
 export function separatePoints(items, minDist, iterations = 22) {
