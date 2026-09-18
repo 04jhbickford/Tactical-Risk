@@ -375,6 +375,11 @@ check('p28 coast shelf is a wide turquoise fringe',
   /inflateRing\(ring, 18\.5\)/.test(art));
 check('p28 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P28.md')));
 check('p28 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p28/SCORE.md')));
+check('p28 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-mid-390.png'));
+check('p28 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-mid-hud-390.png'));
+check('p28 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-near-select-390.png'));
+check('p28 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-near-units-390.png'));
+check('p28 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);
