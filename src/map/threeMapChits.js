@@ -1,5 +1,5 @@
-// Faction-colored molded A&A plastic. No chit discs.
-// Match refs/aa-plastic-units.png: solid body color, thick dark outline, shadow.
+// Faction-colored molded A&A plastic silhouettes. No number-coins, no grey stamps.
+// Match refs/aa-plastic-units.png: solid body color, ≥2px dark outline, shadow.
 
 import * as THREE from 'three';
 import { PLASTIC } from './threeMapPalette.js';
@@ -266,17 +266,30 @@ const PATHS = {
   transport: pathTr,
 };
 
-function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
+function drawContactShadow(ctx, cx, cy, s) {
   ctx.save();
-  ctx.shadowColor = 'rgba(12, 10, 8, 0.55)';
-  ctx.shadowBlur = s * 0.18;
-  ctx.shadowOffsetX = s * 0.06;
-  ctx.shadowOffsetY = s * 0.14;
+  ctx.fillStyle = 'rgba(18, 14, 10, 0.42)';
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.04, cy + s * 0.82, s * 0.72, s * 0.16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
+  drawContactShadow(ctx, cx, cy, s);
+
+  ctx.save();
+  pathFn(ctx, cx, cy + s * 0.02, s * 1.04);
+  ctx.fillStyle = '#14110C';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
   pathFn(ctx, cx, cy, s);
   const g = ctx.createLinearGradient(cx - s, cy - s, cx + s, cy + s);
-  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.18));
-  g.addColorStop(0.42, color);
-  g.addColorStop(1, mixRgb(color, '#000000', 0.48));
+  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.28));
+  g.addColorStop(0.38, color);
+  g.addColorStop(1, mixRgb(color, '#000000', 0.42));
   ctx.fillStyle = g;
   ctx.fill();
   ctx.restore();
@@ -284,7 +297,7 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
   ctx.save();
   pathFn(ctx, cx, cy, s);
   ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(9, s * 0.13);
+  ctx.lineWidth = Math.max(12, s * 0.18);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.stroke();
@@ -293,136 +306,81 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
   ctx.save();
   pathFn(ctx, cx, cy, s);
   ctx.clip();
-  const hi = ctx.createRadialGradient(cx - s * 0.28, cy - s * 0.32, s * 0.04, cx, cy, s);
-  hi.addColorStop(0, 'rgba(255,255,255,0.28)');
-  hi.addColorStop(0.45, 'rgba(255,255,255,0.04)');
+  const hi = ctx.createRadialGradient(cx - s * 0.28, cy - s * 0.34, s * 0.04, cx, cy, s);
+  hi.addColorStop(0, 'rgba(255,255,255,0.36)');
+  hi.addColorStop(0.42, 'rgba(255,255,255,0.06)');
   hi.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hi;
   ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
   ctx.restore();
 }
 
-function drawAtlasTint(ctx, type, cx, cy, s, color) {
-  const cell = atlasCellFor(type);
-  const img = cell ? atlases[cell.atlas] : null;
-  if (!cell || !img) return false;
-  const sw = img.width / (cell.atlas === 'land' ? 4 : 2);
+function tintAtlasCell(img, cell, color) {
+  const cols = cell.atlas === 'land' ? 4 : 2;
+  const sw = img.width / cols;
   const sh = img.height / 2;
   const sx = cell.col * sw;
   const sy = cell.row * sh;
-  const d = s * 2.05;
   const off = document.createElement('canvas');
   off.width = 256;
   off.height = 256;
   const ox = off.getContext('2d');
   ox.clearRect(0, 0, 256, 256);
   ox.drawImage(img, sx, sy, sw, sh, 0, 0, 256, 256);
-  ox.globalCompositeOperation = 'multiply';
-  ox.fillStyle = color;
-  ox.fillRect(0, 0, 256, 256);
-  ox.globalCompositeOperation = 'source-atop';
-  ox.fillStyle = color;
-  ox.globalAlpha = 0.42;
-  ox.fillRect(0, 0, 256, 256);
-  ox.globalAlpha = 1;
-  ox.globalCompositeOperation = 'destination-in';
-  ox.drawImage(img, sx, sy, sw, sh, 0, 0, 256, 256);
+  const pix = ox.getImageData(0, 0, 256, 256);
+  const d = pix.data;
+  const [tr, tg, tb] = hexRgb(color);
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 8) continue;
+    const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 160;
+    d[i] = Math.max(0, Math.min(255, tr * lum));
+    d[i + 1] = Math.max(0, Math.min(255, tg * lum));
+    d[i + 2] = Math.max(0, Math.min(255, tb * lum));
+  }
+  ox.putImageData(pix, 0, 0);
+  return off;
+}
 
+function drawGeneratedPlastic(ctx, type, cx, cy, s, color) {
+  const cell = atlasCellFor(type);
+  const img = cell ? atlases[cell.atlas] : null;
+  if (!cell || !img) return false;
+  const tinted = tintAtlasCell(img, cell, color);
+  const d = s * 2.35;
   ctx.save();
-  ctx.shadowColor = 'rgba(12, 10, 8, 0.55)';
-  ctx.shadowBlur = s * 0.18;
-  ctx.shadowOffsetX = s * 0.06;
-  ctx.shadowOffsetY = s * 0.14;
-  ctx.drawImage(off, cx - d / 2, cy - d / 2, d, d);
+  ctx.shadowColor = 'rgba(12, 10, 8, 0.48)';
+  ctx.shadowBlur = s * 0.16;
+  ctx.shadowOffsetX = s * 0.05;
+  ctx.shadowOffsetY = s * 0.12;
+  ctx.drawImage(tinted, cx - d / 2, cy - d / 2, d, d);
   ctx.restore();
-
-  // Thick dark outline from alpha
-  ctx.save();
-  ctx.shadowColor = '#1A1610';
-  ctx.shadowBlur = Math.max(6, s * 0.08);
-  ctx.globalAlpha = 0.95;
-  ctx.drawImage(off, cx - d / 2, cy - d / 2, d, d);
-  ctx.restore();
-  ctx.drawImage(off, cx - d / 2, cy - d / 2, d, d);
   return true;
 }
 
-function drawFallback(ctx, type, cx, cy, s, color) {
+function drawMolded(ctx, type, cx, cy, s, color) {
+  if (drawGeneratedPlastic(ctx, type, cx, cy, s, color)) return;
   const pathFn = PATHS[type] || pathInf;
-  if (type === 'infantry') {
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.fillStyle = color;
-    ctx.lineWidth = Math.max(7, s * 0.09);
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(cx + s * 0.08, cy + s * 0.02);
-    ctx.lineTo(cx + s * 0.58, cy - s * 0.40);
-    ctx.stroke();
-    ctx.restore();
-  }
   drawPlasticBody(ctx, pathFn, cx, cy, s, color);
 }
 
 export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256 } = {}) {
   const cx = w / 2;
-  const cy = h / 2;
-  const s = Math.min(w, h) * 0.38;
+  const cy = h / 2 - Math.min(w, h) * 0.02;
+  const s = Math.min(w, h) * 0.40;
   ctx.clearRect(0, 0, w, h);
-  const usedAtlas = drawAtlasTint(ctx, type, cx, cy, s, ownerColor);
-  if (!usedAtlas) drawFallback(ctx, type, cx, cy, s, ownerColor);
-  if (quantity > 1) drawBadge(ctx, w * 0.78, h * 0.80, quantity, Math.min(w, h));
+  drawMolded(ctx, type, cx, cy, s, ownerColor);
+  if (quantity >= 1) drawBadge(ctx, w * 0.78, h * 0.80, quantity, Math.min(w, h));
 }
 
-export function paintPip(ctx, { ownerColor, total, types = [], size = 192 } = {}) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size * 0.36;
-  ctx.clearRect(0, 0, size, size);
-  ctx.save();
-  ctx.shadowColor = 'rgba(12, 10, 8, 0.55)';
-  ctx.shadowBlur = r * 0.28;
-  ctx.shadowOffsetX = r * 0.08;
-  ctx.shadowOffsetY = r * 0.16;
-  const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-  g.addColorStop(0, mixRgb(ownerColor, '#FFFFFF', 0.16));
-  g.addColorStop(0.48, ownerColor);
-  g.addColorStop(1, mixRgb(ownerColor, '#000000', 0.42));
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(12, r * 0.2);
-  ctx.stroke();
-  ctx.font = `800 ${Math.round(size * 0.42)}px -apple-system, "SF Pro Text", "Segoe UI", sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(6, size * 0.045);
-  ctx.strokeText(String(total), cx, cy + 1);
-  ctx.fillStyle = '#F4EFE4';
-  ctx.fillText(String(total), cx, cy + 1);
-  if (types.length > 1) {
-    const n = Math.min(types.length, 5);
-    for (let i = 0; i < n; i++) {
-      const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
-      const dx = cx + Math.cos(a) * r * 0.78;
-      const dy = cy + Math.sin(a) * r * 0.78;
-      ctx.beginPath();
-      ctx.arc(dx, dy, r * 0.09, 0, Math.PI * 2);
-      ctx.fillStyle = '#1A1610';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(dx, dy, r * 0.055, 0, Math.PI * 2);
-      ctx.fillStyle = mixRgb(ownerColor, '#FFFFFF', 0.25);
-      ctx.fill();
-    }
-  }
+export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 192 } = {}) {
+  // Mid/far = ONE plastic silhouette + N. Never a numbered coin / disc.
+  paintPiece(ctx, {
+    type: type || 'infantry',
+    ownerColor,
+    quantity: total,
+    w: size,
+    h: size,
+  });
 }
 
 export function paintOverflow(ctx, { plus, size = 192 } = {}) {
@@ -441,11 +399,11 @@ export function makeChitTexture(type, ownerColor, quantity) {
   return tex;
 }
 
-export function makePipTexture(ownerColor, total, types = []) {
+export function makePipTexture(ownerColor, total, type = 'infantry') {
   const canvas = document.createElement('canvas');
   canvas.width = 192;
   canvas.height = 192;
-  paintPip(canvas.getContext('2d'), { ownerColor, total, types });
+  paintPip(canvas.getContext('2d'), { ownerColor, total, type });
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;

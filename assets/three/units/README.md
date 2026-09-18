@@ -1,12 +1,13 @@
 # Three preview unit atlases (molded plastic)
 
-Preview only (`?three=1`). Faction identity is the **plastic body color**.
-Kill cream discs. Runtime tints these grayscale molds.
+Preview only (`?three=1`). Photoreal A&A minis from image-gen, then cut + packed.
+Faction identity is a luminosity tint of the plastic body color.
+Kill cream discs / Lucide stamps / number-coins.
 
 | File | Grid | Cells |
 |---|---|---|
 | `units-land-plastic.png` | 4×2 | INF, TNK, ART, FTR / BMB, AA, FAC |
 | `units-naval-plastic.png` | 2×2 | BB, CV / SS, TR |
 
-Regenerate with `python3 tools/gen-three-plastic-units.py`.
+Regenerate: `python3 tools/bake-three-gen-art.py` (needs gen sources).
 Ref: `briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png`.

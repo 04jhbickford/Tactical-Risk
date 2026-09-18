@@ -4,3 +4,6 @@ node_modules/
 .claude/
 nul
 .firebase/
+assets/three/gen/
+assets/three/units/cut-*.png
+tools/__pycache__/

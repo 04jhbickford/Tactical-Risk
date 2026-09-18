@@ -6,12 +6,12 @@ export const LOD_NEAR = 92;
 export const NEAR_MAX = 4;
 export const NEAR_TYPED = 3;
 export const GAP_PX = 5;
-export const PIP_PX = 36;
-export const PIECE_PX = 44;
-export const PIP_MIN_PX = 30;
-export const PIP_MAX_PX = 42;
-export const PIECE_MIN_PX = 34;
-export const PIECE_MAX_PX = 50;
+export const PIP_PX = 40;
+export const PIECE_PX = 48;
+export const PIP_MIN_PX = 34;
+export const PIP_MAX_PX = 46;
+export const PIECE_MIN_PX = 40;
+export const PIECE_MAX_PX = 56;
 
 const TYPE_PRIORITY = [
   'infantry', 'armour', 'fighter', 'bomber', 'artillery',
@@ -57,6 +57,12 @@ export function sortStacks(stacks) {
     const pb = TYPE_PRIORITY.indexOf(b.type);
     return (pa < 0 ? 99 : pa) - (pb < 0 ? 99 : pb);
   });
+}
+
+/** Mid/far mark uses one silhouette — priority type, not a number-coin. */
+export function primaryType(stacks) {
+  const sorted = sortStacks(stacks);
+  return sorted[0]?.type || 'infantry';
 }
 
 // Near: ≤3 typed + overflow when more types exist; else up to 4 typed.

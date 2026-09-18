@@ -51,7 +51,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
-      background:#7A90A0; overflow:hidden;
+      background:#3D5A66; overflow:hidden;
       font-family:-apple-system,"SF Pro Text","SF Pro Display","Segoe UI",sans-serif;
       -webkit-font-smoothing:antialiased;
     }
@@ -75,9 +75,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(12px, env(safe-area-inset-left));
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:rgba(30,36,32,0.72);
-      -webkit-backdrop-filter:blur(24px) saturate(1.15);
-      backdrop-filter:blur(24px) saturate(1.15);
+      background:rgba(30,36,32,0.58);
+      -webkit-backdrop-filter:blur(28px) saturate(1.2);
+      backdrop-filter:blur(28px) saturate(1.2);
       border-bottom:1px solid rgba(255,255,255,0.08);
       color:#E8E2D4;
       pointer-events:none;
@@ -112,7 +112,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-bottom {
       position:absolute; left:0; right:0; bottom:0; z-index:32;
-      padding:0 16px calc(10px + env(safe-area-inset-bottom, 0px));
+      padding:0 16px calc(12px + env(safe-area-inset-bottom, 0px));
       padding-left:max(16px, env(safe-area-inset-left));
       padding-right:max(16px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;
@@ -122,9 +122,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek {
       display:none; pointer-events:none;
       min-height:44px; padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.78);
-      -webkit-backdrop-filter:blur(24px) saturate(1.15);
-      backdrop-filter:blur(24px) saturate(1.15);
+      background:rgba(30,36,32,0.62);
+      -webkit-backdrop-filter:blur(28px) saturate(1.2);
+      backdrop-filter:blur(28px) saturate(1.2);
       color:#E8E2D4;
       border:1px solid rgba(255,255,255,0.08);
       box-shadow:0 8px 24px rgba(0,0,0,0.35);

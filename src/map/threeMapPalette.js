@@ -1,5 +1,5 @@
 // Preview-only Three.js palette. A&A printed board (AA-HECORRECT-11).
-// Continent washes + visible cardboard grain. Not Canvas live art.
+// Continent washes + phone-visible cardboard grain. Not Canvas live art.
 // Ink Blue is money-only — never recolor this war board.
 
 import * as THREE from 'three';
@@ -27,9 +27,10 @@ export const PALETTE = {
   landGrain: '#B7AA82',
   landInk: '#3A3428',
   landBevel: '#8A7A58',
-  oceanDeep: '#7A90A0',
-  oceanShelf: '#8AA0AE',
-  oceanFog: '#7A90A0',
+  // AA-PALETTE slate-teal — printed A&A sea, not charcoal noise.
+  oceanDeep: '#3D5A66',
+  oceanShelf: '#4F6E78',
+  oceanFog: '#3D5A66',
   foam: '#D9D2C0',
   border: '#3A3428',
   waterHair: '#3A3428',
@@ -40,8 +41,8 @@ export const PALETTE = {
   boneText: '#E8E2D4',
   hud: '#1E2420',
   hudInk: '#E8E2D4',
-  sky: '#F0E8D4',
-  ground: '#8A7A58',
+  sky: '#E8E0C8',
+  ground: '#5A6A58',
   key: '#FFF6E4',
   fill: '#D4C8A4',
 };
@@ -85,19 +86,34 @@ export const FACTION_WASH = {
   Japanese: '#A87A48',
 };
 
-export const OCEAN_DEEP = 0x7a90a0;
-export const OCEAN_SHELF = 0x8aa0ae;
-export const PAPER_UV = 11;
-export const OCEAN_UV = 14;
-export const GRAIN_STRENGTH = 0.78;
+export const OCEAN_DEEP = 0x3d5a66;
+export const OCEAN_SHELF = 0x4f6e78;
+export const PAPER_UV = 48;
+export const OCEAN_UV = 56;
+// Overlay + multiply punch — 8–14% is invisible at 390. Glance must read scanned board.
+export const GRAIN_STRENGTH = 0.86;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
   ocean: 'assets/three/board/board-ocean-tile.png',
 };
 
+export const WASH_TEX = {
+  Europe: 'assets/three/board/wash-europe.png',
+  USSR: 'assets/three/board/wash-ussr.png',
+  Africa: 'assets/three/board/wash-africa.png',
+  'Middle East': 'assets/three/board/wash-middle-east.png',
+  Asia: 'assets/three/board/wash-asia.png',
+  'North America': 'assets/three/board/wash-north-america.png',
+  'South America': 'assets/three/board/wash-south-america.png',
+  Oceania: 'assets/three/board/wash-oceania.png',
+};
+
 let paperTex = null;
 let oceanMap = null;
+let grainCanvas = null;
+const landSheets = new Map();
+const washMaps = new Map();
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -112,95 +128,168 @@ function loadImage(src) {
   });
 }
 
-function addSpeckle(ctx, size, count, alpha) {
-  for (let i = 0; i < count; i++) {
-    const x = ((Math.sin(i * 12.9898) * 43758.5453) % 1);
-    const y = ((Math.sin(i * 78.233) * 93721.1947) % 1);
-    const px = Math.abs(x) * size;
-    const py = Math.abs(y) * size;
-    const shade = i % 4 === 0 ? 255 : 0;
-    ctx.fillStyle = `rgba(${shade},${shade},${shade},${i % 5 === 0 ? alpha : alpha * 0.55})`;
-    ctx.fillRect(px, py, i % 9 === 0 ? 2.1 : 1.15, i % 11 === 0 ? 2.1 : 1.15);
-  }
+function wrapHash(ix, iy, period) {
+  const x = ((ix % period) + period) % period;
+  const y = ((iy % period) + period) % period;
+  let n = x * 374761393 + y * 668265263;
+  n = (n ^ (n >> 13)) * 1274126177;
+  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
 }
 
-function contrastGrain(ctx, size, amount) {
-  const img = ctx.getImageData(0, 0, size, size);
+function valueNoise(x, y, period) {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const n00 = wrapHash(x0, y0, period);
+  const n10 = wrapHash(x0 + 1, y0, period);
+  const n01 = wrapHash(x0, y0 + 1, period);
+  const n11 = wrapHash(x0 + 1, y0 + 1, period);
+  return n00 + (n10 - n00) * sx + (n01 - n00) * sy + (n11 - n01 - n10 + n00) * sx * sy;
+}
+
+function fbm(x, y, period, octaves = 4) {
+  let sum = 0;
+  let amp = 0.5;
+  let freq = 1;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    const p = Math.max(2, Math.round(period / freq));
+    sum += valueNoise(x * freq, y * freq, p) * amp;
+    norm += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return sum / (norm || 1);
+}
+
+function canvasTex(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Large-scale cardboard / pulp — designed to read at 390, not 1px speckle.
+function bakeGrainField(size = 512) {
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const img = ctx.createImageData(size, size);
   const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const l = 0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
-    const v = Math.max(0, Math.min(255, 128 + (l - 128) * amount));
-    d[i] = v;
-    d[i + 1] = v;
-    d[i + 2] = v;
+  const blotchPeriod = 7;
+  const fiberPeriod = 22;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const blotch = fbm(x / 74, y / 62, blotchPeriod, 5);
+      const fiber = fbm(x / 14, y / 46, fiberPeriod, 3);
+      const pulp = fbm(x / 28 + 3.1, y / 24 + 1.7, 11, 3);
+      const fleck = wrapHash(x, y, size);
+      let v = 0.50 + blotch * 0.38 + fiber * 0.16 + (pulp - 0.5) * 0.10;
+      if (fleck > 0.992) v += 0.16;
+      if (fleck < 0.012) v -= 0.14;
+      v = Math.max(0.22, Math.min(1, v));
+      const i = (y * size + x) * 4;
+      d[i] = Math.round(210 * v);
+      d[i + 1] = Math.round(196 * v);
+      d[i + 2] = Math.round(150 * v);
+      d[i + 3] = 255;
+    }
   }
   ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+function overlayPhoto(ctx, img, size, alpha, mode) {
+  if (!img) return;
+  ctx.save();
+  ctx.globalCompositeOperation = mode;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(img, 0, 0, size, size);
+  ctx.restore();
 }
 
 function bakeParchment(img) {
   const size = 512;
+  grainCanvas = bakeGrainField(size);
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#D8CDA8';
+  ctx.fillStyle = '#D2C49A';
   ctx.fillRect(0, 0, size, size);
-  if (img) {
-    ctx.globalCompositeOperation = 'overlay';
-    ctx.globalAlpha = GRAIN_STRENGTH;
-    ctx.drawImage(img, 0, 0, size, size);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  addSpeckle(ctx, size, 9800, 0.12);
-  contrastGrain(ctx, size, 3.15);
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.globalAlpha = 0.22;
-  ctx.fillStyle = '#8A7A52';
+  ctx.drawImage(grainCanvas, 0, 0);
+  overlayPhoto(ctx, img, size, GRAIN_STRENGTH, 'overlay');
+  overlayPhoto(ctx, img, size, 0.28, 'multiply');
+  paperTex = canvasTex(canvas);
+  return paperTex;
+}
+
+function imageToTex(img, fallbackHex) {
+  const size = img ? (img.naturalWidth || img.width || 1024) : 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = fallbackHex;
   ctx.fillRect(0, 0, size, size);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
-  return tex;
+  if (img) ctx.drawImage(img, 0, 0, size, size);
+  return canvasTex(canvas);
 }
 
 function bakeOcean(img) {
+  // Generated printed slate-teal tile is the SoT. Do not greyscale it.
+  oceanMap = imageToTex(img, PALETTE.oceanDeep);
+  return oceanMap;
+}
+
+function bakeLandSheet(washHex) {
+  const key = String(washHex || PALETTE.landBase).toLowerCase();
+  if (landSheets.has(key)) return landSheets.get(key);
+  if (!grainCanvas) grainCanvas = bakeGrainField(512);
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = PALETTE.oceanShelf;
+  ctx.fillStyle = washHex || PALETTE.landBase;
   ctx.fillRect(0, 0, size, size);
-  if (img) {
-    ctx.globalCompositeOperation = 'overlay';
-    ctx.globalAlpha = 0.70;
-    ctx.drawImage(img, 0, 0, size, size);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  addSpeckle(ctx, size, 4800, 0.06);
-  contrastGrain(ctx, size, 1.85);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
+  // Punch: overlay + multiply of large-scale cardboard. Must read at 390.
+  overlayPhoto(ctx, grainCanvas, size, GRAIN_STRENGTH, 'overlay');
+  overlayPhoto(ctx, grainCanvas, size, 0.48, 'multiply');
+  if (paperTex?.image) overlayPhoto(ctx, paperTex.image, size, 0.40, 'soft-light');
+  const tex = canvasTex(canvas);
+  landSheets.set(key, tex);
   return tex;
 }
 
+function continentKey(territory) {
+  if (!territory) return 'Europe';
+  if (USSR_LANDS.has(territory.name)) return 'USSR';
+  return WASH_TEX[territory.continent] ? territory.continent : 'Europe';
+}
+
 export async function loadBoardTextures() {
-  if (paperTex && oceanMap) return { paperTex, oceanMap };
-  const [parchment, ocean] = await Promise.all([
+  if (paperTex && oceanMap && washMaps.size) return { paperTex, oceanMap };
+  const names = Object.keys(WASH_TEX);
+  const [parchment, ocean, ...washes] = await Promise.all([
     loadImage(BOARD_TEX.parchment),
     loadImage(BOARD_TEX.ocean),
+    ...names.map((k) => loadImage(WASH_TEX[k])),
   ]);
-  paperTex = bakeParchment(parchment);
+  paperTex = parchment ? imageToTex(parchment, '#C4B896') : bakeParchment(null);
   oceanMap = bakeOcean(ocean);
+  landSheets.clear();
+  washMaps.clear();
+  names.forEach((k, i) => {
+    washMaps.set(k, washes[i] ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase) : null);
+  });
   return { paperTex, oceanMap };
 }
 
@@ -240,45 +329,46 @@ export function plasticColor(owner) {
   return PLASTIC[owner] || '#8E8F8C';
 }
 
-export function makeLandMaterials(regionHex, ownerHex) {
+export function makeLandMaterials(regionHex, ownerHex, territory) {
   const region = regionHex || PALETTE.landBase;
   const wash = ownerHex ? mixHex(region, ownerHex, 0.12) : hexColor(region);
-  const side = mixHex(region, PALETTE.landShadow, 0.45);
-  const paper = makePaperTexture();
-  const top = new THREE.MeshLambertMaterial({
-    map: paper,
-    color: wash,
-    emissive: 0x000000,
+  const washHex = `#${wash.toString(16).padStart(6, '0')}`;
+  const sideHex = mixHex(region, PALETTE.landShadow, 0.45);
+  const key = continentKey(territory);
+  const sheet = washMaps.get(key) || bakeLandSheet(washHex);
+  // MeshBasic — printed cardboard. Lighting must not crush grain to flat olive.
+  const top = new THREE.MeshBasicMaterial({
+    map: sheet,
+    color: 0xffffff,
     transparent: false,
     side: THREE.DoubleSide,
+    toneMapped: false,
   });
-  const wall = new THREE.MeshLambertMaterial({
-    color: side,
-    emissive: 0x000000,
+  const wall = new THREE.MeshBasicMaterial({
+    color: sideHex,
     transparent: false,
     side: THREE.DoubleSide,
+    toneMapped: false,
   });
-  const seal = new THREE.MeshLambertMaterial({
-    map: paper,
-    color: wash,
+  const seal = new THREE.MeshBasicMaterial({
+    map: sheet,
+    color: 0xffffff,
     side: THREE.DoubleSide,
     transparent: false,
     depthWrite: true,
+    toneMapped: false,
   });
   return { top, side: wall, bottom: wall, seal };
 }
 
 export function makeOceanMaterial() {
-  if (oceanMap) {
-    return new THREE.MeshLambertMaterial({
-      map: oceanMap,
-      color: 0xc8d4dc,
-      transparent: false,
-    });
-  }
-  return new THREE.MeshLambertMaterial({
-    color: PALETTE.oceanShelf,
+  makePaperTexture();
+  if (!oceanMap) bakeOcean(null);
+  return new THREE.MeshBasicMaterial({
+    map: oceanMap,
+    color: 0xffffff,
     transparent: false,
+    toneMapped: false,
   });
 }
 

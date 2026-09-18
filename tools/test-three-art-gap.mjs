@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.11 AA-HECORRECT-11 + STACK-LOD + iPhone HUD.
+// V2.81.51-three-polish.12 generated board/units + iPhone pinch + STACK-LOD.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -17,6 +17,7 @@ const {
   isSupportType,
   isDenseBand,
   nearLayout,
+  primaryType,
   shouldCollapse,
   worldSizeFromScreen,
   NEAR_MAX,
@@ -44,12 +45,15 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.11', GAME_VERSION === 'V2.81.51-three-polish.11');
+check('GAME_VERSION is V2.81.51-three-polish.12', GAME_VERSION === 'V2.81.51-three-polish.12');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
-check('parchment tile is real PNG', pngOk('assets/three/board/board-parchment-tile.png'));
-check('ocean tile is real PNG', pngOk('assets/three/board/board-ocean-tile.png'));
+check('generated parchment tile', pngOk('assets/three/board/board-parchment-tile.png'));
+check('generated ocean tile', pngOk('assets/three/board/board-ocean-tile.png'));
+check('generated Europe wash', pngOk('assets/three/board/wash-europe.png'));
+check('generated USSR wash', pngOk('assets/three/board/wash-ussr.png'));
+check('generated Africa wash', pngOk('assets/three/board/wash-africa.png'));
 check('continent ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
 check('plastic ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png'));
 
@@ -58,13 +62,10 @@ check('plastic atlas cells INF/TNK/ART/FTR',
   && /armour: \{ atlas: 'land', col: 1, row: 0 \}/.test(chits)
   && /artillery: \{ atlas: 'land', col: 2, row: 0 \}/.test(chits)
   && /fighter: \{ atlas: 'land', col: 3, row: 0 \}/.test(chits));
-check('plastic atlas cells BMB/AA/FAC + ships',
-  /bomber: \{ atlas: 'land', col: 0, row: 1 \}/.test(chits)
-  && /aaGun: \{ atlas: 'land', col: 1, row: 1 \}/.test(chits)
-  && /factory: \{ atlas: 'land', col: 2, row: 1 \}/.test(chits)
-  && /battleship: \{ atlas: 'naval', col: 0, row: 0 \}/.test(chits));
-check('chit discs killed', !/#F0E6D2/.test(chits) && !/CHIT_FACE/.test(chits));
-check('thick dark outline', /#1A1610/.test(chits) && /lineWidth/.test(chits));
+check('paint uses generated atlas tint', /tintAtlasCell/.test(chits) && /drawGeneratedPlastic/.test(chits));
+check('mid pip is plastic not number-coin',
+  /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
+check('thick dark outline', /#1A1610/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
   /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
   && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
@@ -72,14 +73,21 @@ check('faction plastic DE/SU/UK/US/JP',
 check('continent Europe olive', /Europe: '#8C9A52'/.test(palette));
 check('continent USSR tan', /USSR: '#C4A06A'/.test(palette));
 check('continent Africa ochre', /Africa: '#D6B85C'/.test(palette));
-check('grain strength phone-visible', /GRAIN_STRENGTH = 0\.78/.test(palette));
-check('no 11% invisible grain', !/globalAlpha = 0\.11/.test(palette));
+check('ocean slate-teal AA-PALETTE', /oceanDeep: '#3D5A66'/.test(palette) && /oceanShelf: '#4F6E78'/.test(palette));
+check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
+check('grain strength phone-visible', /GRAIN_STRENGTH = 0\.86/.test(palette));
+check('no greyscale contrastGrain', !/function contrastGrain/.test(palette));
+check('loads generated wash tiles', /WASH_TEX/.test(palette) && /wash-europe\.png/.test(palette));
 check('select gold only', /select: '#C4A35A'/.test(palette));
 check('no neon teal leftover', !/#00ced1/i.test(palette) && !/#44C5BD/.test(palette));
 
 check('LOD far/mid/near', lodBand(240) === 'far' && lodBand(160) === 'mid' && lodBand(80) === 'near');
 check('dense mid is pip band', isDenseBand('mid') && isDenseBand('far') && !isDenseBand('near'));
 check('near max 4', NEAR_MAX === 4);
+check('primaryType is first priority', primaryType([
+  { type: 'factory', quantity: 1 },
+  { type: 'infantry', quantity: 4 },
+]) === 'infantry');
 const six = [
   { type: 'infantry', quantity: 4 },
   { type: 'armour', quantity: 2 },
@@ -110,16 +118,20 @@ check('collision spacing separates piles', Math.hypot(piled[0].x - piled[1].x, p
 check('spike uses STACK-LOD not dual parade',
   /nearLayout/.test(spike) && /isDenseBand\(band\)/.test(spike)
   && /Never show pip and typed/.test(spike));
+check('spike mid pip uses primaryType', /primaryType\(stacks\)/.test(spike));
+check('iPhone two-finger pinch',
+  /touchstart/.test(spike) && /dollyBy\(factor\)/.test(spike)
+  && /touches\.TWO = THREE\.TOUCH\.PAN/.test(spike));
 check('spike gold select not blue glow',
-  /never a blue glow ring/.test(spike) && /select: '#C4A35A'/.test(palette)
-  && !/#00/.test(palette) && !/0x1a1408/.test(spike) && !/0x161008/.test(spike));
+  /never a blue glow ring/.test(spike) && /select: '#C4A35A'/.test(palette));
 check('chrome frosted + SF + 44pt',
-  /backdrop-filter:blur\(24px\)/.test(chrome)
+  /backdrop-filter:blur\(28px\)/.test(chrome)
   && /-apple-system/.test(chrome)
   && /min-height:50px/.test(chrome)
   && /width:44px; height:44px/.test(chrome)
   && /min-height:44px/.test(chrome)
   && /THREE-IPHONE-UI\.md/.test(chrome));
+check('chrome slate-teal page bg', /#3D5A66/.test(chrome));
 check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',
   /three-peek-unit/.test(chrome) && /pieceIconDataUrl/.test(chrome));

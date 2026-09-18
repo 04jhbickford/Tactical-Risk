@@ -51,6 +51,7 @@ import {
   separatePoints,
   isDenseBand,
   nearLayout,
+  primaryType,
   shouldCollapse,
   worldSizeFromScreen,
   PIP_PX,
@@ -255,8 +256,8 @@ export async function bootThreeMapSpike() {
   });
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(PALETTE.oceanShelf);
-  scene.fog = new THREE.Fog(PALETTE.oceanFog, 1100, 2100);
+  scene.background = new THREE.Color(PALETTE.oceanDeep);
+  scene.fog = null;
 
   const ocean = makeOceanMesh(WORLD_W * 5.2, WORLD_H * 2.4);
   ocean.position.set(WORLD_W / 2, -0.2, -WORLD_H / 2);
@@ -268,13 +269,13 @@ export async function bootThreeMapSpike() {
 
   const landBorderMat = makeLineMat(PALETTE.border, 0.7, 0.62);
   const foamMat = makeLineMat(PALETTE.foam, 0.7, 0.4);
-  const selectMat = makeLineMat(PALETTE.select, 1.55, 0.92);
+  const selectMat = makeLineMat(PALETTE.select, 2.85, 1);
   lineMats.push(landBorderMat, foamMat, selectMat);
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
     const ownerHex = factionColor.get(owner) || FACTION_FALLBACK[owner] || null;
-    landMats.set(land.name, makeLandMaterials(regionWashFor(land), ownerHex));
+    landMats.set(land.name, makeLandMaterials(regionWashFor(land), ownerHex, land));
   }
 
   const textureCache = new Map();
@@ -285,10 +286,10 @@ export async function bootThreeMapSpike() {
     }
     return textureCache.get(key);
   }
-  function pipTexture(owner, total, types) {
-    const key = `pip|${owner}|${total}|${(types || []).join(',')}`;
+  function pipTexture(owner, total, type) {
+    const key = `pip|${owner}|${total}|${type || 'infantry'}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, makePipTexture(ownerPlastic(owner), total, types));
+      textureCache.set(key, makePipTexture(ownerPlastic(owner), total, type || 'infantry'));
     }
     return textureCache.get(key);
   }
@@ -353,7 +354,7 @@ export async function bootThreeMapSpike() {
         expanded.push(sprite);
       }
 
-      const pipTex = pipTexture(owner, total, stacks.map((s) => s.type));
+      const pipTex = pipTexture(owner, total, primaryType(stacks));
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
@@ -419,19 +420,13 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.HemisphereLight(PALETTE.sky, PALETTE.ground, 1.05));
-  const sun = new THREE.DirectionalLight(PALETTE.key, 0.42);
-  sun.position.set(30, 240, 12);
-  scene.add(sun);
-  const fill = new THREE.DirectionalLight(PALETTE.fill, 0.16);
-  fill.position.set(-90, 90, -40);
-  scene.add(fill);
+  scene.add(new THREE.AmbientLight(0xffffff, 1));
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.04;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -442,11 +437,14 @@ export async function bootThreeMapSpike() {
   controls.enablePan = true;
   controls.screenSpacePanning = true;
   controls.enableRotate = false;
+  controls.enableZoom = true;
   controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
   controls.mouseButtons.RIGHT = THREE.MOUSE.DOLLY;
   controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
   controls.touches.ONE = THREE.TOUCH.PAN;
-  controls.touches.TWO = THREE.TOUCH.DOLLY;
+  // r170 has no TOUCH.DOLLY (was undefined → iPhone pinch died).
+  // Custom two-finger pinch below; Orbit only pans on two fingers.
+  controls.touches.TWO = THREE.TOUCH.PAN;
   controls.minDistance = 38;
   controls.maxDistance = 268;
   controls.minPolarAngle = 0.08;
@@ -763,12 +761,26 @@ export async function bootThreeMapSpike() {
     });
   });
 
+  let pinchDist = 0;
+
+  function twoFinger() {
+    const pts = [...pointers.values()];
+    if (pts.length < 2) return null;
+    const a = pts[0];
+    const b = pts[1];
+    return { dist: Math.hypot(b.x - a.x, b.y - a.y) };
+  }
+
   renderer.domElement.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 && e.pointerType !== 'touch') return;
     if (e.target.closest?.('#three-bottom, #three-l0, #three-sheet, #three-zoom, #three-confirm')) return;
+    try { renderer.domElement.setPointerCapture(e.pointerId); } catch { /* iOS */ }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
     maxPointers = Math.max(maxPointers, pointers.size);
-    if (pointers.size >= 2) gesturePinch = true;
+    if (pointers.size >= 2) {
+      gesturePinch = true;
+      pinchDist = twoFinger()?.dist || 0;
+    }
     renderer.domElement.classList.add('is-panning');
   });
 
@@ -777,6 +789,14 @@ export async function bootThreeMapSpike() {
     if (rec) {
       rec.x = e.clientX;
       rec.y = e.clientY;
+      if (pointers.size >= 2) {
+        const now = twoFinger();
+        if (now && pinchDist > 8 && now.dist > 8) {
+          const factor = pinchDist / now.dist;
+          if (Number.isFinite(factor) && factor > 0.25 && factor < 4) dollyBy(factor);
+        }
+        pinchDist = now?.dist || pinchDist;
+      }
       return;
     }
     if (!isCoarsePointer()) paintSelection(pickTerritory(e), { hover: true });
@@ -795,9 +815,41 @@ export async function bootThreeMapSpike() {
       const allowTap = !pinched && (dx * dx + dy * dy) <= slop * slop;
       gesturePinch = false;
       maxPointers = 0;
+      pinchDist = 0;
       if (allowTap) paintSelection(pickTerritory(e));
+    } else if (pointers.size === 1) {
+      pinchDist = 0;
     }
   }
+
+  function touchPinchOf(e) {
+    const a = e.touches[0];
+    const b = e.touches[1];
+    return { dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) };
+  }
+  let touchPinch = null;
+  renderer.domElement.addEventListener('touchstart', (e) => {
+    if (e.touches.length >= 2) {
+      e.preventDefault();
+      gesturePinch = true;
+      touchPinch = touchPinchOf(e);
+    }
+  }, { passive: false });
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if (e.touches.length >= 2 && touchPinch) {
+      e.preventDefault();
+      if (pointers.size >= 2) return;
+      const now = touchPinchOf(e);
+      if (touchPinch.dist > 8 && now.dist > 8) {
+        const factor = touchPinch.dist / now.dist;
+        if (Number.isFinite(factor) && factor > 0.25 && factor < 4) dollyBy(factor);
+      }
+      touchPinch = now;
+    }
+  }, { passive: false });
+  renderer.domElement.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) touchPinch = null;
+  }, { passive: false });
 
   renderer.domElement.addEventListener('pointerup', endPointer);
   renderer.domElement.addEventListener('pointercancel', (e) => {
@@ -849,7 +901,7 @@ export async function bootThreeMapSpike() {
   const europeNorthOnScreen = ukXY && germanyXY && ukXY.y < germanyXY.y + 80;
   const ukWestOfGermany = ukXY && germanyXY && ukXY.x < germanyXY.x;
   const westEuropeWestOfGermany = westEuropeXY && germanyXY && westEuropeXY.x < germanyXY.x;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-atlas ocean=muted-slate`, {
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=slate-teal`, {
     africaSouthOfEurope,
     africaNotUnderNA,
     africaSouthOnScreen,

@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.12 (preview only, SCHEMA 11)
+
+James HARD he-correct on polish.11 (~25%): vector/GIS board, simple icons, no image-gen texture, iPhone pinch dead. Preview `?three=1` only. Do not merge over live Canvas. Tesla off.
+
+1. **Generated board** — scanned cardboard parchment + printed slate-teal ocean `#3D5A66`/`#4F6E78` + continent wash tiles (image-gen, then baked). Grain must read at 390.
+2. **Generated units** — photoreal molded A&A plastic atlases (INF/TNK/ART/FTR/BMB/AA/FAC/ships), thick outline, faction luminosity tint. Number-coins / Lucide stamps killed. Mid = one plastic + N; near ≤3–4 + `+K`.
+3. **iPhone pinch** — two-finger pinch in/out (Canvas parity) + pan. `TOUCH.DOLLY` was undefined in r170. Fit / +/- remain.
+
+Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.12.
+
+---
+
 ## 9.17.26 — V2.81.51-three-polish.11 (preview only, SCHEMA 11)
 
 James HARD he-correct on polish.10: no texture, no continent colors, cream discs, washed icons, placement breaks. Preview `?three=1` only. Do not merge over live Canvas. Tesla off.

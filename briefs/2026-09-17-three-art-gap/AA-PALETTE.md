@@ -14,7 +14,7 @@ Ink Blue is money-only. Do **not** recolor this war board.
   - Asia muted green `#8EAE6A`
   - Americas soft green `#86A85E` / `#6F9848`
 - Ownership is a gentle 12% tint on top of the region wash.
-- Ocean: muted printed blue-grey, textured. No neon / cyan bloom.
+- Ocean: AA-PALETTE slate-teal `#3D5A66` / shelf `#4F6E78`, printed + textured. No charcoal slab, no neon / cyan bloom.
 - Select: gold/amber `#C4A35A` only. No blue glow rings.
 
 ## Units
