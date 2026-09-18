@@ -61,6 +61,7 @@ import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
   isSupportType,
+  showMinis,
   spiralPack,
   separatePoints,
   isDenseBand,
@@ -287,7 +288,7 @@ export async function bootThreeMapSpike() {
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
   const coastShelfMat = makeCoastShelfMaterial();
-  const riverMat = makeLineMat('#4A7680', 2.35, 0.88);
+  const riverMat = makeLineMat('#3A6A74', 3.6, 0.92);
   const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
   lineMats.push(landBorderMat, foamMat, riverMat, selectMat);
 
@@ -680,7 +681,7 @@ export async function bootThreeMapSpike() {
       });
     }
     return worldSizeFromScreen(PIECE_PX, dist, camera.fov, h, {
-      minPx: PIECE_MIN_PX, maxPx: PIECE_MAX_PX, maxWorld: 9.5,
+      minPx: PIECE_MIN_PX, maxPx: PIECE_MAX_PX, maxWorld: 13.5,
     });
   }
 
@@ -734,12 +735,12 @@ export async function bootThreeMapSpike() {
       const movers = [];
       for (const rec of recs) {
         const selected = rec.territory.name === selectedName;
-        // STACK-LOD / P22 HARD: mid/far = ONE cream pip+N. ZERO type parade.
-        // Near = molded plastic minis ≤3–4 +K. Roster lives in peek.
+        // STACK-LOD / P22 HARD: mid/far idle = ONE cream pip+N. ZERO type parade.
+        // Near OR select = molded plastic minis ≤3–4 +K. Roster lives in peek.
         const dense = isDenseBand(band);
         const plan = nearLayout(rec.stacks);
-        // Near never falls back to pip — molded minis only.
-        const collapse = dense;
+        // Near/select never falls back to pip — molded minis only.
+        const collapse = !showMinis(band, selected);
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
         rec.pip.position.set(rec.homeX, rec.height + 4.8, rec.homeZ);
@@ -1119,6 +1120,8 @@ export async function bootThreeMapSpike() {
         rivers: true,
         landUndulation: true,
         nearMinis: true,
+        selectMinis: true,
+        geoUnmirror: true,
       };
     },
   };

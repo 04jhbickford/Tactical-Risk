@@ -7,11 +7,16 @@ export const NEAR_MAX = 4;
 export const NEAR_TYPED = 3;
 export const GAP_PX = 5;
 export const PIP_PX = 64;
-export const PIECE_PX = 68;
+export const PIECE_PX = 96;
 export const PIP_MIN_PX = 58;
 export const PIP_MAX_PX = 72;
-export const PIECE_MIN_PX = 58;
-export const PIECE_MAX_PX = 78;
+export const PIECE_MIN_PX = 84;
+export const PIECE_MAX_PX = 118;
+
+/** Near camera OR a selected land — molded minis. Mid/far idle stays pip+N. */
+export function showMinis(band, selected) {
+  return band === 'near' || !!selected;
+}
 
 const TYPE_PRIORITY = [
   'infantry', 'armour', 'fighter', 'bomber', 'artillery',

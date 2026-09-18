@@ -95,23 +95,23 @@ const BIOME_HEX = {
 };
 
 const BIOME_HEIGHT = {
-  mountain: 1.82,
-  hills: 1.18,
-  forest: 0.92,
-  snow: 0.98,
-  steppe: 0.80,
-  lush: 0.76,
-  arid: 0.68,
+  mountain: 2.24,
+  hills: 1.36,
+  forest: 0.98,
+  snow: 1.08,
+  steppe: 0.84,
+  lush: 0.80,
+  arid: 0.70,
 };
 
 const BIOME_LIFT = {
-  mountain: 0.62,
-  hills: 0.28,
-  forest: 0.12,
-  snow: 0.16,
-  steppe: 0.10,
-  lush: 0.09,
-  arid: 0.07,
+  mountain: 1.18,
+  hills: 0.46,
+  forest: 0.18,
+  snow: 0.22,
+  steppe: 0.14,
+  lush: 0.12,
+  arid: 0.09,
 };
 
 // Printed IPC homage (classic A&A board language). Sits on paper, not HUD.
@@ -146,13 +146,21 @@ export const PRINT_IPC = {
 
 // World-space ridge polylines (map pixels). Alps / Himalayas / Rockies / Andes.
 export const RIDGES = [
-  [[980, 620], [994, 605], [1040, 630], [1098, 685], [1160, 660]], // Alps
-  [[1700, 820], [1798, 800], [1900, 760], [2024, 720], [2140, 700]], // Himalaya
-  [[3200, 200], [3263, 279], [3300, 480], [3328, 722]], // Rockies
-  [[220, 1230], [204, 1411], [275, 1613]], // Andes
+  [[960, 590], [992, 604], [1040, 630], [1096, 680], [1160, 700], [1200, 690]], // Alps
+  [[1700, 820], [1791, 860], [1900, 760], [2034, 733], [2140, 700]], // Himalaya
+  [[3180, 220], [3258, 400], [3260, 620], [3258, 795]], // Rockies
+  [[220, 1230], [240, 1411], [285, 1635]], // Andes
   [[1550, 700], [1679, 600], [1905, 490]], // Altai / Kazakh
-  [[1085, 180], [1067, 280], [1085, 229]], // Scandes
+  [[1086, 160], [1070, 230], [1086, 280]], // Scandes
 ];
+
+const CAPITAL_ROUNDELS = {
+  Germany: '#5A5C59',
+  Russia: '#2F5A28',
+  'United Kingdom': '#B08948',
+  'East US': '#3F4F22',
+  Japan: '#B8441E',
+};
 
 // Thin drainage into sea — recessed printed-ink rivers, not Civ city chrome.
 export const RIVERS = [
@@ -329,18 +337,100 @@ function stampClumps(ctx, img, poly, w, h, count, seed) {
   }
   const cx = sx / poly.length;
   const cy = sy / poly.length;
-  const tw = 220;
-  const th = 220;
+  const tw = 260;
+  const th = 260;
   for (let i = 0; i < count; i++) {
     const n1 = wrapHash(seed + i * 17, seed + i * 31, 97);
     const n2 = wrapHash(seed + i * 53, seed + i * 11, 97);
     const n3 = wrapHash(seed + i * 7, seed + i * 71, 97);
-    const px = wxToU(cx + (n1 - 0.5) * 220) * w - tw / 2;
-    const py = wyToV(cy + (n2 - 0.5) * 180) * h - th / 2;
-    ctx.globalAlpha = 0.42 + n3 * 0.28;
+    const px = wxToU(cx + (n1 - 0.5) * 280) * w - tw / 2;
+    const py = wyToV(cy + (n2 - 0.5) * 220) * h - th / 2;
+    ctx.globalAlpha = 0.62 + n3 * 0.28;
     ctx.globalCompositeOperation = 'multiply';
-    ctx.drawImage(img, px, py, tw * (0.7 + n3 * 0.5), th * (0.7 + n1 * 0.5));
+    ctx.drawImage(img, px, py, tw * (0.75 + n3 * 0.55), th * (0.75 + n1 * 0.55));
   }
+  ctx.restore();
+}
+
+function stampForestStipple(ctx, poly, w, h, count, seed) {
+  if (!poly) return;
+  ctx.save();
+  if (!pathPoly(ctx, poly, w, h)) {
+    ctx.restore();
+    return;
+  }
+  ctx.clip();
+  let sx = 0;
+  let sy = 0;
+  for (const [x, y] of poly) {
+    sx += x;
+    sy += y;
+  }
+  const cx = sx / poly.length;
+  const cy = sy / poly.length;
+  for (let i = 0; i < count; i++) {
+    const n1 = wrapHash(seed + i * 19, seed + i * 41, 127);
+    const n2 = wrapHash(seed + i * 67, seed + i * 13, 127);
+    const n3 = wrapHash(seed + i * 3, seed + i * 89, 127);
+    const px = wxToU(cx + (n1 - 0.5) * 260) * w;
+    const py = wyToV(cy + (n2 - 0.5) * 200) * h;
+    const r = 1.6 + n3 * 2.8;
+    ctx.globalAlpha = 0.42 + n3 * 0.28;
+    ctx.fillStyle = n3 > 0.55 ? '#3A4A28' : '#2A3A1C';
+    ctx.beginPath();
+    ctx.ellipse(px, py, r * 0.85, r * 0.55, n1 * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawRidgeHatch(ctx, ridge, w, h) {
+  if (!ridge || ridge.length < 2) return;
+  drawPolyline(ctx, ridge.map(([x, y]) => [x + 18, y + 22]), w, h, 'rgba(48, 36, 22, 0.42)', 26);
+  drawPolyline(ctx, ridge.map(([x, y]) => [x + 8, y + 10]), w, h, 'rgba(62, 48, 28, 0.50)', 14);
+  drawPolyline(ctx, ridge, w, h, 'rgba(92, 72, 42, 0.78)', 8);
+  drawPolyline(ctx, ridge, w, h, 'rgba(232, 220, 190, 0.28)', 2.2);
+  for (let i = 0; i < ridge.length - 1; i++) {
+    const [x0, y0] = ridge[i];
+    const [x1, y1] = ridge[i + 1];
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    const steps = Math.max(4, Math.round(len / 18));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const x = x0 + dx * t;
+      const y = y0 + dy * t;
+      const tick = 16 + (s % 3) * 6;
+      drawPolyline(ctx, [
+        [x - nx * 4, y - ny * 4],
+        [x + nx * tick, y + ny * tick],
+      ], w, h, 'rgba(58, 44, 24, 0.38)', 1.6);
+    }
+  }
+}
+
+function drawRoundel(ctx, x, y, color, w, h) {
+  const px = wxToU(x) * w;
+  const py = wyToV(y) * h;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, 9.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(232, 223, 200, 0.88)';
+  ctx.fill();
+  ctx.strokeStyle = '#3A3428';
+  ctx.lineWidth = 1.3;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(px, py, 5.6, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(px, py, 2.4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(232, 223, 200, 0.55)';
+  ctx.fill();
   ctx.restore();
 }
 
@@ -366,14 +456,14 @@ function drawIpcDot(ctx, x, y, value, w, h) {
   const py = wyToV(y) * h;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(px, py, 7.5, 0, Math.PI * 2);
+  ctx.arc(px, py, 10.5, 0, Math.PI * 2);
   ctx.fillStyle = '#E8DFC8';
   ctx.fill();
   ctx.strokeStyle = '#3A3428';
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 1.7;
   ctx.stroke();
   ctx.fillStyle = '#3A3428';
-  ctx.font = '700 9px "Segoe UI", serif';
+  ctx.font = '700 11px "Segoe UI", serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(String(value), px, py + 0.5);
@@ -425,54 +515,61 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
       ctx.globalAlpha = 1;
       ctx.fillStyle = mixed;
       ctx.fill();
-      if (biome === 'snow') drawTileClipped(ctx, tiles.snow, 0.70, 'soft-light', 0.55);
-      else if (biome === 'arid') drawTileClipped(ctx, tiles.arid, 0.78, 'multiply', 0.62);
+      if (biome === 'snow') drawTileClipped(ctx, tiles.snow, 0.82, 'soft-light', 0.55);
+      else if (biome === 'arid') drawTileClipped(ctx, tiles.arid, 0.88, 'multiply', 0.62);
       else if (biome === 'forest') {
-        drawTileClipped(ctx, tiles.forest, 0.18, 'multiply', 0.70);
+        // Clumps only — never a solid green fill.
+        drawTileClipped(ctx, tiles.forest, 0.10, 'multiply', 0.78);
       } else if (biome === 'mountain') {
-        drawTileClipped(ctx, tiles.mountain, 0.70, 'multiply', 0.42);
+        drawTileClipped(ctx, tiles.mountain, 0.88, 'multiply', 0.48);
       } else if (biome === 'hills') {
-        drawTileClipped(ctx, tiles.mountain, 0.18, 'multiply', 0.55);
+        drawTileClipped(ctx, tiles.mountain, 0.42, 'multiply', 0.58);
       } else if (biome === 'lush') {
         ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.28;
+        ctx.globalAlpha = 0.16;
         ctx.fillStyle = '#6B7A4A';
         ctx.fill();
       } else if (biome === 'steppe') {
-        drawTileClipped(ctx, tiles.arid, 0.28, 'soft-light', 0.7);
+        drawTileClipped(ctx, tiles.arid, 0.38, 'soft-light', 0.7);
       }
       ctx.restore();
       if (biome === 'forest') {
-        stampClumps(ctx, tiles.forest, poly, w, h, 7, hashName(land.name));
-      } else if (biome === 'lush' && hashName(land.name) % 2 === 0) {
-        stampClumps(ctx, tiles.forest, poly, w, h, 3, hashName(land.name));
+        stampClumps(ctx, tiles.forest, poly, w, h, 14, hashName(land.name));
+        stampForestStipple(ctx, poly, w, h, 70, hashName(land.name) + 3);
+      } else if (biome === 'lush') {
+        stampClumps(ctx, tiles.forest, poly, w, h, 5, hashName(land.name));
+        stampForestStipple(ctx, poly, w, h, 28, hashName(land.name) + 9);
+      } else if (biome === 'mountain' || biome === 'hills') {
+        stampClumps(ctx, tiles.mountain, poly, w, h, 4, hashName(land.name));
       }
     }
   }
 
   // Soft SE mountain shadow + ridge hatch (printed relief, not a brown stamp).
   for (const ridge of RIDGES) {
-    drawPolyline(ctx, ridge.map(([x, y]) => [x + 14, y + 16]), w, h, 'rgba(48, 36, 22, 0.28)', 18);
-    drawPolyline(ctx, ridge, w, h, 'rgba(72, 58, 36, 0.55)', 7);
+    drawRidgeHatch(ctx, ridge, w, h);
     if (tiles.mountain) {
       ctx.save();
-      ctx.globalAlpha = 0.40;
+      ctx.globalAlpha = 0.62;
       ctx.globalCompositeOperation = 'multiply';
-      const mid = ridge[Math.floor(ridge.length / 2)];
-      ctx.drawImage(
-        tiles.mountain,
-        wxToU(mid[0]) * w - 90,
-        wyToV(mid[1]) * h - 70,
-        200,
-        160,
-      );
+      for (let i = 0; i < ridge.length; i++) {
+        const pt = ridge[i];
+        ctx.drawImage(
+          tiles.mountain,
+          wxToU(pt[0]) * w - 110,
+          wyToV(pt[1]) * h - 86,
+          240,
+          190,
+        );
+      }
       ctx.restore();
     }
   }
 
   for (const river of RIVERS) {
-    drawPolyline(ctx, river, w, h, 'rgba(48, 86, 96, 0.82)', 3.6);
-    drawPolyline(ctx, river, w, h, 'rgba(122, 168, 176, 0.42)', 1.6);
+    drawPolyline(ctx, river.map(([x, y]) => [x + 2, y + 3]), w, h, 'rgba(28, 52, 60, 0.55)', 6.2);
+    drawPolyline(ctx, river, w, h, 'rgba(48, 86, 96, 0.92)', 4.4);
+    drawPolyline(ctx, river, w, h, 'rgba(140, 188, 196, 0.55)', 2.0);
   }
 
   for (const land of lands) {
@@ -489,7 +586,11 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
       }
     }
     if (!n) continue;
-    drawIpcDot(ctx, sx / n + 18, sy / n + 22, v, w, h);
+    const cx = sx / n;
+    const cy = sy / n;
+    drawIpcDot(ctx, cx + 18, cy + 22, v, w, h);
+    const roundel = CAPITAL_ROUNDELS[land.name];
+    if (roundel) drawRoundel(ctx, cx - 22, cy - 10, roundel, w, h);
   }
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -515,9 +616,12 @@ export function applyWorldLandUVs(geometry) {
   if (!pos || !uv) return;
   const SCALE = 0.1;
   for (let i = 0; i < pos.count; i++) {
-    const wx = pos.getX(i) / SCALE;
+    // Mesh X is (MAP_WIDTH - origX) * SCALE. Atlas is painted in orig map X.
+    // Un-mirror or ridges/forests/rivers/IPC land on the wrong continent.
+    const flippedX = pos.getX(i) / SCALE;
+    const origX = MAP_WIDTH - flippedX;
     const wy = -pos.getZ(i) / SCALE;
-    uv.setXY(i, wx / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
+    uv.setXY(i, origX / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
   }
   uv.needsUpdate = true;
   geometry.setAttribute('uv2', uv.clone());
@@ -537,12 +641,14 @@ export function sculptLandRelief(geometry, territory, height) {
     const n = fbm(x * 0.22 + seed, z * 0.22 + seed, 14, 4);
     let lift = (n - 0.42) * amp;
     if (biome === 'mountain') {
-      const ridge = Math.pow(Math.max(0, n - 0.38), 1.25) * 0.72;
+      const ridge = Math.pow(Math.max(0, n - 0.32), 1.18) * 1.15;
       lift += ridge;
     } else if (biome === 'hills') {
-      lift += Math.max(0, n - 0.5) * 0.22;
+      lift += Math.max(0, n - 0.48) * 0.38;
     } else if (biome === 'forest') {
-      lift += Math.max(0, n - 0.62) * 0.10;
+      lift += Math.max(0, n - 0.58) * 0.16;
+    } else {
+      lift += (n - 0.5) * 0.06;
     }
     pos.setY(i, y + lift);
   }
@@ -552,9 +658,9 @@ export function sculptLandRelief(geometry, territory, height) {
 
 export function makeCoastShelfMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0x7aadb0,
+    color: 0x8ec4c6,
     transparent: true,
-    opacity: 0.46,
+    opacity: 0.58,
     roughness: 0.48,
     metalness: 0.08,
     depthWrite: false,

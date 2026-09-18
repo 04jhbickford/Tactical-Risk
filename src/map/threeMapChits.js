@@ -549,22 +549,25 @@ function paintMoldedMini(ctx, {
     for (let i = 0; i < d.length; i += 4) {
       const a = d[i + 3];
       if (a < 8) continue;
+      // Grey sculpt → faction plastic. Mid-grey maps to owner color; do not
+      // crush shadows to black silhouettes (that was the tray-glyph fail).
       const lum = (d[i] * 0.35 + d[i + 1] * 0.45 + d[i + 2] * 0.20) / 255;
-      const lift = 0.28 + lum * 0.92;
-      d[i] = Math.min(255, Math.round(fr * lift));
-      d[i + 1] = Math.min(255, Math.round(fg * lift));
-      d[i + 2] = Math.min(255, Math.round(fb * lift));
+      const mapped = 0.38 + (lum / 0.52) * 0.78;
+      d[i] = Math.min(255, Math.round(fr * mapped + 16));
+      d[i + 1] = Math.min(255, Math.round(fg * mapped + 14));
+      d[i + 2] = Math.min(255, Math.round(fb * mapped + 10));
+      d[i + 3] = a;
     }
     tx.putImageData(pix, 0, 0);
-    const dw = w * 0.90;
-    const dh = h * 0.90;
-    ctx.drawImage(tmp, (w - dw) / 2, (h - dh) / 2 - 4, dw, dh);
+    const dw = w * 0.96;
+    const dh = h * 0.96;
+    ctx.drawImage(tmp, (w - dw) / 2, (h - dh) / 2 - 2, dw, dh);
     // Soft toy-plastic specular — keep the sculpt, do not flatten to a disc.
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
-    const spec = ctx.createRadialGradient(w * 0.34, h * 0.28, 2, w * 0.34, h * 0.28, w * 0.22);
-    spec.addColorStop(0, 'rgba(255,255,255,0.42)');
-    spec.addColorStop(0.35, 'rgba(255,248,230,0.10)');
+    const spec = ctx.createRadialGradient(w * 0.34, h * 0.28, 2, w * 0.34, h * 0.28, w * 0.26);
+    spec.addColorStop(0, 'rgba(255,255,255,0.58)');
+    spec.addColorStop(0.28, 'rgba(255,248,230,0.16)');
     spec.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = spec;
     ctx.fillRect(0, 0, w, h);
@@ -643,8 +646,8 @@ export function makeOverflowTexture(plus) {
 
 export function pieceIconDataUrl(type, ownerColor, quantity = 1) {
   const canvas = document.createElement('canvas');
-  canvas.width = 96;
-  canvas.height = 96;
-  paintPiece(canvas.getContext('2d'), { type, ownerColor, quantity, w: 96, h: 96 });
+  canvas.width = 128;
+  canvas.height = 128;
+  paintPiece(canvas.getContext('2d'), { type, ownerColor, quantity, w: 128, h: 128 });
   return canvas.toDataURL('image/png');
 }

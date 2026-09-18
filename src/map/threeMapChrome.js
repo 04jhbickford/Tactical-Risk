@@ -155,10 +155,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;
     }
     #three-peek .three-peek-unit {
-      position:relative; width:44px; height:44px;
+      position:relative; width:68px; height:68px;
       display:inline-flex; align-items:center; justify-content:center;
+      background:rgba(240,230,210,0.16);
+      border-radius:12px;
     }
-    #three-peek .three-peek-unit img { width:36px; height:36px; display:block; }
+    #three-peek .three-peek-unit img { width:60px; height:60px; display:block; }
     #three-peek .three-peek-unit b {
       position:absolute; right:-2px; bottom:-2px;
       min-width:16px; height:16px; padding:0 4px;

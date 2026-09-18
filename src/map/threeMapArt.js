@@ -134,7 +134,7 @@ export function applyWorldUVs(geometry) {
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) / SCALE;
     const wy = -pos.getZ(i) / SCALE;
-    uv.setXY(i, wx / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
+    uv.setXY(i, 1 - wx / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
   }
   uv.needsUpdate = true;
 }
@@ -407,8 +407,8 @@ export function makeCoastShelfMeshes(territory, material) {
   for (const poly of territory.polygons || []) {
     const ring = simplifyRing(poly, 0.6);
     if (!ring || ring.length < 4) continue;
-    const outer = inflateRing(ring, 9.6);
-    const inner = inflateRing(ring, 2.2);
+    const outer = inflateRing(ring, 18.5);
+    const inner = inflateRing(ring, 2.0);
     const shape = shapeFromRing(outer);
     const hole = shapeFromRing(inner.slice().reverse());
     shape.holes.push(hole);
