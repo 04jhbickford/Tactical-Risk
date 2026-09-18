@@ -63,13 +63,14 @@ check('plastic atlas cells INF/TNK/ART/FTR',
   && /armour: \{ atlas: 'land', col: 1, row: 0 \}/.test(chits)
   && /artillery: \{ atlas: 'land', col: 2, row: 0 \}/.test(chits)
   && /fighter: \{ atlas: 'land', col: 3, row: 0 \}/.test(chits));
-check('paint uses generated atlas tint', /tintAtlasCell/.test(chits) && /drawGeneratedPlastic/.test(chits));
+check('paint uses generated atlas tint', /tintAtlasCell/.test(chits) && /drawPhotorealPlastic/.test(chits));
 check('mid pip is plastic not number-coin',
   /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
-check('cream plastic chit body', /#F0E6D2/.test(chits) && /drawCreamChit/.test(chits));
-check('faction rim on cream chit', /strokeStyle = faction/.test(chits));
+check('no cream disc coin', !/drawCreamChit/.test(chits) && !/ctx.arc\(cx, cy/.test(chits));
+check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F0E6D2/.test(chits));
 check('thick dark outline', /#1A1610/.test(chits));
-check('contact shadow under chit', /drawContactShadow/.test(chits));
+check('contact shadow under plastic', /drawContactShadow/.test(chits));
+check('toy sheen on plastic', /soft-light/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
   /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
   && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
@@ -79,9 +80,13 @@ check('continent USSR tan', /USSR: '#C4A06A'/.test(palette));
 check('continent Africa ochre', /Africa: '#D6B85C'/.test(palette));
 check('ocean slate-teal AA-PALETTE', /oceanDeep: '#3D5A66'/.test(palette) && /oceanShelf: '#4F6E78'/.test(palette));
 check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
-check('parchment multiply 8-14%', /GRAIN_MULTIPLY = 0\.14/.test(palette));
+check('baked wash is albedo not 14% flatten',
+  /imageToTex\(washes\[i\]/.test(palette) && !/GRAIN_MULTIPLY = 0\.14/.test(palette));
 check('no greyscale contrastGrain', !/function contrastGrain/.test(palette));
 check('loads generated wash tiles', /WASH_TEX/.test(palette) && /wash-europe\.png/.test(palette));
+check('James parchment macro on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/board-parchment-macro-tile.png'));
+check('James ocean macro on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/board-ocean-print-macro-tile.png'));
+check('James hi-detail unit atlas on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/units-molded-plastic-atlas-hi.png'));
 check('land lids use wash map not flat side',
   /const mats = \[materials\.top, materials\.side\]/.test(art)
   && !/\[materials\.side, materials\.top/.test(art));
@@ -135,8 +140,9 @@ check('spike uses STACK-LOD not dual parade',
   && /Never show pip and typed/.test(spike));
 check('spike mid pip uses primaryType', /primaryType\(stacks\)/.test(spike));
 check('iPhone two-finger pinch',
-  /touchstart/.test(spike) && /dollyBy\(factor\)/.test(spike)
-  && /touches\.TWO = THREE\.TOUCH\.PAN/.test(spike));
+  /touchstart/.test(spike) && /dollyBy\(factor/.test(spike)
+  && /touches\.TWO = THREE\.TOUCH\.ROTATE/.test(spike)
+  && /worldOnPlane/.test(spike) && /panByWorld/.test(spike));
 check('spike gold select not blue glow',
   /never a blue glow ring/.test(spike) && /select: '#C4A35A'/.test(palette));
 check('chrome frosted + SF + 44pt',

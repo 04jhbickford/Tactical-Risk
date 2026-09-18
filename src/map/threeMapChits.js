@@ -1,5 +1,6 @@
-// Faction-colored molded A&A plastic silhouettes. No number-coins, no grey stamps.
-// Match refs/aa-plastic-units.png: solid body color, ≥2px dark outline, shadow.
+// Photoreal molded A&A plastics from the James/Arc image-gen atlas.
+// Cream/plastic body + faction tint, ≥2px dark outline, contact shadow, toy sheen.
+// NOT cream discs. NOT grey matte silhouettes. NOT number-coins.
 
 import * as THREE from 'three';
 import { PLASTIC, PALETTE } from './threeMapPalette.js';
@@ -317,6 +318,11 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
   ctx.restore();
 }
 
+function plasticBodyColor(faction) {
+  // Cream plastic dyed with faction — sculpt stays, not a cream disc / grey matte.
+  return mixRgb(CREAM, faction || '#8E8F8C', 0.64);
+}
+
 function tintAtlasCell(img, cell, color) {
   const cols = cell.atlas === 'land' ? 4 : 2;
   const sw = img.width / cols;
@@ -334,7 +340,7 @@ function tintAtlasCell(img, cell, color) {
   const [tr, tg, tb] = hexRgb(color);
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] < 8) continue;
-    const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 160;
+    const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 168;
     d[i] = Math.max(0, Math.min(255, tr * lum));
     d[i + 1] = Math.max(0, Math.min(255, tg * lum));
     d[i + 2] = Math.max(0, Math.min(255, tb * lum));
@@ -343,41 +349,33 @@ function tintAtlasCell(img, cell, color) {
   return off;
 }
 
-function drawGeneratedPlastic(ctx, type, cx, cy, s, color) {
+function drawPhotorealPlastic(ctx, type, cx, cy, s, color) {
   const cell = atlasCellFor(type);
   const img = cell ? atlases[cell.atlas] : null;
   if (!cell || !img) return false;
   const tinted = tintAtlasCell(img, cell, color);
-  const d = s * 2.15;
-  ctx.drawImage(tinted, cx - d / 2, cy - d / 2, d, d);
+  const d = s * 2.28;
+  ctx.drawImage(tinted, cx - d / 2, cy - d / 2 - s * 0.04, d, d);
+  ctx.save();
+  ctx.globalCompositeOperation = 'soft-light';
+  const hi = ctx.createRadialGradient(cx - s * 0.30, cy - s * 0.46, s * 0.04, cx, cy, s * 1.15);
+  hi.addColorStop(0, 'rgba(255,255,255,0.58)');
+  hi.addColorStop(0.34, 'rgba(255,255,255,0.14)');
+  hi.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = hi;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - s * 0.04, s * 0.94, s * 1.08, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
   return true;
 }
 
-function drawCreamChit(ctx, type, cx, cy, s, faction) {
-  // Cream plastic body + faction rim + ≥2px dark outline + contact shadow.
-  // Not a grey matte Lucide stamp. Not a numbered coin.
-  drawContactShadow(ctx, cx, cy, s);
-  const r = s * 1.08;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy + s * 0.04, r, 0, Math.PI * 2);
-  ctx.fillStyle = CREAM;
-  ctx.fill();
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = faction || '#8E8F8C';
-  ctx.lineWidth = Math.max(5, s * 0.16);
-  ctx.stroke();
-  ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(2, s * 0.07);
-  ctx.stroke();
-  ctx.restore();
-  if (!drawGeneratedPlastic(ctx, type, cx, cy - s * 0.04, s * 0.78, CREAM)) {
-    drawPlasticBody(ctx, PATHS[type] || pathInf, cx, cy - s * 0.04, s * 0.72, CREAM);
-  }
-}
-
 function drawMolded(ctx, type, cx, cy, s, color) {
-  drawCreamChit(ctx, type, cx, cy, s, color);
+  drawContactShadow(ctx, cx, cy, s);
+  const body = plasticBodyColor(color);
+  if (!drawPhotorealPlastic(ctx, type, cx, cy, s, body)) {
+    drawPlasticBody(ctx, PATHS[type] || pathInf, cx, cy, s, body);
+  }
 }
 
 export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256 } = {}) {
@@ -389,7 +387,7 @@ export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256 }
   if (quantity >= 1) drawBadge(ctx, w * 0.80, h * 0.82, quantity, Math.min(w, h));
 }
 
-export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 192 } = {}) {
+export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 256 } = {}) {
   // Mid/far = ONE plastic silhouette + N. Never a numbered coin / disc.
   paintPiece(ctx, {
     type: type || 'infantry',
@@ -405,25 +403,31 @@ export function paintOverflow(ctx, { plus, size = 192 } = {}) {
   drawBadge(ctx, size / 2, size / 2, `+${plus}`, size * 1.35);
 }
 
+function chitTex(canvas) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function makeChitTexture(type, ownerColor, quantity) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
   paintPiece(canvas.getContext('2d'), { type, ownerColor, quantity });
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+  return chitTex(canvas);
 }
 
 export function makePipTexture(ownerColor, total, type = 'infantry') {
   const canvas = document.createElement('canvas');
-  canvas.width = 192;
-  canvas.height = 192;
-  paintPip(canvas.getContext('2d'), { ownerColor, total, type });
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  canvas.width = 256;
+  canvas.height = 256;
+  paintPip(canvas.getContext('2d'), { ownerColor, total, type, size: 256 });
+  return chitTex(canvas);
 }
 
 export function makeOverflowTexture(plus) {
@@ -431,9 +435,7 @@ export function makeOverflowTexture(plus) {
   canvas.width = 192;
   canvas.height = 192;
   paintOverflow(canvas.getContext('2d'), { plus });
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return chitTex(canvas);
 }
 
 export function pieceIconDataUrl(type, ownerColor, quantity = 1) {

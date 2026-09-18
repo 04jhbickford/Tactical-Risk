@@ -443,8 +443,9 @@ export async function bootThreeMapSpike() {
   controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
   controls.touches.ONE = THREE.TOUCH.PAN;
   // r170 has no TOUCH.DOLLY (was undefined → iPhone pinch died).
-  // Custom two-finger pinch below; Orbit only pans on two fingers.
-  controls.touches.TWO = THREE.TOUCH.PAN;
+  // Custom two-finger pinch+pan below. Orbit rotate is off, so TWO=ROTATE
+  // keeps Orbit from fighting the iPhone gesture.
+  controls.touches.TWO = THREE.TOUCH.ROTATE;
   controls.minDistance = 38;
   controls.maxDistance = 268;
   controls.minPolarAngle = 0.08;
@@ -524,12 +525,39 @@ export async function bootThreeMapSpike() {
   frameEuropeAfrica();
   window.addEventListener('resize', resize);
 
-  function dollyBy(factor) {
+  function worldOnPlane(clientX, clientY) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / Math.max(1, rect.width)) * 2 - 1,
+      -((clientY - rect.top) / Math.max(1, rect.height)) * 2 + 1,
+    );
+    const hit = new THREE.Vector3();
+    raycaster.setFromCamera(ndc, camera);
+    return raycaster.ray.intersectPlane(plane, hit) ? hit.clone() : null;
+  }
+
+  function dollyBy(factor, clientX, clientY) {
     const dir = new THREE.Vector3().subVectors(camera.position, controls.target);
     const next = dir.multiplyScalar(factor);
     const dist = next.length();
     if (dist < controls.minDistance || dist > controls.maxDistance) return;
+    const anchor = (clientX != null && clientY != null) ? worldOnPlane(clientX, clientY) : null;
     camera.position.copy(controls.target).add(next);
+    if (anchor) {
+      const after = worldOnPlane(clientX, clientY);
+      if (after) {
+        const delta = anchor.sub(after);
+        camera.position.add(delta);
+        controls.target.add(delta);
+      }
+    }
+  }
+
+  function panByWorld(from, to) {
+    if (!from || !to) return;
+    const delta = from.clone().sub(to);
+    camera.position.add(delta);
+    controls.target.add(delta);
   }
 
   chrome.zoom.addEventListener('click', (e) => {
@@ -762,13 +790,18 @@ export async function bootThreeMapSpike() {
   });
 
   let pinchDist = 0;
+  let pinchMid = null;
 
   function twoFinger() {
     const pts = [...pointers.values()];
     if (pts.length < 2) return null;
     const a = pts[0];
     const b = pts[1];
-    return { dist: Math.hypot(b.x - a.x, b.y - a.y) };
+    return {
+      dist: Math.hypot(b.x - a.x, b.y - a.y),
+      mx: (a.x + b.x) / 2,
+      my: (a.y + b.y) / 2,
+    };
   }
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
@@ -779,7 +812,9 @@ export async function bootThreeMapSpike() {
     maxPointers = Math.max(maxPointers, pointers.size);
     if (pointers.size >= 2) {
       gesturePinch = true;
-      pinchDist = twoFinger()?.dist || 0;
+      const now = twoFinger();
+      pinchDist = now?.dist || 0;
+      pinchMid = now ? { x: now.mx, y: now.my } : null;
     }
     renderer.domElement.classList.add('is-panning');
   });
@@ -793,9 +828,16 @@ export async function bootThreeMapSpike() {
         const now = twoFinger();
         if (now && pinchDist > 8 && now.dist > 8) {
           const factor = pinchDist / now.dist;
-          if (Number.isFinite(factor) && factor > 0.25 && factor < 4) dollyBy(factor);
+          if (Number.isFinite(factor) && factor > 0.25 && factor < 4) {
+            dollyBy(factor, now.mx, now.my);
+          }
+        } else if (now && pinchMid) {
+          const before = worldOnPlane(pinchMid.x, pinchMid.y);
+          const after = worldOnPlane(now.mx, now.my);
+          panByWorld(before, after);
         }
         pinchDist = now?.dist || pinchDist;
+        pinchMid = now ? { x: now.mx, y: now.my } : pinchMid;
       }
       return;
     }
@@ -816,16 +858,22 @@ export async function bootThreeMapSpike() {
       gesturePinch = false;
       maxPointers = 0;
       pinchDist = 0;
+      pinchMid = null;
       if (allowTap) paintSelection(pickTerritory(e));
     } else if (pointers.size === 1) {
       pinchDist = 0;
+      pinchMid = null;
     }
   }
 
   function touchPinchOf(e) {
     const a = e.touches[0];
     const b = e.touches[1];
-    return { dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY) };
+    return {
+      dist: Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY),
+      mx: (a.clientX + b.clientX) / 2,
+      my: (a.clientY + b.clientY) / 2,
+    };
   }
   let touchPinch = null;
   renderer.domElement.addEventListener('touchstart', (e) => {
@@ -842,7 +890,11 @@ export async function bootThreeMapSpike() {
       const now = touchPinchOf(e);
       if (touchPinch.dist > 8 && now.dist > 8) {
         const factor = touchPinch.dist / now.dist;
-        if (Number.isFinite(factor) && factor > 0.25 && factor < 4) dollyBy(factor);
+        if (Number.isFinite(factor) && factor > 0.25 && factor < 4) {
+          dollyBy(factor, now.mx, now.my);
+        }
+      } else {
+        panByWorld(worldOnPlane(touchPinch.mx, touchPinch.my), worldOnPlane(now.mx, now.my));
       }
       touchPinch = now;
     }

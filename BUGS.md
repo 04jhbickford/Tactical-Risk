@@ -4,12 +4,12 @@
 
 ## 9.18.26 — V2.81.51-three-polish.12 (preview only, SCHEMA 11)
 
-Arc harsh QC on polish.11 (~50%): number-coins, charcoal ocean, flat GIS olive, Lucide silhouettes. Preview `?three=1` only. Do not merge. Tesla off.
+James HE-CORRECT on polish.11 (~25% love): no texture, icons too simple, looks vector / GIS. Preview `?three=1` only. Do not merge. Tesla off.
 
-1. **Grain** — continent wash + 14% parchment multiply (Viz 8–14%). Lids get the map. No mipmaps.
-2. **Ocean** — AA-PALETTE slate-teal `#3D5A66` / `#4F6E78` from the Arc print tile, quiet tooth. Not charcoal / grey noise.
-3. **Units** — cream plastic chits + faction rim + ≥2px dark outline + contact shadow. Mid = one pip+N; near ≤3–4 typed + `+K`.
-4. **P1** — frost L0/peek, gold select, Confirm 18px above home indicator. Pinch kept.
+1. **Image-gen first** — James parchment macro + continent wash tiles are the land albedo (not hex + 14% flatten). Ocean is the printed slate-teal macro, color-locked to `#3D5A66` / `#4F6E78`. Lids get the map. No mipmaps.
+2. **Units** — photoreal molded A&A plastics from `units-molded-plastic-atlas-hi` + cut fallbacks. Cream/plastic body + faction tint, ≥2px dark outline, contact shadow, toy sheen. Cream discs / Lucide / number-coins killed. Mid = one pip+N; near ≤3–4 typed + `+K`.
+3. **Pinch** — two-finger pinch zoom around midpoint + two-finger pan. +/− / Fit stay secondary.
+4. **P1** — frost L0/peek, gold select, Confirm 18px above home indicator.
 
 Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.12.
 
