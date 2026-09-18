@@ -427,9 +427,9 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.52);
+  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.68);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFF6E4, 1.18);
+  const key = new THREE.DirectionalLight(0xFFF6E4, 0.98);
   key.position.set(-62, 54, -36);
   scene.add(key);
   scene.add(key.target);
@@ -443,7 +443,7 @@ export async function bootThreeMapSpike() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.06;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.06).texture;
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 

@@ -372,10 +372,10 @@ export function makeFoamBandMeshes(territory, material) {
   for (const poly of territory.polygons || []) {
     const ring = simplifyRing(poly, 0.55);
     if (!ring || ring.length < 4) continue;
-    const outer = inflateRing(ring, 5.2);
-    const inner = inflateRing(ring, 0.8);
+    const outer = inflateRing(ring, 4.4);
+    const inner = inflateRing(ring, 1.1);
     const shape = shapeFromRing(outer);
-    const hole = shapeFromRing(inner);
+    const hole = shapeFromRing(inner.slice().reverse());
     shape.holes.push(hole);
     const geom = new THREE.ShapeGeometry(shape, 1);
     geom.rotateX(-Math.PI / 2);
