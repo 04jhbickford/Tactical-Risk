@@ -429,13 +429,13 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.68);
+  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.72);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFF6E4, 0.98);
+  const key = new THREE.DirectionalLight(0xFFF6E4, 0.86);
   key.position.set(-62, 54, -36);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x9BB0B8, 0.28);
+  const fill = new THREE.DirectionalLight(0x9BB0B8, 0.32);
   fill.position.set(46, 32, 22);
   scene.add(fill);
 
@@ -443,7 +443,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.06;
+  renderer.toneMappingExposure = 1.00;
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   renderer.domElement.id = 'threeCanvas';

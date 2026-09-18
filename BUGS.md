@@ -2,6 +2,19 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.16 (preview only, SCHEMA 11)
+
+James A&A + Risk homage lock. Preview `?three=1` only. Do not merge. Pattern homage — no scanned board.
+
+1. **Land** — parchment grain + punched continent print ink (Viz hexes). Europe olive / USSR tan / Africa ochre / Asia sage must read at 390 mid. Not mono khaki GIS.
+2. **Ocean** — printed slate-teal `#3D5A66` / `#4F6E78`.
+3. **Units** — molded A&A plastic atlas (cream + faction rim). Keep MeshStandard + hemi/key + AO.
+4. **Light** — slightly cooler key/exposure so ACES does not crush washes back to one khaki planet.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.16.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.15 (preview only, SCHEMA 11)
 
 `PRODUCTION-PATH.md` is now **standing production SoT** (preview now; Canvas cutover later only with James yes) — not a one-off polish note. Every pass = director ladder fail-closed: bake → lights/AO → pinch → 390 scorecard. If SVG glance FAIL, iterate the same ladder without waiting for James.

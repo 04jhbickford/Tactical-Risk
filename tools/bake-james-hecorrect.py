@@ -24,7 +24,9 @@ BOARD = ROOT / 'assets/three/board'
 UNITS = ROOT / 'assets/three/units'
 CELL = 512
 
-# Viz AA-PALETTE continent washes — 18–28% over parchment (not candy Risk).
+# Viz AA-PALETTE continent washes. Hex tokens stay locked.
+# 18–28% literal RGB mix reads as one khaki planet after ACES.
+# Homage / Risk glance: parchment luminosity + stronger print ink.
 WASH_HEX = {
     'europe': (0x6B, 0x7A, 0x4A),
     'ussr': (0x8A, 0x73, 0x55),
@@ -36,6 +38,9 @@ WASH_HEX = {
     'oceania': (0x7A, 0x6B, 0x8A),
 }
 WASH_STRENGTH = 0.28
+# Colorize amount so Europe olive / USSR tan / Africa ochre survive 390.
+WASH_COLORIZE = 0.70
+WASH_CHROMA = 1.22
 LAND_BASE = (0xC4, 0xB8, 0x96)
 
 # James 4×2 hi-detail sheet (grey/olive plastics on parchment).
@@ -99,9 +104,21 @@ def colorize_keep_grain(im: Image.Image, rgb, strength=0.78) -> Image.Image:
 
 
 def wash_over_parchment(parchment: Image.Image, rgb, strength=WASH_STRENGTH) -> Image.Image:
-    """Parchment luminosity + continent hue. Grain stays; continents read at 390."""
-    dyed = colorize_keep_grain(parchment, rgb, 0.52)
-    return Image.blend(dyed, parchment, 0.12)
+    """Parchment grain + continent print ink. Soft, not a flat fill; Risk-readable at 390."""
+    arr = np.array(parchment, dtype=np.float32)
+    lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
+    lum = np.clip((lum - 0.12) / 0.68, 0.40, 1.20)
+    target = np.array(rgb, dtype=np.float32)
+    printed = target * lum[..., None]
+    t = WASH_COLORIZE
+    out = arr * (1.0 - t) + printed * t
+    # Push hue apart (Europe green vs USSR brown vs Africa ochre) without flattening grain.
+    grey = out.mean(axis=2, keepdims=True)
+    out = grey + (out - grey) * WASH_CHROMA
+    # Tiny parchment return so it stays printed paper, not candy plastic.
+    paper = min(0.10, max(0.0, 0.28 - float(strength)))
+    out = out * (1.0 - paper) + arr * paper
+    return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), 'RGB')
 
 
 def height_to_normal(im: Image.Image, strength=2.4) -> Image.Image:
@@ -159,7 +176,7 @@ def bake_board():
 
     for slug, rgb in WASH_HEX.items():
         wash = wash_over_parchment(parchment, rgb, WASH_STRENGTH)
-        wash = ImageEnhance.Contrast(wash).enhance(1.08)
+        wash = ImageEnhance.Contrast(wash).enhance(1.14)
         wash.save(BOARD / f'wash-{slug}.png', 'PNG', optimize=True)
         print('wrote', BOARD / f'wash-{slug}.png')
 
