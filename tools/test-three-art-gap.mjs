@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.30 even parchment + quiet printed sea lanes.
+// V2.81.51-three-polish.31 painted board + live Risk continents + no-clip LOD.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -24,6 +24,13 @@ const {
   NEAR_MAX,
   PIP_PX,
   PIECE_PX,
+  clusterPack,
+  packPitchFor,
+  footprintPiecePx,
+  pieceWorldCap,
+  isSmallLand,
+  territoryFootprint,
+  DENSE_LANDS,
 } = await import(pathToFileURL(join(root, 'src/map/threeMapDensity.js')));
 
 const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
@@ -51,7 +58,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.30', GAME_VERSION === 'V2.81.51-three-polish.30');
+check('GAME_VERSION is V2.81.51-three-polish.31', GAME_VERSION === 'V2.81.51-three-polish.31');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -112,14 +119,14 @@ check('faction plastic DE/SU/UK/US/JP',
   /#6A6C68/.test(palette) && /#2F7A2A/.test(palette) && /#B89050/.test(palette)
   && /#4E6828/.test(palette) && /#D24A1C/.test(palette));
 
-check('continent Europe olive', /Europe: '#6B7A4A'/.test(palette));
-check('continent USSR tan', /USSR: '#8A7355'/.test(palette));
+check('continent Europe dusty steel (live bonus)', /Europe: '#4E7388'/.test(palette));
+check('continent USSR leftover only, not a bonus group', /USSR: '#8A7355'/.test(palette));
 check('continent Africa ochre', /Africa: '#B08948'/.test(palette));
-check('continent Asia sage', /Asia: '#5F7A5A'/.test(palette));
+check('continent Asia olive (includes Russia/Ukraine)', /Asia: '#6A8A3C'/.test(palette));
 check('continent NA green', /'North America': '#6A8B6E'/.test(palette));
-check('continent SA teal', /'South America': '#5A8A72'/.test(palette));
-check('continent Pacific mauve', /Oceania: '#7A6B8A'/.test(palette));
-check('continent ME khaki', /'Middle East': '#A09058'/.test(palette));
+check('continent SA cocoa', /'South America': '#8A6848'/.test(palette));
+check('continent Pacific slate', /Oceania: '#7A7B8A'/.test(palette));
+check('continent ME dusty gold', /'Middle East': '#C4A068'/.test(palette));
 check('continent wash 18-28%', /CONTINENT_WASH_STRENGTH = 0\.28/.test(palette));
 check('Viz wash is 18-28% over parchment not solid',
   /WASH_STRENGTH = 0\.28/.test(baker)
@@ -367,8 +374,8 @@ check('p27 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27
 check('p27 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/vercel-live-mid-390.png'));
 check('world atlas UVs un-mirror mesh X onto orig map X',
   /Un-mirror/.test(terrain) && /origX = MAP_WIDTH - flippedX/.test(terrain));
-check('p28 louder mountain hatch + forest stipple',
-  /drawRidgeHatch/.test(terrain) && /stampForestStipple/.test(terrain)
+check('p28 louder mountain + forest stipple',
+  /paintMountainMass/.test(terrain) && /stampForestStipple/.test(terrain)
   && /CAPITAL_ROUNDELS/.test(terrain) && /0x6a8488/.test(terrain));
 check('p29 mini tint is luminance colorize (no primer-grey army)',
   /P29 HARD: luminance colorize/.test(chits)
@@ -382,9 +389,11 @@ check('p29 coast shelf is a wide turquoise fringe',
 check('p29 parchment wash not solid biome fill',
   /P29 HARD: parchment ink wash/.test(terrain)
   && /Never solid charcoal GIS fills/.test(terrain));
-check('p29 printed ridge hatch reads at 390',
-  /P29 HARD: printed mountain hatch/.test(terrain)
-  && /rgba\(92, 68, 38, 0\.92\)/.test(terrain));
+check('p31 painted mountains, not hatch-tick ridges',
+  /P31 HARD: painted tabletop ranges/.test(terrain)
+  && /paintMountainMass/.test(terrain)
+  && !/drawRidgeHatch/.test(terrain)
+  && !/tick = 28/.test(terrain));
 check('p29 frameNear helper for faction stills',
   /frameNear\(name\)/.test(spike) && /frameNearGermany/.test(spike));
 check('p28 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P28.md')));
@@ -418,11 +427,14 @@ check('p30 quiet printed sea lanes, not cyan neon',
   && /dashed: true/.test(spike)
   && !/#2E6470/.test(spike)
   && !/0x9ed4d4/.test(terrain));
-check('p30 select is soft gold ring, not candy flood',
+check('p31 select is crystal-clear gold, not candy flood',
   /Soft gold ring\/ink/.test(spike)
-  && /emissiveIntensity = 0\.16/.test(spike)
+  && /emissiveIntensity = 0\.30/.test(spike)
+  && /makeSelectWashMeshes/.test(spike)
+  && /selectHaloMat/.test(spike)
+  && /makeLineMat\(PALETTE\.select, 6\.4/.test(spike)
   && !/emissiveIntensity = hex \? 0\.58/.test(spike)
-  && /makeLineMat\(PALETTE\.select, 3\.6/.test(spike));
+  && !/makeLineMat\(PALETTE\.select, 3\.6/.test(spike));
 check('p30 coast shelf is printed ink not neon turquoise',
   /printed shelf ink/.test(terrain)
   && /color: 0x6a8488/.test(terrain)
@@ -437,6 +449,51 @@ check('p30 tray still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europ
 check('p30 second faction UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/uk-near-select-390.png'));
 check('p30 third faction SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/russia-near-select-390.png'));
 check('p30 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/vercel-live-mid-390.png'));
+check('p31 live Risk bonus continents, no USSR remap',
+  /P31 HARD: live Risk bonus continents/.test(palette)
+  && /LIVE_CONTINENTS/.test(palette)
+  && /bonusContinent/.test(palette)
+  && /bonusContinent/.test(terrain)
+  && !/if \(USSR_LANDS\.has\(territory\.name\)\) return 'USSR'/.test(palette)
+  && !/if \(USSR_LANDS\.has\(territory\.name\)\) return REGION_WASH\.USSR/.test(terrain)
+  && /CONTINENT_BADGES/.test(terrain)
+  && /addTerritoryInk\(group, land, landBorderMat, height \+ 0\.05, continentMats/.test(spike));
+check('p31 units never depth-clipped by map',
+  /depthTest: false/.test(spike)
+  && /sprite\.center\.set\(0\.5, 0\.16\)/.test(spike)
+  && /polygonOffsetFactor = 1\.5/.test(art)
+  && /renderOrder = 24/.test(spike));
+check('p31 Japan / multi-type footprint LOD',
+  DENSE_LANDS.has('Japan')
+  && isSmallLand('Japan', { min: 286 })
+  && /clusterPack/.test(spike)
+  && /packPitchFor/.test(spike)
+  && /pieceWorldCap/.test(spike)
+  && /territoryFootprint/.test(spike)
+  && /frameNearJapan/.test(spike)
+  && /byHome/.test(spike)
+  && /'Japan Sea Zone': \{ x: 2695/.test(spike));
+check('p31 cluster pack is tighter than spiral',
+  clusterPack(4, 6).length === 4
+  && Math.hypot(clusterPack(4, 6)[0].x, clusterPack(4, 6)[0].z) < 4);
+check('p31 footprint cap shrinks pieces on small lands',
+  pieceWorldCap(13.5, { min: 90 }, 4) < 8
+  && footprintPiecePx({ min: 90 }, 'near', true, 4) < PIECE_PX);
+check('p31 feathered fills + coast tooth',
+  /fillFeathered/.test(terrain)
+  && /paintCoastTooth/.test(terrain)
+  && /smoothRing/.test(art));
+check('p31 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P31.md')));
+check('p31 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p31/SCORE.md')));
+check('p31 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-mid-390.png'));
+check('p31 mid HUD 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-mid-hud-390.png'));
+check('p31 mid select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-mid-select-390.png'));
+check('p31 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-near-select-390.png'));
+check('p31 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-near-units-390.png'));
+check('p31 Japan near multi-type still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/japan-near-select-390.png'));
+check('p31 UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/uk-near-select-390.png'));
+check('p31 SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/russia-near-select-390.png'));
+check('p31 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);

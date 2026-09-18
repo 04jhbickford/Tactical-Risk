@@ -50,18 +50,29 @@ export const PALETTE = {
   cream: '#F0E6D2',
 };
 
-// Viz AA-PALETTE lock: exact hex @ 18–28% over parchment (not solid fills).
-// Stack: parchment+grain → continent wash → faction ownership → ink → units.
+// P31 HARD: live Risk bonus continents from data/continents.json (7 groups).
+// Muted print hexes — parchment stain, not candy Risk primaries, not Confirm gold fills.
+// USSR is NOT a bonus continent (Russia/Ukraine/Karelia are Asia).
 export const REGION_WASH = {
-  Europe: '#6B7A4A',
-  USSR: '#8A7355',
+  Europe: '#4E7388',
+  Asia: '#6A8A3C',
   Africa: '#B08948',
-  'Middle East': '#A09058',
-  Asia: '#5F7A5A',
+  'Middle East': '#C4A068',
   'North America': '#6A8B6E',
-  'South America': '#5A8A72',
-  Oceania: '#7A6B8A',
+  'South America': '#8A6848',
+  Oceania: '#7A7B8A',
+  // Leftover tile key only — never remap live bonus groups onto this.
+  USSR: '#8A7355',
 };
+export const LIVE_CONTINENTS = [
+  'Europe',
+  'Asia',
+  'Africa',
+  'Middle East',
+  'North America',
+  'South America',
+  'Oceania',
+];
 export const CONTINENT_WASH_STRENGTH = 0.28;
 // Runtime multiply so Europe/USSR/Africa still split at 390 after lighting.
 // P23: punch is LOD-invariant — hold at near; do not flatten when dollying in.
@@ -366,10 +377,15 @@ function bakeLandSheet(washHex) {
   return tex;
 }
 
+export function bonusContinent(territory) {
+  if (!territory || territory.isWater) return null;
+  const key = territory.continent;
+  return LIVE_CONTINENTS.includes(key) ? key : 'Europe';
+}
+
 function continentKey(territory) {
-  if (!territory) return 'Europe';
-  if (USSR_LANDS.has(territory.name)) return 'USSR';
-  return WASH_TEX[territory.continent] ? territory.continent : 'Europe';
+  // P31: bonus group == live continents.json. Do not remap USSR_LANDS.
+  return bonusContinent(territory) || 'Europe';
 }
 
 export async function loadBoardTextures() {
@@ -420,8 +436,8 @@ export function applyPaperUVs(geometry, territory) {
 
 export function regionWashFor(territory) {
   if (!territory) return REGION_WASH.Europe;
-  if (USSR_LANDS.has(territory.name)) return REGION_WASH.USSR;
-  return REGION_WASH[territory.continent] || PALETTE.landBase;
+  const key = bonusContinent(territory) || 'Europe';
+  return REGION_WASH[key] || PALETTE.landBase;
 }
 
 export function landWashHex(ownerHex, regionHex) {
@@ -446,8 +462,8 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const world = worldLandMap;
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
-  // light wash. P30: keep continent split but do not tint lids toward void.
-  const continentTint = mixHex('#ffffff', region, world ? 0.08 : CONTINENT_CHROMA_PUNCH);
+  // light wash. P31: a bit more live-continent chroma so bonus groups read.
+  const continentTint = mixHex('#ffffff', region, world ? 0.24 : CONTINENT_CHROMA_PUNCH);
   const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.08 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,

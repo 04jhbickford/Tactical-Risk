@@ -20,6 +20,8 @@ import {
   makeLandSealMeshes,
   makeLineMat,
   addTerritoryInk,
+  makeSelectWashMaterial,
+  makeSelectWashMeshes,
   createWrapGroups,
   syncWrapVisibility,
   wrapPanLikeCanvas,
@@ -50,6 +52,8 @@ import {
   plasticColor,
   setWorldLandMap,
   getPaperImage,
+  bonusContinent,
+  REGION_WASH,
 } from './threeMapPalette.js';
 import {
   makeChitTexture,
@@ -64,6 +68,12 @@ import {
   isSupportType,
   showMinis,
   spiralPack,
+  clusterPack,
+  packPitchFor,
+  footprintPiecePx,
+  pieceWorldCap,
+  isSmallLand,
+  territoryFootprint,
   separatePoints,
   isDenseBand,
   nearLayout,
@@ -93,6 +103,7 @@ const SEA_ZONE_CENTERS = {
   'Hawaii Sea Zone': { x: 3062, y: 960 },
   'Wake Island Sea Zone': { x: 2764, y: 1003 },
   'Okinawa Sea Zone': { x: 2569, y: 943 },
+  'Japan Sea Zone': { x: 2695, y: 750 },
   'New Zealand Sea Zone': { x: 2964, y: 1658 },
   'South Pacific Sea Zone': { x: 2992, y: 1314 },
   'Solomon Islands Sea Zone': { x: 2778, y: 1288 },
@@ -290,13 +301,20 @@ export async function bootThreeMapSpike() {
   const coastAoMat = makeCoastAoMaterial();
   const coastShelfMat = makeCoastShelfMaterial();
   const riverMat = makeLineMat('#3A4E52', 2.2, 0.46);
-  const selectMat = makeLineMat(PALETTE.select, 3.6, 0.86);
+  const selectHaloMat = makeLineMat('#3A3428', 8.8, 0.52);
+  const selectMat = makeLineMat(PALETTE.select, 6.4, 0.94);
+  const selectWashMat = makeSelectWashMaterial();
+  const continentMats = new Map();
+  for (const [name, hex] of Object.entries(REGION_WASH)) {
+    if (name === 'USSR') continue;
+    continentMats.set(name, makeLineMat(hex, 3.4, 0.62));
+  }
   const seaLaneMat = makeLineMat('#B8B09A', 1.45, 0.38, {
     dashed: true,
     dashSize: 5.4,
     gapSize: 7.2,
   });
-  lineMats.push(landBorderMat, foamMat, riverMat, selectMat, seaLaneMat);
+  lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, ...continentMats.values());
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
@@ -343,7 +361,7 @@ export async function bootThreeMapSpike() {
       for (const seal of makeLandSealMeshes(land, landMats.get(land.name)?.seal)) {
         group.add(seal);
       }
-      addTerritoryInk(group, land, landBorderMat, height + 0.05);
+      addTerritoryInk(group, land, landBorderMat, height + 0.05, continentMats.get(bonusContinent(land)));
       addFoamCoast(group, land, foamMat, 0.05);
       for (const shelf of makeCoastShelfMeshes(land, coastShelfMat)) {
         group.add(shelf);
@@ -376,13 +394,14 @@ export async function bootThreeMapSpike() {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
-          depthTest: true,
+          depthTest: false,
           depthWrite: false,
           toneMapped: false,
         }));
+        sprite.center.set(0.5, 0.16);
         sprite.scale.set(5.5, 5.5, 1);
-        sprite.position.set(x, height + 5.0, z);
-        sprite.renderOrder = 4;
+        sprite.position.set(x, height + 0.42, z);
+        sprite.renderOrder = 24;
         sprite.userData.territory = t;
         sprite.userData.unitType = stack.type;
         sprite.userData.kind = 'chit';
@@ -395,13 +414,14 @@ export async function bootThreeMapSpike() {
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
-        depthTest: true,
+        depthTest: false,
         depthWrite: false,
         toneMapped: false,
       }));
+      pip.center.set(0.5, 0.16);
       pip.scale.set(6.4, 6.4, 1);
-      pip.position.set(x, height + 5.0, z);
-      pip.renderOrder = 5;
+      pip.position.set(x, height + 0.42, z);
+      pip.renderOrder = 25;
       pip.userData.territory = t;
       pip.userData.kind = 'pip';
       pip.visible = false;
@@ -410,13 +430,14 @@ export async function bootThreeMapSpike() {
       const overflow = new THREE.Sprite(new THREE.SpriteMaterial({
         map: overflowTexture(1),
         transparent: true,
-        depthTest: true,
+        depthTest: false,
         depthWrite: false,
         toneMapped: false,
       }));
+      overflow.center.set(0.5, 0.16);
       overflow.scale.set(4.2, 4.2, 1);
-      overflow.position.set(x, height + 5.0, z);
-      overflow.renderOrder = 5;
+      overflow.position.set(x, height + 0.42, z);
+      overflow.renderOrder = 25;
       overflow.userData.territory = t;
       overflow.userData.kind = 'overflow';
       overflow.visible = false;
@@ -433,9 +454,10 @@ export async function bootThreeMapSpike() {
         }));
         const lo = LABEL_OFFSETS[t.name] || { x: 0, y: -36 };
         const lp = worldToScene(center.x + lo.x, center.y + lo.y);
+        label.center.set(0.5, 0.5);
         label.scale.set(24, 4.8, 1);
-        label.position.set(lp.x, height + 3.2, lp.z);
-        label.renderOrder = 6;
+        label.position.set(lp.x, height + 1.4, lp.z);
+        label.renderOrder = 22;
         label.userData.territory = t;
         label.userData.kind = 'label';
         group.add(label);
@@ -452,6 +474,7 @@ export async function bootThreeMapSpike() {
         homeX: x,
         homeZ: z,
         height,
+        footprint: t.isWater ? { w: 220, h: 220, min: 220 } : territoryFootprint(t),
         copy: group.userData.copy,
       });
     }
@@ -676,7 +699,7 @@ export async function bootThreeMapSpike() {
     if (mats?.top?.emissive) {
       if (hex) {
         mats.top.emissive.setHex(hex);
-        mats.top.emissiveIntensity = 0.16;
+        mats.top.emissiveIntensity = 0.30;
       } else {
         mats.top.emissive.setHex(0xc4b896);
         mats.top.emissiveIntensity = 0.045;
@@ -684,17 +707,24 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  function screenScale(kind) {
+  function screenScale(kind, footprint, typeCount = 1) {
     const dist = camera.position.distanceTo(controls.target);
     const h = renderer.domElement.clientHeight || window.innerHeight || 844;
+    const px = footprintPiecePx(footprint, kind === 'pip' ? 'mid' : 'near', kind !== 'pip', typeCount);
+    const small = (footprint?.min || 200) < 140;
     if (kind === 'pip') {
-      return worldSizeFromScreen(PIP_PX, dist, camera.fov, h, {
-        minPx: PIP_MIN_PX, maxPx: PIP_MAX_PX, maxWorld: 8.5,
+      return worldSizeFromScreen(px, dist, camera.fov, h, {
+        minPx: small ? 40 : PIP_MIN_PX,
+        maxPx: small ? 56 : PIP_MAX_PX,
+        maxWorld: small ? 6.0 : 8.5,
       });
     }
-    return worldSizeFromScreen(PIECE_PX, dist, camera.fov, h, {
-      minPx: PIECE_MIN_PX, maxPx: PIECE_MAX_PX, maxWorld: 13.5,
+    const world = worldSizeFromScreen(px, dist, camera.fov, h, {
+      minPx: small ? 50 : 68,
+      maxPx: small ? 76 : PIECE_MAX_PX,
+      maxWorld: small ? 7.0 : 13.5,
     });
+    return pieceWorldCap(world, footprint, typeCount);
   }
 
   function screenGap(tokenWorld) {
@@ -716,14 +746,23 @@ export async function bootThreeMapSpike() {
   function drawSelectInk(territory) {
     clearSelectInk();
     if (!territory || territory.isWater) return;
-    const y = (landHeights.get(territory.name) || BASE_LAND) + 0.36;
+    const height = landHeights.get(territory.name) || BASE_LAND;
+    const y = height + 0.42;
     for (const group of wrapGroups) {
       if (!group.visible) continue;
+      for (const wash of makeSelectWashMeshes(territory, selectWashMat, height)) {
+        group.add(wash);
+        selectInk.push(wash);
+      }
       for (const poly of territory.polygons || []) {
-        const ring = simplifyRing(poly);
+        const ring = simplifyRing(poly, 0.28);
         if (!ring) continue;
-        const line = makeBorderLine(ring, y, selectMat);
-        line.renderOrder = 4;
+        const halo = makeBorderLine(ring, y, selectHaloMat);
+        halo.renderOrder = 9;
+        group.add(halo);
+        selectInk.push(halo);
+        const line = makeBorderLine(ring, y + 0.04, selectMat);
+        line.renderOrder = 10;
         group.add(line);
         selectInk.push(line);
       }
@@ -740,13 +779,15 @@ export async function bootThreeMapSpike() {
       if (!copies.has(rec.copy)) copies.set(rec.copy, []);
       copies.get(rec.copy).push(rec);
     }
-    const pipS = screenScale('pip');
-    const pieceS = screenScale('piece');
-    const minSep = screenGap(band === 'near' ? pieceS : pipS);
     for (const recs of copies.values()) {
       const movers = [];
       for (const rec of recs) {
         const selected = rec.territory.name === selectedName;
+        const footprint = rec.footprint || { min: 200 };
+        const typeCount = rec.stacks.length;
+        const pipS = screenScale('pip', footprint, 1);
+        const pieceS = screenScale('piece', footprint, Math.max(1, Math.min(4, typeCount)));
+        const small = isSmallLand(rec.territory.name, footprint) || typeCount >= 4;
         // STACK-LOD / P22 HARD: mid/far idle = ONE cream pip+N. ZERO type parade.
         // Near OR select = molded plastic minis ≤3–4 +K. Roster lives in peek.
         const dense = isDenseBand(band);
@@ -755,7 +796,7 @@ export async function bootThreeMapSpike() {
         const collapse = !showMinis(band, selected);
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
-        rec.pip.position.set(rec.homeX, rec.height + 4.8, rec.homeZ);
+        rec.pip.position.set(rec.homeX, rec.height + 0.38, rec.homeZ);
         const shownTypes = new Set((collapse ? [] : plan.shown).map((s) => s.type));
         for (const sprite of rec.expanded) {
           const on = !collapse && shownTypes.has(sprite.userData.unitType);
@@ -770,12 +811,14 @@ export async function bootThreeMapSpike() {
             rec.overflow.material.map.needsUpdate = true;
             rec.overflow.material.needsUpdate = true;
           }
-          rec.overflow.scale.set(pieceS * 0.72, pieceS * 0.72, 1);
+          rec.overflow.scale.set(pieceS * 0.70, pieceS * 0.70, 1);
         }
         if (!collapse) {
           const shown = rec.expanded.filter((s) => s.visible);
           if (rec.overflow?.visible) shown.push(rec.overflow);
-          const spots = spiralPack(shown.length, minSep);
+          const pitch = packPitchFor(shown.length, pieceS, footprint);
+          const spots = (small ? clusterPack : spiralPack)(shown.length, pitch);
+          const minSep = screenGap(pieceS * (small ? 0.72 : 1));
           shown.forEach((sprite, i) => {
             movers.push({
               sprite,
@@ -783,8 +826,9 @@ export async function bootThreeMapSpike() {
               z: rec.homeZ + spots[i].z,
               homeX: rec.homeX,
               homeZ: rec.homeZ,
-              maxDrift: 14,
-              y: rec.height + 5.2,
+              maxDrift: small ? Math.max(3.2, pitch * 1.6) : 14,
+              y: rec.height + 0.42,
+              minSep,
             });
           });
         }
@@ -795,10 +839,19 @@ export async function bootThreeMapSpike() {
           rec.label.visible = !hide;
           const lo = LABEL_OFFSETS[rec.territory.name] || { x: 0, y: 28 };
           const lp = worldToScene(rec.center.x + lo.x, rec.center.y + lo.y);
-          rec.label.position.set(lp.x, rec.height + 2.7, lp.z - 3.4);
+          rec.label.position.set(lp.x, rec.height + 1.2, lp.z - 3.4);
         }
       }
-      separatePoints(movers, minSep);
+      const byHome = new Map();
+      for (const m of movers) {
+        const key = `${m.homeX.toFixed(2)}|${m.homeZ.toFixed(2)}`;
+        if (!byHome.has(key)) byHome.set(key, []);
+        byHome.get(key).push(m);
+      }
+      for (const group of byHome.values()) {
+        const sep = group[0]?.minSep || 4;
+        separatePoints(group, sep);
+      }
       for (const m of movers) {
         m.sprite.position.set(m.x, m.y, m.z);
       }
@@ -1084,6 +1137,10 @@ export async function bootThreeMapSpike() {
     frameNearGermany() {
       return window.__threeSpike.frameNear('Germany');
     },
+    frameNearJapan() {
+      return window.__threeSpike.frameNear('Japan');
+    },
+    continents,
     rosterOf(name) {
       const stacks = stacksFor(name, placements);
       return {
@@ -1141,6 +1198,13 @@ export async function bootThreeMapSpike() {
         evenParchment: true,
         parchmentFloor: 0.48,
         quietLanes: true,
+        paintedMountains: true,
+        noHatchRidges: true,
+        unitNoClip: true,
+        japanLod: true,
+        selectClear: true,
+        liveContinents: true,
+        continentCount: continents.length,
       };
     },
   };

@@ -109,6 +109,92 @@ export function hexPack(n, pitch) {
   return spiralPack(n, pitch);
 }
 
+// P31 HARD: Japan / island / multi-type — pack to the land footprint so
+// minis never spill into soup. Mid idle still pip+N only.
+export const DENSE_LANDS = new Set([
+  'Japan', 'Okinawa', 'Philippines', 'United Kingdom', 'Eire',
+  'Switzerland', 'Cuba', 'Wake Island', 'Midway', 'Hawaiian Islands',
+  'Solomon Islands', 'Caroline Islands', 'New Zealand', 'Kwangtung',
+  'Manchuria', 'Borneo Celebes', 'East Indies',
+]);
+
+export function territoryFootprint(territory) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const poly of territory?.polygons || []) {
+    for (const [x, y] of poly) {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (!Number.isFinite(minX)) return { w: 200, h: 200, min: 200 };
+  const w = Math.max(1, maxX - minX);
+  const h = Math.max(1, maxY - minY);
+  return { w, h, min: Math.min(w, h) };
+}
+
+export function isSmallLand(name, footprint) {
+  if (DENSE_LANDS.has(name)) return true;
+  return (footprint?.min || 999) < 140;
+}
+
+export function footprintPiecePx(footprint, band, selected, typeCount = 1) {
+  const min = footprint?.min || 200;
+  if (band === 'near' || selected) {
+    if (min < 80) return 52;
+    if (min < 140) return 62;
+    if (typeCount >= 4 && min < 320) return 70;
+    if (min < 200) return 78;
+    return PIECE_PX;
+  }
+  if (min < 80) return 44;
+  if (min < 140) return 50;
+  return PIP_PX;
+}
+
+export function pieceWorldCap(baseWorld, footprint, n) {
+  const minWorld = Math.max(8, (footprint?.min || 200) * 0.1);
+  const cap = (minWorld * 0.55) / Math.max(1, Math.sqrt(Math.max(1, n)));
+  return Math.max(3.6, Math.min(baseWorld, cap));
+}
+
+export function clusterPack(n, pitch) {
+  if (n <= 0) return [];
+  if (n === 1) return [{ x: 0, z: 0 }];
+  if (n === 2) {
+    return [
+      { x: -pitch * 0.34, z: 0 },
+      { x: pitch * 0.34, z: 0 },
+    ];
+  }
+  if (n === 3) {
+    return [
+      { x: 0, z: -pitch * 0.30 },
+      { x: -pitch * 0.33, z: pitch * 0.24 },
+      { x: pitch * 0.33, z: pitch * 0.24 },
+    ];
+  }
+  if (n === 4) {
+    return [
+      { x: -pitch * 0.30, z: -pitch * 0.24 },
+      { x: pitch * 0.30, z: -pitch * 0.24 },
+      { x: -pitch * 0.30, z: pitch * 0.24 },
+      { x: pitch * 0.30, z: pitch * 0.24 },
+    ];
+  }
+  return spiralPack(n, pitch * 0.78);
+}
+
+export function packPitchFor(n, pieceWorld, footprint) {
+  const minWorld = Math.max(8, (footprint?.min || 200) * 0.1);
+  const budget = Math.max(minWorld * 0.36, pieceWorld * 0.50);
+  return Math.min(pieceWorld * 0.58, budget / Math.max(1, Math.sqrt(n)));
+}
+
 export function separatePoints(items, minDist, iterations = 22) {
   for (let iter = 0; iter < iterations; iter++) {
     for (let i = 0; i < items.length; i++) {
