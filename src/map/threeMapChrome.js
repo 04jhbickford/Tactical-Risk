@@ -75,11 +75,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(12px, env(safe-area-inset-left));
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:linear-gradient(180deg, rgba(30,36,32,0.50) 0%, rgba(30,36,32,0.32) 100%);
-      -webkit-backdrop-filter:saturate(1.8) blur(24px);
-      backdrop-filter:saturate(1.8) blur(24px);
-      border-bottom:1px solid rgba(255,255,255,0.18);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.16);
+      background:linear-gradient(180deg, rgba(30,36,32,0.26) 0%, rgba(30,36,32,0.06) 100%);
+      -webkit-backdrop-filter:saturate(2.15) blur(14px);
+      backdrop-filter:saturate(2.15) blur(14px);
+      border-bottom:1px solid rgba(255,255,255,0.20);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);
       color:#E8E2D4;
       pointer-events:none;
     }
@@ -123,9 +123,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek {
       display:none; pointer-events:none;
       min-height:44px; padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.50);
-      -webkit-backdrop-filter:saturate(1.8) blur(24px);
-      backdrop-filter:saturate(1.8) blur(24px);
+      background:rgba(30,36,32,0.28);
+      -webkit-backdrop-filter:saturate(2.15) blur(14px);
+      backdrop-filter:saturate(2.15) blur(14px);
       color:#E8E2D4;
       border:1px solid rgba(255,255,255,0.16);
       box-shadow:0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
@@ -191,9 +191,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.22);
-      background:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(30,36,32,0.40));
-      -webkit-backdrop-filter:saturate(1.8) blur(24px);
-      backdrop-filter:saturate(1.8) blur(24px);
+      background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(30,36,32,0.22));
+      -webkit-backdrop-filter:saturate(2.15) blur(14px);
+      backdrop-filter:saturate(2.15) blur(14px);
       color:#E8E2D4;
       font-size:20px; line-height:1; cursor:pointer;
       -webkit-tap-highlight-color:transparent;

@@ -2,6 +2,19 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.25 (preview only, SCHEMA 11)
+
+Arc+Viz love-gate ~86% on .24 — FAIL. P0s of .24 passed; glance vs Poly/Root/TTR still short: lighting even/flat, parchment tooth too subtle at 390 mid, cream chits read matte token. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Key/fill drama** — warmer raking key `#FFE2B0` + cooler hemi/fill so land planes sculpt at mid. MeshStandard only. No neon.
+2. **Parchment tooth @390** — macro paper grain punched for arm’s-length mid; mid-frequency fibers, not 1px speckle at near.
+3. **Glossy molded specular** — cream chits get a tight toy-plastic specular lobe + streak. Recessed glyphs + ≥2.5px outline + contact AO kept. Mid stays pip+N.
+4. **P1** — thinner L0 frost (saturate 2.15 / blur 14); deeper ocean ink + foam hairline; 150ms select micro-settle.
+
+390 stills in `qa-loop/p25/`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.25.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.24 (preview only, SCHEMA 11)
 
 Arc live 390 score ~78%, love-gate FAIL. P0s of .23 passed; glance vs Poly/Root/TTR still short: chits read as embossed tokens, board lighting/AO soft-flat, L0 frost slabby. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
