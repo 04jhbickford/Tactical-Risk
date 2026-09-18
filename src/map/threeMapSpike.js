@@ -666,8 +666,8 @@ export async function bootThreeMapSpike() {
         mats.top.emissive.setHex(hex);
         mats.top.emissiveIntensity = 0.30;
       } else {
-        mats.top.emissive.setHex(0xc4b896);
-        mats.top.emissiveIntensity = 0.045;
+        mats.top.emissive.setHex(0x000000);
+        mats.top.emissiveIntensity = 0;
       }
     }
   }

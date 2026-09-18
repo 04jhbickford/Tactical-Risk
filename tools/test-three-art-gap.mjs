@@ -562,7 +562,8 @@ check('p33 land samples painted albedo, stain is fallback',
   && /loadWorldLandAlbedo/.test(terrain)
   && /painted atlas is the hero/.test(terrain)
   && /FALLBACK ONLY/.test(terrain)
-  && /world \? 0\.035/.test(palette));
+  && /painted albedo is the hero/.test(palette)
+  && /emissive: 0x000000/.test(palette));
 check('p33 no permanent name sprites',
   /permanent name sprites are gone/.test(spike)
   && !/labelTexture\(t\.name\)/.test(spike)
@@ -594,6 +595,16 @@ check('p33 inspect flags painted albedo / dissolve / no labels',
   && /dissolveSelect: true/.test(spike)
   && /noMapLabels: true/.test(spike)
   && /noBakedIpc: true/.test(spike));
+check('p33 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md')));
+check('p33 mid painted board still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/europe-mid-390.png'));
+check('p33 China select no-internal-border still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/china-select-390.png'));
+check('p33 Japan near multi-type held still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/near-japan-multitype-390.png'));
+check('p33 Japan mid pip still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/japan-mid-390.png'));
+check('p33 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/vercel-live-mid-390.png'));
+check('p33 SCORE states painted albedo + dissolve',
+  /Painted world albedo/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
+  && /Dissolve China select/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
+  && /rings=1/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

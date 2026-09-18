@@ -322,10 +322,12 @@ def build_atlas(lands) -> Image.Image:
     if not world:
         raise SystemExit('P33 fail-closed: missing image-gen world-painted.png')
     fitted = world.resize((w, h), Image.Resampling.LANCZOS)
-    fitted = ImageEnhance.Color(fitted).enhance(0.94)
-    fitted = ImageEnhance.Contrast(fitted).enhance(1.08)
+    fitted = ImageEnhance.Color(fitted).enhance(1.16)
+    fitted = ImageEnhance.Contrast(fitted).enhance(1.28)
+    fitted = ImageEnhance.Sharpness(fitted).enhance(1.18)
     img = Image.composite(fitted, img, mask_all)
-    img = Image.composite(ImageChops.soft_light(img, paper), img, mask_all.point(lambda v: 64))
+    # Tiny paper tooth only — do not flatten the painting back to a wash.
+    img = Image.composite(ImageChops.soft_light(img, paper), img, mask_all.point(lambda v: 28))
 
     # Regional theater paintings — UV-aligned crops, not full-bleed stretch.
     if europe:
@@ -338,7 +340,7 @@ def build_atlas(lands) -> Image.Image:
     # Quiet printed chroma so Risk groups still split — painting stays hero.
     for key, rgb in CONT_HEX.items():
         cm = land_mask(lands, w, h, continents={key})
-        img = stain_hex(img, cm, rgb, alpha=0.14)
+        img = stain_hex(img, cm, rgb, alpha=0.20)
 
     if forest:
         fm = land_mask(lands, w, h, biomes={'forest'})
