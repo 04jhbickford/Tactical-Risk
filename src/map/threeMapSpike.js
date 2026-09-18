@@ -1276,7 +1276,7 @@ export async function bootThreeMapSpike() {
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
-        continentPunch: 0.18,
+        continentPunch: 0.22,
         seaDeckClear: true,
         eastMedPinSouth: true,
         noBlotchAtlas: true,

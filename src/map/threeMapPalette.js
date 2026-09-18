@@ -57,7 +57,7 @@ export const PALETTE = {
 // at mid 390. Quiet print hexes, not candy primaries, not Confirm gold.
 export const REGION_WASH = {
   Europe: '#6B7A4A',
-  Asia: '#5F7A5A',
+  Asia: '#8A7355',
   Africa: '#B08948',
   'Middle East': '#A09058',
   'North America': '#6A8B6E',
@@ -79,7 +79,7 @@ export const CONTINENT_WASH_STRENGTH = 0.16;
 // P35 HARD: quiet Risk punch stays ON the painted albedo so continents read
 // at 390. 0.18 is identity, not the .31 chocolate flood (0.42).
 // P23: punch is LOD-invariant — hold at near; do not flatten when dollying in.
-export const CONTINENT_CHROMA_PUNCH = 0.18;
+export const CONTINENT_CHROMA_PUNCH = 0.22;
 
 export const USSR_LANDS = new Set([
   'Russia',
@@ -132,7 +132,7 @@ export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 // P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
 export const OCEAN_GRAIN = 0.14;
 export const OCEAN_OPEN_DARKEN = 0.38;
-export const OCEAN_TEAL_PUNCH = 0.42;
+export const OCEAN_TEAL_PUNCH = 0.58;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
@@ -517,7 +517,7 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0x9eb8bc,
+    color: 0x6e8c94,
     roughness: 0.46,
     metalness: 0.10,
     envMapIntensity: 0.28,
@@ -530,9 +530,9 @@ export function makeOceanMaterial() {
 
 export function makeSeaWaterMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0x3d5a66,
+    color: 0x2f4c56,
     transparent: true,
-    opacity: 0.55,
+    opacity: 0.72,
     roughness: 0.52,
     metalness: 0.08,
     depthWrite: false,
@@ -575,11 +575,10 @@ export function makeOceanMesh(width, height) {
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // P35: keep shelf teal — pale vertex colors made Med read as stained land.
-    const reef = 1 - t;
-    colors[i * 3] = shade * (0.62 + reef * 0.06);
-    colors[i * 3 + 1] = shade * (0.78 + reef * 0.08);
-    colors[i * 3 + 2] = shade * (0.80 + reef * 0.08);
+    // P35: keep the whole basin teal — shelf brightening made Med look like land.
+    colors[i * 3] = shade * 0.52;
+    colors[i * 3 + 1] = shade * 0.68;
+    colors[i * 3 + 2] = shade * 0.72;
   }
   if (uv) {
     uv.needsUpdate = true;

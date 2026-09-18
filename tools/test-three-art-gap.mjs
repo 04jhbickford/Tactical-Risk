@@ -128,7 +128,7 @@ check('faction plastic DE/SU/UK/US/JP',
 check('continent Europe olive (AA-PALETTE)', /Europe: '#6B7A4A'/.test(palette));
 check('continent USSR leftover only, not a bonus group', /USSR: '#8A7355'/.test(palette));
 check('continent Africa ochre', /Africa: '#B08948'/.test(palette));
-check('continent Asia sage (includes Russia/Ukraine)', /Asia: '#5F7A5A'/.test(palette));
+check('continent Asia khaki (includes Russia/Ukraine)', /Asia: '#8A7355'/.test(palette));
 check('continent NA green', /'North America': '#6A8B6E'/.test(palette));
 check('continent SA teal-green', /'South America': '#5A8A72'/.test(palette));
 check('continent Pacific mauve', /Oceania: '#7A6B8A'/.test(palette));
@@ -266,7 +266,7 @@ check('near never collapses typed chits back to pip',
 check('select or near shows molded minis; mid idle stays pip',
   showMinis('near', false) && showMinis('mid', true) && !showMinis('mid', false)
   && !showMinis('far', false) && PIECE_PX >= 96);
-check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.18/.test(palette));
+check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.22/.test(palette));
 check('ocean shelf + grain', /oceanShelf/.test(palette) && /OCEAN_GRAIN/.test(palette));
 check('gold select emissive on land', /0xC4A35A/.test(spike) && /emissiveIntensity/.test(spike));
 check('iPhone two-finger pinch',
@@ -508,7 +508,7 @@ check('p32 quiet continent wash under select gold',
   && /CONTINENT_OVERLAY_ALPHA = 0\.11/.test(terrain)
   && /fillStain/.test(terrain)
   && /quietContinentWash/.test(terrain)
-  && /CONTINENT_CHROMA_PUNCH = 0\.18/.test(palette)
+  && /CONTINENT_CHROMA_PUNCH = 0\.22/.test(palette)
   && /CONTINENT_WASH_STRENGTH = 0\.16/.test(palette)
   && /quiet continent tint/.test(palette)
   && /Europe: '#6B7A4A'/.test(palette)
@@ -677,8 +677,20 @@ check('p35 land inflate does not eat Med',
   && /inflateRing\(ring, 8\.2\)/.test(art)
   && !/inflateRing\(ring, 26\.5\)/.test(art));
 check('p35 no .31 chocolate flood',
-  /CONTINENT_CHROMA_PUNCH = 0\.18/.test(palette)
+  /CONTINENT_CHROMA_PUNCH = 0\.22/.test(palette)
   && !/CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
+check('p35 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md')));
+check('p35 required stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/mid-land-sea.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/mid-continents.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/east-med-select-no-clip.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/china-select-hold.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/japan-near-hold.png'));
+check('p35 SCORE states four James bars',
+  /Land vs sea at mid 390/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8'))
+  && /East Med z-order/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8'))
+  && /shipsAboveItaly/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8'))
+  && /3\.60/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);
