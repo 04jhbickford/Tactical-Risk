@@ -31,6 +31,7 @@ export const PALETTE = {
   // AA-PALETTE slate-teal — printed A&A sea, not charcoal noise.
   oceanDeep: '#3D5A66',
   oceanShelf: '#4F6E78',
+  oceanReef: '#7AADB0',
   oceanFog: '#3D5A66',
   foam: '#D9D2C0',
   border: '#3A3428',
@@ -146,8 +147,17 @@ let paperNormal = null;
 let paperAO = null;
 let oceanNormal = null;
 let grainCanvas = null;
+let worldLandMap = null;
 const landSheets = new Map();
 const washMaps = new Map();
+
+export function setWorldLandMap(tex) {
+  worldLandMap = tex || null;
+}
+
+export function getPaperImage() {
+  return paperTex?.image || grainCanvas || null;
+}
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -312,9 +322,10 @@ function bakeOcean(img) {
   ctx.fillRect(0, 0, size, size);
   if (img) ctx.drawImage(img, 0, 0, size, size);
   const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.06, size * 0.5, size * 0.5, size * 0.92);
-  shelf.addColorStop(0, PALETTE.oceanShelf);
-  shelf.addColorStop(0.36, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.46));
-  shelf.addColorStop(0.68, PALETTE.oceanDeep);
+  shelf.addColorStop(0, PALETTE.oceanReef || '#7AADB0');
+  shelf.addColorStop(0.22, PALETTE.oceanShelf);
+  shelf.addColorStop(0.52, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.40));
+  shelf.addColorStop(0.78, PALETTE.oceanDeep);
   shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#152428', 0.62));
   ctx.globalCompositeOperation = 'soft-light';
   ctx.globalAlpha = 0.90;
@@ -430,15 +441,17 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const washHex = `#${(ownerHex ? mixHex(region, ownerHex, OWNER_WASH_STRENGTH) : hexColor(region)).toString(16).padStart(6, '0')}`;
   const sideHex = mixHex(region, PALETTE.landShadow, 0.45);
   const key = continentKey(territory);
-  const sheet = washMaps.get(key) || bakeLandSheet(washHex);
-  // Punch continent chroma at runtime so Risk washes still split at 390.
-  const continentTint = mixHex('#ffffff', region, CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, OWNER_WASH_STRENGTH) : continentTint;
+  const world = worldLandMap;
+  const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
+  // World bake already carries continent + biome. Owner stays a light wash.
+  // Fallback path still punches Risk chroma at 390.
+  const continentTint = mixHex('#ffffff', region, world ? 0.22 : CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.12 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
-    normalMap: paperNormal || null,
-    aoMap: paperAO || null,
-    aoMapIntensity: paperAO ? 1.08 : 0,
+    normalMap: world ? null : (paperNormal || null),
+    aoMap: world ? null : (paperAO || null),
+    aoMapIntensity: world ? 0 : (paperAO ? 1.08 : 0),
     color: tint,
     roughness: 0.76,
     metalness: 0.0,
@@ -492,7 +505,7 @@ export function makeFoamMaterial() {
     color: 0xd9d2c0,
     map: paperTex,
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.28,
     roughness: 0.78,
     metalness: 0.03,
     depthWrite: false,
@@ -514,11 +527,13 @@ export function makeOceanMesh(width, height) {
   for (let i = 0; i < pos.count; i++) {
     if (uv) uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
-    const t = Math.min(1, Math.max(0, (d - 36) / 150));
+    const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    colors[i * 3] = shade;
-    colors[i * 3 + 1] = shade * 0.98;
-    colors[i * 3 + 2] = shade * 0.96;
+    // Near-shelf verts lean turquoise; open sea goes ink-deep.
+    const reef = 1 - t;
+    colors[i * 3] = shade * (0.90 + reef * 0.02);
+    colors[i * 3 + 1] = shade * (0.96 + reef * 0.08);
+    colors[i * 3 + 2] = shade * (0.94 + reef * 0.10);
   }
   if (uv) {
     uv.needsUpdate = true;

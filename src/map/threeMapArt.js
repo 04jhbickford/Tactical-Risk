@@ -7,12 +7,20 @@ import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
 import { applyPaperUVs } from './threeMapPalette.js';
+import {
+  applyWorldLandUVs,
+  getWorldLandTex,
+  landHeightForTerrain,
+  sculptLandRelief,
+  makeCoastShelfMaterial,
+  RIVERS,
+} from './threeMapTerrain.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
 export const WORLD_H = MAP_HEIGHT * SCALE;
-export const BASE_LAND = 0.72;
-export const MT_LAND = 1.18;
+export const BASE_LAND = 0.76;
+export const MT_LAND = 1.82;
 export const WRAP_COPIES = [-1, 0, 1];
 
 const TILE_SIZE = 256;
@@ -200,24 +208,8 @@ export function territoryCenter(territory) {
 }
 
 export function landHeightFor(territory, center) {
-  const area = center?.area || 0;
-  let h = BASE_LAND;
-  if (area > 9000) h = 0.9;
-  else if (area > 3500) h = 0.8;
-  else if (area < 700) h = 0.5;
-  const continent = territory.continent || '';
-  if (continent === 'Europe' || continent === 'Asia') h += 0.1;
-  if (continent === 'Africa') h += 0.04;
-  let hash = 0;
-  const str = territory.name || '';
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
-    hash |= 0;
-  }
-  hash = Math.abs(hash);
-  if (area > 2800 && hash % 5 === 0) return Math.min(MT_LAND, h + 0.32);
-  if (hash % 3 === 1) return h + 0.08;
-  return h;
+  void center;
+  return landHeightForTerrain(territory);
 }
 
 function inflateRing(ring, amt) {
@@ -266,8 +258,10 @@ export function makeLandMesh(territory, materials, height) {
     curveSegments: 1,
   });
   geom.rotateX(-Math.PI / 2);
+  sculptLandRelief(geom, territory, height);
   geom.computeVertexNormals();
-  applyPaperUVs(geom, territory);
+  if (getWorldLandTex()) applyWorldLandUVs(geom);
+  else applyPaperUVs(geom, territory);
   // r170 ExtrudeGeometry: group 0 = lids (top+bottom), group 1 = walls.
   // [side, top] hid the atlas fiber on 1px edges and left GIS-flat lids.
   const mats = [materials.top, materials.side];
@@ -300,7 +294,8 @@ export function makeLandSealMeshes(territory, material) {
     if (!ring) continue;
     const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 2.4)));
     geom.rotateX(-Math.PI / 2);
-    applyPaperUVs(geom, territory);
+    if (getWorldLandTex()) applyWorldLandUVs(geom);
+    else applyPaperUVs(geom, territory);
     const mesh = new THREE.Mesh(geom, material);
     mesh.position.y = 0.05;
     mesh.renderOrder = 1;
@@ -402,6 +397,49 @@ export function makeCoastAoMaterial() {
     side: THREE.DoubleSide,
     envMapIntensity: 0,
   });
+}
+
+export { makeCoastShelfMaterial };
+
+export function makeCoastShelfMeshes(territory, material) {
+  const meshes = [];
+  if (!material || territory?.isWater) return meshes;
+  for (const poly of territory.polygons || []) {
+    const ring = simplifyRing(poly, 0.6);
+    if (!ring || ring.length < 4) continue;
+    const outer = inflateRing(ring, 9.6);
+    const inner = inflateRing(ring, 2.2);
+    const shape = shapeFromRing(outer);
+    const hole = shapeFromRing(inner.slice().reverse());
+    shape.holes.push(hole);
+    const geom = new THREE.ShapeGeometry(shape, 1);
+    geom.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.y = 0.02;
+    mesh.renderOrder = 1;
+    mesh.userData.territory = territory;
+    mesh.userData.kind = 'coast-shelf';
+    meshes.push(mesh);
+  }
+  return meshes;
+}
+
+export function addRiverLines(group, material, y = 0.22) {
+  for (const pts of RIVERS) {
+    if (!pts || pts.length < 2) continue;
+    const positions = [];
+    for (const [wx, wy] of pts) {
+      const p = worldToScene(wx, wy);
+      positions.push(p.x, y, p.z);
+    }
+    const geo = new LineGeometry();
+    geo.setPositions(positions);
+    const line = new Line2(geo, material);
+    line.computeLineDistances();
+    line.renderOrder = 3;
+    line.userData.kind = 'river';
+    group.add(line);
+  }
 }
 
 export function makeCoastAoMeshes(territory, material) {

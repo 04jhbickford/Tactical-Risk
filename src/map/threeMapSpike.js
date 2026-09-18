@@ -32,6 +32,9 @@ import {
   makeFoamBandMeshes,
   makeCoastAoMaterial,
   makeCoastAoMeshes,
+  makeCoastShelfMaterial,
+  makeCoastShelfMeshes,
+  addRiverLines,
 } from './threeMapArt.js';
 import {
   PALETTE,
@@ -44,12 +47,16 @@ import {
   factionWash,
   regionWashFor,
   plasticColor,
+  setWorldLandMap,
+  getPaperImage,
 } from './threeMapPalette.js';
 import {
   makeChitTexture,
   makePipTexture,
   makeOverflowTexture,
+  loadUnitAtlases,
 } from './threeMapChits.js';
+import { bakeWorldLandAtlas } from './threeMapTerrain.js';
 import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
@@ -222,6 +229,7 @@ export async function bootThreeMapSpike() {
   }
 
   await loadBoardTextures();
+  await loadUnitAtlases();
 
   const factionColor = new Map();
   for (const f of setup.classic?.factions || setup.factions || []) {
@@ -230,6 +238,8 @@ export async function bootThreeMapSpike() {
   const owners = setup.classic?.territoryOwners || {};
   const placements = setup.classic?.unitPlacements || setup.unitPlacements || {};
   const lands = territories.filter((t) => !t.isWater);
+  const worldLand = await bakeWorldLandAtlas(lands, getPaperImage());
+  setWorldLandMap(worldLand);
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
   const landHeights = new Map();
@@ -276,8 +286,10 @@ export async function bootThreeMapSpike() {
   const foamMat = makeLineMat(PALETTE.foam, 1.15, 0.62);
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
+  const coastShelfMat = makeCoastShelfMaterial();
+  const riverMat = makeLineMat('#4A7680', 2.35, 0.88);
   const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
-  lineMats.push(landBorderMat, foamMat, selectMat);
+  lineMats.push(landBorderMat, foamMat, riverMat, selectMat);
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
@@ -326,6 +338,9 @@ export async function bootThreeMapSpike() {
       }
       addTerritoryInk(group, land, landBorderMat, height + 0.05);
       addFoamCoast(group, land, foamMat, 0.05);
+      for (const shelf of makeCoastShelfMeshes(land, coastShelfMat)) {
+        group.add(shelf);
+      }
       for (const band of makeFoamBandMeshes(land, foamBandMat)) {
         group.add(band);
       }
@@ -333,6 +348,7 @@ export async function bootThreeMapSpike() {
         group.add(ao);
       }
     }
+    addRiverLines(group, riverMat, 0.28);
   }
 
   for (const group of wrapGroups) {
@@ -719,10 +735,10 @@ export async function bootThreeMapSpike() {
       for (const rec of recs) {
         const selected = rec.territory.name === selectedName;
         // STACK-LOD / P22 HARD: mid/far = ONE cream pip+N. ZERO type parade.
-        // Near = typed cream chits ≤3–4 +K. Roster lives in peek.
+        // Near = molded plastic minis ≤3–4 +K. Roster lives in peek.
         const dense = isDenseBand(band);
         const plan = nearLayout(rec.stacks);
-        // Near never falls back to pip — typed cream chits only.
+        // Near never falls back to pip — molded minis only.
         const collapse = dense;
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
@@ -1095,6 +1111,14 @@ export async function bootThreeMapSpike() {
         lodTooth: lodMode === 'near' ? 'clean' : 'loud',
         quietZoom: true,
         plasticSpec: 'tight-lobe',
+        geography: true,
+        biomeWashes: true,
+        mountainRelief: true,
+        forestClumps: true,
+        coastShelf: true,
+        rivers: true,
+        landUndulation: true,
+        nearMinis: true,
       };
     },
   };

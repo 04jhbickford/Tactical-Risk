@@ -1,8 +1,8 @@
-// Injection-molded cream plastic chits for ?three=1. AA-PALETTE / STACK-LOD lock.
-// Face #F0E6D2 + deep bevel + thick dark outline (≥2.5px screen) + faction rim
-// + soft contact AO + glossy toy-plastic specular lobe. Glyphs recessed INTO cream.
-// P22–P25 HARD: mid/far pip = cream token + N ONLY. ZERO type parade.
-// Near = same molded cream + type glyph. Kill grey figurines / atlas soldiers.
+// STACK-LOD lock for ?three=1.
+// Mid/far: cream pip + N ONLY. ZERO type parade. (James OK)
+// Near / select / tray / peek: faction-tinted molded plastic A&A minis
+// (infantry / tank / plane / ship) — not recessed glyph-on-disc.
+// Grey mold atlas + runtime plastic tint. Not photoreal photo-scan figurines.
 
 import * as THREE from 'three';
 import { PLASTIC, PALETTE } from './threeMapPalette.js';
@@ -10,8 +10,8 @@ import { PLASTIC, PALETTE } from './threeMapPalette.js';
 const CREAM = PALETTE.cream || '#F0E6D2';
 
 export const UNIT_ATLAS = {
-  land: 'assets/three/units/units-land-plastic.png',
-  naval: 'assets/three/units/units-naval-plastic.png',
+  land: 'assets/three/units/units-land-minis.png',
+  naval: 'assets/three/units/units-naval-minis.png',
 };
 
 export const ATLAS_CELL = {
@@ -507,15 +507,85 @@ function paintCreamChit(ctx, {
   if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
 }
 
+function atlasImage(type) {
+  const cell = atlasCellFor(type);
+  if (!cell) return null;
+  return atlases[cell.atlas] || null;
+}
+
+function sampleCell(img, type) {
+  const cell = atlasCellFor(type);
+  if (!img || !cell) return null;
+  const cols = cell.atlas === 'naval' ? 2 : 4;
+  const rows = 2;
+  const cw = (img.naturalWidth || img.width) / cols;
+  const ch = (img.naturalHeight || img.height) / rows;
+  return { img, sx: cell.col * cw, sy: cell.row * ch, cw, ch };
+}
+
+function paintMoldedMini(ctx, {
+  type,
+  ownerColor,
+  quantity,
+  w = 256,
+  h = 256,
+  shadow = true,
+} = {}) {
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2;
+  const cy = h / 2;
+  const s = Math.min(w, h) * 0.42;
+  if (shadow) drawContactShadow(ctx, cx, cy + s * 0.12, s);
+  const src = sampleCell(atlasImage(type), type);
+  const [fr, fg, fb] = hexRgb(ownerColor || '#8E8F8C');
+  if (src) {
+    const tmp = document.createElement('canvas');
+    tmp.width = 256;
+    tmp.height = 256;
+    const tx = tmp.getContext('2d');
+    tx.drawImage(src.img, src.sx, src.sy, src.cw, src.ch, 0, 0, 256, 256);
+    const pix = tx.getImageData(0, 0, 256, 256);
+    const d = pix.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3];
+      if (a < 8) continue;
+      const lum = (d[i] * 0.35 + d[i + 1] * 0.45 + d[i + 2] * 0.20) / 255;
+      const lift = 0.28 + lum * 0.92;
+      d[i] = Math.min(255, Math.round(fr * lift));
+      d[i + 1] = Math.min(255, Math.round(fg * lift));
+      d[i + 2] = Math.min(255, Math.round(fb * lift));
+    }
+    tx.putImageData(pix, 0, 0);
+    const dw = w * 0.90;
+    const dh = h * 0.90;
+    ctx.drawImage(tmp, (w - dw) / 2, (h - dh) / 2 - 4, dw, dh);
+    // Soft toy-plastic specular — keep the sculpt, do not flatten to a disc.
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const spec = ctx.createRadialGradient(w * 0.34, h * 0.28, 2, w * 0.34, h * 0.28, w * 0.22);
+    spec.addColorStop(0, 'rgba(255,255,255,0.42)');
+    spec.addColorStop(0.35, 'rgba(255,248,230,0.10)');
+    spec.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = spec;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  } else {
+    // Fallback: faction-plastic silhouette, still not a cream glyph disc.
+    ctx.save();
+    const pathFn = PATHS[type] || PATHS.infantry;
+    pathFn(ctx, cx, cy, s * 0.95);
+    ctx.fillStyle = ownerColor || '#8E8F8C';
+    ctx.fill();
+    ctx.strokeStyle = '#0E0C08';
+    ctx.lineWidth = Math.max(3, s * 0.05);
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
+}
+
 export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
-  paintCreamChit(ctx, {
-    faction: ownerColor,
-    quantity,
-    glyph: type || 'infantry',
-    w,
-    h,
-    shadow,
-  });
+  paintMoldedMini(ctx, { type, ownerColor, quantity, w, h, shadow });
 }
 
 export function paintPip(ctx, { ownerColor, total, size = 256 } = {}) {
