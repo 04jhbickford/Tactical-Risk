@@ -63,6 +63,7 @@ export const REGION_WASH = {
 };
 export const CONTINENT_WASH_STRENGTH = 0.28;
 // Runtime multiply so Europe/USSR/Africa still split at 390 after lighting.
+// P23: punch is LOD-invariant — hold at near; do not flatten when dollying in.
 export const CONTINENT_CHROMA_PUNCH = 0.42;
 
 export const USSR_LANDS = new Set([

@@ -1010,6 +1010,25 @@ export async function bootThreeMapSpike() {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
     },
+    frameNearGermany() {
+      const land = lands.find((t) => t.name === 'Germany');
+      const c = land && territoryCenter(land);
+      if (!c) return;
+      const p = worldToScene(c.x, c.y);
+      camera.position.set(p.x, 58, p.z - 8);
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      syncDensity();
+    },
+    rosterOf(name) {
+      const stacks = stacksFor(name, placements);
+      return {
+        stacks,
+        total: stackTotal(stacks),
+        peekTotal: Number(chrome.peek.dataset.rosterTotal || 0),
+      };
+    },
     dollyBy,
     inspect() {
       const mats = pickables[0]?.material;
@@ -1032,10 +1051,13 @@ export async function bootThreeMapSpike() {
         landSeal: true,
         atlas: true,
         palette: 'aa-hecorrect-11',
+        version: GAME_VERSION,
         lod: lodMode,
         regionWash: true,
         plastic: true,
         stackLod: true,
+        idleCta: chrome.confirm.classList.contains('is-idle'),
+        confirmCopy: chrome.confirm.textContent,
       };
     },
   };

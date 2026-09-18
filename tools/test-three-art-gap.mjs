@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.22 cream pip+N, no mid type parade, punched washes.
+// V2.81.51-three-polish.23 idle CTA quiet-dark + molded cream plastic.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -48,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.22', GAME_VERSION === 'V2.81.51-three-polish.22');
+check('GAME_VERSION is V2.81.51-three-polish.23', GAME_VERSION === 'V2.81.51-three-polish.23');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -73,7 +73,15 @@ check('mid pip is cream chit + N, ZERO type parade',
   && !/drawPhotorealPlastic/.test(chits)
   && !/tintAtlasCell/.test(chits));
 check('near chits keep type glyphs on cream', /glyph: type/.test(chits) && /drawTypeGlyph/.test(chits));
+check('glyphs embossed INTO cream, not Lucide stamps',
+  /Embossed INTO cream plastic/.test(chits)
+  && /mixRgb\(CREAM, '#5A4A32'/.test(chits)
+  && !/ctx\.fillStyle = '#2C2820'/.test(chits));
 check('cream plastic face #F0E6D2', /#F0E6D2/.test(chits) && /CREAM/.test(chits));
+check('molded bevel + thick outline ≥2px screen',
+  /Emboss \/ bevel/.test(chits)
+  && /outlineW = Math\.max\(11/.test(chits)
+  && /≥2px screen/.test(chits));
 check('faction rim + dark outline on cream token',
   /Faction rim/.test(chits) && /#1A1610/.test(chits) && /strokeStyle = faction/.test(chits));
 check('mixRgb returns hex so tint cannot collapse to grey', /padStart\(2, '0'\)/.test(chits) && !/return `rgb\(\$\{m\[0\]\}/.test(chits));
@@ -222,7 +230,18 @@ check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',
   /three-peek-unit/.test(chrome) && /pieceIconDataUrl/.test(chrome));
 check('idle Confirm is Select a territory', /Select a territory/.test(chrome));
+check('idle CTA is quiet-dark, never Confirm gold',
+  /is-idle/.test(chrome)
+  && /setConfirmIdle/.test(chrome)
+  && /rgba\(30,36,32,0\.88\)/.test(chrome)
+  && /idle never wears Confirm gold/.test(chrome)
+  && /is-ready:not\(:disabled\):not\(\.is-idle\)/.test(chrome));
 check('named Confirm colon form', /Confirm: \$\{land\.name\}/.test(chrome));
+check('peek roster total stays synced to map stacks',
+  /dataset\.rosterTotal/.test(chrome)
+  && /rosterOf/.test(spike)
+  && /stackTotal/.test(spike));
+check('continent punch holds at near', /LOD-invariant/.test(palette) && /CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
 check('preview gate stays ?three=1', /isThreeSpikeRequested/.test(spike));
 check('support types are FAC/AA', isSupportType('factory') && isSupportType('aaGun') && !isSupportType('infantry'));
 check('p22 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-390.png'));

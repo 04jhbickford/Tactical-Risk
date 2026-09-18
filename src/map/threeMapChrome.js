@@ -75,11 +75,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(12px, env(safe-area-inset-left));
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(30,36,32,0.38) 100%);
-      -webkit-backdrop-filter:blur(28px) saturate(1.65);
-      backdrop-filter:blur(28px) saturate(1.65);
-      border-bottom:1px solid rgba(255,255,255,0.22);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);
+      background:linear-gradient(180deg, rgba(30,36,32,0.72) 0%, rgba(30,36,32,0.58) 100%);
+      -webkit-backdrop-filter:blur(28px) saturate(1.45);
+      backdrop-filter:blur(28px) saturate(1.45);
+      border-bottom:1px solid rgba(255,255,255,0.12);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.10);
       color:#E8E2D4;
       pointer-events:none;
     }
@@ -123,12 +123,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek {
       display:none; pointer-events:none;
       min-height:44px; padding:10px 12px; border-radius:12px;
-      background:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(30,36,32,0.42));
-      -webkit-backdrop-filter:blur(28px) saturate(1.65);
-      backdrop-filter:blur(28px) saturate(1.65);
+      background:rgba(30,36,32,0.78);
+      -webkit-backdrop-filter:blur(28px) saturate(1.45);
+      backdrop-filter:blur(28px) saturate(1.45);
       color:#E8E2D4;
-      border:1px solid rgba(255,255,255,0.20);
-      box-shadow:0 8px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.16);
+      border:1px solid rgba(255,255,255,0.12);
+      box-shadow:0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
     }
     #three-peek.is-on { display:block; }
     #three-peek strong {
@@ -156,24 +156,28 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:700 11px/16px -apple-system,"SF Pro Text",sans-serif;
       font-variant-numeric:tabular-nums; text-align:center;
     }
-    #three-confirm {
+    #three-confirm,
+    #three-confirm.is-idle,
+    #three-confirm:disabled {
       pointer-events:auto;
       min-height:50px; height:50px; width:100%;
-      border:1px solid rgba(255,255,255,0.20); border-radius:14px;
-      background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(30,36,32,0.46)); color:#c5c9d4;
-      -webkit-backdrop-filter:blur(28px) saturate(1.55);
-      backdrop-filter:blur(28px) saturate(1.55);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);
+      border:1px solid rgba(255,255,255,0.10); border-radius:14px;
+      /* P23 HARD: idle is quiet frosted-dark. NEVER --cta-confirm / #C4A35A. */
+      background:rgba(30,36,32,0.88); color:rgba(232,226,212,0.42);
+      -webkit-backdrop-filter:blur(24px) saturate(1.15);
+      backdrop-filter:blur(24px) saturate(1.15);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
       font:600 17px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:-0.01em;
       cursor:default;
       -webkit-tap-highlight-color:transparent;
     }
-    #three-confirm.is-ready {
+    #three-confirm.is-ready:not(:disabled):not(.is-idle) {
       background:#C4A35A; color:#1E2420; cursor:pointer;
       border-color:transparent;
       -webkit-backdrop-filter:none;
       backdrop-filter:none;
+      box-shadow:inset 0 1px 0 rgba(255,248,230,0.28);
     }
     #three-zoom {
       position:absolute; right:max(12px, env(safe-area-inset-right));
@@ -248,7 +252,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bottom.id = 'three-bottom';
   bottom.innerHTML = `
     <div id="three-peek"></div>
-    <button type="button" id="three-confirm" disabled>Select a territory</button>
+    <button type="button" id="three-confirm" class="is-idle" disabled>Select a territory</button>
   `;
   document.body.appendChild(bottom);
 
@@ -299,6 +303,21 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     isSheetOpen() {
       return sheet.classList.contains('is-open');
     },
+    setConfirmIdle() {
+      // P23 HARD fail-closed: idle never wears Confirm gold.
+      api.confirm.disabled = true;
+      api.confirm.classList.remove('is-ready');
+      api.confirm.classList.add('is-idle');
+      api.confirm.textContent = 'Select a territory';
+      api.confirm.style.removeProperty('background');
+      api.confirm.style.removeProperty('color');
+    },
+    setConfirmReady(label) {
+      api.confirm.disabled = false;
+      api.confirm.classList.remove('is-idle');
+      api.confirm.classList.add('is-ready');
+      api.confirm.textContent = label;
+    },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
       if (api.isSheetOpen()) {
         api.peek.classList.remove('is-on');
@@ -306,9 +325,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       if (!land) {
         api.peek.classList.remove('is-on');
         api.peek.textContent = '';
-        api.confirm.disabled = true;
-        api.confirm.classList.remove('is-ready');
-        api.confirm.textContent = 'Select a territory';
+        api.setConfirmIdle();
         api.syncLayers();
         return;
       }
@@ -316,20 +333,21 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       const unitLine = unitType
         ? `${formatUnitName(unitType)}`
         : '';
+      const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
       api.peek.innerHTML = `<strong>${land.name}</strong>
         <div class="three-peek-meta">${[owner, unitLine].filter(Boolean).join(' · ')}</div>
         ${iconRowHtml(stacks)}`;
+      api.peek.dataset.rosterTotal = String(rosterTotal);
       if (!api.isSheetOpen()) api.peek.classList.add('is-on');
       api.syncLayers();
-      api.confirm.disabled = false;
-      api.confirm.classList.add('is-ready');
+      // Named Confirm only when a land is staged. Gold lives on is-ready alone.
       if (unitType) {
         const qty = stacks.find((s) => s.type === unitType)?.quantity || 1;
-        api.confirm.textContent = `Confirm: ${shortType(unitType)} ×${qty} · ${land.name}`;
+        api.setConfirmReady(`Confirm: ${shortType(unitType)} ×${qty} · ${land.name}`);
       } else {
-        api.confirm.textContent = confirmed
+        api.setConfirmReady(confirmed
           ? `Confirm inspect · ${land.name}`
-          : `Confirm: ${land.name}`;
+          : `Confirm: ${land.name}`);
       }
     },
   };
