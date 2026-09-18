@@ -71,15 +71,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-l0 {
       position:absolute; left:0; right:0; top:0; z-index:30;
       height:calc(48px + env(safe-area-inset-top, 0px));
-      padding:env(safe-area-inset-top, 0px) 12px 0;
-      padding-left:max(12px, env(safe-area-inset-left));
-      padding-right:max(12px, env(safe-area-inset-right));
+      padding:env(safe-area-inset-top, 0px) 10px 0;
+      padding-left:max(10px, env(safe-area-inset-left));
+      padding-right:max(10px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:linear-gradient(180deg, rgba(30,36,32,0.26) 0%, rgba(30,36,32,0.06) 100%);
-      -webkit-backdrop-filter:saturate(2.15) blur(14px);
-      backdrop-filter:saturate(2.15) blur(14px);
-      border-bottom:1px solid rgba(255,255,255,0.20);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);
+      /* P26: native vibrancy — high blur, low fill. Not a painted slab. */
+      background:linear-gradient(180deg, rgba(30,36,32,0.12) 0%, rgba(30,36,32,0.00) 100%);
+      -webkit-backdrop-filter:saturate(1.35) blur(22px);
+      backdrop-filter:saturate(1.35) blur(22px);
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.06);
       color:#E8E2D4;
       pointer-events:none;
     }
@@ -87,17 +88,26 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-menu-btn {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.10); color:#E8E2D4;
+      background:rgba(30,36,32,0.42); color:#E8E2D4;
+      -webkit-backdrop-filter:saturate(1.35) blur(16px);
+      backdrop-filter:saturate(1.35) blur(16px);
       font-size:18px; cursor:pointer;
       -webkit-tap-highlight-color:transparent;
     }
     #three-l0 .three-l0-chip {
       min-height:44px; padding:0 12px; border-radius:999px;
       display:inline-flex; align-items:center; gap:6px;
-      background:rgba(255,255,255,0.08);
-      border:1px solid rgba(255,255,255,0.16);
+      /* P26: L0 chips are quiet frost. PLACE must never wear Confirm gold. */
+      background:rgba(30,36,32,0.42);
+      border:1px solid rgba(255,255,255,0.12);
+      color:#E8E2D4;
+      -webkit-backdrop-filter:saturate(1.35) blur(16px);
+      backdrop-filter:saturate(1.35) blur(16px);
       font:600 13px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:0.02em;
+    }
+    #three-phase {
+      background:rgba(30,36,32,0.48);
     }
     #three-l0 .three-l0-seat { margin-left:auto; font-weight:500; letter-spacing:0; }
     #three-l0 .three-l0-ipc {
@@ -113,19 +123,19 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-bottom {
       position:absolute; left:0; right:0; bottom:0; z-index:32;
-      padding:0 16px calc(18px + env(safe-area-inset-bottom, 0px));
-      padding-left:max(16px, env(safe-area-inset-left));
-      padding-right:max(16px, env(safe-area-inset-right));
+      padding:0 14px calc(16px + env(safe-area-inset-bottom, 0px));
+      padding-left:max(14px, env(safe-area-inset-left));
+      padding-right:max(14px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;
       pointer-events:none;
       background:linear-gradient(0deg, rgba(30,36,32,0.42) 0%, transparent 70%);
     }
     #three-peek {
       display:none; pointer-events:none;
-      min-height:44px; padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.28);
-      -webkit-backdrop-filter:saturate(2.15) blur(14px);
-      backdrop-filter:saturate(2.15) blur(14px);
+      min-height:44px; padding:8px 12px; border-radius:12px;
+      background:rgba(30,36,32,0.36);
+      -webkit-backdrop-filter:saturate(1.35) blur(18px);
+      backdrop-filter:saturate(1.35) blur(18px);
       color:#E8E2D4;
       border:1px solid rgba(255,255,255,0.16);
       box-shadow:0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
@@ -180,24 +190,28 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       box-shadow:inset 0 1px 0 rgba(255,248,230,0.28);
     }
     #three-zoom {
-      position:absolute; right:max(12px, env(safe-area-inset-right));
-      bottom:calc(76px + env(safe-area-inset-bottom, 0px));
+      position:absolute; right:max(10px, env(safe-area-inset-right));
+      bottom:calc(74px + env(safe-area-inset-bottom, 0px));
       z-index:28; display:flex; flex-direction:column; gap:8px;
     }
     html.three-spike.has-l1 #three-zoom {
       bottom:calc(208px + env(safe-area-inset-bottom, 0px));
     }
     html.three-spike.has-l2 #three-zoom { display:none; }
+    /* P26 HARD: zoom is quiet L0 frost. NEVER mustard / --cta-confirm / #C4A35A. */
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
-      border:1px solid rgba(255,255,255,0.22);
-      background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(30,36,32,0.22));
-      -webkit-backdrop-filter:saturate(2.15) blur(14px);
-      backdrop-filter:saturate(2.15) blur(14px);
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(30,36,32,0.62);
+      -webkit-backdrop-filter:saturate(1.35) blur(18px);
+      backdrop-filter:saturate(1.35) blur(18px);
       color:#E8E2D4;
-      font-size:20px; line-height:1; cursor:pointer;
+      font:600 18px/1 -apple-system,"SF Pro Text",sans-serif;
+      cursor:pointer;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.08);
       -webkit-tap-highlight-color:transparent;
     }
+    #three-zoom button[data-zoom="fit"] { font-size:12px; letter-spacing:0.02em; }
     #three-sheet {
       display:none; position:absolute; left:0; right:0; bottom:0; z-index:40;
       max-height:min(52dvh, 420px);

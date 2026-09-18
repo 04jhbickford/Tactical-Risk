@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.25 key/fill drama + parchment tooth + glossy plastic.
+// V2.81.51-three-polish.26 quiet zoom chrome + App Store glance + LOD tooth.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -48,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.25', GAME_VERSION === 'V2.81.51-three-polish.25');
+check('GAME_VERSION is V2.81.51-three-polish.26', GAME_VERSION === 'V2.81.51-three-polish.26');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -164,7 +164,14 @@ check('parchment tooth punches at 390 mid',
   /TOOTH_STRENGTH = 0\.42/.test(palette)
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
   && /macro paper tooth/.test(palette)
-  && /normalScale\.set\(2\.05/.test(palette));
+  && /TOOTH_NORMAL_MID = 2\.05/.test(palette)
+  && /normalScale\.set\(TOOTH_NORMAL_MID/.test(palette));
+check('lod tooth is loud mid / clean near',
+  /TOOTH_NORMAL_NEAR = 1\.08/.test(palette)
+  && /TOOTH_ROUGH_NEAR = 0\.86/.test(palette)
+  && /applyLodTooth/.test(palette)
+  && /loud mid tooth/.test(palette)
+  && /applyLodTooth\(landMats/.test(spike));
 check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
 check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
 check('soft coast AO band', /makeCoastAoMeshes/.test(art) && /makeCoastAoMeshes/.test(spike));
@@ -242,17 +249,30 @@ check('iPhone two-finger pinch',
 check('spike gold select not blue glow',
   /never a blue glow ring/.test(spike) && /select: '#C4A35A'/.test(palette));
 check('chrome frosted + SF + 44pt',
-  /backdrop-filter:saturate\(2\.15\) blur\(14px\)/.test(chrome)
+  /backdrop-filter:saturate\(1\.35\) blur\(22px\)/.test(chrome)
   && /-apple-system/.test(chrome)
   && /min-height:50px/.test(chrome)
-  && /calc\(18px \+ env\(safe-area-inset-bottom/.test(chrome)
+  && /calc\(16px \+ env\(safe-area-inset-bottom/.test(chrome)
   && /width:44px; height:44px/.test(chrome)
   && /min-height:44px/.test(chrome)
   && /THREE-IPHONE-UI\.md/.test(chrome));
 check('L0 frost is thin vibrancy not slab',
-  /saturate\(2\.15\) blur\(14px\)/.test(chrome)
-  && /rgba\(30,36,32,0\.26\)/.test(chrome)
+  /saturate\(1\.35\) blur\(22px\)/.test(chrome)
+  && /rgba\(30,36,32,0\.12\)/.test(chrome)
+  && /native vibrancy/.test(chrome)
+  && !/rgba\(30,36,32,0\.26\) 0%/.test(chrome)
   && !/rgba\(30,36,32,0\.50\) 0%/.test(chrome));
+check('zoom chrome is quiet frost, never mustard/gold',
+  /#three-zoom button/.test(chrome)
+  && /P26 HARD: zoom is quiet L0 frost/.test(chrome)
+  && /background:rgba\(30,36,32,0\.62\)/.test(chrome)
+  && !/linear-gradient\(180deg, rgba\(255,255,255,0\.16\)/.test(chrome)
+  && !/#three-zoom button[\s\S]*#C4A35A/.test(chrome));
+check('PLACE phase chip is quiet frost, never Confirm gold',
+  /#three-phase/.test(chrome)
+  && /PLACE must never wear Confirm gold/.test(chrome)
+  && /#three-l0 \.three-l0-chip \{[\s\S]*?background:rgba\(30,36,32,0\.42\)/.test(chrome)
+  && !/#three-phase[\s\S]{0,80}#C4A35A/.test(chrome));
 check('chrome slate-teal page bg', /#3D5A66/.test(chrome));
 check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',
@@ -294,6 +314,12 @@ check('p25 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa
 check('p25 near units specular closeup still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p25/europe-near-units-390.png'));
 check('p25 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p25/SCORE.md')));
 check('p25 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p25/vercel-live-mid-390.png'));
+check('p26 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p26/SCORE.md')));
+check('p26 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-mid-390.png'));
+check('p26 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-mid-hud-390.png'));
+check('p26 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-near-select-390.png'));
+check('p26 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-near-units-390.png'));
+check('p26 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);
