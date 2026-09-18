@@ -14,7 +14,7 @@ Confirm exclusive gold; painted albedo bound.
 | Painted landscape (not wash) | **PASS** | `mid-painted-relief.png` / `mid-vs-p35.png`: Alps volume, Central Europe forest masses, Sahara dune tooth, parchment grain. Left=.35 flat wash, right=.36 printed board. |
 | Imhof relief | **PASS** | Alps ridge across Switzerland/N Italy; Himalayas in Asia crop; NW hillshade baked. Inspect `imhofRelief` + `normalBound`. |
 | Landcover + canvas tooth | **PASS** | Forest canopy stain, arid grain, steppe khaki, tundra pale. Inspect `landcoverBound` + `canvasTooth`. |
-| Albedo bound | **PASS** | Console: `painted albedo bound 4096 2340 …?v=p36`. Inspect `albedoBound: true`, `stainFallback: false`, `albedoRev: p36`. |
+| Albedo bound | **PASS** | Local + live Vercel: `painted albedo bound 4096 2340 …?v=p36`. Inspect `albedoBound: true`, `stainFallback: false`, `albedoRev: p36`. |
 | Soft-light stain OFF | **PASS** | fillStain not hero. Residual tooth only. |
 | Sea stays slate-teal | **PASS** | `mid-land-sea.png`: Med / Black Sea / Atlantic are water, not stained land. |
 
@@ -63,5 +63,7 @@ continents:   7 (NA 24 / SA 12 / EU 30 / ME 18 / AF 27 / AS 33 / OC 39)
 - `east-med-select-no-clip.png` — required z-order proof
 - `china-select-hold.png` / `japan-near-hold.png`
 - `computed.json` — machine-read CSS + inspect + eastMed deck
+- `vercel-live-mid-390.png` — live preview `?three=1` = `V2.81.51-three-polish.36`
 
+**Vercel:** https://tactical-risk20-i9xfi3zbh-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/61 (stacked on PR60 / `.35`)

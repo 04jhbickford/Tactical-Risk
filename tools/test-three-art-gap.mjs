@@ -714,7 +714,8 @@ check('p36 required stills',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/mid-continents.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/east-med-select-no-clip.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/china-select-hold.png')
-  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/japan-near-hold.png'));
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/japan-near-hold.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/vercel-live-mid-390.png'));
 check('p36 SCORE states Layer A + Layer B',
   /Imhof/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
   && /albedoBound/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
