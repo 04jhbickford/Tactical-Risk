@@ -228,6 +228,7 @@ check('support types are FAC/AA', isSupportType('factory') && isSupportType('aaG
 check('p22 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-390.png'));
 check('p22 mid HUD 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-hud-390.png'));
 check('p22 near select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-near-select-390.png'));
+check('p22 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);

@@ -24,3 +24,6 @@ Local 390 stills in this folder. Fail-closed: mid has **zero** type parade.
 - `europe-mid-390.png`
 - `europe-mid-hud-390.png`
 - `europe-near-select-390.png`
+- `vercel-live-mid-390.png` — live `?three=1` confirms V2.81.51-three-polish.22, zero type parade
+
+**Vercel:** https://tactical-risk20-git-cursor-three-1ea25b-james-projects-20d8de40.vercel.app/?three=1
