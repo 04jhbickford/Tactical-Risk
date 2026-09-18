@@ -48,12 +48,12 @@ inspect:      paintedMountains · unitNoClip · japanLod · japanHome · quietCo
 - `near-japan-multitype-390.png` — **required** Japan near multi-type LOD
 - `japan-near-select-390.png` / `japan-near-units-390.png` — same frame
 - `japan-mid-390.png` — Japan theater mid = pip+N only
-- `vercel-live-mid-390.png` — live `?three=1` (follow-up)
+- `vercel-live-mid-390.png` — live `?three=1` = `V2.81.51-three-polish.32`
 - `computed.json` — machine-read CSS + inspect
 
 ## How each P0 was solved
 1. **Japan LOD** — `JAPAN_HOME_CENTER` + `LAND_ANCHORS.Japan` so camera/units sit on the home islands. `frameNearJapan` lift 90 (still `near`, island + ocean). Japan Sea Zone stays `(2695, 750)`. Dense footprint cap + tighter `clusterPack` so INF/TNK/FTR/+K fit without soup. Mid idle never expands.
 2. **Quiet wash** — `fillStain` (no 16/32px feathers that stacked across Europe). Soft-light 0.11 + multiply 0.08 toward parchment. Punch 0.12. Alps painted mass shrunk so it is a range, not a chocolate continent oval. Identity = tint + outline + `+N`.
 
-**Vercel:** https://tactical-risk20-4m90sdcnd-james-projects-20d8de40.vercel.app/?three=1
+**Vercel:** https://tactical-risk20-g8459pwvc-james-projects-20d8de40.vercel.app/?three=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/57 (stacked on PR56 / `.31`)

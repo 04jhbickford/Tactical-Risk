@@ -531,6 +531,7 @@ check('p32 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/eu
 check('p32 mid select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/europe-mid-select-390.png'));
 check('p32 required Japan near multi-type still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/near-japan-multitype-390.png'));
 check('p32 Japan theater mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/japan-mid-390.png'));
+check('p32 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/vercel-live-mid-390.png'));
 check('p32 SCORE states Japan LOD proven',
   /Japan multi-type LOD/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8'))
   && /\*\*PASS\*\*/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8'))
