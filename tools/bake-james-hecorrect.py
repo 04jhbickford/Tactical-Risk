@@ -21,16 +21,19 @@ BOARD = ROOT / 'assets/three/board'
 UNITS = ROOT / 'assets/three/units'
 CELL = 512
 
+# Viz AA-PALETTE continent washes — 18–28% over parchment (not candy Risk).
 WASH_HEX = {
-    'europe': (0x8C, 0x9A, 0x52),
-    'ussr': (0xC4, 0xA0, 0x6A),
-    'africa': (0xD6, 0xB8, 0x5C),
-    'middle-east': (0xD4, 0xBC, 0x68),
-    'asia': (0x8E, 0xAE, 0x6A),
-    'north-america': (0x86, 0xA8, 0x5E),
-    'south-america': (0x6F, 0x98, 0x48),
-    'oceania': (0xA3, 0xB0, 0x6A),
+    'europe': (0x6B, 0x7A, 0x4A),
+    'ussr': (0x8A, 0x73, 0x55),
+    'africa': (0xB0, 0x89, 0x48),
+    'middle-east': (0xA0, 0x90, 0x58),
+    'asia': (0x5F, 0x7A, 0x5A),
+    'north-america': (0x6A, 0x8B, 0x6E),
+    'south-america': (0x5A, 0x8A, 0x72),
+    'oceania': (0x7A, 0x6B, 0x8A),
 }
+WASH_STRENGTH = 0.28
+LAND_BASE = (0xC4, 0xB8, 0x96)
 
 # James 4×2 hi-detail sheet (grey/olive plastics on parchment).
 #   INF-grey  TNK-grey  INF-olive  TNK-olive
@@ -92,13 +95,48 @@ def colorize_keep_grain(im: Image.Image, rgb, strength=0.78) -> Image.Image:
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), 'RGB')
 
 
+def wash_over_parchment(parchment: Image.Image, rgb, strength=WASH_STRENGTH) -> Image.Image:
+    """Parchment luminosity + continent hue. Grain stays; continents read at 390."""
+    dyed = colorize_keep_grain(parchment, rgb, 0.52)
+    return Image.blend(dyed, parchment, 0.12)
+
+
+def height_to_normal(im: Image.Image, strength=2.4) -> Image.Image:
+    gray = np.array(im.convert('L'), dtype=np.float32) / 255.0
+    dx = np.zeros_like(gray)
+    dy = np.zeros_like(gray)
+    dx[:, 1:-1] = gray[:, 2:] - gray[:, :-2]
+    dy[1:-1, :] = gray[2:, :] - gray[:-2, :]
+    nx = -dx * strength
+    ny = -dy * strength
+    nz = np.ones_like(gray)
+    n = np.stack([nx, ny, nz], axis=-1)
+    n /= np.linalg.norm(n, axis=-1, keepdims=True) + 1e-6
+    rgb = np.clip(n * 0.5 + 0.5, 0, 1) * 255
+    return Image.fromarray(rgb.astype(np.uint8), 'RGB')
+
+
+def height_to_ao(im: Image.Image, amount=0.38) -> Image.Image:
+    gray = np.array(im.convert('L'), dtype=np.float32) / 255.0
+    ao = np.clip(1.0 - (1.0 - gray) * amount, 0.55, 1.0)
+    pix = (ao * 255).astype(np.uint8)
+    return Image.fromarray(np.stack([pix, pix, pix], axis=-1), 'RGB')
+
+
 def bake_board():
     BOARD.mkdir(parents=True, exist_ok=True)
     parchment = square_tile(REFS / 'board-parchment-macro-tile.png')
     parchment = ImageEnhance.Contrast(parchment).enhance(1.42)
+    parchment = colorize_keep_grain(parchment, LAND_BASE, 0.16)
     parchment = make_tileable(parchment, 36)
     parchment.save(BOARD / 'board-parchment-tile.png', 'PNG', optimize=True)
     print('wrote', BOARD / 'board-parchment-tile.png')
+    nrm = height_to_normal(parchment, 2.6)
+    nrm.save(BOARD / 'board-parchment-normal.png', 'PNG', optimize=True)
+    print('wrote', BOARD / 'board-parchment-normal.png')
+    ao = height_to_ao(parchment, 0.40)
+    ao.save(BOARD / 'board-parchment-ao.png', 'PNG', optimize=True)
+    print('wrote', BOARD / 'board-parchment-ao.png')
 
     ocean = square_tile(REFS / 'board-ocean-print-macro-tile.png')
     ocean = ImageEnhance.Contrast(ocean).enhance(1.22)
@@ -112,12 +150,13 @@ def bake_board():
     ocean = make_tileable(ocean, 32)
     ocean.save(BOARD / 'board-ocean-tile.png', 'PNG', optimize=True)
     print('wrote', BOARD / 'board-ocean-tile.png')
+    ocean_n = height_to_normal(ocean, 1.6)
+    ocean_n.save(BOARD / 'board-ocean-normal.png', 'PNG', optimize=True)
+    print('wrote', BOARD / 'board-ocean-normal.png')
 
     for slug, rgb in WASH_HEX.items():
-        # Continent dye ON the parchment — fiber stays the albedo.
-        wash = colorize_keep_grain(parchment, rgb, 0.72)
-        wash = Image.blend(wash, parchment, 0.22)
-        wash = ImageEnhance.Contrast(wash).enhance(1.14)
+        wash = wash_over_parchment(parchment, rgb, WASH_STRENGTH)
+        wash = ImageEnhance.Contrast(wash).enhance(1.08)
         wash.save(BOARD / f'wash-{slug}.png', 'PNG', optimize=True)
         print('wrote', BOARD / f'wash-{slug}.png')
 
@@ -220,5 +259,7 @@ def bake_units():
 
 
 if __name__ == '__main__':
+    import sys
     bake_board()
-    bake_units()
+    if '--board-only' not in sys.argv:
+        bake_units()

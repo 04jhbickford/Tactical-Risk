@@ -23,7 +23,7 @@ function mixHex(hex, toward, t) {
 export const PALETTE = {
   landBase: '#C4B896',
   landBone: '#C4B896',
-  landShadow: '#8A7A58',
+  landShadow: '#8F8468',
   landGrain: '#B7AA82',
   landInk: '#3A3428',
   landBevel: '#8A7A58',
@@ -48,17 +48,18 @@ export const PALETTE = {
   cream: '#F0E6D2',
 };
 
-// Soft but unmistakable region washes — match refs/aa-board-continents.png.
+// Viz AA-PALETTE continent washes — Risk glance, A&A print (18–28% over parchment).
 export const REGION_WASH = {
-  Europe: '#8C9A52',
-  USSR: '#C4A06A',
-  Africa: '#D6B85C',
-  'Middle East': '#D4BC68',
-  Asia: '#8EAE6A',
-  'North America': '#86A85E',
-  'South America': '#6F9848',
-  Oceania: '#A3B06A',
+  Europe: '#6B7A4A',
+  USSR: '#8A7355',
+  Africa: '#B08948',
+  'Middle East': '#A09058',
+  Asia: '#5F7A5A',
+  'North America': '#6A8B6E',
+  'South America': '#5A8A72',
+  Oceania: '#7A6B8A',
 };
+export const CONTINENT_WASH_STRENGTH = 0.28;
 
 export const USSR_LANDS = new Set([
   'Russia',
@@ -80,12 +81,13 @@ export const PLASTIC = {
 };
 
 export const FACTION_WASH = {
-  Russians: '#6B8B4A',
-  Germans: '#7A7A72',
-  British: '#6A7A8A',
+  Russians: '#8B3A3A',
+  Germans: '#5A5A52',
+  British: '#4A5C7A',
   Americans: '#5C6B4A',
-  Japanese: '#A87A48',
+  Japanese: '#8A6B3A',
 };
+export const OWNER_WASH_STRENGTH = 0.18;
 
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
@@ -99,6 +101,9 @@ export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
   ocean: 'assets/three/board/board-ocean-tile.png',
+  parchmentNormal: 'assets/three/board/board-parchment-normal.png',
+  parchmentAO: 'assets/three/board/board-parchment-ao.png',
+  oceanNormal: 'assets/three/board/board-ocean-normal.png',
 };
 
 export const WASH_TEX = {
@@ -114,6 +119,9 @@ export const WASH_TEX = {
 
 let paperTex = null;
 let oceanMap = null;
+let paperNormal = null;
+let paperAO = null;
+let oceanNormal = null;
 let grainCanvas = null;
 const landSheets = new Map();
 const washMaps = new Map();
@@ -168,9 +176,9 @@ function fbm(x, y, period, octaves = 4) {
   return sum / (norm || 1);
 }
 
-function canvasTex(canvas) {
+function canvasTex(canvas, { srgb = true } = {}) {
   const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.LinearSRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = 8;
@@ -238,7 +246,7 @@ function bakeParchment(img) {
   return paperTex;
 }
 
-function imageToTex(img, fallbackHex, grainImg = null) {
+function imageToTex(img, fallbackHex, grainImg = null, { srgb = true } = {}) {
   const size = img ? (img.naturalWidth || img.width || 512) : 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -257,7 +265,7 @@ function imageToTex(img, fallbackHex, grainImg = null) {
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
-  return canvasTex(canvas);
+  return canvasTex(canvas, { srgb });
 }
 
 function bakeOcean(img) {
@@ -304,21 +312,27 @@ function continentKey(territory) {
 export async function loadBoardTextures() {
   if (paperTex && oceanMap && washMaps.size) return { paperTex, oceanMap };
   const names = Object.keys(WASH_TEX);
-  const [parchment, ocean, ...washes] = await Promise.all([
+  const [parchment, ocean, pN, pAO, oN, ...washes] = await Promise.all([
     loadImage(BOARD_TEX.parchment),
     loadImage(BOARD_TEX.ocean),
+    loadImage(BOARD_TEX.parchmentNormal),
+    loadImage(BOARD_TEX.parchmentAO),
+    loadImage(BOARD_TEX.oceanNormal),
     ...names.map((k) => loadImage(WASH_TEX[k])),
   ]);
   paperTex = parchment ? imageToTex(parchment, '#C4B896') : bakeParchment(null);
   oceanMap = bakeOcean(ocean);
+  paperNormal = pN ? imageToTex(pN, '#8080ff', null, { srgb: false }) : null;
+  paperAO = pAO ? imageToTex(pAO, '#ffffff', null, { srgb: false }) : null;
+  oceanNormal = oN ? imageToTex(oN, '#8080ff', null, { srgb: false }) : null;
   landSheets.clear();
   washMaps.clear();
   names.forEach((k, i) => {
     const hex = REGION_WASH[k] || PALETTE.landBase;
-    // Baked continent wash is the albedo (parchment fiber + dye).
+    // Stack: parchment+grain → continent wash (baked). Faction is a color tint.
     washMaps.set(k, imageToTex(washes[i], hex));
   });
-  return { paperTex, oceanMap };
+  return { paperTex, oceanMap, paperNormal, paperAO, oceanNormal };
 }
 
 export function makePaperTexture() {
@@ -335,6 +349,7 @@ export function applyPaperUVs(geometry) {
     uv.setXY(i, pos.getX(i) / PAPER_UV, -pos.getZ(i) / PAPER_UV);
   }
   uv.needsUpdate = true;
+  geometry.setAttribute('uv2', uv.clone());
 }
 
 export function regionWashFor(territory) {
@@ -346,7 +361,7 @@ export function regionWashFor(territory) {
 export function landWashHex(ownerHex, regionHex) {
   const base = regionHex || PALETTE.landBase;
   if (!ownerHex) return base;
-  return `#${mixHex(base, ownerHex, 0.12).toString(16).padStart(6, '0')}`;
+  return `#${mixHex(base, ownerHex, OWNER_WASH_STRENGTH).toString(16).padStart(6, '0')}`;
 }
 
 export function factionWash(owner) {
@@ -359,32 +374,42 @@ export function plasticColor(owner) {
 
 export function makeLandMaterials(regionHex, ownerHex, territory) {
   const region = regionHex || PALETTE.landBase;
-  const wash = ownerHex ? mixHex(region, ownerHex, 0.12) : hexColor(region);
-  const washHex = `#${wash.toString(16).padStart(6, '0')}`;
+  const washHex = `#${(ownerHex ? mixHex(region, ownerHex, OWNER_WASH_STRENGTH) : hexColor(region)).toString(16).padStart(6, '0')}`;
   const sideHex = mixHex(region, PALETTE.landShadow, 0.45);
   const key = continentKey(territory);
   const sheet = washMaps.get(key) || bakeLandSheet(washHex);
-  // MeshBasic — printed cardboard. Lighting must not crush grain to flat olive.
-  const top = new THREE.MeshBasicMaterial({
+  // Faction ownership sits ON the continent wash — never 100% replace it.
+  const tint = ownerHex ? mixHex('#ffffff', ownerHex, OWNER_WASH_STRENGTH) : 0xffffff;
+  const top = new THREE.MeshStandardMaterial({
     map: sheet,
-    color: 0xffffff,
+    normalMap: paperNormal || null,
+    aoMap: paperAO || null,
+    aoMapIntensity: paperAO ? 0.72 : 0,
+    color: tint,
+    roughness: 0.92,
+    metalness: 0.0,
+    envMapIntensity: 0.12,
     transparent: false,
     side: THREE.DoubleSide,
-    toneMapped: false,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
   });
-  const wall = new THREE.MeshBasicMaterial({
+  if (top.normalMap) top.normalScale.set(0.55, 0.55);
+  const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
+    roughness: 0.96,
+    metalness: 0.0,
     transparent: false,
     side: THREE.DoubleSide,
-    toneMapped: false,
   });
-  const seal = new THREE.MeshBasicMaterial({
+  const seal = new THREE.MeshStandardMaterial({
     map: sheet,
-    color: 0xffffff,
+    color: tint,
+    roughness: 0.94,
+    metalness: 0.0,
     side: THREE.DoubleSide,
     transparent: false,
     depthWrite: true,
-    toneMapped: false,
   });
   return { top, side: wall, bottom: wall, seal };
 }
@@ -392,16 +417,21 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
 export function makeOceanMaterial() {
   makePaperTexture();
   if (!oceanMap) bakeOcean(null);
-  return new THREE.MeshBasicMaterial({
+  const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
+    normalMap: oceanNormal || null,
     color: 0xffffff,
+    roughness: 0.58,
+    metalness: 0.08,
+    envMapIntensity: 0.22,
     transparent: false,
-    toneMapped: false,
   });
+  if (mat.normalMap) mat.normalScale.set(0.32, 0.32);
+  return mat;
 }
 
 export function makeOceanMesh(width, height) {
-  const geo = new THREE.PlaneGeometry(width, height, 8, 8);
+  const geo = new THREE.PlaneGeometry(width, height, 16, 16);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   const uv = geo.attributes.uv;
@@ -410,6 +440,7 @@ export function makeOceanMesh(width, height) {
       uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
     }
     uv.needsUpdate = true;
+    geo.setAttribute('uv2', uv.clone());
   }
   const mat = makeOceanMaterial();
   const mesh = new THREE.Mesh(geo, mat);

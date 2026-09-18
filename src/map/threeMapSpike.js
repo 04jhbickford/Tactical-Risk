@@ -420,13 +420,18 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  scene.add(new THREE.AmbientLight(0xffffff, 1));
+  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.64);
+  scene.add(hemi);
+  const key = new THREE.DirectionalLight(0xFFF6E4, 0.92);
+  key.position.set(-48, 86, -28);
+  scene.add(key);
+  scene.add(key.target);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NoToneMapping;
-  renderer.toneMappingExposure = 1;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.02;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -749,6 +754,21 @@ export async function bootThreeMapSpike() {
     relayoutUnits(band);
   }
 
+  function bobSelected(now) {
+    if (!selectedName) return;
+    const t = now * 0.001;
+    const lift = 0.26 + Math.sin(t * 2.3) * 0.10;
+    const yaw = Math.sin(t * 1.55) * 0.035;
+    for (const rec of unitRecords) {
+      if (rec.territory.name !== selectedName) continue;
+      const sprites = [...rec.expanded, rec.pip, rec.overflow].filter((s) => s?.visible);
+      for (const sprite of sprites) {
+        sprite.position.y += lift;
+        if (sprite.material) sprite.material.rotation = yaw;
+      }
+    }
+  }
+
   function paintSelection(picked, { hover = false } = {}) {
     const next = picked?.territory || null;
     const unitType = picked?.unitType || null;
@@ -920,6 +940,7 @@ export async function bootThreeMapSpike() {
     applyZoomCap();
     const shown = syncWrapVisibility(wrapGroups, camera);
     syncDensity();
+    bobSelected(performance.now());
     if (ocean.material?.uniforms?.uCamera) {
       ocean.material.uniforms.uCamera.value.copy(camera.position);
     }
@@ -993,7 +1014,7 @@ export async function bootThreeMapSpike() {
         westEuropeWestOfGermany,
         waterInk: false,
         foam: true,
-        bevel: false,
+        bevel: true,
         landSeal: true,
         atlas: true,
         palette: 'aa-hecorrect-11',

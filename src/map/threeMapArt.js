@@ -256,11 +256,13 @@ export function makeLandMesh(territory, materials, height) {
   }
   if (!shapes.length) return null;
 
-  // No bevel inset — bevelSize punched coast holes so ocean showed
-  // through Egypt / N. Africa as teal/purple plates.
+  // Tiny bevel for crease AO. Seals still cover Egypt / N. Africa.
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
-    bevelEnabled: false,
+    bevelEnabled: true,
+    bevelThickness: 0.05,
+    bevelSize: 0.06,
+    bevelSegments: 1,
     curveSegments: 1,
   });
   geom.rotateX(-Math.PI / 2);

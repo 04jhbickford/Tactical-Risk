@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.13 (preview only, SCHEMA 11)
+
+ART-PIPELINE + AA-PALETTE continent lock. James: still vector/flat. Preview `?three=1` only. Do not merge. Quiet James. Tesla off.
+
+1. **Bake** — parchment albedo + normal/AO, printed slate-teal ocean + normal, Viz continent washes over grain (Europe `#6B7A4A` / USSR `#8A7355` / Asia `#5F7A5A` / Africa `#B08948` / ME `#A09058` / NA `#6A8B6E` / SA `#5A8A72` / Pacific `#7A6B8A`). Stack: parchment → continent → 18% ownership → ink → plastics.
+2. **Depth** — MeshStandard land/ocean (kill MeshBasic), hemisphere + warm key, ACES, tiny extrusion bevel, contact shadows, select bob/turn.
+3. **Units** — photoreal molded plastics + faction tint. Mid pip+N; near ≤3–4 +K. Pinch kept.
+
+Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.13.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.12 (preview only, SCHEMA 11)
 
 James HE-CORRECT on polish.11 (~25% love): no texture, icons too simple, looks vector / GIS. Preview `?three=1` only. Do not merge. Tesla off.

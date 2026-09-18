@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.12 generated board/units + iPhone pinch + STACK-LOD.
+// V2.81.51-three-polish.13 ART-PIPELINE MeshStandard + Viz continent washes.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -46,7 +46,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.12', GAME_VERSION === 'V2.81.51-three-polish.12');
+check('GAME_VERSION is V2.81.51-three-polish.13', GAME_VERSION === 'V2.81.51-three-polish.13');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -75,9 +75,19 @@ check('faction plastic DE/SU/UK/US/JP',
   /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
   && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
 
-check('continent Europe olive', /Europe: '#8C9A52'/.test(palette));
-check('continent USSR tan', /USSR: '#C4A06A'/.test(palette));
-check('continent Africa ochre', /Africa: '#D6B85C'/.test(palette));
+check('continent Europe olive', /Europe: '#6B7A4A'/.test(palette));
+check('continent USSR tan', /USSR: '#8A7355'/.test(palette));
+check('continent Africa ochre', /Africa: '#B08948'/.test(palette));
+check('continent Asia sage', /Asia: '#5F7A5A'/.test(palette));
+check('continent NA green', /'North America': '#6A8B6E'/.test(palette));
+check('continent SA teal', /'South America': '#5A8A72'/.test(palette));
+check('continent Pacific mauve', /Oceania: '#7A6B8A'/.test(palette));
+check('continent ME khaki', /'Middle East': '#A09058'/.test(palette));
+check('continent wash 18-28%', /CONTINENT_WASH_STRENGTH = 0\.28/.test(palette));
+check('ownership wash 15-22%', /OWNER_WASH_STRENGTH = 0\.18/.test(palette));
+check('faction wash SU/DE/UK/US/JP',
+  /#8B3A3A/.test(palette) && /#5A5A52/.test(palette) && /#4A5C7A/.test(palette)
+  && /#5C6B4A/.test(palette) && /#8A6B3A/.test(palette));
 check('ocean slate-teal AA-PALETTE', /oceanDeep: '#3D5A66'/.test(palette) && /oceanShelf: '#4F6E78'/.test(palette));
 check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
 check('baked wash is albedo not 14% flatten',
@@ -91,6 +101,21 @@ check('land lids use wash map not flat side',
   /const mats = \[materials\.top, materials\.side\]/.test(art)
   && !/\[materials\.side, materials\.top/.test(art));
 check('board textures keep fiber (no mipmaps)', /generateMipmaps = false/.test(palette));
+check('land/ocean are MeshStandard not MeshBasic',
+  /MeshStandardMaterial/.test(palette) && /roughness: 0\.92/.test(palette)
+  && /roughness: 0\.58/.test(palette)
+  && !/new THREE\.MeshBasicMaterial/.test(palette));
+check('parchment normal + AO maps',
+  pngOk('assets/three/board/board-parchment-normal.png')
+  && pngOk('assets/three/board/board-parchment-ao.png')
+  && pngOk('assets/three/board/board-ocean-normal.png'));
+check('ART-PIPELINE SoT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/ART-PIPELINE.md')));
+check('AA-PALETTE SoT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/AA-PALETTE.md')));
+check('hemi + warm key + ACES',
+  /HemisphereLight/.test(spike) && /DirectionalLight\(0xFFF6E4/.test(spike)
+  && /ACESFilmicToneMapping/.test(spike));
+check('select idle bob/turn', /bobSelected/.test(spike) && /material.rotation = yaw/.test(spike));
+check('tiny land bevel for crease AO', /bevelEnabled: true/.test(art));
 check('atlas board texture ref', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents-texture.png')
   || pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
 check('atlas plastic photo ref', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units-photo.png')
