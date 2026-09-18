@@ -66,7 +66,10 @@ check('plastic atlas cells INF/TNK/ART/FTR',
 check('paint uses generated atlas tint', /tintAtlasCell/.test(chits) && /drawGeneratedPlastic/.test(chits));
 check('mid pip is plastic not number-coin',
   /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
+check('cream plastic chit body', /#F0E6D2/.test(chits) && /drawCreamChit/.test(chits));
+check('faction rim on cream chit', /strokeStyle = faction/.test(chits));
 check('thick dark outline', /#1A1610/.test(chits));
+check('contact shadow under chit', /drawContactShadow/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
   /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
   && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
@@ -76,7 +79,7 @@ check('continent USSR tan', /USSR: '#C4A06A'/.test(palette));
 check('continent Africa ochre', /Africa: '#D6B85C'/.test(palette));
 check('ocean slate-teal AA-PALETTE', /oceanDeep: '#3D5A66'/.test(palette) && /oceanShelf: '#4F6E78'/.test(palette));
 check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
-check('grain strength phone-visible', /GRAIN_STRENGTH = 0\.86/.test(palette));
+check('parchment multiply 8-14%', /GRAIN_MULTIPLY = 0\.14/.test(palette));
 check('no greyscale contrastGrain', !/function contrastGrain/.test(palette));
 check('loads generated wash tiles', /WASH_TEX/.test(palette) && /wash-europe\.png/.test(palette));
 check('land lids use wash map not flat side',
@@ -140,6 +143,7 @@ check('chrome frosted + SF + 44pt',
   /backdrop-filter:blur\(28px\)/.test(chrome)
   && /-apple-system/.test(chrome)
   && /min-height:50px/.test(chrome)
+  && /calc\(18px \+ env\(safe-area-inset-bottom/.test(chrome)
   && /width:44px; height:44px/.test(chrome)
   && /min-height:44px/.test(chrome)
   && /THREE-IPHONE-UI\.md/.test(chrome));

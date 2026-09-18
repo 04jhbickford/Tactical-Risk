@@ -45,6 +45,7 @@ export const PALETTE = {
   ground: '#5A6A58',
   key: '#FFF6E4',
   fill: '#D4C8A4',
+  cream: '#F0E6D2',
 };
 
 // Soft but unmistakable region washes — match refs/aa-board-continents.png.
@@ -90,8 +91,10 @@ export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
 export const PAPER_UV = 22;
 export const OCEAN_UV = 28;
-// Overlay + multiply punch — 8–14% is invisible at 390. Glance must read scanned board.
-export const GRAIN_STRENGTH = 0.86;
+// Viz lock: parchment on land is an 8–14% multiply, not a 86% overlay punch.
+// Continent wash hexes carry the color so 390 does not read flat GIS olive.
+export const GRAIN_MULTIPLY = 0.14;
+export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -258,8 +261,28 @@ function imageToTex(img, fallbackHex, grainImg = null) {
 }
 
 function bakeOcean(img) {
-  // Generated printed slate-teal tile is the SoT. Do not greyscale it.
-  oceanMap = imageToTex(img, PALETTE.oceanDeep);
+  // AA-PALETTE slate-teal + quiet print tooth. Not a mottled grey slab.
+  const size = img ? (img.naturalWidth || img.width || 512) : 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PALETTE.oceanDeep;
+  ctx.fillRect(0, 0, size, size);
+  if (img) {
+    ctx.drawImage(img, 0, 0, size, size);
+    ctx.globalCompositeOperation = 'color';
+    ctx.globalAlpha = 0.72;
+    ctx.fillStyle = PALETTE.oceanDeep;
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = PALETTE.oceanShelf;
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  oceanMap = canvasTex(canvas);
   return oceanMap;
 }
 
@@ -302,11 +325,24 @@ export async function loadBoardTextures() {
   landSheets.clear();
   washMaps.clear();
   names.forEach((k, i) => {
-    // Atlas fiber is already in the wash. A second parchment overlay
-    // flattened the tooth into soft smoke / GIS olive at 390.
-    washMaps.set(k, washes[i]
-      ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase)
-      : null);
+    const hex = REGION_WASH[k] || PALETTE.landBase;
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = hex;
+    ctx.fillRect(0, 0, size, size);
+    if (washes[i]) ctx.drawImage(washes[i], 0, 0, size, size);
+    // 14% parchment multiply — Viz P0. Color stays the continent wash.
+    if (parchment) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = GRAIN_MULTIPLY;
+      ctx.drawImage(parchment, 0, 0, size, size);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    washMaps.set(k, canvasTex(canvas));
   });
   return { paperTex, oceanMap };
 }

@@ -112,7 +112,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-bottom {
       position:absolute; left:0; right:0; bottom:0; z-index:32;
-      padding:0 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      padding:0 16px calc(18px + env(safe-area-inset-bottom, 0px));
       padding-left:max(16px, env(safe-area-inset-left));
       padding-right:max(16px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;

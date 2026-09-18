@@ -70,9 +70,10 @@ def bake_board():
     print('wrote', BOARD / 'board-parchment-tile.png')
 
     ocean = square_tile(REFS / 'arc-ocean-print-tile.png')
-    ocean = ImageEnhance.Contrast(ocean).enhance(1.38)
-    # Keep printed muted blue-grey. Do not crush toward charcoal.
-    ocean = colorize_keep_grain(ocean, (0x7B, 0x92, 0x9E), 0.28)
+    ocean = ImageEnhance.Contrast(ocean).enhance(1.08)
+    # AA-PALETTE slate-teal + quiet print tooth. Not a mottled grey slab.
+    ocean = colorize_keep_grain(ocean, (0x3D, 0x5A, 0x66), 0.78)
+    ocean = colorize_keep_grain(ocean, (0x4F, 0x6E, 0x78), 0.18)
     ocean = make_tileable(ocean, 28)
     ocean.save(BOARD / 'board-ocean-tile.png', 'PNG', optimize=True)
     print('wrote', BOARD / 'board-ocean-tile.png')

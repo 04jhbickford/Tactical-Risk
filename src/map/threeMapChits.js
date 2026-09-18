@@ -2,7 +2,9 @@
 // Match refs/aa-plastic-units.png: solid body color, ≥2px dark outline, shadow.
 
 import * as THREE from 'three';
-import { PLASTIC } from './threeMapPalette.js';
+import { PLASTIC, PALETTE } from './threeMapPalette.js';
+
+const CREAM = PALETTE.cream || '#F0E6D2';
 
 export const UNIT_ATLAS = {
   land: 'assets/three/units/units-land-plastic.png',
@@ -346,30 +348,45 @@ function drawGeneratedPlastic(ctx, type, cx, cy, s, color) {
   const img = cell ? atlases[cell.atlas] : null;
   if (!cell || !img) return false;
   const tinted = tintAtlasCell(img, cell, color);
-  const d = s * 2.35;
-  ctx.save();
-  ctx.shadowColor = 'rgba(12, 10, 8, 0.48)';
-  ctx.shadowBlur = s * 0.16;
-  ctx.shadowOffsetX = s * 0.05;
-  ctx.shadowOffsetY = s * 0.12;
+  const d = s * 2.15;
   ctx.drawImage(tinted, cx - d / 2, cy - d / 2, d, d);
-  ctx.restore();
   return true;
 }
 
+function drawCreamChit(ctx, type, cx, cy, s, faction) {
+  // Cream plastic body + faction rim + ≥2px dark outline + contact shadow.
+  // Not a grey matte Lucide stamp. Not a numbered coin.
+  drawContactShadow(ctx, cx, cy, s);
+  const r = s * 1.08;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy + s * 0.04, r, 0, Math.PI * 2);
+  ctx.fillStyle = CREAM;
+  ctx.fill();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = faction || '#8E8F8C';
+  ctx.lineWidth = Math.max(5, s * 0.16);
+  ctx.stroke();
+  ctx.strokeStyle = '#1A1610';
+  ctx.lineWidth = Math.max(2, s * 0.07);
+  ctx.stroke();
+  ctx.restore();
+  if (!drawGeneratedPlastic(ctx, type, cx, cy - s * 0.04, s * 0.78, CREAM)) {
+    drawPlasticBody(ctx, PATHS[type] || pathInf, cx, cy - s * 0.04, s * 0.72, CREAM);
+  }
+}
+
 function drawMolded(ctx, type, cx, cy, s, color) {
-  if (drawGeneratedPlastic(ctx, type, cx, cy, s, color)) return;
-  const pathFn = PATHS[type] || pathInf;
-  drawPlasticBody(ctx, pathFn, cx, cy, s, color);
+  drawCreamChit(ctx, type, cx, cy, s, color);
 }
 
 export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256 } = {}) {
   const cx = w / 2;
   const cy = h / 2 - Math.min(w, h) * 0.02;
-  const s = Math.min(w, h) * 0.40;
+  const s = Math.min(w, h) * 0.38;
   ctx.clearRect(0, 0, w, h);
   drawMolded(ctx, type, cx, cy, s, ownerColor);
-  if (quantity >= 1) drawBadge(ctx, w * 0.78, h * 0.80, quantity, Math.min(w, h));
+  if (quantity >= 1) drawBadge(ctx, w * 0.80, h * 0.82, quantity, Math.min(w, h));
 }
 
 export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 192 } = {}) {
