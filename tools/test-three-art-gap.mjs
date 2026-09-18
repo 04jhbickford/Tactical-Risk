@@ -319,6 +319,7 @@ check('p26 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/eu
 check('p26 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-mid-hud-390.png'));
 check('p26 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-near-select-390.png'));
 check('p26 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-near-units-390.png'));
+check('p26 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);
