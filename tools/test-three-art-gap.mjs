@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.23 idle CTA quiet-dark + molded cream plastic.
+// V2.81.51-three-polish.24 deeper molded cream + board light pass.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -48,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.23', GAME_VERSION === 'V2.81.51-three-polish.23');
+check('GAME_VERSION is V2.81.51-three-polish.24', GAME_VERSION === 'V2.81.51-three-polish.24');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -73,15 +73,16 @@ check('mid pip is cream chit + N, ZERO type parade',
   && !/drawPhotorealPlastic/.test(chits)
   && !/tintAtlasCell/.test(chits));
 check('near chits keep type glyphs on cream', /glyph: type/.test(chits) && /drawTypeGlyph/.test(chits));
-check('glyphs embossed INTO cream, not Lucide stamps',
-  /Embossed INTO cream plastic/.test(chits)
+check('glyphs recessed INTO cream, not stamp-on-disc',
+  /Recessed INTO cream plastic/.test(chits)
   && /mixRgb\(CREAM, '#5A4A32'/.test(chits)
-  && !/ctx\.fillStyle = '#2C2820'/.test(chits));
+  && !/ctx\.fillStyle = '#2C2820'/.test(chits)
+  && /not a stamp-on-disc/.test(chits));
 check('cream plastic face #F0E6D2', /#F0E6D2/.test(chits) && /CREAM/.test(chits));
-check('molded bevel + thick outline ≥2px screen',
+check('molded bevel + thick outline ≥2.5px screen',
   /Emboss \/ bevel/.test(chits)
-  && /outlineW = Math\.max\(11/.test(chits)
-  && /≥2px screen/.test(chits));
+  && /outlineW = Math\.max\(14/.test(chits)
+  && /≥2\.5px screen/.test(chits));
 check('faction rim + dark outline on cream token',
   /Faction rim/.test(chits) && /#1A1610/.test(chits) && /strokeStyle = faction/.test(chits));
 check('mixRgb returns hex so tint cannot collapse to grey', /padStart\(2, '0'\)/.test(chits) && !/return `rgb\(\$\{m\[0\]\}/.test(chits));
@@ -94,7 +95,7 @@ check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /
 check('paper UV offsets break tile seams', /PAPER_UV_SHIFT/.test(palette) && /PAPER_UV = 26/.test(palette));
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
-check('toy sheen on plastic', /Toy sheen on cream plastic/.test(chits) && /createRadialGradient/.test(chits));
+check('toy sheen on plastic', /Tight plastic spec/.test(chits) && /createRadialGradient/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
   /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
   && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
@@ -132,8 +133,9 @@ check('land lids use wash map not flat side',
   && !/\[materials\.side, materials\.top/.test(art));
 check('board textures keep fiber (no mipmaps)', /generateMipmaps = false/.test(palette));
 check('land/ocean are MeshStandard not MeshBasic',
-  /MeshStandardMaterial/.test(palette) && /roughness: 0\.86/.test(palette)
-  && /roughness: 0\.40/.test(palette)
+  /MeshStandardMaterial/.test(palette) && /roughness: 0\.82/.test(palette)
+  && /roughness: 0\.46/.test(palette)
+  && /vertexColors: true/.test(palette)
   && !/new THREE\.MeshBasicMaterial/.test(palette));
 check('parchment normal + AO maps',
   pngOk('assets/three/board/board-parchment-normal.png')
@@ -151,7 +153,13 @@ check('hemi + warm key + ACES',
   && /ACESFilmicToneMapping/.test(spike));
 check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
 check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
-check('select idle bob/turn', /bobSelected/.test(spike) && /2 \* Math.PI \/ 180/.test(spike));
+check('soft coast AO band', /makeCoastAoMeshes/.test(art) && /makeCoastAoMeshes/.test(spike));
+check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN/.test(palette) && /vertexColors/.test(palette));
+check('select stack lift 2-4px / 120ms',
+  /liftSelected/.test(spike)
+  && /SELECT_LIFT_MS = 120/.test(spike)
+  && /SELECT_LIFT_PX = 3\.2/.test(spike)
+  && !/bobSelected/.test(spike));
 check('tiny land bevel for crease AO', /bevelEnabled: true/.test(art));
 check('atlas board texture ref', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents-texture.png')
   || pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
@@ -218,7 +226,7 @@ check('iPhone two-finger pinch',
 check('spike gold select not blue glow',
   /never a blue glow ring/.test(spike) && /select: '#C4A35A'/.test(palette));
 check('chrome frosted + SF + 44pt',
-  /backdrop-filter:blur\(28px\)/.test(chrome)
+  /backdrop-filter:saturate\(1\.8\) blur\(24px\)/.test(chrome)
   && /-apple-system/.test(chrome)
   && /min-height:50px/.test(chrome)
   && /calc\(18px \+ env\(safe-area-inset-bottom/.test(chrome)

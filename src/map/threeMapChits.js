@@ -1,7 +1,7 @@
-// Molded cream plastic chits for ?three=1. AA-PALETTE / STACK-LOD lock.
-// Face #F0E6D2 + emboss/bevel + thick dark outline (≥2px screen) + faction rim
-// + contact shadow. Glyphs are embossed INTO the cream — not flat Lucide stamps.
-// P22/P23 HARD: mid/far pip = cream token + N ONLY. ZERO type parade.
+// Injection-molded cream plastic chits for ?three=1. AA-PALETTE / STACK-LOD lock.
+// Face #F0E6D2 + deep bevel + thick dark outline (≥2.5px screen) + faction rim
+// + soft contact AO. Glyphs are recessed INTO the cream — not stamp-on-disc.
+// P22–P24 HARD: mid/far pip = cream token + N ONLY. ZERO type parade.
 // Near = same molded cream + type glyph. Kill grey figurines / atlas soldiers.
 
 import * as THREE from 'three';
@@ -272,15 +272,15 @@ const PATHS = {
 };
 
 function drawContactShadow(ctx, cx, cy, s) {
-  // Soft ground blob UNDER the chit — never a black disc over the cream face.
+  // Soft contact AO blob UNDER the chit — never a black disc over the cream face.
   ctx.save();
-  ctx.fillStyle = 'rgba(28, 22, 16, 0.34)';
+  ctx.fillStyle = 'rgba(14, 12, 8, 0.48)';
   ctx.beginPath();
-  ctx.ellipse(cx + s * 0.06, cy + s * 0.82, s * 0.78, s * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + s * 0.10, cy + s * 1.02, s * 0.92, s * 0.30, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(28, 22, 16, 0.16)';
+  ctx.fillStyle = 'rgba(14, 12, 8, 0.22)';
   ctx.beginPath();
-  ctx.ellipse(cx + s * 0.08, cy + s * 0.90, s * 0.96, s * 0.30, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + s * 0.12, cy + s * 1.14, s * 1.16, s * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -291,24 +291,25 @@ function tokenEllipse(ctx, cx, cy, rx, ry) {
 }
 
 function drawCreamToken(ctx, cx, cy, s, faction) {
-  const rx = s * 0.90;
-  const ry = s * 0.68;
-  const side = s * 0.24;
-  // ≥2px screen at mid 64px sprite (256 tex → 11px stroke ≈ 2.8px on glass).
-  const outlineW = Math.max(11, s * 0.12);
+  const rx = s * 0.88;
+  const ry = s * 0.66;
+  const side = s * 0.36;
+  // ≥2.5px screen at mid 64px sprite (256 tex → 14px stroke ≈ 3.5px on glass).
+  const outlineW = Math.max(14, s * 0.155);
 
-  // Thick dark outline (outer wall + undercut).
-  tokenEllipse(ctx, cx + 1.5, cy + side + 2.2, rx + outlineW * 0.42, ry + outlineW * 0.36);
-  ctx.fillStyle = '#1A1610';
+  // Thick dark silhouette / undercut — filled wall, not a hairline stroke.
+  tokenEllipse(ctx, cx + 2.2, cy + side + 3.6, rx + outlineW * 0.58, ry + outlineW * 0.50);
+  ctx.fillStyle = '#0E0C08';
   ctx.fill();
-  tokenEllipse(ctx, cx, cy - 1, rx + outlineW * 0.42, ry + outlineW * 0.36);
+  tokenEllipse(ctx, cx, cy - 1.6, rx + outlineW * 0.58, ry + outlineW * 0.50);
   ctx.fill();
 
-  // Cylinder side — molded cream plastic, not a flat disc / grey figurine.
+  // Cylinder side — injection-molded cream plastic, not a flat disc / grey figurine.
   const sideGrad = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy + side);
-  sideGrad.addColorStop(0, mixRgb(CREAM, '#8A7355', 0.34));
-  sideGrad.addColorStop(0.38, '#D4C4A8');
-  sideGrad.addColorStop(1, mixRgb(CREAM, '#5A4A32', 0.42));
+  sideGrad.addColorStop(0, mixRgb(CREAM, '#8A7355', 0.42));
+  sideGrad.addColorStop(0.32, '#D4C4A8');
+  sideGrad.addColorStop(0.68, mixRgb(CREAM, '#6A5640', 0.28));
+  sideGrad.addColorStop(1, mixRgb(CREAM, '#3A2E1C', 0.52));
   ctx.beginPath();
   ctx.ellipse(cx, cy + side, rx, ry, 0, 0, Math.PI);
   ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, 0, true);
@@ -318,59 +319,77 @@ function drawCreamToken(ctx, cx, cy, s, faction) {
 
   // Faction rim painted on the side + lip — thick enough to read at 64px.
   ctx.save();
-  tokenEllipse(ctx, cx, cy + side * 0.16, rx, ry);
+  tokenEllipse(ctx, cx, cy + side * 0.22, rx, ry);
   ctx.strokeStyle = faction || '#8E8F8C';
-  ctx.lineWidth = Math.max(12, s * 0.24);
+  ctx.lineWidth = Math.max(14, s * 0.28);
   ctx.stroke();
   ctx.restore();
 
-  // Cream #F0E6D2 top face — molded lighting, not a flat icon-disc.
+  // Cream #F0E6D2 top face — keep cream (do not bleach to white poker-chip).
   const top = ctx.createLinearGradient(cx - rx, cy - ry, cx + rx * 0.7, cy + ry);
-  top.addColorStop(0, mixRgb(CREAM, '#FFFFFF', 0.22));
-  top.addColorStop(0.38, CREAM);
-  top.addColorStop(1, mixRgb(CREAM, '#8A7355', 0.22));
+  top.addColorStop(0, mixRgb(CREAM, '#FFF8E6', 0.10));
+  top.addColorStop(0.42, CREAM);
+  top.addColorStop(1, mixRgb(CREAM, '#8A7355', 0.28));
   tokenEllipse(ctx, cx, cy, rx - 2, ry - 2);
   ctx.fillStyle = top;
   ctx.fill();
 
-  // Emboss / bevel highlight (NW lip) + shadow (SE undercut).
+  // Recessed face well — injection cavity, not a stamp-on-disc.
+  ctx.save();
+  tokenEllipse(ctx, cx, cy, rx * 0.78, ry * 0.76);
+  ctx.clip();
+  const well = ctx.createRadialGradient(cx, cy, s * 0.08, cx, cy, s * 0.72);
+  well.addColorStop(0, mixRgb(CREAM, '#8A7355', 0.16));
+  well.addColorStop(0.62, 'rgba(240,230,210,0)');
+  well.addColorStop(1, 'rgba(58,46,28,0.10)');
+  ctx.fillStyle = well;
+  ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
+  ctx.restore();
+
+  // Emboss / bevel highlight (NW lip) + shadow (SE undercut) — stronger molded edge.
   ctx.save();
   tokenEllipse(ctx, cx, cy, rx - 3, ry - 3);
   ctx.clip();
   ctx.beginPath();
-  ctx.ellipse(cx - rx * 0.12, cy - ry * 0.16, rx * 0.92, ry * 0.86, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,248,230,0.72)';
-  ctx.lineWidth = Math.max(5, s * 0.08);
+  ctx.ellipse(cx - rx * 0.10, cy - ry * 0.18, rx * 0.94, ry * 0.88, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,248,230,0.88)';
+  ctx.lineWidth = Math.max(7, s * 0.11);
   ctx.stroke();
   ctx.beginPath();
-  ctx.ellipse(cx + rx * 0.10, cy + ry * 0.18, rx * 0.90, ry * 0.84, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(90,74,50,0.38)';
-  ctx.lineWidth = Math.max(5, s * 0.08);
+  ctx.ellipse(cx + rx * 0.12, cy + ry * 0.20, rx * 0.90, ry * 0.84, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(58,46,28,0.52)';
+  ctx.lineWidth = Math.max(7, s * 0.11);
   ctx.stroke();
   ctx.restore();
 
-  // Dark inner outline so the cream punches at 64px (≥2px screen).
+  // Dark inner outline so the cream punches at 64px (≥2.5px screen).
   tokenEllipse(ctx, cx, cy, rx - 2, ry - 2);
-  ctx.strokeStyle = '#1A1610';
+  ctx.strokeStyle = '#0E0C08';
   ctx.lineWidth = outlineW;
   ctx.stroke();
 
   // Faction lip on the top edge (2–3px screen at mid).
-  tokenEllipse(ctx, cx, cy, rx - outlineW * 0.72, ry - outlineW * 0.62);
+  tokenEllipse(ctx, cx, cy, rx - outlineW * 0.70, ry - outlineW * 0.60);
   ctx.strokeStyle = faction || '#8E8F8C';
-  ctx.lineWidth = Math.max(8, s * 0.15);
+  ctx.lineWidth = Math.max(9, s * 0.17);
   ctx.stroke();
 
-  // Toy sheen on cream plastic.
+  // Mold seam groove between rim and face.
+  tokenEllipse(ctx, cx, cy, rx - outlineW * 1.05, ry - outlineW * 0.92);
+  ctx.strokeStyle = 'rgba(14,12,8,0.28)';
+  ctx.lineWidth = Math.max(2, s * 0.028);
+  ctx.stroke();
+
+  // Tight plastic spec — injection sheen, not a bleached wash.
   ctx.save();
   tokenEllipse(ctx, cx, cy, rx - outlineW * 0.85, ry - outlineW * 0.75);
   ctx.clip();
   const hi = ctx.createRadialGradient(
-    cx - rx * 0.30, cy - ry * 0.40, s * 0.03,
-    cx, cy, s,
+    cx - rx * 0.34, cy - ry * 0.44, s * 0.02,
+    cx - rx * 0.08, cy - ry * 0.10, s * 0.62,
   );
-  hi.addColorStop(0, 'rgba(255,255,255,0.58)');
-  hi.addColorStop(0.34, 'rgba(255,255,255,0.12)');
+  hi.addColorStop(0, 'rgba(255,255,255,0.34)');
+  hi.addColorStop(0.22, 'rgba(255,248,230,0.10)');
   hi.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hi;
   ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
@@ -378,11 +397,11 @@ function drawCreamToken(ctx, cx, cy, s, faction) {
 }
 
 function drawTypeGlyph(ctx, type, cx, cy, s) {
-  // Embossed INTO cream plastic — recessed stamp, not a flat Lucide fill.
+  // Recessed INTO cream plastic — carved cavity, not a stamp-on-disc / Lucide fill.
   const pathFn = PATHS[type];
   if (!pathFn) return;
-  const gs = s * 0.40;
-  const gy = cy + s * 0.02;
+  const gs = s * 0.38;
+  const gy = cy + s * 0.04;
   const strokePath = (dx, dy, style, width) => {
     ctx.save();
     ctx.translate(dx, dy);
@@ -402,31 +421,36 @@ function drawTypeGlyph(ctx, type, cx, cy, s) {
     ctx.fill();
     ctx.restore();
   };
-  fillPath(1.8, 2.0, 'rgba(26, 22, 16, 0.22)');
-  fillPath(-1.4, -1.6, 'rgba(255, 248, 230, 0.70)');
-  fillPath(0, 0.5, mixRgb(CREAM, '#5A4A32', 0.36));
-  strokePath(-0.8, -1.0, 'rgba(255,248,230,0.55)', Math.max(1.4, s * 0.022));
-  strokePath(0.9, 1.1, 'rgba(26,22,16,0.28)', Math.max(1.2, s * 0.018));
+  fillPath(2.6, 3.0, 'rgba(14, 12, 8, 0.34)');
+  fillPath(-2.2, -2.4, 'rgba(255, 248, 230, 0.48)');
+  fillPath(0.6, 1.0, mixRgb(CREAM, '#5A4A32', 0.52));
+  fillPath(0.2, 0.4, mixRgb(CREAM, '#3A2E1C', 0.22));
+  strokePath(-1.6, -1.8, 'rgba(255,248,230,0.40)', Math.max(1.8, s * 0.028));
+  strokePath(1.6, 1.8, 'rgba(14,12,8,0.42)', Math.max(1.6, s * 0.024));
 }
 
 function drawFactionWell(ctx, cx, cy, s, faction) {
-  // Recessed faction dimple on mid pip — not a soldier/type mark.
+  // Recessed faction dimple on mid pip — molded cavity, not a soldier/type mark.
   ctx.save();
   ctx.beginPath();
-  ctx.ellipse(cx + 0.8, cy + 1.1, s * 0.17, s * 0.13, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(26, 22, 16, 0.22)';
+  ctx.ellipse(cx + 1.2, cy + 1.6, s * 0.20, s * 0.15, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(14, 12, 8, 0.36)';
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(cx - 0.6, cy - 0.8, s * 0.16, s * 0.12, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255, 248, 230, 0.45)';
+  ctx.ellipse(cx - 1.0, cy - 1.2, s * 0.18, s * 0.14, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255, 248, 230, 0.42)';
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(cx, cy, s * 0.16, s * 0.12, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, s * 0.17, s * 0.13, 0, 0, Math.PI * 2);
   ctx.fillStyle = faction || '#8E8F8C';
   ctx.fill();
-  ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#0E0C08';
+  ctx.lineWidth = 2.4;
   ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(cx - s * 0.04, cy - s * 0.04, s * 0.08, s * 0.06, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,248,230,0.28)';
+  ctx.fill();
   ctx.restore();
 }
 
@@ -439,8 +463,8 @@ function paintCreamChit(ctx, {
   shadow = true,
 } = {}) {
   const cx = w / 2;
-  const cy = h / 2 - Math.min(w, h) * 0.06;
-  const s = Math.min(w, h) * 0.38;
+  const cy = h / 2 - Math.min(w, h) * 0.10;
+  const s = Math.min(w, h) * 0.36;
   ctx.clearRect(0, 0, w, h);
   if (shadow) drawContactShadow(ctx, cx, cy, s);
   drawCreamToken(ctx, cx, cy, s, faction);

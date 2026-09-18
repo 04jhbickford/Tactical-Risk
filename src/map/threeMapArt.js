@@ -256,13 +256,13 @@ export function makeLandMesh(territory, materials, height) {
   }
   if (!shapes.length) return null;
 
-  // Tiny bevel for crease AO. Seals still cover Egypt / N. Africa.
+  // Soft crease AO — thicker bevel so walls catch the warm key.
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
     bevelEnabled: true,
-    bevelThickness: 0.05,
-    bevelSize: 0.06,
-    bevelSegments: 1,
+    bevelThickness: 0.16,
+    bevelSize: 0.14,
+    bevelSegments: 2,
     curveSegments: 1,
   });
   geom.rotateX(-Math.PI / 2);
@@ -386,6 +386,42 @@ export function makeFoamBandMeshes(territory, material) {
     mesh.renderOrder = 2;
     mesh.userData.territory = territory;
     mesh.userData.kind = 'foam-mask';
+    meshes.push(mesh);
+  }
+  return meshes;
+}
+
+export function makeCoastAoMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0x1a1610,
+    transparent: true,
+    opacity: 0.22,
+    roughness: 1,
+    metalness: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0,
+  });
+}
+
+export function makeCoastAoMeshes(territory, material) {
+  const meshes = [];
+  if (!material || territory?.isWater) return meshes;
+  for (const poly of territory.polygons || []) {
+    const ring = simplifyRing(poly, 0.6);
+    if (!ring || ring.length < 4) continue;
+    const outer = inflateRing(ring, 6.2);
+    const inner = inflateRing(ring, 0.4);
+    const shape = shapeFromRing(outer);
+    const hole = shapeFromRing(inner.slice().reverse());
+    shape.holes.push(hole);
+    const geom = new THREE.ShapeGeometry(shape, 1);
+    geom.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.y = 0.03;
+    mesh.renderOrder = 1;
+    mesh.userData.territory = territory;
+    mesh.userData.kind = 'coast-ao';
     meshes.push(mesh);
   }
   return meshes;
