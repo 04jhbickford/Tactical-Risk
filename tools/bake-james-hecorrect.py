@@ -126,8 +126,9 @@ def wash_over_parchment(parchment: Image.Image, rgb, strength=WASH_STRENGTH) -> 
     t_lum = (0.30 * target[0] + 0.59 * target[1] + 0.11 * target[2]) / 255.0
     t_lum = max(float(t_lum), 0.08)
     grey = t_lum * 255.0
-    boosted = np.clip(grey + (target - grey) * 1.70, 0, 255)
-    ink = np.clip(boosted * (lum / t_lum)[..., None], 0, 255)
+    boosted = np.clip(grey + (target - grey) * 2.80, 0, 255)
+    # Keep more hex character so Europe/USSR/Africa/Asia still split at 390.
+    ink = np.clip(boosted * (0.40 + 0.60 * (lum / t_lum))[..., None], 0, 255)
     out = arr * (1.0 - t) + ink * t
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), 'RGB')
 
@@ -157,10 +158,11 @@ def height_to_ao(im: Image.Image, amount=0.38) -> Image.Image:
 def bake_board():
     BOARD.mkdir(parents=True, exist_ok=True)
     parchment = square_tile(REFS / 'board-parchment-macro-tile.png')
-    parchment = flatten_blotch(parchment, 0.20)
-    parchment = ImageEnhance.Contrast(parchment).enhance(1.12)
-    parchment = colorize_keep_grain(parchment, LAND_BASE, 0.22)
-    parchment = make_tileable(parchment, 96)
+    parchment = flatten_blotch(parchment, 0.12)
+    fiber = ImageEnhance.Contrast(parchment).enhance(1.38)
+    parchment = Image.blend(parchment, fiber, 0.62)
+    parchment = colorize_keep_grain(parchment, LAND_BASE, 0.18)
+    parchment = make_tileable(parchment, 120)
     parchment.save(BOARD / 'board-parchment-tile.png', 'PNG', optimize=True)
     print('wrote', BOARD / 'board-parchment-tile.png')
     nrm = height_to_normal(parchment, 2.6)
@@ -171,15 +173,20 @@ def bake_board():
     print('wrote', BOARD / 'board-parchment-ao.png')
 
     ocean = square_tile(REFS / 'board-ocean-print-macro-tile.png')
-    ocean = ImageEnhance.Contrast(ocean).enhance(1.22)
-    ocean = ImageEnhance.Brightness(ocean).enhance(1.12)
-    # Printed slate-teal paper — keep tooth, do not crush to charcoal.
+    ocean = ImageEnhance.Contrast(ocean).enhance(1.18)
+    ocean = ImageEnhance.Brightness(ocean).enhance(1.08)
+    # Printed slate-teal + shelf lift. Keep tooth, do not crush to charcoal.
     arr = np.array(ocean, dtype=np.float32)
     lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
     lum = np.clip((lum - 0.08) / 0.70, 0.38, 1.28)
-    target = np.array([0x4A, 0x68, 0x72], dtype=np.float32)
-    ocean = Image.fromarray(np.clip(arr * 0.38 + (target * lum[..., None]) * 0.62, 0, 255).astype(np.uint8), 'RGB')
-    ocean = make_tileable(ocean, 32)
+    deep = np.array([0x3D, 0x5A, 0x66], dtype=np.float32)
+    shelf = np.array([0x4F, 0x6E, 0x78], dtype=np.float32)
+    h, w = arr.shape[:2]
+    yy = np.linspace(0, 1, h, dtype=np.float32)[:, None]
+    shelf_w = np.clip(0.38 + 0.42 * (1.0 - np.abs(yy - 0.45) * 1.6), 0.18, 0.78)
+    ink = deep * (1.0 - shelf_w)[..., None] + shelf * shelf_w[..., None]
+    ocean = Image.fromarray(np.clip(arr * 0.34 + (ink * lum[..., None]) * 0.66, 0, 255).astype(np.uint8), 'RGB')
+    ocean = make_tileable(ocean, 40)
     ocean.save(BOARD / 'board-ocean-tile.png', 'PNG', optimize=True)
     print('wrote', BOARD / 'board-ocean-tile.png')
     ocean_n = height_to_normal(ocean, 1.6)

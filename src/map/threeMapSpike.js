@@ -56,7 +56,6 @@ import {
   separatePoints,
   isDenseBand,
   nearLayout,
-  primaryType,
   shouldCollapse,
   worldSizeFromScreen,
   PIP_PX,
@@ -292,10 +291,10 @@ export async function bootThreeMapSpike() {
     }
     return textureCache.get(key);
   }
-  function pipTexture(owner, total, type) {
-    const key = `pip|${owner}|${total}|${type || 'infantry'}`;
+  function pipTexture(owner, total) {
+    const key = `pip|${owner}|${total}`;
     if (!textureCache.has(key)) {
-      textureCache.set(key, makePipTexture(ownerPlastic(owner), total, type || 'infantry'));
+      textureCache.set(key, makePipTexture(ownerPlastic(owner), total));
     }
     return textureCache.get(key);
   }
@@ -363,7 +362,7 @@ export async function bootThreeMapSpike() {
         expanded.push(sprite);
       }
 
-      const pipTex = pipTexture(owner, total, primaryType(stacks));
+      const pipTex = pipTexture(owner, total);
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
@@ -636,7 +635,9 @@ export async function bootThreeMapSpike() {
   function setLandEmissive(name, hex) {
     const mats = landMats.get(name);
     // Gold/amber select language only — never a blue glow ring.
-    if (mats?.top?.emissive) mats.top.emissive.setHex(hex);
+    if (!mats?.top?.emissive) return;
+    mats.top.emissive.setHex(hex);
+    mats.top.emissiveIntensity = hex ? 0.26 : 0;
   }
 
   function screenScale(kind) {
@@ -795,6 +796,7 @@ export async function bootThreeMapSpike() {
     if (chrome.isSheetOpen()) chrome.setSheetOpen(false);
     if (selectedName) setLandEmissive(selectedName, 0x000000);
     selectedName = next ? next.name : null;
+    if (next && !next.isWater) setLandEmissive(next.name, 0xC4A35A);
     selectedUnitType = unitType && next && !next.isWater ? unitType : (next && selectedUnitType && selectedName === next.name ? selectedUnitType : unitType);
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;

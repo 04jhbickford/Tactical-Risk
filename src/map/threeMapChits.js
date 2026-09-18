@@ -1,7 +1,7 @@
-// Photoreal molded A&A plastics from the James/Arc image-gen atlas.
-// ART-PIPELINE / AA-RISK-HOMAGE: cream #F0E6D2 body + faction rim.
-// ≥2px dark outline, contact shadow, toy sheen.
-// NOT cream discs. NOT grey matte silhouettes. NOT number-coins.
+// Cream plastic CHITS + faction rim. AA-PALETTE / SCORE P0.
+// Mid = pip+N only (no type parade, no pedestal minis).
+// Near = typed cream discs from the embossed chit atlas.
+// NOT black Lucide stamps. NOT number-coins. NOT 3D pedestal minis.
 
 import * as THREE from 'three';
 import { PLASTIC, PALETTE } from './threeMapPalette.js';
@@ -11,6 +11,8 @@ const CREAM = PALETTE.cream || '#F0E6D2';
 export const UNIT_ATLAS = {
   land: 'assets/three/units/units-land-plastic.png',
   naval: 'assets/three/units/units-naval-plastic.png',
+  landAir: 'assets/three/units/units-land-air-cream.png',
+  navalCream: 'assets/three/units/units-naval-cream.png',
 };
 
 export const ATLAS_CELL = {
@@ -30,7 +32,21 @@ export const ATLAS_CELL = {
   transport: { atlas: 'naval', col: 1, row: 1 },
 };
 
-const atlases = { land: null, naval: null };
+export const CHIT_CELL = {
+  infantry: { atlas: 'landAir', col: 0, row: 0, cols: 2 },
+  armour: { atlas: 'landAir', col: 1, row: 0, cols: 2 },
+  fighter: { atlas: 'landAir', col: 0, row: 1, cols: 2 },
+  bomber: { atlas: 'landAir', col: 1, row: 1, cols: 2 },
+  tacticalBomber: { atlas: 'landAir', col: 1, row: 1, cols: 2 },
+  battleship: { atlas: 'navalCream', col: 0, row: 0, cols: 2 },
+  destroyer: { atlas: 'navalCream', col: 0, row: 0, cols: 2 },
+  cruiser: { atlas: 'navalCream', col: 0, row: 0, cols: 2 },
+  carrier: { atlas: 'navalCream', col: 1, row: 0, cols: 2 },
+  submarine: { atlas: 'navalCream', col: 0, row: 1, cols: 2 },
+  transport: { atlas: 'navalCream', col: 1, row: 1, cols: 2 },
+};
+
+const atlases = { land: null, naval: null, landAir: null, navalCream: null };
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -46,13 +62,17 @@ function loadImage(src) {
 }
 
 export async function loadUnitAtlases() {
-  if (atlases.land && atlases.naval) return atlases;
-  const [land, naval] = await Promise.all([
+  if (atlases.landAir && atlases.navalCream) return atlases;
+  const [land, naval, landAir, navalCream] = await Promise.all([
     loadImage(UNIT_ATLAS.land),
     loadImage(UNIT_ATLAS.naval),
+    loadImage(UNIT_ATLAS.landAir),
+    loadImage(UNIT_ATLAS.navalCream),
   ]);
   atlases.land = land;
   atlases.naval = naval;
+  atlases.landAir = landAir;
+  atlases.navalCream = navalCream;
   return atlases;
 }
 
@@ -393,25 +413,93 @@ function drawMolded(ctx, type, cx, cy, s, color, { shadow = true } = {}) {
   }
 }
 
-export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
+function drawCreamDisc(ctx, cx, cy, r, faction, { shadow = true } = {}) {
+  if (shadow) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(28, 22, 16, 0.20)';
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.04, cy + r * 0.88, r * 0.90, r * 0.20, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.save();
+  const body = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+  body.addColorStop(0, '#F7F0E2');
+  body.addColorStop(0.42, CREAM);
+  body.addColorStop(1, '#D4C4A8');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = body;
+  ctx.fill();
+  ctx.strokeStyle = '#1A1610';
+  ctx.lineWidth = Math.max(4, r * 0.07);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r - Math.max(5, r * 0.09), 0, Math.PI * 2);
+  ctx.strokeStyle = faction || '#8E8F8C';
+  ctx.lineWidth = Math.max(5, r * 0.10);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function stampChitGlyph(ctx, type, cx, cy, r) {
+  const cell = CHIT_CELL[type];
+  const img = cell ? atlases[cell.atlas] : null;
+  if (cell && img) {
+    const cols = cell.cols || 2;
+    const sw = img.width / cols;
+    const sh = img.height / 2;
+    const d = r * 2.08;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.84, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, cell.col * sw, cell.row * sh, sw, sh, cx - d / 2, cy - d / 2, d, d);
+    ctx.restore();
+    return;
+  }
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(r * 0.012, r * 0.012);
+  ctx.fillStyle = 'rgba(44, 40, 32, 0.38)';
+  (PATHS[type] || pathInf)(ctx, 0, 0, 42);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCreamChit(ctx, {
+  type = null,
+  ownerColor,
+  quantity = 0,
+  w = 256,
+  h = 256,
+  shadow = true,
+  glyph = true,
+} = {}) {
   const cx = w / 2;
   const cy = h / 2 - Math.min(w, h) * 0.02;
-  const s = Math.min(w, h) * 0.42;
+  const r = Math.min(w, h) * 0.38;
   ctx.clearRect(0, 0, w, h);
-  drawMolded(ctx, type, cx, cy, s, ownerColor, { shadow });
+  drawCreamDisc(ctx, cx, cy, r, ownerColor, { shadow });
+  if (glyph && type) stampChitGlyph(ctx, type, cx, cy, r);
   if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.84, quantity, Math.min(w, h) * 0.85);
 }
 
+export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
+  // Near: typed cream chit + faction rim. Not a pedestal mini.
+  drawCreamChit(ctx, { type, ownerColor, quantity, w, h, shadow, glyph: true });
+}
+
 export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 256 } = {}) {
-  // Mid/far = ONE cream molded plastic + N. Never a numbered coin / disc.
-  // Soft contact shadow + thick outline — cream sculpt must still dominate at 64px.
-  paintPiece(ctx, {
-    type: type || 'infantry',
+  // Mid/far = pip+N only. Type glyphs only on near. Never a type parade.
+  drawCreamChit(ctx, {
+    type: null,
     ownerColor,
     quantity: total,
     w: size,
     h: size,
     shadow: true,
+    glyph: false,
   });
 }
 
