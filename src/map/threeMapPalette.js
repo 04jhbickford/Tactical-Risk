@@ -54,8 +54,8 @@ export const PALETTE = {
 // Muted print hexes — parchment stain, not candy Risk primaries, not Confirm gold fills.
 // USSR is NOT a bonus continent (Russia/Ukraine/Karelia are Asia).
 export const REGION_WASH = {
-  Europe: '#6A8490',
-  Asia: '#7A8B52',
+  Europe: '#4E7388',
+  Asia: '#6A8A3C',
   Africa: '#B08948',
   'Middle East': '#C4A068',
   'North America': '#6A8B6E',
@@ -463,7 +463,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
   // light wash. P31: a bit more live-continent chroma so bonus groups read.
-  const continentTint = mixHex('#ffffff', region, world ? 0.16 : CONTINENT_CHROMA_PUNCH);
+  const continentTint = mixHex('#ffffff', region, world ? 0.24 : CONTINENT_CHROMA_PUNCH);
   const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.08 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,

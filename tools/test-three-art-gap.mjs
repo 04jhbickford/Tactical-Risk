@@ -119,10 +119,10 @@ check('faction plastic DE/SU/UK/US/JP',
   /#6A6C68/.test(palette) && /#2F7A2A/.test(palette) && /#B89050/.test(palette)
   && /#4E6828/.test(palette) && /#D24A1C/.test(palette));
 
-check('continent Europe dusty steel (live bonus)', /Europe: '#6A8490'/.test(palette));
+check('continent Europe dusty steel (live bonus)', /Europe: '#4E7388'/.test(palette));
 check('continent USSR leftover only, not a bonus group', /USSR: '#8A7355'/.test(palette));
 check('continent Africa ochre', /Africa: '#B08948'/.test(palette));
-check('continent Asia olive (includes Russia/Ukraine)', /Asia: '#7A8B52'/.test(palette));
+check('continent Asia olive (includes Russia/Ukraine)', /Asia: '#6A8A3C'/.test(palette));
 check('continent NA green', /'North America': '#6A8B6E'/.test(palette));
 check('continent SA cocoa', /'South America': '#8A6848'/.test(palette));
 check('continent Pacific slate', /Oceania: '#7A7B8A'/.test(palette));
@@ -470,7 +470,9 @@ check('p31 Japan / multi-type footprint LOD',
   && /packPitchFor/.test(spike)
   && /pieceWorldCap/.test(spike)
   && /territoryFootprint/.test(spike)
-  && /frameNearJapan/.test(spike));
+  && /frameNearJapan/.test(spike)
+  && /byHome/.test(spike)
+  && /'Japan Sea Zone': \{ x: 2695/.test(spike));
 check('p31 cluster pack is tighter than spiral',
   clusterPack(4, 6).length === 4
   && Math.hypot(clusterPack(4, 6)[0].x, clusterPack(4, 6)[0].z) < 4);
@@ -482,6 +484,15 @@ check('p31 feathered fills + coast tooth',
   && /paintCoastTooth/.test(terrain)
   && /smoothRing/.test(art));
 check('p31 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P31.md')));
+check('p31 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p31/SCORE.md')));
+check('p31 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-mid-390.png'));
+check('p31 mid HUD 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-mid-hud-390.png'));
+check('p31 mid select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-mid-select-390.png'));
+check('p31 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-near-select-390.png'));
+check('p31 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/europe-near-units-390.png'));
+check('p31 Japan near multi-type still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/japan-near-select-390.png'));
+check('p31 UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/uk-near-select-390.png'));
+check('p31 SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/russia-near-select-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);

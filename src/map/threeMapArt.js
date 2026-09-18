@@ -333,7 +333,7 @@ export function makeSelectWashMaterial() {
   return new THREE.MeshStandardMaterial({
     color: 0xc4a35a,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.32,
     roughness: 0.88,
     metalness: 0,
     depthWrite: false,

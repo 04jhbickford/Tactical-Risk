@@ -103,6 +103,7 @@ const SEA_ZONE_CENTERS = {
   'Hawaii Sea Zone': { x: 3062, y: 960 },
   'Wake Island Sea Zone': { x: 2764, y: 1003 },
   'Okinawa Sea Zone': { x: 2569, y: 943 },
+  'Japan Sea Zone': { x: 2695, y: 750 },
   'New Zealand Sea Zone': { x: 2964, y: 1658 },
   'South Pacific Sea Zone': { x: 2992, y: 1314 },
   'Solomon Islands Sea Zone': { x: 2778, y: 1288 },
@@ -306,7 +307,7 @@ export async function bootThreeMapSpike() {
   const continentMats = new Map();
   for (const [name, hex] of Object.entries(REGION_WASH)) {
     if (name === 'USSR') continue;
-    continentMats.set(name, makeLineMat(hex, 2.6, 0.48));
+    continentMats.set(name, makeLineMat(hex, 3.4, 0.62));
   }
   const seaLaneMat = makeLineMat('#B8B09A', 1.45, 0.38, {
     dashed: true,
@@ -841,8 +842,16 @@ export async function bootThreeMapSpike() {
           rec.label.position.set(lp.x, rec.height + 1.2, lp.z - 3.4);
         }
       }
-      const sep = movers.reduce((m, it) => Math.min(m, it.minSep || m), 12);
-      if (movers.length) separatePoints(movers, sep);
+      const byHome = new Map();
+      for (const m of movers) {
+        const key = `${m.homeX.toFixed(2)}|${m.homeZ.toFixed(2)}`;
+        if (!byHome.has(key)) byHome.set(key, []);
+        byHome.get(key).push(m);
+      }
+      for (const group of byHome.values()) {
+        const sep = group[0]?.minSep || 4;
+        separatePoints(group, sep);
+      }
       for (const m of movers) {
         m.sprite.position.set(m.x, m.y, m.z);
       }

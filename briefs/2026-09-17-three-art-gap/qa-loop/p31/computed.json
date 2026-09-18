@@ -1,0 +1,240 @@
+{
+  "version": "V2.81.51-three-polish.31",
+  "inspect": {
+    "name": "Alaska",
+    "verts": 125028,
+    "materialCount": 2,
+    "hasTileMap": false,
+    "wrap": "1",
+    "africaSouthOfEurope": true,
+    "africaNotUnderNA": true,
+    "africaSouthOnScreen": true,
+    "europeNorthOnScreen": true,
+    "ukWestOfGermany": true,
+    "westEuropeWestOfGermany": true,
+    "waterInk": false,
+    "foam": true,
+    "bevel": true,
+    "landSeal": true,
+    "atlas": true,
+    "palette": "aa-hecorrect-11",
+    "version": "V2.81.51-three-polish.31",
+    "lod": "near",
+    "regionWash": true,
+    "plastic": true,
+    "stackLod": true,
+    "idleCta": false,
+    "confirmCopy": "Confirm inspect · Japan",
+    "selectLiftMs": 150,
+    "moldedOutline": "≥2.5px",
+    "keyFill": "warm-key-cool-fill",
+    "parchmentTooth": true,
+    "lodTooth": "clean",
+    "quietZoom": true,
+    "plasticSpec": "tight-lobe",
+    "geography": true,
+    "biomeWashes": true,
+    "mountainRelief": true,
+    "forestClumps": true,
+    "coastShelf": true,
+    "rivers": true,
+    "landUndulation": true,
+    "nearMinis": true,
+    "selectMinis": true,
+    "geoUnmirror": true,
+    "evenParchment": true,
+    "parchmentFloor": 0.48,
+    "quietLanes": true,
+    "paintedMountains": true,
+    "noHatchRidges": true,
+    "unitNoClip": true,
+    "japanLod": true,
+    "selectClear": true,
+    "liveContinents": true,
+    "continentCount": 7
+  },
+  "confirmReady": {
+    "background": "rgb(196, 163, 90)",
+    "copy": "Confirm inspect · Japan",
+    "class": "is-ready"
+  },
+  "zoom": "rgba(30, 36, 32, 0.62)",
+  "place": "rgba(30, 36, 32, 0.42)",
+  "lod": "near",
+  "roster": {
+    "germany": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 2,
+          "owner": "Germans"
+        },
+        {
+          "type": "infantry",
+          "quantity": 4,
+          "owner": "Germans"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Germans"
+        }
+      ],
+      "total": 10,
+      "peekTotal": 8
+    },
+    "japan": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "infantry",
+          "quantity": 3,
+          "owner": "Japanese"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Japanese"
+        }
+      ],
+      "total": 8,
+      "peekTotal": 8
+    },
+    "unitedKingdom": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 1,
+          "owner": "British"
+        },
+        {
+          "type": "infantry",
+          "quantity": 2,
+          "owner": "British"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "British"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "British"
+        },
+        {
+          "type": "fighter",
+          "quantity": 2,
+          "owner": "British"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "British"
+        }
+      ],
+      "total": 8,
+      "peekTotal": 8
+    },
+    "russia": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 2,
+          "owner": "Russians"
+        },
+        {
+          "type": "infantry",
+          "quantity": 4,
+          "owner": "Russians"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Russians"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Russians"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Russians"
+        }
+      ],
+      "total": 9,
+      "peekTotal": 8
+    }
+  },
+  "continents": [
+    {
+      "name": "North America",
+      "bonus": 24
+    },
+    {
+      "name": "South America",
+      "bonus": 12
+    },
+    {
+      "name": "Europe",
+      "bonus": 30
+    },
+    {
+      "name": "Middle East",
+      "bonus": 18
+    },
+    {
+      "name": "Africa",
+      "bonus": 27
+    },
+    {
+      "name": "Asia",
+      "bonus": 33
+    },
+    {
+      "name": "Oceania",
+      "bonus": 39
+    }
+  ],
+  "idle": {
+    "confirm": "rgba(30, 36, 32, 0.88)",
+    "copy": "Select a territory",
+    "class": "is-idle"
+  }
+}

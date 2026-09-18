@@ -295,8 +295,8 @@ function continentWash(territory) {
 
 // Printed +N chips at bonus-group centroids (data/continents.json).
 export const CONTINENT_BADGES = [
-  { name: 'Europe', bonus: 30, x: 1048, y: 528 },
-  { name: 'Asia', bonus: 33, x: 1710, y: 390 },
+  { name: 'Europe', bonus: 30, x: 900, y: 640 },
+  { name: 'Asia', bonus: 33, x: 1420, y: 500 },
   { name: 'Africa', bonus: 27, x: 1088, y: 1264 },
   { name: 'Middle East', bonus: 18, x: 1516, y: 872 },
   { name: 'North America', bonus: 24, x: 3184, y: 628 },
@@ -409,61 +409,69 @@ function stampForestStipple(ctx, poly, w, h, count, seed) {
   ctx.restore();
 }
 
-function paintMountainMass(ctx, ridge, w, h) {
+function paintMountainMass(ctx, ridge, w, h, tile) {
   // P31 HARD: painted tabletop ranges — not “a line with hatches.”
   if (!ridge || ridge.length < 2) return;
   ctx.save();
+  ctx.beginPath();
+  const [x0, y0] = ridge[0];
+  ctx.moveTo(wxToU(x0) * w, wyToV(y0) * h);
+  for (let i = 1; i < ridge.length; i++) {
+    ctx.lineTo(wxToU(ridge[i][0]) * w, wyToV(ridge[i][1]) * h);
+  }
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 118;
+  ctx.strokeStyle = 'rgba(0,0,0,1)';
+  // Fat corridor clip via destination-in mask on a temp path: clip to
+  // overlapping ellipses so the range is a painted mass, not a spine.
+  ctx.beginPath();
   for (let i = 0; i < ridge.length; i++) {
-    const [x, y] = ridge[i];
-    const px = wxToU(x) * w;
-    const py = wyToV(y) * h;
-    const shade = ctx.createRadialGradient(px + 22, py + 28, 6, px + 16, py + 18, 118);
-    shade.addColorStop(0, 'rgba(86, 64, 38, 0.40)');
-    shade.addColorStop(0.42, 'rgba(132, 108, 70, 0.22)');
-    shade.addColorStop(1, 'rgba(196, 184, 150, 0)');
-    ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = shade;
-    ctx.beginPath();
-    ctx.ellipse(px + 10, py + 14, 96, 62, 0.28, 0, Math.PI * 2);
-    ctx.fill();
+    const px = wxToU(ridge[i][0]) * w;
+    const py = wyToV(ridge[i][1]) * h;
+    ctx.ellipse(px, py, 108, 72, 0.2, 0, Math.PI * 2);
   }
   for (let i = 0; i < ridge.length - 1; i++) {
-    const [x0, y0] = ridge[i];
-    const [x1, y1] = ridge[i + 1];
-    const len = Math.hypot(x1 - x0, y1 - y0) || 1;
-    const steps = Math.max(5, Math.round(len / 22));
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const x = x0 + (x1 - x0) * t;
-      const y = y0 + (y1 - y0) * t;
-      const px = wxToU(x) * w;
-      const py = wyToV(y) * h;
-      const rock = 18 + (s % 3) * 7;
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = 'rgba(118, 94, 60, 0.34)';
-      ctx.beginPath();
-      ctx.ellipse(px, py, rock * 1.15, rock * 0.62, 0.35, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'soft-light';
-      ctx.fillStyle = 'rgba(236, 224, 192, 0.36)';
-      ctx.beginPath();
-      ctx.ellipse(px - rock * 0.28, py - rock * 0.22, rock * 0.55, rock * 0.28, -0.5, 0, Math.PI * 2);
-      ctx.fill();
-      if (s % 2 === 0) {
-        ctx.globalCompositeOperation = 'screen';
-        ctx.globalAlpha = 0.22;
-        ctx.fillStyle = '#F4EEE0';
-        ctx.beginPath();
-        ctx.ellipse(px - rock * 0.12, py - rock * 0.34, rock * 0.28, rock * 0.14, -0.35, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
+    const ax = wxToU(ridge[i][0]) * w;
+    const ay = wyToV(ridge[i][1]) * h;
+    const bx = wxToU(ridge[i + 1][0]) * w;
+    const by = wyToV(ridge[i + 1][1]) * h;
+    const mx = (ax + bx) / 2;
+    const my = (ay + by) / 2;
+    ctx.ellipse(mx, my, 120, 78, 0.15, 0, Math.PI * 2);
+  }
+  ctx.clip();
+  if (tile) {
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.55;
+    const tw = 420;
+    const th = 320;
+    for (let i = 0; i < ridge.length; i++) {
+      const px = wxToU(ridge[i][0]) * w;
+      const py = wyToV(ridge[i][1]) * h;
+      ctx.drawImage(tile, px - tw / 2, py - th / 2, tw, th);
     }
   }
+  for (let i = 0; i < ridge.length; i++) {
+    const px = wxToU(ridge[i][0]) * w;
+    const py = wyToV(ridge[i][1]) * h;
+    const shade = ctx.createRadialGradient(px + 18, py + 22, 8, px, py, 130);
+    shade.addColorStop(0, 'rgba(92, 70, 42, 0.36)');
+    shade.addColorStop(0.5, 'rgba(150, 124, 82, 0.16)');
+    shade.addColorStop(1, 'rgba(196, 184, 150, 0)');
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = shade;
+    ctx.beginPath();
+    ctx.ellipse(px + 8, py + 10, 110, 74, 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.fillStyle = 'rgba(236, 226, 196, 0.28)';
+    ctx.beginPath();
+    ctx.ellipse(px - 22, py - 18, 48, 26, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
-  drawPolyline(ctx, ridge.map(([x, y]) => [x + 10, y + 12]), w, h, 'rgba(72, 54, 32, 0.22)', 14);
-  drawPolyline(ctx, ridge, w, h, 'rgba(92, 72, 46, 0.28)', 5.5);
-  drawPolyline(ctx, ridge, w, h, 'rgba(232, 220, 188, 0.20)', 2.0);
 }
 
 function fillFeathered(ctx, poly, w, h, style, alpha) {
@@ -557,12 +565,10 @@ function drawRoundel(ctx, x, y, color, w, h) {
 
 function floorParchmentLuminance(ctx, w, h, floor = PARCHMENT_LUMA_FLOOR) {
   // P30 HARD: lift crushed land texels back to stained paper.
-  // Run AFTER washes / stipple / tooth, BEFORE hatch / rivers / IPC ink.
+  // P31: scale RGB equally — do not mix toward tan parchment (that killed
+  // live continent chroma so Europe/Asia read as one brown slab).
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
-  const pr = 0xC4 / 255;
-  const pg = 0xB8 / 255;
-  const pb = 0x96 / 255;
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i] / 255;
     const g = d[i + 1] / 255;
@@ -570,10 +576,9 @@ function floorParchmentLuminance(ctx, w, h, floor = PARCHMENT_LUMA_FLOOR) {
     const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     if (y >= floor || y < 0.002) continue;
     const lift = floor / y;
-    const t = (floor - y) / floor;
-    d[i] = Math.min(255, Math.round((r * lift * (1 - t * 0.32) + pr * t * 0.32) * 255));
-    d[i + 1] = Math.min(255, Math.round((g * lift * (1 - t * 0.32) + pg * t * 0.32) * 255));
-    d[i + 2] = Math.min(255, Math.round((b * lift * (1 - t * 0.32) + pb * t * 0.32) * 255));
+    d[i] = Math.min(255, Math.round(r * lift * 255));
+    d[i + 1] = Math.min(255, Math.round(g * lift * 255));
+    d[i + 2] = Math.min(255, Math.round(b * lift * 255));
   }
   ctx.putImageData(img, 0, 0);
 }
@@ -665,8 +670,8 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
       if (!pathPoly(ctx, poly, w, h)) continue;
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
-      fillFeathered(ctx, poly, w, h, continent, 0.28);
-      fillFeathered(ctx, poly, w, h, climate, 0.10);
+      fillFeathered(ctx, poly, w, h, continent, 0.38);
+      fillFeathered(ctx, poly, w, h, climate, 0.08);
       if (!pathPoly(ctx, poly, w, h)) {
         ctx.restore();
         continue;
@@ -702,6 +707,16 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
         drawTileClipped(ctx, tiles.arid, 0.22, 'soft-light', 0.7);
       }
       ctx.restore();
+      if (pathPoly(ctx, poly, w, h)) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = continent;
+        ctx.globalAlpha = 0.40;
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 3.8;
+        ctx.stroke();
+        ctx.restore();
+      }
       paintCoastTooth(ctx, poly, w, h);
       if (biome === 'forest') {
         stampClumps(ctx, tiles.forest, poly, w, h, 28, hashName(land.name));
@@ -738,23 +753,7 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
   // Painted mountain masses (A&A board caliber) — never hatch-tick ridges.
   // Soft SE mountain shadow stays as a painted wash, not a hatch stamp.
   for (const ridge of RIDGES) {
-    paintMountainMass(ctx, ridge, w, h);
-    if (tiles.mountain) {
-      ctx.save();
-      ctx.globalAlpha = 0.36;
-      ctx.globalCompositeOperation = 'multiply';
-      for (let i = 0; i < ridge.length; i++) {
-        const pt = ridge[i];
-        ctx.drawImage(
-          tiles.mountain,
-          wxToU(pt[0]) * w - 150,
-          wyToV(pt[1]) * h - 118,
-          320,
-          250,
-        );
-      }
-      ctx.restore();
-    }
+    paintMountainMass(ctx, ridge, w, h, tiles.mountain);
   }
 
   for (const badge of CONTINENT_BADGES) {
