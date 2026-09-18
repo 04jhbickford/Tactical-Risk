@@ -268,6 +268,11 @@ check('zoom chrome is quiet frost, never mustard/gold',
   && /background:rgba\(30,36,32,0\.62\)/.test(chrome)
   && !/linear-gradient\(180deg, rgba\(255,255,255,0\.16\)/.test(chrome)
   && !/#three-zoom button[\s\S]*#C4A35A/.test(chrome));
+check('PLACE phase chip is quiet frost, never Confirm gold',
+  /#three-phase/.test(chrome)
+  && /PLACE must never wear Confirm gold/.test(chrome)
+  && /#three-l0 \.three-l0-chip \{[\s\S]*?background:rgba\(30,36,32,0\.42\)/.test(chrome)
+  && !/#three-phase[\s\S]{0,80}#C4A35A/.test(chrome));
 check('chrome slate-teal page bg', /#3D5A66/.test(chrome));
 check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',

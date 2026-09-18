@@ -88,17 +88,26 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-menu-btn {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.10); color:#E8E2D4;
+      background:rgba(30,36,32,0.42); color:#E8E2D4;
+      -webkit-backdrop-filter:saturate(1.35) blur(16px);
+      backdrop-filter:saturate(1.35) blur(16px);
       font-size:18px; cursor:pointer;
       -webkit-tap-highlight-color:transparent;
     }
     #three-l0 .three-l0-chip {
       min-height:44px; padding:0 12px; border-radius:999px;
       display:inline-flex; align-items:center; gap:6px;
-      background:rgba(255,255,255,0.08);
-      border:1px solid rgba(255,255,255,0.16);
+      /* P26: L0 chips are quiet frost. PLACE must never wear Confirm gold. */
+      background:rgba(30,36,32,0.42);
+      border:1px solid rgba(255,255,255,0.12);
+      color:#E8E2D4;
+      -webkit-backdrop-filter:saturate(1.35) blur(16px);
+      backdrop-filter:saturate(1.35) blur(16px);
       font:600 13px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:0.02em;
+    }
+    #three-phase {
+      background:rgba(30,36,32,0.48);
     }
     #three-l0 .three-l0-seat { margin-left:auto; font-weight:500; letter-spacing:0; }
     #three-l0 .three-l0-ipc {
