@@ -1,7 +1,7 @@
-// Photoreal molded A&A plastics from the James/Arc image-gen atlas.
-// ART-PIPELINE / AA-RISK-HOMAGE: cream #F0E6D2 body + faction rim.
-// ≥2px dark outline, contact shadow, toy sheen.
-// NOT cream discs. NOT grey matte silhouettes. NOT number-coins.
+// Cream plastic chits for ?three=1. AA-PALETTE / STACK-LOD lock.
+// Face #F0E6D2 + faction rim + dark outline + contact shadow.
+// P22 HARD: mid/far pip = cream token + N ONLY. ZERO type parade.
+// Near = same cream token + type glyph. Kill grey figurines / atlas soldiers.
 
 import * as THREE from 'three';
 import { PLASTIC, PALETTE } from './threeMapPalette.js';
@@ -271,144 +271,137 @@ const PATHS = {
 };
 
 function drawContactShadow(ctx, cx, cy, s) {
-  // Soft ground blob UNDER the mini — never a black disc over the sculpt.
+  // Soft ground blob UNDER the chit — never a black disc over the cream face.
   ctx.save();
-  ctx.fillStyle = 'rgba(28, 22, 16, 0.20)';
+  ctx.fillStyle = 'rgba(28, 22, 16, 0.28)';
   ctx.beginPath();
-  ctx.ellipse(cx + s * 0.04, cy + s * 0.86, s * 0.70, s * 0.15, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + s * 0.05, cy + s * 0.78, s * 0.72, s * 0.20, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = 'rgba(28, 22, 16, 0.10)';
+  ctx.fillStyle = 'rgba(28, 22, 16, 0.12)';
   ctx.beginPath();
-  ctx.ellipse(cx + s * 0.04, cy + s * 0.88, s * 0.86, s * 0.20, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + s * 0.05, cy + s * 0.84, s * 0.88, s * 0.26, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
 
-function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
-  drawContactShadow(ctx, cx, cy, s);
+function drawCreamToken(ctx, cx, cy, s, faction) {
+  const rx = s * 0.92;
+  const ry = s * 0.70;
+  const side = s * 0.20;
 
-  ctx.save();
-  pathFn(ctx, cx, cy, s);
-  const g = ctx.createLinearGradient(cx - s, cy - s, cx + s, cy + s);
-  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.22));
-  g.addColorStop(0.42, color);
-  g.addColorStop(1, mixRgb(color, '#8A7355', 0.28));
-  ctx.fillStyle = g;
+  // Dark outline (outer wall).
+  ctx.beginPath();
+  ctx.ellipse(cx + 1, cy + side + 1, rx + 3.5, ry + 2.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy - 1, rx + 3.5, ry + 2.5, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#1A1610';
   ctx.fill();
-  ctx.restore();
 
+  // Cylinder side — cream plastic, not grey figurine.
+  const sideGrad = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy + side);
+  sideGrad.addColorStop(0, mixRgb(CREAM, '#8A7355', 0.28));
+  sideGrad.addColorStop(0.45, '#D4C4A8');
+  sideGrad.addColorStop(1, mixRgb(CREAM, '#6A5A40', 0.35));
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + side, rx, ry, 0, 0, Math.PI);
+  ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, 0, true);
+  ctx.closePath();
+  ctx.fillStyle = sideGrad;
+  ctx.fill();
+
+  // Faction rim painted on the side + lip.
   ctx.save();
-  pathFn(ctx, cx, cy, s);
-  ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(5, s * 0.07);
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + side * 0.18, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = faction || '#8E8F8C';
+  ctx.lineWidth = Math.max(6, s * 0.16);
   ctx.stroke();
   ctx.restore();
 
+  // Cream #F0E6D2 top face.
+  const top = ctx.createLinearGradient(cx - rx, cy - ry, cx + rx, cy + ry);
+  top.addColorStop(0, '#FFF8EC');
+  top.addColorStop(0.38, CREAM);
+  top.addColorStop(1, '#D8C8AC');
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
+  ctx.fillStyle = top;
+  ctx.fill();
+
+  // Dark inner outline so the cream punches at 64px.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = '#1A1610';
+  ctx.lineWidth = Math.max(3, s * 0.055);
+  ctx.stroke();
+
+  // Faction lip on the top edge.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx - 6, ry - 5, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = faction || '#8E8F8C';
+  ctx.lineWidth = Math.max(4, s * 0.09);
+  ctx.stroke();
+
+  // Toy sheen on cream plastic.
   ctx.save();
-  pathFn(ctx, cx, cy, s);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx - 8, ry - 7, 0, 0, Math.PI * 2);
   ctx.clip();
-  const hi = ctx.createRadialGradient(cx - s * 0.28, cy - s * 0.34, s * 0.04, cx, cy, s);
-  hi.addColorStop(0, 'rgba(255,255,255,0.36)');
-  hi.addColorStop(0.42, 'rgba(255,255,255,0.06)');
+  const hi = ctx.createRadialGradient(cx - rx * 0.28, cy - ry * 0.36, s * 0.04, cx, cy, s);
+  hi.addColorStop(0, 'rgba(255,255,255,0.55)');
+  hi.addColorStop(0.40, 'rgba(255,255,255,0.10)');
   hi.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hi;
   ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
   ctx.restore();
 }
 
-function plasticBodyColor(faction) {
-  // ART-PIPELINE: cream #F0E6D2 body. Faction is a rim, not a dye that reads black at 390.
-  return mixRgb(CREAM, faction || '#8E8F8C', 0.12);
-}
-
-function tintAtlasCell(img, cell, color) {
-  const cols = cell.atlas === 'land' ? 4 : 2;
-  const sw = img.width / cols;
-  const sh = img.height / 2;
-  const sx = cell.col * sw;
-  const sy = cell.row * sh;
-  const off = document.createElement('canvas');
-  off.width = 256;
-  off.height = 256;
-  const ox = off.getContext('2d', { willReadFrequently: true });
-  ox.clearRect(0, 0, 256, 256);
-  ox.drawImage(img, sx, sy, sw, sh, 0, 0, 256, 256);
-  const pix = ox.getImageData(0, 0, 256, 256);
-  const d = pix.data;
-  const [tr, tg, tb] = hexRgb(color);
-  for (let i = 0; i < d.length; i += 4) {
-    if (d[i + 3] < 8) continue;
-    const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
-    // Atlas is already cream-lifted. Keep sculpt; never floor to a black stamp.
-    const shade = 0.72 + lum * 0.38;
-    d[i] = Math.max(0, Math.min(255, (d[i] * 0.72) + (tr * shade) * 0.28));
-    d[i + 1] = Math.max(0, Math.min(255, (d[i + 1] * 0.72) + (tg * shade) * 0.28));
-    d[i + 2] = Math.max(0, Math.min(255, (d[i + 2] * 0.72) + (tb * shade) * 0.28));
-  }
-  ox.putImageData(pix, 0, 0);
-  return off;
-}
-
-function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
-  const cell = atlasCellFor(type);
-  const img = cell ? atlases[cell.atlas] : null;
-  if (!cell || !img) return false;
-  const tinted = tintAtlasCell(img, cell, color);
-  const d = s * 2.20;
-  const x = cx - d / 2;
-  const y = cy - d / 2 - s * 0.02;
-  // Outline lives OUTSIDE the alpha via drop-shadow so it cannot sit under
-  // the cream feather and collapse the 64px pip to a black stamp.
-  // ~8px on a 256 atlas ≈ 2px screen at mid.
+function drawTypeGlyph(ctx, type, cx, cy, s) {
+  const pathFn = PATHS[type];
+  if (!pathFn) return;
   ctx.save();
-  ctx.filter = [
-    'drop-shadow(0 0 2px #3A3228)',
-    'drop-shadow(0 0 2px #3A3228)',
-    'drop-shadow(0 0 1px #1A1610)',
-    `drop-shadow(0 0 1px ${faction || '#8E8F8C'})`,
-  ].join(' ');
-  ctx.drawImage(tinted, x, y, d, d);
-  ctx.restore();
-  ctx.save();
-  ctx.globalCompositeOperation = 'soft-light';
-  const hi = ctx.createRadialGradient(cx - s * 0.30, cy - s * 0.46, s * 0.04, cx, cy, s * 1.15);
-  hi.addColorStop(0, 'rgba(255,255,255,0.42)');
-  hi.addColorStop(0.34, 'rgba(255,255,255,0.10)');
-  hi.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = hi;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy - s * 0.04, s * 0.90, s * 1.02, 0, 0, Math.PI * 2);
+  pathFn(ctx, cx, cy + s * 0.02, s * 0.38);
+  ctx.fillStyle = '#2C2820';
   ctx.fill();
   ctx.restore();
-  return true;
 }
 
-function drawMolded(ctx, type, cx, cy, s, color, { shadow = true } = {}) {
+function paintCreamChit(ctx, {
+  faction,
+  quantity,
+  glyph = null,
+  w = 256,
+  h = 256,
+  shadow = true,
+} = {}) {
+  const cx = w / 2;
+  const cy = h / 2 - Math.min(w, h) * 0.06;
+  const s = Math.min(w, h) * 0.38;
+  ctx.clearRect(0, 0, w, h);
   if (shadow) drawContactShadow(ctx, cx, cy, s);
-  const body = plasticBodyColor(color);
-  if (!drawPhotorealPlastic(ctx, type, cx, cy, s, body, color)) {
-    drawPlasticBody(ctx, PATHS[type] || pathInf, cx, cy, s, body);
-  }
+  drawCreamToken(ctx, cx, cy, s, faction);
+  // Near only. Mid/far pass glyph:null — ZERO type parade.
+  if (glyph) drawTypeGlyph(ctx, glyph, cx, cy, s);
+  if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
 }
 
 export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
-  const cx = w / 2;
-  const cy = h / 2 - Math.min(w, h) * 0.02;
-  const s = Math.min(w, h) * 0.42;
-  ctx.clearRect(0, 0, w, h);
-  drawMolded(ctx, type, cx, cy, s, ownerColor, { shadow });
-  if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.84, quantity, Math.min(w, h) * 0.85);
+  paintCreamChit(ctx, {
+    faction: ownerColor,
+    quantity,
+    glyph: type || 'infantry',
+    w,
+    h,
+    shadow,
+  });
 }
 
-export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 256 } = {}) {
-  // Mid/far = ONE cream molded plastic + N. Never a numbered coin / disc.
-  // Soft contact shadow + thick outline — cream sculpt must still dominate at 64px.
-  paintPiece(ctx, {
-    type: type || 'infantry',
-    ownerColor,
+export function paintPip(ctx, { ownerColor, total, size = 256 } = {}) {
+  // P22 HARD: mid/far = cream plastic chit + faction rim + N.
+  // ZERO type parade. No soldier, ship, tank, or atlas figurine.
+  paintCreamChit(ctx, {
+    faction: ownerColor,
     quantity: total,
+    glyph: null,
     w: size,
     h: size,
     shadow: true,
@@ -439,11 +432,11 @@ export function makeChitTexture(type, ownerColor, quantity) {
   return chitTex(canvas);
 }
 
-export function makePipTexture(ownerColor, total, type = 'infantry') {
+export function makePipTexture(ownerColor, total) {
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 256;
-  paintPip(canvas.getContext('2d'), { ownerColor, total, type, size: 256 });
+  paintPip(canvas.getContext('2d'), { ownerColor, total, size: 256 });
   return chitTex(canvas);
 }
 

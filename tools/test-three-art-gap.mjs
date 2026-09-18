@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.21 cream plastics + seamless parchment + punched washes.
+// V2.81.51-three-polish.22 cream pip+N, no mid type parade, punched washes.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -48,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.21', GAME_VERSION === 'V2.81.51-three-polish.21');
+check('GAME_VERSION is V2.81.51-three-polish.22', GAME_VERSION === 'V2.81.51-three-polish.22');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -65,24 +65,28 @@ check('plastic atlas cells INF/TNK/ART/FTR',
   && /armour: \{ atlas: 'land', col: 1, row: 0 \}/.test(chits)
   && /artillery: \{ atlas: 'land', col: 2, row: 0 \}/.test(chits)
   && /fighter: \{ atlas: 'land', col: 3, row: 0 \}/.test(chits));
-check('paint uses generated atlas tint', /tintAtlasCell/.test(chits) && /drawPhotorealPlastic/.test(chits));
-check('mid pip is plastic not number-coin',
-  /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
-check('no cream disc coin', !/drawCreamChit/.test(chits) && !/ctx.arc\(cx, cy/.test(chits));
-check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F0E6D2/.test(chits));
+check('paintCreamChit is the only unit mark', /paintCreamChit/.test(chits) && /drawCreamToken/.test(chits));
+check('mid pip is cream chit + N, ZERO type parade',
+  /ZERO type parade/.test(chits)
+  && /glyph: null/.test(chits)
+  && /paintPip/.test(chits)
+  && !/drawPhotorealPlastic/.test(chits)
+  && !/tintAtlasCell/.test(chits));
+check('near chits keep type glyphs on cream', /glyph: type/.test(chits) && /drawTypeGlyph/.test(chits));
+check('cream plastic face #F0E6D2', /#F0E6D2/.test(chits) && /CREAM/.test(chits));
+check('faction rim + dark outline on cream token',
+  /Faction rim/.test(chits) && /#1A1610/.test(chits) && /strokeStyle = faction/.test(chits));
 check('mixRgb returns hex so tint cannot collapse to grey', /padStart\(2, '0'\)/.test(chits) && !/return `rgb\(\$\{m\[0\]\}/.test(chits));
-check('faction rim on cream plastic', /drop-shadow\(0 0 1px \$\{faction/.test(chits));
-check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /0\.72 \+ lum \* 0\.38/.test(chits) && /never floor to a black stamp/.test(chits));
-check('faction rim is a ring not a filled blob', /drop-shadow/.test(chits) && /cannot sit under/.test(chits) && !/d \* 1\.10/.test(chits));
-check('mid pip large enough to read sculpt', PIP_PX === 64);
-check('mid pip keeps soft contact shadow', /shadow: true/.test(chits) && /cream sculpt must still dominate/.test(chits));
+check('mid pip large enough to read token', PIP_PX === 64);
+check('mid pip keeps contact shadow', /shadow: true/.test(chits) && /drawContactShadow/.test(chits));
+check('no grey figurine atlas paint', !/drawPhotorealPlastic/.test(chits) && !/drawImage\(tinted/.test(chits));
 check('baker cream-lifts atlas (no baked black halo)',
   /def cream_lift/.test(baker) && /def strip_black_halo/.test(baker) && !/MaxFilter\(11\)/.test(baker));
 check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /make_tileable\(parchment, 96\)/.test(baker));
 check('paper UV offsets break tile seams', /PAPER_UV_SHIFT/.test(palette) && /PAPER_UV = 26/.test(palette));
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
-check('toy sheen on plastic', /soft-light/.test(chits));
+check('toy sheen on plastic', /Toy sheen on cream plastic/.test(chits) && /createRadialGradient/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
   /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
   && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
@@ -187,8 +191,14 @@ check('collision spacing separates piles', Math.hypot(piled[0].x - piled[1].x, p
 
 check('spike uses STACK-LOD not dual parade',
   /nearLayout/.test(spike) && /isDenseBand\(band\)/.test(spike)
-  && /Never show pip and typed/.test(spike));
-check('spike mid pip uses primaryType', /primaryType\(stacks\)/.test(spike));
+  && /ZERO type parade/.test(spike));
+check('spike mid pip ignores type / primaryType',
+  !/primaryType\(stacks\)/.test(spike)
+  && /pipTexture\(owner, total\)/.test(spike)
+  && !/makePipTexture\([^)]+type/.test(spike));
+check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
+check('ocean shelf + grain', /oceanShelf/.test(palette) && /OCEAN_GRAIN/.test(palette));
+check('gold select emissive on land', /0xC4A35A/.test(spike) && /emissiveIntensity/.test(spike));
 check('iPhone two-finger pinch',
   /touchstart/.test(spike) && /dollyBy\(factor/.test(spike)
   && /touches\.TWO = THREE\.TOUCH\.ROTATE/.test(spike)
