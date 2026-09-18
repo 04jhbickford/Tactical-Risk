@@ -14,7 +14,8 @@ export const BAKE_H = 1170;
 // if this PNG does not bind (no silent GIS wash fallback).
 export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
 export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
-export const WORLD_LAND_ALBEDO_REV = 'p35';
+export const WORLD_LAND_NORMAL = 'assets/three/board/world-land-normal.png';
+export const WORLD_LAND_ALBEDO_REV = 'p36';
 
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',
@@ -192,6 +193,7 @@ export const RIVERS = [
 
 const tiles = { forest: null, mountain: null, arid: null, snow: null };
 let worldLandTex = null;
+let worldLandNormal = null;
 
 function loadImage(src) {
   return new Promise((resolve) => {
@@ -684,15 +686,18 @@ export async function loadWorldLandAlbedo() {
   const img = await new Promise((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error(`P34 fail-closed: ${src} failed to load`));
+    el.onerror = () => reject(new Error(`P36 fail-closed: ${src} failed to load`));
     el.src = src;
   });
   if (!img.width || img.width < 4096) {
-    throw new Error(`P34 fail-closed: albedo too small ${img.width}×${img.height}`);
+    throw new Error(`P36 fail-closed: albedo too small ${img.width}×${img.height}`);
   }
   const tex = await textureFromImage(img);
   tex.userData = {
     paintedAlbedo: true,
+    imhofRelief: true,
+    landcoverBound: true,
+    canvasTooth: true,
     src: WORLD_LAND_ALBEDO,
     rev: WORLD_LAND_ALBEDO_REV,
     width: img.width,
@@ -700,7 +705,29 @@ export async function loadWorldLandAlbedo() {
   };
   worldLandTex = tex;
   console.log('[three-spike] painted albedo bound', img.width, img.height, src);
+  const nrm = await loadWorldLandNormal();
+  if (nrm) tex.userData.normalBound = true;
   return tex;
+}
+
+export async function loadWorldLandNormal() {
+  const src = `${WORLD_LAND_NORMAL}?v=${WORLD_LAND_ALBEDO_REV}`;
+  const img = await new Promise((resolve) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => resolve(null);
+    el.src = src;
+  });
+  if (!img || !img.width) return null;
+  const tex = await textureFromImage(img);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.userData = { imhofNormal: true, src: WORLD_LAND_NORMAL, rev: WORLD_LAND_ALBEDO_REV };
+  worldLandNormal = tex;
+  return tex;
+}
+
+export function getWorldLandNormal() {
+  return worldLandNormal;
 }
 
 export async function bakeWorldLandAtlas(lands, parchmentImg) {
