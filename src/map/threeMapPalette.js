@@ -231,8 +231,8 @@ function bakeParchment(img) {
   return paperTex;
 }
 
-function imageToTex(img, fallbackHex) {
-  const size = img ? (img.naturalWidth || img.width || 1024) : 512;
+function imageToTex(img, fallbackHex, grainImg = null) {
+  const size = img ? (img.naturalWidth || img.width || 512) : 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -240,6 +240,16 @@ function imageToTex(img, fallbackHex) {
   ctx.fillStyle = fallbackHex;
   ctx.fillRect(0, 0, size, size);
   if (img) ctx.drawImage(img, 0, 0, size, size);
+  if (grainImg) {
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = GRAIN_STRENGTH;
+    ctx.drawImage(grainImg, 0, 0, size, size);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = 0.34;
+    ctx.drawImage(grainImg, 0, 0, size, size);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
   return canvasTex(canvas);
 }
 
@@ -288,7 +298,9 @@ export async function loadBoardTextures() {
   landSheets.clear();
   washMaps.clear();
   names.forEach((k, i) => {
-    washMaps.set(k, washes[i] ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase) : null);
+    washMaps.set(k, washes[i]
+      ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase, parchment)
+      : null);
   });
   return { paperTex, oceanMap };
 }
