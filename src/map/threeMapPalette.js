@@ -49,8 +49,8 @@ export const PALETTE = {
   cream: '#F0E6D2',
 };
 
-// Viz AA-PALETTE hexes. Baked as parchment grain + print ink so 390 mid
-// reads Risk-clear continents (AA-RISK-HOMAGE). Not a literal 28% mix.
+// Viz AA-PALETTE lock: exact hex @ 18–28% over parchment (not solid fills).
+// Stack: parchment+grain → continent wash → faction ownership → ink → units.
 export const REGION_WASH = {
   Europe: '#6B7A4A',
   USSR: '#8A7355',

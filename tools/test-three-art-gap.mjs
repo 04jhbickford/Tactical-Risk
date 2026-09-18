@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.16 A&A homage + Risk-clear continent washes.
+// V2.81.51-three-polish.17 Viz wash hexes @ 18–28% over parchment.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -47,7 +47,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.16', GAME_VERSION === 'V2.81.51-three-polish.16');
+check('GAME_VERSION is V2.81.51-three-polish.17', GAME_VERSION === 'V2.81.51-three-polish.17');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -86,9 +86,11 @@ check('continent SA teal', /'South America': '#5A8A72'/.test(palette));
 check('continent Pacific mauve', /Oceania: '#7A6B8A'/.test(palette));
 check('continent ME khaki', /'Middle East': '#A09058'/.test(palette));
 check('continent wash 18-28%', /CONTINENT_WASH_STRENGTH = 0\.28/.test(palette));
-check('homage wash punch so 390 continents read',
-  /WASH_COLORIZE = 0\.70/.test(baker) && /WASH_CHROMA = 1\.22/.test(baker)
-  && /Parchment grain \+ continent print ink/.test(baker));
+check('Viz wash is 18-28% over parchment not solid',
+  /WASH_STRENGTH = 0\.28/.test(baker)
+  && /np\.clip\(strength.*0\.18, 0\.28\)/.test(baker)
+  && !/WASH_COLORIZE = 0\.70/.test(baker)
+  && /exact hex @ 18–28% over parchment/.test(baker));
 check('AA-RISK-HOMAGE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/AA-RISK-HOMAGE.md')));
 check('ownership wash 15-22%', /OWNER_WASH_STRENGTH = 0\.18/.test(palette));
 check('faction wash SU/DE/UK/US/JP',

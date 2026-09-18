@@ -24,9 +24,9 @@ BOARD = ROOT / 'assets/three/board'
 UNITS = ROOT / 'assets/three/units'
 CELL = 512
 
-# Viz AA-PALETTE continent washes. Hex tokens stay locked.
-# 18–28% literal RGB mix reads as one khaki planet after ACES.
-# Homage / Risk glance: parchment luminosity + stronger print ink.
+# Viz AA-PALETTE continent washes LOCKED — exact hex @ 18–28% over parchment.
+# Soft print (luma-matched ink, then 28% over grain). Not a solid fill.
+# Not a literal mix(parchment, hex, 0.28) — that reads as one khaki planet.
 WASH_HEX = {
     'europe': (0x6B, 0x7A, 0x4A),
     'ussr': (0x8A, 0x73, 0x55),
@@ -38,9 +38,6 @@ WASH_HEX = {
     'oceania': (0x7A, 0x6B, 0x8A),
 }
 WASH_STRENGTH = 0.28
-# Colorize amount so Europe olive / USSR tan / Africa ochre survive 390.
-WASH_COLORIZE = 0.70
-WASH_CHROMA = 1.22
 LAND_BASE = (0xC4, 0xB8, 0x96)
 
 # James 4×2 hi-detail sheet (grey/olive plastics on parchment).
@@ -104,20 +101,19 @@ def colorize_keep_grain(im: Image.Image, rgb, strength=0.78) -> Image.Image:
 
 
 def wash_over_parchment(parchment: Image.Image, rgb, strength=WASH_STRENGTH) -> Image.Image:
-    """Parchment grain + continent print ink. Soft, not a flat fill; Risk-readable at 390."""
+    """Viz lock: exact hex @ 18–28% over parchment. Soft print, not a solid fill.
+
+    Ink is luma-matched to the parchment grain (keeps tooth), then composited
+    at WASH_STRENGTH. Candy primaries and 70% solid colorize are out.
+    """
+    t = float(np.clip(strength if strength is not None else WASH_STRENGTH, 0.18, 0.28))
     arr = np.array(parchment, dtype=np.float32)
     lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
-    lum = np.clip((lum - 0.12) / 0.68, 0.40, 1.20)
     target = np.array(rgb, dtype=np.float32)
-    printed = target * lum[..., None]
-    t = WASH_COLORIZE
-    out = arr * (1.0 - t) + printed * t
-    # Push hue apart (Europe green vs USSR brown vs Africa ochre) without flattening grain.
-    grey = out.mean(axis=2, keepdims=True)
-    out = grey + (out - grey) * WASH_CHROMA
-    # Tiny parchment return so it stays printed paper, not candy plastic.
-    paper = min(0.10, max(0.0, 0.28 - float(strength)))
-    out = out * (1.0 - paper) + arr * paper
+    t_lum = (0.30 * target[0] + 0.59 * target[1] + 0.11 * target[2]) / 255.0
+    t_lum = max(float(t_lum), 0.08)
+    ink = np.clip(target * (lum / t_lum)[..., None], 0, 255)
+    out = arr * (1.0 - t) + ink * t
     return Image.fromarray(np.clip(out, 0, 255).astype(np.uint8), 'RGB')
 
 
@@ -176,7 +172,6 @@ def bake_board():
 
     for slug, rgb in WASH_HEX.items():
         wash = wash_over_parchment(parchment, rgb, WASH_STRENGTH)
-        wash = ImageEnhance.Contrast(wash).enhance(1.14)
         wash.save(BOARD / f'wash-{slug}.png', 'PNG', optimize=True)
         print('wrote', BOARD / f'wash-{slug}.png')
 

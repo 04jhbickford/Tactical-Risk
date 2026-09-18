@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.17 (preview only, SCHEMA 11)
+
+Viz continent wash hexes LOCKED @ 18–28% over parchment — not solid fills, not candy Risk primaries. Preview `?three=1` only. Do not merge.
+
+Exact tokens: Europe `#6B7A4A` · USSR `#8A7355` · Asia `#5F7A5A` · Africa `#B08948` · ME `#A09058` · NA `#6A8B6E` · SA `#5A8A72` · Pacific `#7A6B8A`.
+
+Stack: parchment+grain → continent wash (luma-matched ink @ 28%) → faction ownership 18% → ink borders → plastic units. Kill 70% solid colorize from .16.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.17.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.16 (preview only, SCHEMA 11)
 
 James A&A + Risk homage lock. Preview `?three=1` only. Do not merge. Pattern homage — no scanned board.
