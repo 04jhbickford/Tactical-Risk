@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.28 (preview only, SCHEMA 11)
+
+Viz love-gate FAIL ~72% on `.27`. Near/tray still read as ring-discs + flat glyphs; GEO still weak vs A&A board. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Units** — near / select / tray / peek = faction-tinted molded plastic A&A minis (standing infantry, tank, planes, ships). Kill ring-pucks and 36px tray glyphs as the hero. Mid stays cream pip+N.
+2. **Geography** — louder mountain hatch/shade, forest stipple clumps, coast shelf, rivers, undulation, printed IPC + subtle capital roundels. Atlas UVs un-mirrored so features land on the right territories. Not Civ/Polytopia toy art.
+3. **Chrome locks from .26** — idle CTA quiet-dark; gold ONLY Confirm staged + select ring; quiet zoom/PLACE frost.
+
+390 stills in `qa-loop/p28/`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.28.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.27 (preview only, SCHEMA 11)
 
 James he-correct REOPENED love-gate: map still missing geography; near/tray units not original molded pieces. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.

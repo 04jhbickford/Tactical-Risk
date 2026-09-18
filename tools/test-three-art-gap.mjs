@@ -1,5 +1,5 @@
-// V2.81.51-three-polish.27 geography + molded minis. Chrome locks from .26.
-// Run: node tools/test-three-art-gap.mjs
+// V2.81.51-three-polish.28 louder GEO + faction plastic minis.
+// Chrome locks from .26. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
@@ -16,12 +16,14 @@ const {
   separatePoints,
   isSupportType,
   isDenseBand,
+  showMinis,
   nearLayout,
   primaryType,
   shouldCollapse,
   worldSizeFromScreen,
   NEAR_MAX,
   PIP_PX,
+  PIECE_PX,
 } = await import(pathToFileURL(join(root, 'src/map/threeMapDensity.js')));
 
 const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
@@ -49,7 +51,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.27', GAME_VERSION === 'V2.81.51-three-polish.27');
+check('GAME_VERSION is V2.81.51-three-polish.28', GAME_VERSION === 'V2.81.51-three-polish.28');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -242,9 +244,12 @@ check('spike mid pip ignores type / primaryType',
   && /pipTexture\(owner, total\)/.test(spike)
   && !/makePipTexture\([^)]+type/.test(spike));
 check('near never collapses typed chits back to pip',
-  /Near never falls back to pip/.test(spike)
-  && /const collapse = dense;/.test(spike)
+  /Near\/select never falls back to pip/.test(spike)
+  && /const collapse = !showMinis\(band, selected\)/.test(spike)
   && !/dense \|\| shouldCollapse/.test(spike));
+check('select or near shows molded minis; mid idle stays pip',
+  showMinis('near', false) && showMinis('mid', true) && !showMinis('mid', false)
+  && !showMinis('far', false) && PIECE_PX >= 96);
 check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
 check('ocean shelf + grain', /oceanShelf/.test(palette) && /OCEAN_GRAIN/.test(palette));
 check('gold select emissive on land', /0xC4A35A/.test(spike) && /emissiveIntensity/.test(spike));
@@ -287,7 +292,8 @@ check('chrome gold fill is Confirm-only (no sheet/zoom/PLACE mustard)',
 check('chrome slate-teal page bg', /#3D5A66/.test(chrome));
 check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',
-  /three-peek-unit/.test(chrome) && /pieceIconDataUrl/.test(chrome));
+  /three-peek-unit/.test(chrome) && /pieceIconDataUrl/.test(chrome)
+  && /width:60px; height:60px/.test(chrome));
 check('idle Confirm is Select a territory', /Select a territory/.test(chrome));
 check('idle CTA is quiet-dark, never Confirm gold',
   /is-idle/.test(chrome)
@@ -356,6 +362,19 @@ check('p27 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-lo
 check('p27 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/europe-near-select-390.png'));
 check('p27 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/europe-near-units-390.png'));
 check('p27 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/vercel-live-mid-390.png'));
+check('world atlas UVs un-mirror mesh X onto orig map X',
+  /Un-mirror/.test(terrain) && /origX = MAP_WIDTH - flippedX/.test(terrain));
+check('p28 louder mountain hatch + forest stipple',
+  /drawRidgeHatch/.test(terrain) && /stampForestStipple/.test(terrain)
+  && /CAPITAL_ROUNDELS/.test(terrain) && /0x8ec4c6/.test(terrain));
+check('p28 mini tint keeps sculpt (no black crush)',
+  /Mid-grey maps to owner color/.test(chits)
+  && /mapped = 0\.38/.test(chits)
+  && /pieceIconDataUrl[\s\S]*128/.test(chits));
+check('p28 coast shelf is a wide turquoise fringe',
+  /inflateRing\(ring, 18\.5\)/.test(art));
+check('p28 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P28.md')));
+check('p28 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p28/SCORE.md')));
 
 if (failures) {
   console.error(`\n${failures} failed`);
