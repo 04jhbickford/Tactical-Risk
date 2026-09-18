@@ -739,9 +739,9 @@ export async function bootThreeMapSpike() {
       });
     }
     const world = worldSizeFromScreen(px, dist, camera.fov, h, {
-      minPx: japan ? 42 : (small ? 50 : 68),
-      maxPx: japan ? 58 : (small ? 76 : PIECE_MAX_PX),
-      maxWorld: japan ? 5.2 : (small ? 7.0 : 13.5),
+      minPx: japan ? 46 : (small ? 50 : 68),
+      maxPx: japan ? 64 : (small ? 76 : PIECE_MAX_PX),
+      maxWorld: japan ? 5.6 : (small ? 7.0 : 13.5),
     });
     return pieceWorldCap(world, footprint, typeCount, name);
   }
@@ -1151,8 +1151,8 @@ export async function bootThreeMapSpike() {
       const japan = name === 'Japan';
       // Japan: stay NEAR (<92) but pull back so home islands + ocean read.
       // y=58 cropped Japan into a land blob and failed the love-gate.
-      const lift = opts.lift ?? (japan ? 84 : 58);
-      const south = opts.south ?? (japan ? 12 : 8);
+      const lift = opts.lift ?? (japan ? 90 : 58);
+      const south = opts.south ?? (japan ? 6 : 8);
       camera.position.set(p.x, lift, p.z - south);
       controls.target.set(p.x, 0, p.z);
       applyZoomCap();
@@ -1164,7 +1164,7 @@ export async function bootThreeMapSpike() {
       return window.__threeSpike.frameNear('Germany');
     },
     frameNearJapan() {
-      const band = window.__threeSpike.frameNear('Japan', { lift: 84, south: 12 });
+      const band = window.__threeSpike.frameNear('Japan', { lift: 90, south: 6 });
       window.__threeSpike.selectLand('Japan');
       return band === 'near';
     },

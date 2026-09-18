@@ -120,7 +120,7 @@ export const DENSE_LANDS = new Set([
 
 // Printed A&A Japan home-island pin (not the bbox centroid, not Japan Sea Zone).
 // Bbox min=286 is the long island chain; the visual mass sits nearer Honshu.
-export const JAPAN_HOME_CENTER = { x: 2562, y: 718 };
+export const JAPAN_HOME_CENTER = { x: 2594, y: 736 };
 
 export function isDenseLand(name, footprint) {
   return DENSE_LANDS.has(name) || isSmallLand(name, footprint);
@@ -161,7 +161,7 @@ export function footprintPiecePx(footprint, band, selected, typeCount = 1, name 
   const min = denseFootprint(name, footprint)?.min || footprint?.min || 200;
   const japan = name === 'Japan';
   if (band === 'near' || selected) {
-    if (japan) return typeCount >= 3 ? 48 : 54;
+    if (japan) return typeCount >= 3 ? 52 : 58;
     if (min < 80) return 52;
     if (min < 140) return 62;
     if (typeCount >= 4 && min < 320) return 70;

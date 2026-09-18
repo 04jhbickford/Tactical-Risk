@@ -497,8 +497,9 @@ check('p31 UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/uk-
 check('p31 SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/russia-near-select-390.png'));
 check('p31 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/vercel-live-mid-390.png'));
 check('p32 quiet continent wash under select gold',
-  /CONTINENT_FILL_ALPHA = 0\.12/.test(terrain)
-  && /CONTINENT_OVERLAY_ALPHA = 0\.09/.test(terrain)
+  /CONTINENT_FILL_ALPHA = 0\.08/.test(terrain)
+  && /CONTINENT_OVERLAY_ALPHA = 0\.11/.test(terrain)
+  && /fillStain/.test(terrain)
   && /quietContinentWash/.test(terrain)
   && /CONTINENT_CHROMA_PUNCH = 0\.12/.test(palette)
   && /CONTINENT_WASH_STRENGTH = 0\.12/.test(palette)
@@ -507,16 +508,16 @@ check('p32 quiet continent wash under select gold',
   && !/fillFeathered\(ctx, poly, w, h, continent, 0\.38\)/.test(terrain)
   && !/CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
 check('p32 Japan home-island frame, not sea-zone centroid',
-  JAPAN_HOME_CENTER.x === 2562
-  && JAPAN_HOME_CENTER.y === 718
+  JAPAN_HOME_CENTER.x === 2594
+  && JAPAN_HOME_CENTER.y === 736
   && /LAND_ANCHORS/.test(spike)
   && /frameMidJapan/.test(spike)
-  && /lift: 84/.test(spike)
+  && /lift: 90/.test(spike)
   && /'Japan Sea Zone': \{ x: 2695/.test(spike)
   && /water pin — keep east of home islands/.test(spike)
   && /applyLiveContinents/.test(spike));
 check('p32 Japan multi-type pieces are tighter than .31 bbox cap',
-  footprintPiecePx({ min: 286 }, 'near', true, 4, 'Japan') <= 48
+  footprintPiecePx({ min: 286 }, 'near', true, 4, 'Japan') <= 52
   && pieceWorldCap(13.5, { min: 286 }, 4, 'Japan') < pieceWorldCap(13.5, { min: 286 }, 4)
   && denseFootprint('Japan', { min: 286 }).min === 92
   && packPitchFor(4, 6, { min: 286 }, 'Japan') < packPitchFor(4, 6, { min: 286 }));
@@ -525,6 +526,15 @@ check('p32 inspect proves Japan LOD + quiet wash',
   && /quietContinentWash: true/.test(spike)
   && /japanLod: true/.test(spike));
 check('p32 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P32.md')));
+check('p32 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md')));
+check('p32 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/europe-mid-390.png'));
+check('p32 mid select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/europe-mid-select-390.png'));
+check('p32 required Japan near multi-type still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/near-japan-multitype-390.png'));
+check('p32 Japan theater mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p32/japan-mid-390.png'));
+check('p32 SCORE states Japan LOD proven',
+  /Japan multi-type LOD/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8'))
+  && /\*\*PASS\*\*/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8'))
+  && /near-japan-multitype-390\.png/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

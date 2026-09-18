@@ -8,11 +8,12 @@ Viz love-gate FAIL ~92% on `.31`. Asia mid still was pip-only so Japan multi-typ
 LOD was unproven; Europe +30 chocolate flood rivaled select gold. Preview
 `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
 
-1. **Japan multi-type LOD** — home-island pin `JAPAN_HOME_CENTER` (2562, 718),
-   near frame at lift 84 (island + ocean, still `near`), tighter/smaller JP
+1. **Japan multi-type LOD** — home-island pin `JAPAN_HOME_CENTER` (2594, 736),
+   near frame at lift 90 (island + ocean, still `near`), tighter/smaller JP
    minis. Mid idle stays pip+N. Sea Zone water pin 2695/750 kept.
-2. **Quiet continent wash** — fill 0.12 + overlay 0.09, punch 0.12, lighter
-   stain hexes. Identity = tint + outline + `+N` badge. Under select gold.
+2. **Quiet continent wash** — fillStain 0.08 + soft-light 0.11 (no stacked
+   32px feathers), punch 0.12, lighter stain hexes. Identity = tint + outline
+   + `+N` badge. Under select gold.
 3. **Keep** — painted mountains (slightly denser mass), no-clip, Confirm gold
    exclusive, live `continents.json`.
 
