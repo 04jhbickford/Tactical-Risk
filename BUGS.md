@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.26 (preview only, SCHEMA 11)
+
+Arc love-gate ~92% on .25 — FAIL <95%. P0s of .25 passed; glance vs Poly/Root/TTR still short: zoom cluster mustard/gold vs Confirm accent, slight “web preview” tell, L0 frost a touch slabby. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Quiet chrome** — zoom +/−/Fit is neutral frosted dark (L0 family). Never mustard/gold. Gold ONLY on named Confirm when staged. Idle CTA stays quiet-dark `.is-idle`.
+2. **App Store glance** — 390 mid (idle) + near (Confirm) + HUD density/margins/safe-area tightened. No new chrome.
+3. **P1** — thinner native L0 vibrancy (blur 22 / saturate 1.35 / fade-out fill). Mid tooth stays loud (`TOOTH_NORMAL_MID 2.05`); near cleans (`TOOTH_NORMAL_NEAR 1.08`).
+
+390 stills in `qa-loop/p26/`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.26.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.25 (preview only, SCHEMA 11)
 
 Arc+Viz love-gate ~86% on .24 — FAIL. P0s of .24 passed; glance vs Poly/Root/TTR still short: lighting even/flat, parchment tooth too subtle at 390 mid, cream chits read matte token. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
