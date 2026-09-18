@@ -48,6 +48,7 @@ continents:   7 (NA 24 / SA 12 / EU 30 / ME 18 / AF 27 / AS 33 / OC 39)
 - `china-select-hold.png` — outer-union select held
 - `japan-near-hold.png` — multi-type LOD held
 - `computed.json` — machine-read CSS + inspect + eastMed deck
+- `vercel-live-mid-390.png` — live preview `?three=1` = `V2.81.51-three-polish.35`
 
 ## How each P0 was solved
 1. **Blotches** — `bake-world-land-albedo.py` feathers theater boxes, drops oval stamps and baked badges, clamps crushed/loud chroma. Plates stay bound at ~0.36 alpha under continent identity.
@@ -55,5 +56,5 @@ continents:   7 (NA 24 / SA 12 / EU 30 / ME 18 / AF 27 / AS 33 / OC 39)
 3. **Continents** — AA-PALETTE Europe olive / Asia khaki / Africa ochre baked + 0.22 runtime punch on the painted albedo (not .31 flood).
 4. **Z-order** — `deckHeightForSea` = nearby land + 1.55 (East Med 3.60 > Italy 1.82); pin south of Italy; land `polygonOffset` 4.5; sea sprites `renderOrder` 32 + depthTest.
 
-**Vercel:** https://tactical-risk20-git-cursor-three-49424b-james-projects-20d8de40.vercel.app/?three=1  
+**Vercel:** https://tactical-risk20-jsafysl53-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/60 (stacked on PR59 / `.34`)
