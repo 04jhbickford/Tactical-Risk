@@ -271,10 +271,15 @@ const PATHS = {
 };
 
 function drawContactShadow(ctx, cx, cy, s) {
+  // Soft ground blob UNDER the mini — never a black disc over the sculpt.
   ctx.save();
-  ctx.fillStyle = 'rgba(18, 14, 10, 0.38)';
+  ctx.fillStyle = 'rgba(28, 22, 16, 0.20)';
   ctx.beginPath();
-  ctx.ellipse(cx + s * 0.05, cy + s * 0.84, s * 0.82, s * 0.20, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + s * 0.04, cy + s * 0.86, s * 0.70, s * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(28, 22, 16, 0.10)';
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.04, cy + s * 0.88, s * 0.86, s * 0.20, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -283,17 +288,11 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
   drawContactShadow(ctx, cx, cy, s);
 
   ctx.save();
-  pathFn(ctx, cx, cy + s * 0.02, s * 1.04);
-  ctx.fillStyle = '#14110C';
-  ctx.fill();
-  ctx.restore();
-
-  ctx.save();
   pathFn(ctx, cx, cy, s);
   const g = ctx.createLinearGradient(cx - s, cy - s, cx + s, cy + s);
-  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.28));
-  g.addColorStop(0.38, color);
-  g.addColorStop(1, mixRgb(color, '#000000', 0.42));
+  g.addColorStop(0, mixRgb(color, '#FFFFFF', 0.22));
+  g.addColorStop(0.42, color);
+  g.addColorStop(1, mixRgb(color, '#8A7355', 0.28));
   ctx.fillStyle = g;
   ctx.fill();
   ctx.restore();
@@ -301,7 +300,7 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
   ctx.save();
   pathFn(ctx, cx, cy, s);
   ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(12, s * 0.18);
+  ctx.lineWidth = Math.max(5, s * 0.07);
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.stroke();
@@ -321,7 +320,49 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
 
 function plasticBodyColor(faction) {
   // ART-PIPELINE: cream #F0E6D2 body. Faction is a rim, not a dye that reads black at 390.
-  return mixRgb(CREAM, faction || '#8E8F8C', 0.16);
+  return mixRgb(CREAM, faction || '#8E8F8C', 0.12);
+}
+
+function ringFromAlpha(tinted, hex, inner, outer) {
+  // Screen-space 2–3px ring. Not a filled 1.10× silhouette.
+  const w = tinted.width;
+  const h = tinted.height;
+  const src = tinted.getContext('2d').getImageData(0, 0, w, h);
+  const rim = document.createElement('canvas');
+  rim.width = w;
+  rim.height = h;
+  const rx = rim.getContext('2d');
+  const out = rx.createImageData(w, h);
+  const sd = src.data;
+  const od = out.data;
+  const [fr, fg, fb] = hexRgb(hex || '#1A1610');
+  const o2 = outer * outer;
+  const i2 = inner * inner;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (sd[i + 3] >= 16) continue;
+      let nearest = Infinity;
+      for (let dy = -outer; dy <= outer; dy++) {
+        for (let dx = -outer; dx <= outer; dx++) {
+          const dd = dx * dx + dy * dy;
+          if (dd > o2 || dd >= nearest) continue;
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+          if (sd[(yy * w + xx) * 4 + 3] >= 16) nearest = dd;
+        }
+      }
+      if (nearest <= o2 && nearest >= i2) {
+        od[i] = fr;
+        od[i + 1] = fg;
+        od[i + 2] = fb;
+        od[i + 3] = 255;
+      }
+    }
+  }
+  rx.putImageData(out, 0, 0);
+  return rim;
 }
 
 function tintAtlasCell(img, cell, color) {
@@ -342,59 +383,14 @@ function tintAtlasCell(img, cell, color) {
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] < 8) continue;
     const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
-    // Baked atlas outline is a fat black halo — at 390 it is the whole sprite.
-    if (lum < 0.16) {
-      d[i + 3] = 0;
-      continue;
-    }
-    const shade = 0.62 + (lum ** 0.70) * 0.52;
-    d[i] = Math.max(0, Math.min(255, tr * shade));
-    d[i + 1] = Math.max(0, Math.min(255, tg * shade));
-    d[i + 2] = Math.max(0, Math.min(255, tb * shade));
+    // Atlas is already cream-lifted. Keep sculpt; never floor to a black stamp.
+    const shade = 0.58 + lum * 0.50;
+    d[i] = Math.max(0, Math.min(255, (d[i] * 0.55) + (tr * shade) * 0.45));
+    d[i + 1] = Math.max(0, Math.min(255, (d[i + 1] * 0.55) + (tg * shade) * 0.45));
+    d[i + 2] = Math.max(0, Math.min(255, (d[i + 2] * 0.55) + (tb * shade) * 0.45));
   }
   ox.putImageData(pix, 0, 0);
   return off;
-}
-
-function factionRimFrom(tinted, faction) {
-  // 2–3px faction RING, not a filled 1.10× silhouette (that reads as a black stamp at mid).
-  const w = tinted.width;
-  const h = tinted.height;
-  const src = tinted.getContext('2d').getImageData(0, 0, w, h);
-  const rim = document.createElement('canvas');
-  rim.width = w;
-  rim.height = h;
-  const rx = rim.getContext('2d');
-  const out = rx.createImageData(w, h);
-  const sd = src.data;
-  const od = out.data;
-  const [fr, fg, fb] = hexRgb(faction || '#8E8F8C');
-  const R = 4;
-  const R2 = R * R;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      if (sd[i + 3] >= 16) continue;
-      let hit = false;
-      for (let dy = -R; dy <= R && !hit; dy++) {
-        for (let dx = -R; dx <= R && !hit; dx++) {
-          if (dx * dx + dy * dy > R2) continue;
-          const xx = x + dx;
-          const yy = y + dy;
-          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-          if (sd[(yy * w + xx) * 4 + 3] >= 16) hit = true;
-        }
-      }
-      if (hit) {
-        od[i] = fr;
-        od[i + 1] = fg;
-        od[i + 2] = fb;
-        od[i + 3] = 255;
-      }
-    }
-  }
-  rx.putImageData(out, 0, 0);
-  return rim;
 }
 
 function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
@@ -402,19 +398,22 @@ function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
   const img = cell ? atlases[cell.atlas] : null;
   if (!cell || !img) return false;
   const tinted = tintAtlasCell(img, cell, color);
-  const d = s * 2.36;
-  const rim = factionRimFrom(tinted, faction);
-  ctx.drawImage(rim, cx - d / 2, cy - d / 2 - s * 0.04, d, d);
-  ctx.drawImage(tinted, cx - d / 2, cy - d / 2 - s * 0.04, d, d);
+  const d = s * 2.20;
+  const x = cx - d / 2;
+  const y = cy - d / 2 - s * 0.02;
+  // Thick dark outline + faction rim OUTSIDE the cream sculpt.
+  ctx.drawImage(ringFromAlpha(tinted, '#1A1610', 0, 10), x, y, d, d);
+  ctx.drawImage(ringFromAlpha(tinted, faction, 10, 13), x, y, d, d);
+  ctx.drawImage(tinted, x, y, d, d);
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
   const hi = ctx.createRadialGradient(cx - s * 0.30, cy - s * 0.46, s * 0.04, cx, cy, s * 1.15);
-  hi.addColorStop(0, 'rgba(255,255,255,0.58)');
-  hi.addColorStop(0.34, 'rgba(255,255,255,0.14)');
+  hi.addColorStop(0, 'rgba(255,255,255,0.42)');
+  hi.addColorStop(0.34, 'rgba(255,255,255,0.10)');
   hi.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hi;
   ctx.beginPath();
-  ctx.ellipse(cx, cy - s * 0.04, s * 0.94, s * 1.08, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy - s * 0.04, s * 0.90, s * 1.02, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   return true;
@@ -438,15 +437,15 @@ export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, 
 }
 
 export function paintPip(ctx, { ownerColor, total, type = 'infantry', size = 256 } = {}) {
-  // Mid/far = ONE plastic silhouette + N. Never a numbered coin / disc.
-  // No contact blob at mid — it reads as a black stamp at 390.
+  // Mid/far = ONE cream molded plastic + N. Never a numbered coin / disc.
+  // Soft contact shadow + thick outline — cream sculpt must still dominate at 64px.
   paintPiece(ctx, {
     type: type || 'infantry',
     ownerColor,
     quantity: total,
     w: size,
     h: size,
-    shadow: false,
+    shadow: true,
   });
 }
 

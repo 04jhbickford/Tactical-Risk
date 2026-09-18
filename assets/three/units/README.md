@@ -1,7 +1,8 @@
 # Three preview unit atlases (molded plastic)
 
 Preview only (`?three=1`). Photoreal A&A minis from James/Arc image-gen, then cut + packed.
-Faction identity is a luminosity tint of cream plastic + faction dye.
+Faction identity is a cream #F0E6D2 sculpt + thin faction rim.
+Bake strips the fat black halo so 64px mid pips stay cream, not stamps.
 Kill cream discs / Lucide stamps / number-coins.
 
 | File | Grid | Cells |

@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.20 larger mid pips; no contact blob at mid.
+// V2.81.51-three-polish.21 cream plastics + seamless parchment + punched washes.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -48,7 +48,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.20', GAME_VERSION === 'V2.81.51-three-polish.20');
+check('GAME_VERSION is V2.81.51-three-polish.21', GAME_VERSION === 'V2.81.51-three-polish.21');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -70,11 +70,15 @@ check('mid pip is plastic not number-coin',
   /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
 check('no cream disc coin', !/drawCreamChit/.test(chits) && !/ctx.arc\(cx, cy/.test(chits));
 check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F0E6D2/.test(chits));
-check('faction rim on cream plastic', /factionRimFrom/.test(chits));
-check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /lum < 0\.16/.test(chits) && /0\.62 \+ \(lum \*\* 0\.70\)/.test(chits));
-check('faction rim is a ring not a filled blob', /2–3px faction RING/.test(chits) && !/d \* 1\.10/.test(chits));
-check('mid pip large enough to read sculpt', PIP_PX === 56);
-check('mid pip skips contact blob', /shadow: false/.test(chits));
+check('faction rim on cream plastic', /ringFromAlpha/.test(chits));
+check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /0\.58 \+ lum \* 0\.50/.test(chits) && /never floor to a black stamp/.test(chits));
+check('faction rim is a ring not a filled blob', /2–3px ring/.test(chits) && /ringFromAlpha/.test(chits) && !/d \* 1\.10/.test(chits));
+check('mid pip large enough to read sculpt', PIP_PX === 64);
+check('mid pip keeps soft contact shadow', /shadow: true/.test(chits) && /cream sculpt must still dominate/.test(chits));
+check('baker cream-lifts atlas (no baked black halo)',
+  /def cream_lift/.test(baker) && /def strip_black_halo/.test(baker) && !/MaxFilter\(11\)/.test(baker));
+check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /make_tileable\(parchment, 96\)/.test(baker));
+check('paper UV offsets break tile seams', /PAPER_UV_SHIFT/.test(palette) && /PAPER_UV = 26/.test(palette));
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
 check('toy sheen on plastic', /soft-light/.test(chits));

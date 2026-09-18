@@ -267,7 +267,7 @@ export function makeLandMesh(territory, materials, height) {
   });
   geom.rotateX(-Math.PI / 2);
   geom.computeVertexNormals();
-  applyPaperUVs(geom);
+  applyPaperUVs(geom, territory);
   // r170 ExtrudeGeometry: group 0 = lids (top+bottom), group 1 = walls.
   // [side, top] hid the atlas fiber on 1px edges and left GIS-flat lids.
   const mats = [materials.top, materials.side];
@@ -300,6 +300,7 @@ export function makeLandSealMeshes(territory, material) {
     if (!ring) continue;
     const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 2.4)));
     geom.rotateX(-Math.PI / 2);
+    applyPaperUVs(geom, territory);
     const mesh = new THREE.Mesh(geom, material);
     mesh.position.y = 0.05;
     mesh.renderOrder = 1;
@@ -379,7 +380,7 @@ export function makeFoamBandMeshes(territory, material) {
     shape.holes.push(hole);
     const geom = new THREE.ShapeGeometry(shape, 1);
     geom.rotateX(-Math.PI / 2);
-    applyPaperUVs(geom);
+    applyPaperUVs(geom, territory);
     const mesh = new THREE.Mesh(geom, material);
     mesh.position.y = 0.07;
     mesh.renderOrder = 2;

@@ -93,7 +93,17 @@ export const OWNER_WASH_STRENGTH = 0.18;
 
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
-export const PAPER_UV = 18;
+export const PAPER_UV = 26;
+const PAPER_UV_SHIFT = {
+  Europe: [0.00, 0.00],
+  USSR: [0.41, 0.17],
+  Africa: [0.18, 0.46],
+  'Middle East': [0.33, 0.09],
+  Asia: [0.22, 0.38],
+  'North America': [0.55, 0.12],
+  'South America': [0.08, 0.52],
+  Oceania: [0.47, 0.29],
+};
 export const OCEAN_UV = 24;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
@@ -343,12 +353,14 @@ export function makePaperTexture() {
   return paperTex;
 }
 
-export function applyPaperUVs(geometry) {
+export function applyPaperUVs(geometry, territory) {
   const pos = geometry.attributes.position;
   const uv = geometry.attributes.uv;
   if (!pos || !uv) return;
+  const key = territory ? continentKey(territory) : 'Europe';
+  const [ox, oy] = PAPER_UV_SHIFT[key] || [0, 0];
   for (let i = 0; i < pos.count; i++) {
-    uv.setXY(i, pos.getX(i) / PAPER_UV, -pos.getZ(i) / PAPER_UV);
+    uv.setXY(i, pos.getX(i) / PAPER_UV + ox, -pos.getZ(i) / PAPER_UV + oy);
   }
   uv.needsUpdate = true;
   geometry.setAttribute('uv2', uv.clone());

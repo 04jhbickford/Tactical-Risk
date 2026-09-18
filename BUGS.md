@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.21 (preview only, SCHEMA 11)
+
+Fail-closed: Arc/Viz p20 live 390 still black silhouette stamps, GIS-flat parchment, weak continent split. Preview `?three=1` only. Do not merge.
+
+1. **Units** — cream-lift molded atlas (strip baked black halo); runtime 2–3px outline + soft contact shadow; mid pip 64px. Cream sculpt must dominate at 390.
+2. **Parchment** — flatten blotches + 96px tile blend + per-continent UV offset. No wallpaper seams.
+3. **Washes** — chroma-punched hex @ 28% so Europe olive / USSR tan / Africa ochre split at mid.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.21.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.20 (preview only, SCHEMA 11)
 
 Fail-closed: .19 cream sculpt is correct at 180px but mid 48px + contact blob still reads stamp. Mid pip 56px; no contact shadow on pips. Preview `?three=1` only.
