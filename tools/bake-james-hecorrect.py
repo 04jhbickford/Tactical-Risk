@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Bake James he-correct macros into Three preview materials.
 
-SoT (this drop):
+Standing SoT: briefs/2026-09-17-three-art-gap/PRODUCTION-PATH.md
+ART-PIPELINE + AA-RISK-HOMAGE + AA-PALETTE continent washes.
+
+Refs (this drop):
   briefs/2026-09-17-three-art-gap/refs/board-parchment-macro-tile.png
   briefs/2026-09-17-three-art-gap/refs/board-ocean-print-macro-tile.png
   briefs/2026-09-17-three-art-gap/refs/units-molded-plastic-atlas-hi.png

@@ -1,5 +1,7 @@
 // Timeboxed Three.js map preview. Gated by ?three=1 from main.js.
-// Canvas SoT coords + wrap. A&A atlas/palette. Preview only — do not replace live Canvas.
+// Standing art bar: briefs/2026-09-17-three-art-gap/PRODUCTION-PATH.md
+// Director ladder fail-closed: bake → lights/AO → pinch → 390 scorecard.
+// Canvas SoT coords + wrap. Preview only — Canvas cutover needs a separate James yes.
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';

@@ -1,8 +1,9 @@
 # ART-PIPELINE lock — Three preview (bake, don’t vector)
+**Indexed by:** `PRODUCTION-PATH.md` (standing production SoT — preview now; Canvas later only with James yes)  
 **As-of:** 17 Sep 2026 ~8:15pm PT · James: still flat vector vs rich online sims · ~25% love on p11  
 **Audience:** TR / cloud · **QC:** Viz → Arc · Quiet James · Tesla off  
-**Extends:** `AA-PALETTE.md` (incl. continent washes) · `THREE-IPHONE-UI.md` · `BAR-POLYTOPIA-ROOT-TTR.md` · `JAMES-HECORRECT-TEXTURE.md` · `ux/STACK-LOD.md`  
-**Fail line:** App Store glance still reads SVG/GIS/Three debug → block.
+**Extends:** `AA-RISK-HOMAGE.md` · `AA-PALETTE.md` (exact continent washes) · `THREE-IPHONE-UI.md` · `BAR-POLYTOPIA-ROOT-TTR.md` · `JAMES-HECORRECT-TEXTURE.md` · `ux/STACK-LOD.md`  
+**Fail line:** App Store glance still reads SVG/GIS/Three debug → director ladder again, do not wait for James.
 
 ---
 
@@ -44,27 +45,27 @@ Image-gen / paint atlas  →  trim & tile  →  Three materials
 ## 3) Concrete bake list (next pass)
 
 ### Land
-- [ ] Tileable **parchment/paper grain** albedo (`refs/board-parchment-macro-tile.png` or regen) @ 8–14% multiply on `--land-base` `#C4B896`
-- [ ] **Continent washes** (Risk-readable, A&A print) from `AA-PALETTE.md`: Europe olive `#6B7A4A`, USSR brown-tan `#8A7355`, Asia sage `#5F7A5A`, Africa ochre `#B08948`, NA soft green `#6A8B6E`, SA teal-green `#5A8A72`, Pacific mauve-grey `#7A6B8A` @ 18–28% — not candy Risk primaries, not one olive planet
-- [ ] Soft faction ownership wash on top (15–22%), not solid fills
-- [ ] Extrusion walls `--land-shadow`; slight bevel normal optional
-- [ ] Internal borders = ink hairline texture or thin decal — not gold everywhere
+- [x] Tileable **parchment/paper grain** albedo (`refs/board-parchment-macro-tile.png` or regen) @ 8–14% multiply on `--land-base` `#C4B896`
+- [x] **Continent washes** (Risk-readable, A&A print) from `AA-PALETTE.md`: Europe olive `#6B7A4A`, USSR brown-tan `#8A7355`, Asia sage `#5F7A5A`, Africa ochre `#B08948`, NA soft green `#6A8B6E`, SA teal-green `#5A8A72`, Pacific mauve-grey `#7A6B8A` @ 18–28% — not candy Risk primaries, not one olive planet
+- [x] Soft faction ownership wash on top (15–22%), not solid fills
+- [x] Extrusion walls `--land-shadow`; slight bevel normal optional
+- [x] Internal borders = ink hairline texture or thin decal — not gold everywhere
 
 ### Ocean
-- [ ] Tileable **print-ink water** (`refs/board-ocean-print-macro-tile.png`) — slate-teal `#3D5A66` / shelf `#4F6E78`
-- [ ] Quiet depth: UV scale + slight deep darken toward open sea
-- [ ] Coast = 1px foam/ink rim `#D9D2C0` — **kill** grey noise slab + cyan bloom
+- [x] Tileable **print-ink water** (`refs/board-ocean-print-macro-tile.png`) — slate-teal `#3D5A66` / shelf `#4F6E78`
+- [x] Quiet depth: UV scale + slight deep darken toward open sea
+- [x] Coast = 1px foam/ink rim `#D9D2C0` — **kill** grey noise slab + cyan bloom
 
 ### Units
-- [ ] **Molded plastic atlas** (`refs/units-molded-plastic-atlas-hi.png`) — cream `#F0E6D2`, embossed glyph, faction rim
-- [ ] Mid: one pip + **N** badge from atlas (not bare digit coin)
-- [ ] Near: ≤3–4 typed chits + `+K`; peek holds full roster
-- [ ] ≥2px dark outline + contact shadow; kill grey matte stamps + Lucide
+- [x] **Molded plastic atlas** (`refs/units-molded-plastic-atlas-hi.png`) — cream `#F0E6D2`, embossed glyph, faction rim
+- [x] Mid: one pip + **N** badge from atlas (not bare digit coin)
+- [x] Near: ≤3–4 typed chits + `+K`; peek holds full roster
+- [x] ≥2px dark outline + contact shadow; kill grey matte stamps + Lucide
 
 ### FX / select (cheap)
-- [ ] Continuous `--select-gold` `#C4A35A` land ring (2–3px screen)
-- [ ] Soft radial AO under selected stack
-- [ ] Confirm amber only when staged (chrome; already THREE-IPHONE-UI)
+- [x] Continuous `--select-gold` `#C4A35A` land ring (2–3px screen)
+- [x] Soft radial AO under selected stack
+- [x] Confirm amber only when staged (chrome; already THREE-IPHONE-UI)
 
 ### Out of bake scope (don’t block)
 Pinch-zoom (required UX, separate), legal-move ink port, full SSAO, cinematic FOG, hire.

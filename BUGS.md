@@ -2,6 +2,19 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.15 (preview only, SCHEMA 11)
+
+`PRODUCTION-PATH.md` is now **standing production SoT** (preview now; Canvas cutover later only with James yes) — not a one-off polish note. Every pass = director ladder fail-closed: bake → lights/AO → pinch → 390 scorecard. If SVG glance FAIL, iterate the same ladder without waiting for James.
+
+1. **SoT index** — `PRODUCTION-PATH.md` + `ASK-REFRAME.md` + `AA-RISK-HOMAGE.md` + `BAR-POLYTOPIA-ROOT-TTR.md`. Keep ART-PIPELINE + AA-PALETTE continent washes + homage.
+2. **Bake / lights** — parchment + printed ocean + Viz washes as albedo; MeshStandard; hemi+key; contact AO. No MeshBasic.
+3. **Units** — cream `#F0E6D2` molded plastic + faction rim (not a cream disc / number-coin). Mid pip+N; near ≤3–4 +K.
+4. **Feel** — iPhone pinch + gold select + frost L0 + named Confirm.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.15. Do not merge.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.14 (preview only, SCHEMA 11)
 
 James depth lock (~8:15pm): still vector/flat vs Poly/Root. Preview `?three=1` only. Do not merge.

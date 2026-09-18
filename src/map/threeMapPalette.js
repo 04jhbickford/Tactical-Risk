@@ -1,4 +1,5 @@
-// Preview-only Three.js palette. A&A printed board (AA-HECORRECT-11).
+// Preview-only Three.js palette. Standing SoT: PRODUCTION-PATH.md
+// A&A homage + Risk continent washes (AA-RISK-HOMAGE + AA-PALETTE).
 // Continent washes + phone-visible cardboard grain. Not Canvas live art.
 // Ink Blue is money-only — never recolor this war board.
 

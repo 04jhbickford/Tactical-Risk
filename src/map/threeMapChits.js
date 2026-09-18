@@ -1,5 +1,6 @@
 // Photoreal molded A&A plastics from the James/Arc image-gen atlas.
-// Cream/plastic body + faction tint, ≥2px dark outline, contact shadow, toy sheen.
+// ART-PIPELINE / AA-RISK-HOMAGE: cream #F0E6D2 body + faction rim.
+// ≥2px dark outline, contact shadow, toy sheen.
 // NOT cream discs. NOT grey matte silhouettes. NOT number-coins.
 
 import * as THREE from 'three';
@@ -319,8 +320,8 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
 }
 
 function plasticBodyColor(faction) {
-  // Cream plastic dyed with faction — sculpt stays, not a cream disc / grey matte.
-  return mixRgb(CREAM, faction || '#8E8F8C', 0.50);
+  // ART-PIPELINE: cream #F0E6D2 plastic body, faction is a dye + rim — not a disc.
+  return mixRgb(CREAM, faction || '#8E8F8C', 0.28);
 }
 
 function tintAtlasCell(img, cell, color) {
@@ -349,12 +350,35 @@ function tintAtlasCell(img, cell, color) {
   return off;
 }
 
-function drawPhotorealPlastic(ctx, type, cx, cy, s, color) {
+function factionRimFrom(tinted, faction) {
+  const rim = document.createElement('canvas');
+  rim.width = tinted.width;
+  rim.height = tinted.height;
+  const rx = rim.getContext('2d');
+  rx.drawImage(tinted, 0, 0);
+  const pix = rx.getImageData(0, 0, rim.width, rim.height);
+  const d = pix.data;
+  const [fr, fg, fb] = hexRgb(faction || '#8E8F8C');
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 12) continue;
+    d[i] = fr;
+    d[i + 1] = fg;
+    d[i + 2] = fb;
+    d[i + 3] = 255;
+  }
+  rx.putImageData(pix, 0, 0);
+  return rim;
+}
+
+function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
   const cell = atlasCellFor(type);
   const img = cell ? atlases[cell.atlas] : null;
   if (!cell || !img) return false;
   const tinted = tintAtlasCell(img, cell, color);
   const d = s * 2.28;
+  const rim = factionRimFrom(tinted, faction);
+  const rd = d * 1.10;
+  ctx.drawImage(rim, cx - rd / 2, cy - rd / 2 - s * 0.04, rd, rd);
   ctx.drawImage(tinted, cx - d / 2, cy - d / 2 - s * 0.04, d, d);
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
@@ -373,7 +397,7 @@ function drawPhotorealPlastic(ctx, type, cx, cy, s, color) {
 function drawMolded(ctx, type, cx, cy, s, color) {
   drawContactShadow(ctx, cx, cy, s);
   const body = plasticBodyColor(color);
-  if (!drawPhotorealPlastic(ctx, type, cx, cy, s, body)) {
+  if (!drawPhotorealPlastic(ctx, type, cx, cy, s, body, color)) {
     drawPlasticBody(ctx, PATHS[type] || pathInf, cx, cy, s, body);
   }
 }
