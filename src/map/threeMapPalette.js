@@ -53,16 +53,18 @@ export const PALETTE = {
 // P31 HARD: live Risk bonus continents from data/continents.json (7 groups).
 // Muted print hexes — parchment stain, not candy Risk primaries, not Confirm gold fills.
 // USSR is NOT a bonus continent (Russia/Ukraine/Karelia are Asia).
+// P35 HARD: AA-PALETTE Risk washes — Europe olive / Africa ochre must split
+// at mid 390. Quiet print hexes, not candy primaries, not Confirm gold.
 export const REGION_WASH = {
-  Europe: '#7A98A4',
-  Asia: '#8A9A62',
-  Africa: '#C4A878',
-  'Middle East': '#D0B888',
-  'North America': '#8A9E88',
-  'South America': '#A88868',
-  Oceania: '#8A8B98',
+  Europe: '#6B7A4A',
+  Asia: '#8A7355',
+  Africa: '#B08948',
+  'Middle East': '#A09058',
+  'North America': '#6A8B6E',
+  'South America': '#5A8A72',
+  Oceania: '#7A6B8A',
   // Leftover tile key only — never remap live bonus groups onto this.
-  USSR: '#A09078',
+  USSR: '#8A7355',
 };
 export const LIVE_CONTINENTS = [
   'Europe',
@@ -73,11 +75,11 @@ export const LIVE_CONTINENTS = [
   'South America',
   'Oceania',
 ];
-export const CONTINENT_WASH_STRENGTH = 0.12;
-// Runtime tint so bonus groups still split at 390 after lighting.
+export const CONTINENT_WASH_STRENGTH = 0.16;
+// P35 HARD: quiet Risk punch stays ON the painted albedo so continents read
+// at 390. 0.18 is identity, not the .31 chocolate flood (0.42).
 // P23: punch is LOD-invariant — hold at near; do not flatten when dollying in.
-// P32 HARD: quiet stain under select gold — identity is tint + outline + badge.
-export const CONTINENT_CHROMA_PUNCH = 0.12;
+export const CONTINENT_CHROMA_PUNCH = 0.22;
 
 export const USSR_LANDS = new Set([
   'Russia',
@@ -127,8 +129,10 @@ export const OCEAN_UV = 24;
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
 export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
-export const OCEAN_GRAIN = 0.50;
-export const OCEAN_OPEN_DARKEN = 0.64;
+// P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
+export const OCEAN_GRAIN = 0.14;
+export const OCEAN_OPEN_DARKEN = 0.38;
+export const OCEAN_TEAL_PUNCH = 0.58;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
@@ -348,7 +352,12 @@ function bakeOcean(img) {
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   overlayPhoto(ctx, grainCanvas, size, OCEAN_GRAIN, 'overlay');
-  overlayPhoto(ctx, grainCanvas, size, 0.28, 'multiply');
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = OCEAN_TEAL_PUNCH;
+  ctx.fillStyle = PALETTE.oceanDeep;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   oceanMap = canvasTex(canvas);
   return oceanMap;
 }
@@ -464,14 +473,14 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
   // light wash. P32: quiet continent tint — never a chocolate flood vs select gold.
-  const continentTint = mixHex('#ffffff', region, world ? 0 : CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.03 : OWNER_WASH_STRENGTH) : continentTint;
+  const continentTint = mixHex('#ffffff', region, CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.04 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: world ? null : (paperNormal || null),
     aoMap: world ? null : (paperAO || null),
     aoMapIntensity: world ? 0 : (paperAO ? 1.08 : 0),
-    color: world ? 0xffffff : tint,
+    color: tint,
     roughness: 0.76,
     metalness: 0.0,
     envMapIntensity: world ? 0.06 : 0.14,
@@ -492,7 +501,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   });
   const seal = new THREE.MeshStandardMaterial({
     map: sheet,
-    color: world ? 0xffffff : tint,
+    color: tint,
     roughness: 0.94,
     metalness: 0.0,
     side: THREE.DoubleSide,
@@ -508,15 +517,32 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0xffffff,
-    roughness: 0.40,
-    metalness: 0.14,
-    envMapIntensity: 0.42,
+    color: 0x6e8c94,
+    roughness: 0.46,
+    metalness: 0.10,
+    envMapIntensity: 0.28,
     transparent: false,
     vertexColors: true,
   });
-  if (mat.normalMap) mat.normalScale.set(0.92, 0.92);
+  if (mat.normalMap) mat.normalScale.set(0.72, 0.72);
   return mat;
+}
+
+export function makeSeaWaterMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0x2f4c56,
+    transparent: true,
+    opacity: 0.72,
+    roughness: 0.52,
+    metalness: 0.08,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.20,
+    polygonOffset: true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits: 2,
+  });
 }
 
 export function makeFoamMaterial() {
@@ -549,11 +575,10 @@ export function makeOceanMesh(width, height) {
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // Printed shelf vs deep — no cyan reef punch (P30 quiet lanes).
-    const reef = 1 - t;
-    colors[i * 3] = shade * (0.90 + reef * 0.04);
-    colors[i * 3 + 1] = shade * (0.93 + reef * 0.05);
-    colors[i * 3 + 2] = shade * (0.90 + reef * 0.04);
+    // P35: keep the whole basin teal — shelf brightening made Med look like land.
+    colors[i * 3] = shade * 0.52;
+    colors[i * 3 + 1] = shade * 0.68;
+    colors[i * 3 + 2] = shade * 0.72;
   }
   if (uv) {
     uv.needsUpdate = true;

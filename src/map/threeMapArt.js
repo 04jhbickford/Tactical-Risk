@@ -263,7 +263,7 @@ export function makeLandMesh(territory, materials, height) {
   for (const poly of territory.polygons || []) {
     const ring = smoothRing(simplifyRing(poly, 0.32), 2);
     if (!ring) continue;
-    shapes.push(shapeFromRing(inflateRing(ring, 1.8)));
+    shapes.push(shapeFromRing(inflateRing(ring, 1.15)));
   }
   if (!shapes.length) return null;
 
@@ -284,7 +284,7 @@ export function makeLandMesh(territory, materials, height) {
   else applyPaperUVs(geom, territory);
   // r170 ExtrudeGeometry: group 0 = lids (top+bottom), group 1 = walls.
   // [side, top] hid the atlas fiber on 1px edges and left GIS-flat lids.
-  // P31: push land away from camera so plastic sprites never get eaten.
+  // P35: push land further back so East Med ships sit above Italy's lid.
   const mats = [materials.top, materials.side];
   for (const mat of mats) {
     if (!mat) continue;
@@ -292,8 +292,8 @@ export function makeLandMesh(territory, materials, height) {
     mat.transparent = false;
     mat.depthWrite = true;
     mat.polygonOffset = true;
-    mat.polygonOffsetFactor = 1.5;
-    mat.polygonOffsetUnits = 2;
+    mat.polygonOffsetFactor = 4.5;
+    mat.polygonOffsetUnits = 8;
   }
   const mesh = new THREE.Mesh(geom, mats);
   mesh.userData.territory = territory;
@@ -311,12 +311,12 @@ export function makeLandSealMeshes(territory, material) {
   material.transparent = false;
   material.depthWrite = true;
   material.polygonOffset = true;
-  material.polygonOffsetFactor = 1.5;
-  material.polygonOffsetUnits = 2;
+  material.polygonOffsetFactor = 4.5;
+  material.polygonOffsetUnits = 8;
   for (const poly of territory.polygons || []) {
     const ring = smoothRing(simplifyRing(poly, 0.28), 2);
     if (!ring) continue;
-    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 2.8)));
+    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 1.4)));
     geom.rotateX(-Math.PI / 2);
     if (getWorldLandTex()) applyWorldLandUVs(geom);
     else applyPaperUVs(geom, territory);
@@ -439,8 +439,8 @@ export function makeFoamBandMeshes(territory, material) {
   for (const poly of territory.polygons || []) {
     const ring = simplifyRing(poly, 0.55);
     if (!ring || ring.length < 4) continue;
-    const outer = inflateRing(ring, 4.4);
-    const inner = inflateRing(ring, 1.1);
+    const outer = inflateRing(ring, 2.6);
+    const inner = inflateRing(ring, 0.8);
     const shape = shapeFromRing(outer);
     const hole = shapeFromRing(inner.slice().reverse());
     shape.holes.push(hole);
@@ -478,8 +478,8 @@ export function makeCoastShelfMeshes(territory, material) {
   for (const poly of territory.polygons || []) {
     const ring = simplifyRing(poly, 0.6);
     if (!ring || ring.length < 4) continue;
-    const outer = inflateRing(ring, 26.5);
-    const inner = inflateRing(ring, 2.0);
+    const outer = inflateRing(ring, 8.2);
+    const inner = inflateRing(ring, 1.6);
     const shape = shapeFromRing(outer);
     const hole = shapeFromRing(inner.slice().reverse());
     shape.holes.push(hole);
@@ -557,6 +557,24 @@ export function addSeaLaneLines(group, waters, material, y = 0.05) {
     }
   }
   return n;
+}
+
+export function makeSeaWaterMeshes(territory, material) {
+  const meshes = [];
+  if (!material || !territory?.isWater) return meshes;
+  for (const poly of territory.polygons || []) {
+    const ring = smoothRing(simplifyRing(poly, 0.55), 1);
+    if (!ring) continue;
+    const geom = new THREE.ShapeGeometry(shapeFromRing(ring));
+    geom.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.y = 0.04;
+    mesh.renderOrder = 1;
+    mesh.userData.territory = territory;
+    mesh.userData.kind = 'sea-water';
+    meshes.push(mesh);
+  }
+  return meshes;
 }
 
 export function makeCoastAoMeshes(territory, material) {
