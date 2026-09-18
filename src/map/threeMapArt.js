@@ -252,10 +252,10 @@ export function makeLandMesh(territory, materials, height) {
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
     bevelEnabled: true,
-    bevelThickness: 0.22,
-    bevelSize: 0.20,
-    bevelSegments: 2,
-    curveSegments: 1,
+    bevelThickness: 0.24,
+    bevelSize: 0.22,
+    bevelSegments: 3,
+    curveSegments: 2,
   });
   geom.rotateX(-Math.PI / 2);
   sculptLandRelief(geom, territory, height);
@@ -407,7 +407,7 @@ export function makeCoastShelfMeshes(territory, material) {
   for (const poly of territory.polygons || []) {
     const ring = simplifyRing(poly, 0.6);
     if (!ring || ring.length < 4) continue;
-    const outer = inflateRing(ring, 18.5);
+    const outer = inflateRing(ring, 26.5);
     const inner = inflateRing(ring, 2.0);
     const shape = shapeFromRing(outer);
     const hole = shapeFromRing(inner.slice().reverse());

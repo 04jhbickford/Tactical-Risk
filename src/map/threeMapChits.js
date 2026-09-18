@@ -77,6 +77,11 @@ function mixRgb(hex, toward, t) {
   return `#${m.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
+function mutePipRim(hex) {
+  // P29 P1: pip rim chroma ≤ Confirm gold. Faction metal ≠ CTA #C4A35A.
+  return mixRgb(hex || '#8E8F8C', '#3A3428', 0.42);
+}
+
 function drawBadge(ctx, x, y, label, scale) {
   const text = String(label);
   ctx.font = `700 ${Math.round(scale * 0.22)}px -apple-system, "SF Pro Text", "Segoe UI", sans-serif`;
@@ -549,13 +554,23 @@ function paintMoldedMini(ctx, {
     for (let i = 0; i < d.length; i += 4) {
       const a = d[i + 3];
       if (a < 8) continue;
-      // Grey sculpt → faction plastic. Mid-grey maps to owner color; do not
-      // crush shadows to black silhouettes (that was the tray-glyph fail).
-      const lum = (d[i] * 0.35 + d[i + 1] * 0.45 + d[i + 2] * 0.20) / 255;
-      const mapped = 0.38 + (lum / 0.52) * 0.78;
-      d[i] = Math.min(255, Math.round(fr * mapped + 16));
-      d[i + 1] = Math.min(255, Math.round(fg * mapped + 14));
-      d[i + 2] = Math.min(255, Math.round(fb * mapped + 10));
+      // P29 HARD: luminance colorize. Grey sculpt lighting stays; chroma
+      // becomes faction plastic (DE field-grey, SU green, UK tan, US olive,
+      // JP orange-red). Do not keep primer-grey or crush to black glyphs.
+      const sculpt = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255;
+      const body = 0.55 + sculpt * 0.75;
+      let r = fr * body;
+      let g = fg * body;
+      let b = fb * body;
+      const highlight = Math.max(0, (sculpt - 0.72) / 0.28);
+      if (highlight > 0) {
+        r += (240 - r) * highlight * 0.40;
+        g += (232 - g) * highlight * 0.34;
+        b += (210 - b) * highlight * 0.24;
+      }
+      d[i] = Math.max(0, Math.min(255, Math.round(r)));
+      d[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
+      d[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
       d[i + 3] = a;
     }
     tx.putImageData(pix, 0, 0);
@@ -594,8 +609,9 @@ export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, 
 export function paintPip(ctx, { ownerColor, total, size = 256 } = {}) {
   // P22 HARD: mid/far = cream plastic chit + faction rim + N.
   // ZERO type parade. No soldier, ship, tank, or atlas figurine.
+  // P29: rim is muted ink-metal so it cannot outshine Confirm gold.
   paintCreamChit(ctx, {
-    faction: ownerColor,
+    faction: mutePipRim(ownerColor),
     quantity: total,
     glyph: null,
     w: size,

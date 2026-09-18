@@ -288,7 +288,7 @@ export async function bootThreeMapSpike() {
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
   const coastShelfMat = makeCoastShelfMaterial();
-  const riverMat = makeLineMat('#3A6A74', 3.6, 0.92);
+  const riverMat = makeLineMat('#2E6470', 5.2, 0.95);
   const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
   lineMats.push(landBorderMat, foamMat, riverMat, selectMat);
 
@@ -450,19 +450,19 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  // P25: warmer raking key + cooler fill/hemi so land planes sculpt at mid.
-  // MeshStandard only. No neon. Continent washes stay the chroma, not the light.
-  const hemi = new THREE.HemisphereLight(0xC5D2DC, 0x24343C, 0.26);
+  // P29: lift hemi so parchment reads; keep warm-key-cool-fill sculpt without
+  // crushing Europe to a charcoal low-poly slab. MeshStandard only. No neon.
+  const hemi = new THREE.HemisphereLight(0xC5D2DC, 0x24343C, 0.58);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFE2B0, 1.68);
-  key.position.set(-110, 42, -40);
+  const key = new THREE.DirectionalLight(0xFFE2B0, 1.22);
+  key.position.set(-96, 58, -28);
   key.target.position.set(WORLD_W * 0.42, 0, -WORLD_H * 0.38);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.28);
-  fill.position.set(72, 18, 44);
+  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.42);
+  fill.position.set(72, 24, 44);
   scene.add(fill);
-  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.07);
+  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.12);
   bounce.position.set(12, -14, 22);
   scene.add(bounce);
 
@@ -470,7 +470,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 1.16;
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
   renderer.domElement.id = 'threeCanvas';
@@ -1057,16 +1057,20 @@ export async function bootThreeMapSpike() {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
     },
-    frameNearGermany() {
-      const land = lands.find((t) => t.name === 'Germany');
+    frameNear(name) {
+      const land = lands.find((t) => t.name === name);
       const c = land && territoryCenter(land);
-      if (!c) return;
+      if (!c) return false;
       const p = worldToScene(c.x, c.y);
       camera.position.set(p.x, 58, p.z - 8);
       controls.target.set(p.x, 0, p.z);
       applyZoomCap();
       controls.update();
       syncDensity();
+      return true;
+    },
+    frameNearGermany() {
+      return window.__threeSpike.frameNear('Germany');
     },
     rosterOf(name) {
       const stacks = stacksFor(name, placements);
