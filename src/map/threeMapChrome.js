@@ -75,9 +75,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(12px, env(safe-area-inset-left));
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:rgba(30,36,32,0.58);
-      -webkit-backdrop-filter:blur(28px) saturate(1.2);
-      backdrop-filter:blur(28px) saturate(1.2);
+      isolation:isolate;
+      background:rgba(30,36,32,0.34);
+      -webkit-backdrop-filter:blur(40px) saturate(1.35);
+      backdrop-filter:blur(40px) saturate(1.35);
       border-bottom:1px solid rgba(255,255,255,0.08);
       color:#E8E2D4;
       pointer-events:none;
@@ -122,9 +123,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek {
       display:none; pointer-events:none;
       min-height:44px; padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.62);
-      -webkit-backdrop-filter:blur(28px) saturate(1.2);
-      backdrop-filter:blur(28px) saturate(1.2);
+      isolation:isolate;
+      background:rgba(30,36,32,0.38);
+      -webkit-backdrop-filter:blur(36px) saturate(1.3);
+      backdrop-filter:blur(36px) saturate(1.3);
       color:#E8E2D4;
       border:1px solid rgba(255,255,255,0.08);
       box-shadow:0 8px 24px rgba(0,0,0,0.35);
@@ -159,9 +161,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       pointer-events:auto;
       min-height:50px; height:50px; width:100%;
       border:1px solid rgba(255,255,255,0.08); border-radius:14px;
-      background:rgba(30,36,32,0.72); color:#c5c9d4;
-      -webkit-backdrop-filter:blur(24px) saturate(1.15);
-      backdrop-filter:blur(24px) saturate(1.15);
+      isolation:isolate;
+      background:rgba(30,36,32,0.40); color:#c5c9d4;
+      -webkit-backdrop-filter:blur(32px) saturate(1.25);
+      backdrop-filter:blur(32px) saturate(1.25);
       font:600 17px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:-0.01em;
       cursor:default;
@@ -185,9 +188,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.14);
-      background:rgba(30,36,32,0.72);
-      -webkit-backdrop-filter:blur(20px);
-      backdrop-filter:blur(20px);
+      isolation:isolate;
+      background:rgba(30,36,32,0.36);
+      -webkit-backdrop-filter:blur(28px);
+      backdrop-filter:blur(28px);
       color:#E8E2D4;
       font-size:20px; line-height:1; cursor:pointer;
       -webkit-tap-highlight-color:transparent;

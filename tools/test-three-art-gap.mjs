@@ -54,9 +54,14 @@ check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-pla
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
 check('generated parchment tile', pngOk('assets/three/board/board-parchment-tile.png'));
 check('generated ocean tile', pngOk('assets/three/board/board-ocean-tile.png'));
+check('cream land-air chit atlas', pngOk('assets/three/units/units-land-air-cream.png'));
+check('cream naval chit atlas', pngOk('assets/three/units/units-naval-cream.png'));
 check('generated Europe wash', pngOk('assets/three/board/wash-europe.png'));
 check('generated USSR wash', pngOk('assets/three/board/wash-ussr.png'));
 check('generated Africa wash', pngOk('assets/three/board/wash-africa.png'));
+check('generated Asia wash', pngOk('assets/three/board/wash-asia.png'));
+check('generated NA wash', pngOk('assets/three/board/wash-north-america.png'));
+check('generated SA wash', pngOk('assets/three/board/wash-south-america.png'));
 check('continent ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
 check('plastic ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png'));
 
@@ -65,21 +70,26 @@ check('plastic atlas cells INF/TNK/ART/FTR',
   && /armour: \{ atlas: 'land', col: 1, row: 0 \}/.test(chits)
   && /artillery: \{ atlas: 'land', col: 2, row: 0 \}/.test(chits)
   && /fighter: \{ atlas: 'land', col: 3, row: 0 \}/.test(chits));
-check('paint uses generated atlas tint', /tintAtlasCell/.test(chits) && /drawPhotorealPlastic/.test(chits));
-check('mid pip is plastic not number-coin',
-  /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
-check('no cream disc coin', !/drawCreamChit/.test(chits) && !/ctx.arc\(cx, cy/.test(chits));
-check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F0E6D2/.test(chits));
+check('cream chit atlas cells INF/TNK/FTR',
+  /infantry: \{ atlas: 'landAir', col: 0, row: 0/.test(chits)
+  && /armour: \{ atlas: 'landAir', col: 1, row: 0/.test(chits)
+  && /fighter: \{ atlas: 'landAir', col: 0, row: 1/.test(chits));
+check('paint uses cream chits', /drawCreamChit/.test(chits) && /stampChitGlyph/.test(chits));
+check('mid pip is pip+N only no type parade',
+  /pip\+N only/.test(chits) && /glyph: false/.test(chits) && /Type glyphs only on near/.test(chits));
+check('cream plastic body + faction rim', /#F0E6D2/.test(chits) && /faction/.test(chits));
 check('mixRgb returns hex so tint cannot collapse to grey', /padStart\(2, '0'\)/.test(chits) && !/return `rgb\(\$\{m\[0\]\}/.test(chits));
-check('faction rim on cream plastic', /drop-shadow\(0 0 1px \$\{faction/.test(chits));
-check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /0\.72 \+ lum \* 0\.38/.test(chits) && /never floor to a black stamp/.test(chits));
-check('faction rim is a ring not a filled blob', /drop-shadow/.test(chits) && /cannot sit under/.test(chits) && !/d \* 1\.10/.test(chits));
-check('mid pip large enough to read sculpt', PIP_PX === 64);
-check('mid pip keeps soft contact shadow', /shadow: true/.test(chits) && /cream sculpt must still dominate/.test(chits));
+check('faction rim on cream chit', /drawCreamDisc/.test(chits) && /strokeStyle = faction/.test(chits));
+check('mid pip large enough to read chit', PIP_PX === 64);
+check('mid pip keeps soft contact shadow', /shadow: true/.test(chits));
 check('baker cream-lifts atlas (no baked black halo)',
   /def cream_lift/.test(baker) && /def strip_black_halo/.test(baker) && !/MaxFilter\(11\)/.test(baker));
-check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /make_tileable\(parchment, 96\)/.test(baker));
-check('paper UV offsets break tile seams', /PAPER_UV_SHIFT/.test(palette) && /PAPER_UV = 26/.test(palette));
+check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /make_tileable\(parchment, 120\)/.test(baker));
+check('paper UV offsets break tile seams', /PAPER_UV_SHIFT/.test(palette) && /PAPER_UV = 32/.test(palette));
+check('ocean shelf + print grain', /OCEAN_SHELF|shelf/.test(baker) && /0x4F, 0x6E, 0x78/.test(baker));
+check('gold land select only', /0xC4A35A/.test(spike) && /never a blue glow ring/.test(spike));
+check('land material punches continent tint', /continentTint/.test(palette) && /mixHex\('#ffffff', region, 0\.24\)/.test(palette));
+check('real frost blur on L0', /blur\(40px\)/.test(chrome) && /isolation:isolate/.test(chrome));
 check('thick dark outline', /#1A1610/.test(chits));
 check('contact shadow under plastic', /drawContactShadow/.test(chits));
 check('toy sheen on plastic', /soft-light/.test(chits));
@@ -188,7 +198,8 @@ check('collision spacing separates piles', Math.hypot(piled[0].x - piled[1].x, p
 check('spike uses STACK-LOD not dual parade',
   /nearLayout/.test(spike) && /isDenseBand\(band\)/.test(spike)
   && /Never show pip and typed/.test(spike));
-check('spike mid pip uses primaryType', /primaryType\(stacks\)/.test(spike));
+check('spike mid pip is pip+N not typed',
+  /pip\|\$\{owner\}\|\$\{total\}/.test(spike) && !/primaryType\(stacks\)/.test(spike));
 check('iPhone two-finger pinch',
   /touchstart/.test(spike) && /dollyBy\(factor/.test(spike)
   && /touches\.TWO = THREE\.TOUCH\.ROTATE/.test(spike)

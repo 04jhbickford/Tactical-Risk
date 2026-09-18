@@ -93,7 +93,7 @@ export const OWNER_WASH_STRENGTH = 0.18;
 
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
-export const PAPER_UV = 26;
+export const PAPER_UV = 32;
 const PAPER_UV_SHIFT = {
   Europe: [0.00, 0.00],
   USSR: [0.41, 0.17],
@@ -392,8 +392,9 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sideHex = mixHex(region, PALETTE.landShadow, 0.45);
   const key = continentKey(territory);
   const sheet = washMaps.get(key) || bakeLandSheet(washHex);
-  // Faction ownership sits ON the continent wash — never 100% replace it.
-  const tint = ownerHex ? mixHex('#ffffff', ownerHex, OWNER_WASH_STRENGTH) : 0xffffff;
+  // Punch continent at 390 (baked wash + soft hex tint). Faction sits on top.
+  const continentTint = mixHex('#ffffff', region, 0.24);
+  const tint = ownerHex ? mixHex(continentTint, ownerHex, OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: paperNormal || null,
