@@ -30,6 +30,8 @@ import {
   makeBorderLine,
   addFoamCoast,
   makeFoamBandMeshes,
+  makeCoastAoMaterial,
+  makeCoastAoMeshes,
 } from './threeMapArt.js';
 import {
   PALETTE,
@@ -272,7 +274,8 @@ export async function bootThreeMapSpike() {
   const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.68);
   const foamMat = makeLineMat(PALETTE.foam, 2.2, 0.46);
   const foamBandMat = makeFoamMaterial();
-  const selectMat = makeLineMat(PALETTE.select, 4.2, 1);
+  const coastAoMat = makeCoastAoMaterial();
+  const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
   lineMats.push(landBorderMat, foamMat, selectMat);
 
   for (const land of lands) {
@@ -324,6 +327,9 @@ export async function bootThreeMapSpike() {
       addFoamCoast(group, land, foamMat, 0.05);
       for (const band of makeFoamBandMeshes(land, foamBandMat)) {
         group.add(band);
+      }
+      for (const ao of makeCoastAoMeshes(land, coastAoMat)) {
+        group.add(ao);
       }
     }
   }
@@ -426,23 +432,26 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.72);
+  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.44);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFF6E4, 0.86);
-  key.position.set(-62, 54, -36);
+  const key = new THREE.DirectionalLight(0xFFF6E4, 1.22);
+  key.position.set(-78, 64, -28);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x9BB0B8, 0.32);
-  fill.position.set(46, 32, 22);
+  const fill = new THREE.DirectionalLight(0x9BB0B8, 0.14);
+  fill.position.set(52, 26, 30);
   scene.add(fill);
+  const bounce = new THREE.DirectionalLight(0xC4B896, 0.12);
+  bounce.position.set(8, -10, 18);
+  scene.add(bounce);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.00;
+  renderer.toneMappingExposure = 1.08;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -597,6 +606,9 @@ export async function bootThreeMapSpike() {
   let maxPointers = 0;
   let lodMode = null;
   let lastSelectForLod = null;
+  let selectLiftStarted = 0;
+  const SELECT_LIFT_MS = 120;
+  const SELECT_LIFT_PX = 3.2;
 
   function setPointerFromEvent(e) {
     const rect = renderer.domElement.getBoundingClientRect();
@@ -635,7 +647,7 @@ export async function bootThreeMapSpike() {
     // Gold/amber select language only — never a blue glow ring.
     if (mats?.top?.emissive) {
       mats.top.emissive.setHex(hex);
-      mats.top.emissiveIntensity = hex ? 0.42 : 0;
+      mats.top.emissiveIntensity = hex ? 0.58 : 0;
     }
   }
 
@@ -671,7 +683,7 @@ export async function bootThreeMapSpike() {
   function drawSelectInk(territory) {
     clearSelectInk();
     if (!territory || territory.isWater) return;
-    const y = (landHeights.get(territory.name) || BASE_LAND) + 0.28;
+    const y = (landHeights.get(territory.name) || BASE_LAND) + 0.36;
     for (const group of wrapGroups) {
       if (!group.visible) continue;
       for (const poly of territory.polygons || []) {
@@ -767,17 +779,22 @@ export async function bootThreeMapSpike() {
     relayoutUnits(band);
   }
 
-  function bobSelected(now) {
+  function liftSelected(now) {
+    // P24: one-shot 2–4px / ~120ms settle. No idle bob / yaw spin.
     if (!selectedName) return;
-    const t = now * 0.001;
-    const lift = 0.46 + Math.sin(t * 2.1) * 0.12;
-    const yaw = Math.sin(t * 1.4) * (2 * Math.PI / 180);
+    const t = Math.min(1, (now - selectLiftStarted) / SELECT_LIFT_MS);
+    const eased = 1 - (1 - t) ** 3;
+    const dist = camera.position.distanceTo(controls.target);
+    const h = renderer.domElement.clientHeight || window.innerHeight || 844;
+    const lift = worldSizeFromScreen(SELECT_LIFT_PX, dist, camera.fov, h, {
+      minPx: 2, maxPx: 4, maxWorld: 1.15, minWorld: 0.16,
+    }) * eased;
     for (const rec of unitRecords) {
       if (rec.territory.name !== selectedName) continue;
       const sprites = [...rec.expanded, rec.pip, rec.overflow].filter((s) => s?.visible);
       for (const sprite of sprites) {
         sprite.position.y += lift;
-        if (sprite.material) sprite.material.rotation = yaw;
+        if (sprite.material) sprite.material.rotation = 0;
       }
     }
   }
@@ -799,6 +816,7 @@ export async function bootThreeMapSpike() {
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
     confirmed = false;
+    selectLiftStarted = performance.now();
     drawSelectInk(next && !next.isWater ? next : null);
     syncDensity();
     chrome.paintSelection({
@@ -954,7 +972,7 @@ export async function bootThreeMapSpike() {
     applyZoomCap();
     const shown = syncWrapVisibility(wrapGroups, camera);
     syncDensity();
-    bobSelected(performance.now());
+    liftSelected(performance.now());
     if (ocean.material?.uniforms?.uCamera) {
       ocean.material.uniforms.uCamera.value.copy(camera.position);
     }
@@ -1058,6 +1076,8 @@ export async function bootThreeMapSpike() {
         stackLod: true,
         idleCta: chrome.confirm.classList.contains('is-idle'),
         confirmCopy: chrome.confirm.textContent,
+        selectLiftMs: SELECT_LIFT_MS,
+        moldedOutline: '≥2.5px',
       };
     },
   };

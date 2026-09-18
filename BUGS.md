@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.24 (preview only, SCHEMA 11)
+
+Arc live 390 score ~78%, love-gate FAIL. P0s of .23 passed; glance vs Poly/Root/TTR still short: chits read as embossed tokens, board lighting/AO soft-flat, L0 frost slabby. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Units** — deeper injection-molded cream `#F0E6D2`: outline ≥2.5px screen, stronger bevel, recessed glyphs (not stamp-on-disc), soft contact AO. Mid stays pip+N. No type parade. No grey figurines.
+2. **Board** — hemi + warm key punch; land/ocean MeshStandard; parchment tooth at 390; crease bevel + coast AO; ocean print-ink darker toward open sea.
+3. **P1** — real iOS frost on L0/peek (blur 24 + hairline); select stack lift 2–4px / 120ms; continuous gold land ring. Idle CTA stays quiet-dark (never gold).
+
+390 stills in `qa-loop/p24/`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.24.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.22 (preview only, SCHEMA 11)
 
 Arc+TR lock: `bc-95c6f821-15e2-53b5-a7c0-f720520dca52` is the only .22 worker.

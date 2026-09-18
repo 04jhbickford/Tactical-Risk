@@ -110,9 +110,10 @@ const PAPER_UV_SHIFT = {
 export const OCEAN_UV = 24;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
-export const GRAIN_MULTIPLY = 0.52;
+export const GRAIN_MULTIPLY = 0.62;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
-export const OCEAN_GRAIN = 0.40;
+export const OCEAN_GRAIN = 0.46;
+export const OCEAN_OPEN_DARKEN = 0.40;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -259,7 +260,8 @@ function bakeParchment(img) {
   overlayPhoto(ctx, img, size, GRAIN_STRENGTH, 'overlay');
   overlayPhoto(ctx, img, size, 0.36, 'multiply');
   // P1: keep paper tooth at 390 — high-frequency fiber after blotch flatten.
-  overlayPhoto(ctx, grainCanvas, size, 0.22, 'soft-light');
+  overlayPhoto(ctx, grainCanvas, size, 0.34, 'soft-light');
+  overlayPhoto(ctx, grainCanvas, size, 0.16, 'multiply');
   paperTex = canvasTex(canvas);
   return paperTex;
 }
@@ -297,18 +299,19 @@ function bakeOcean(img) {
   ctx.fillStyle = PALETTE.oceanDeep;
   ctx.fillRect(0, 0, size, size);
   if (img) ctx.drawImage(img, 0, 0, size, size);
-  const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.08, size * 0.5, size * 0.5, size * 0.72);
+  const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.06, size * 0.5, size * 0.5, size * 0.92);
   shelf.addColorStop(0, PALETTE.oceanShelf);
-  shelf.addColorStop(0.55, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.45));
-  shelf.addColorStop(1, PALETTE.oceanDeep);
+  shelf.addColorStop(0.42, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.38));
+  shelf.addColorStop(0.78, PALETTE.oceanDeep);
+  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#1E3238', 0.42));
   ctx.globalCompositeOperation = 'soft-light';
-  ctx.globalAlpha = 0.70;
+  ctx.globalAlpha = 0.82;
   ctx.fillStyle = shelf;
   ctx.fillRect(0, 0, size, size);
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   overlayPhoto(ctx, grainCanvas, size, OCEAN_GRAIN, 'overlay');
-  overlayPhoto(ctx, grainCanvas, size, 0.22, 'multiply');
+  overlayPhoto(ctx, grainCanvas, size, 0.28, 'multiply');
   oceanMap = canvasTex(canvas);
   return oceanMap;
 }
@@ -330,8 +333,8 @@ function bakeLandSheet(washHex) {
   ctx.fillRect(0, 0, size, size);
   // Punch: overlay + multiply of large-scale cardboard. Must read at 390.
   overlayPhoto(ctx, grainCanvas, size, GRAIN_STRENGTH, 'overlay');
-  overlayPhoto(ctx, grainCanvas, size, 0.48, 'multiply');
-  if (paperTex?.image) overlayPhoto(ctx, paperTex.image, size, 0.40, 'soft-light');
+  overlayPhoto(ctx, grainCanvas, size, 0.56, 'multiply');
+  if (paperTex?.image) overlayPhoto(ctx, paperTex.image, size, 0.48, 'soft-light');
   const tex = canvasTex(canvas);
   landSheets.set(key, tex);
   return tex;
@@ -422,21 +425,22 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     map: sheet,
     normalMap: paperNormal || null,
     aoMap: paperAO || null,
-    aoMapIntensity: paperAO ? 0.72 : 0,
+    aoMapIntensity: paperAO ? 1.08 : 0,
     color: tint,
-    roughness: 0.86,
+    roughness: 0.82,
     metalness: 0.0,
-    envMapIntensity: 0.16,
+    envMapIntensity: 0.24,
     transparent: false,
     side: THREE.DoubleSide,
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
-  if (top.normalMap) top.normalScale.set(1.15, 1.15);
+  if (top.normalMap) top.normalScale.set(1.55, 1.55);
   const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
-    roughness: 0.88,
+    roughness: 0.86,
     metalness: 0.0,
+    envMapIntensity: 0.18,
     transparent: false,
     side: THREE.DoubleSide,
   });
@@ -459,12 +463,13 @@ export function makeOceanMaterial() {
     map: oceanMap,
     normalMap: oceanNormal || null,
     color: 0xffffff,
-    roughness: 0.40,
-    metalness: 0.16,
-    envMapIntensity: 0.62,
+    roughness: 0.46,
+    metalness: 0.12,
+    envMapIntensity: 0.48,
     transparent: false,
+    vertexColors: true,
   });
-  if (mat.normalMap) mat.normalScale.set(0.78, 0.78);
+  if (mat.normalMap) mat.normalScale.set(0.92, 0.92);
   return mat;
 }
 
@@ -484,17 +489,29 @@ export function makeFoamMaterial() {
 }
 
 export function makeOceanMesh(width, height) {
-  const geo = new THREE.PlaneGeometry(width, height, 16, 16);
+  const geo = new THREE.PlaneGeometry(width, height, 32, 24);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.attributes.position;
   const uv = geo.attributes.uv;
-  if (pos && uv) {
-    for (let i = 0; i < pos.count; i++) {
-      uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
-    }
+  const colors = new Float32Array(pos.count * 3);
+  // Print-ink shelf: lighter near Europe/N.Africa, darker toward open sea.
+  // Local verts; mesh is later placed at (WORLD_W/2, y, -WORLD_H/2).
+  const shelfX = 62;
+  const shelfZ = 28;
+  for (let i = 0; i < pos.count; i++) {
+    if (uv) uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
+    const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
+    const t = Math.min(1, Math.max(0, (d - 48) / 170));
+    const shade = 1 - t * OCEAN_OPEN_DARKEN;
+    colors[i * 3] = shade;
+    colors[i * 3 + 1] = shade * 0.98;
+    colors[i * 3 + 2] = shade * 0.96;
+  }
+  if (uv) {
     uv.needsUpdate = true;
     geo.setAttribute('uv2', uv.clone());
   }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const mat = makeOceanMaterial();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = -0.12;
