@@ -77,13 +77,15 @@ export const USSR_LANDS = new Set([
   'Mongolia',
 ]);
 
-// Molded A&A plastic body colors (refs/aa-plastic-units.png).
+// Molded A&A plastic body colors (aa-europe-pieces / risk-board-pieces).
+// P29 HARD: tabletop chroma — DE field-grey, SU green, UK khaki-tan,
+// US olive, JP orange-red. UK tan stays browner than Confirm gold #C4A35A.
 export const PLASTIC = {
-  Germans: '#5A5C59',
-  Russians: '#2F5A28',
-  British: '#B08948',
-  Americans: '#3F4F22',
-  Japanese: '#B8441E',
+  Germans: '#6A6C68',
+  Russians: '#2F7A2A',
+  British: '#B89050',
+  Americans: '#4E6828',
+  Japanese: '#D24A1C',
 };
 
 export const FACTION_WASH = {
@@ -114,7 +116,7 @@ export const OCEAN_UV = 24;
 export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 export const OCEAN_GRAIN = 0.50;
-export const OCEAN_OPEN_DARKEN = 0.58;
+export const OCEAN_OPEN_DARKEN = 0.64;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
@@ -443,9 +445,10 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const key = continentKey(territory);
   const world = worldLandMap;
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
-  // World bake already carries continent + biome. Owner stays a light wash.
-  // Fallback path still punches Risk chroma at 390.
-  const continentTint = mixHex('#ffffff', region, world ? 0.08 : CONTINENT_CHROMA_PUNCH);
+  // World bake already carries parchment + continent + biome. Owner stays a
+  // light wash. P29: a touch more continent on the bake so Europe/Africa split
+  // after the hemi lift — still not a solid GIS fill.
+  const continentTint = mixHex('#ffffff', region, world ? 0.14 : CONTINENT_CHROMA_PUNCH);
   const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.12 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
@@ -531,9 +534,9 @@ export function makeOceanMesh(width, height) {
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
     // Near-shelf verts lean turquoise; open sea goes ink-deep.
     const reef = 1 - t;
-    colors[i * 3] = shade * (0.90 + reef * 0.02);
-    colors[i * 3 + 1] = shade * (0.96 + reef * 0.08);
-    colors[i * 3 + 2] = shade * (0.94 + reef * 0.10);
+    colors[i * 3] = shade * (0.86 + reef * 0.06);
+    colors[i * 3 + 1] = shade * (0.94 + reef * 0.14);
+    colors[i * 3 + 2] = shade * (0.92 + reef * 0.16);
   }
   if (uv) {
     uv.needsUpdate = true;

@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.28 louder GEO + faction plastic minis.
+// V2.81.51-three-polish.29 parchment GEO punch + faction plastic tint.
 // Chrome locks from .26. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -51,7 +51,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.28', GAME_VERSION === 'V2.81.51-three-polish.28');
+check('GAME_VERSION is V2.81.51-three-polish.29', GAME_VERSION === 'V2.81.51-three-polish.29');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -109,8 +109,8 @@ check('glossy toy-plastic specular lobe',
   && /rgba\(255,255,255,0\.92\)/.test(chits)
   && /createRadialGradient/.test(chits));
 check('faction plastic DE/SU/UK/US/JP',
-  /#5A5C59/.test(palette) && /#2F5A28/.test(palette) && /#B08948/.test(palette)
-  && /#3F4F22/.test(palette) && /#B8441E/.test(palette));
+  /#6A6C68/.test(palette) && /#2F7A2A/.test(palette) && /#B89050/.test(palette)
+  && /#4E6828/.test(palette) && /#D24A1C/.test(palette));
 
 check('continent Europe olive', /Europe: '#6B7A4A'/.test(palette));
 check('continent USSR tan', /USSR: '#8A7355'/.test(palette));
@@ -167,7 +167,10 @@ check('key/fill drama: warm key + cool fill/hemi',
   /warm-key-cool-fill/.test(spike)
   && /HemisphereLight\(0xC5D2DC, 0x24343C/.test(spike)
   && /DirectionalLight\(0x7E9AAB/.test(spike)
-  && /1\.68/.test(spike));
+  && /1\.22/.test(spike));
+check('p29 hemi lift kills charcoal slab',
+  /HemisphereLight\(0xC5D2DC, 0x24343C, 0\.58\)/.test(spike)
+  && /toneMappingExposure = 1\.16/.test(spike));
 check('parchment tooth punches at 390 mid',
   /TOOTH_STRENGTH = 0\.42/.test(palette)
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
@@ -183,7 +186,7 @@ check('lod tooth is loud mid / clean near',
 check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
 check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
 check('soft coast AO band', /makeCoastAoMeshes/.test(art) && /makeCoastAoMeshes/.test(spike));
-check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.58/.test(palette) && /vertexColors/.test(palette));
+check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.64/.test(palette) && /vertexColors/.test(palette));
 check('foam coast is a hairline', /makeLineMat\(PALETTE\.foam, 1\.15/.test(spike));
 check('select stack lift 2-4px / 150ms micro-settle',
   /liftSelected/.test(spike)
@@ -366,14 +369,24 @@ check('world atlas UVs un-mirror mesh X onto orig map X',
   /Un-mirror/.test(terrain) && /origX = MAP_WIDTH - flippedX/.test(terrain));
 check('p28 louder mountain hatch + forest stipple',
   /drawRidgeHatch/.test(terrain) && /stampForestStipple/.test(terrain)
-  && /CAPITAL_ROUNDELS/.test(terrain) && /0x8ec4c6/.test(terrain));
-check('p28 mini tint keeps sculpt (no black crush)',
-  /Mid-grey maps to owner color/.test(chits)
-  && /mapped = 0\.38/.test(chits)
+  && /CAPITAL_ROUNDELS/.test(terrain) && /0x9ed4d4/.test(terrain));
+check('p29 mini tint is luminance colorize (no primer-grey army)',
+  /P29 HARD: luminance colorize/.test(chits)
+  && /body = 0\.55 \+ sculpt \* 0\.75/.test(chits)
   && /pieceIconDataUrl[\s\S]*128/.test(chits));
-check('p28 coast shelf is a wide turquoise fringe',
-  /inflateRing\(ring, 18\.5\)/.test(art));
+check('p29 pip rim muted vs Confirm gold',
+  /mutePipRim/.test(chits) && /pip rim chroma/.test(chits)
+  && /paintPip[\s\S]*mutePipRim\(ownerColor\)/.test(chits));
+check('p29 coast shelf is a wide turquoise fringe',
+  /inflateRing\(ring, 26\.5\)/.test(art));
+check('p29 parchment wash not solid biome fill',
+  /P29 HARD: parchment ink wash/.test(terrain)
+  && /Never solid charcoal GIS fills/.test(terrain));
+check('p29 printed ridge hatch reads at 390',
+  /P29 HARD: printed mountain hatch/.test(terrain)
+  && /rgba\(92, 68, 38, 0\.92\)/.test(terrain));
 check('p28 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P28.md')));
+check('p29 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P29.md')));
 check('p28 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p28/SCORE.md')));
 check('p28 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-mid-390.png'));
 check('p28 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-mid-hud-390.png'));
