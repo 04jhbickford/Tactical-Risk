@@ -55,7 +55,6 @@ import {
   separatePoints,
   isDenseBand,
   nearLayout,
-  shouldCollapse,
   worldSizeFromScreen,
   PIP_PX,
   PIECE_PX,
@@ -707,8 +706,8 @@ export async function bootThreeMapSpike() {
         // Near = typed cream chits ≤3–4 +K. Roster lives in peek.
         const dense = isDenseBand(band);
         const plan = nearLayout(rec.stacks);
-        const tokens = plan.shown.length + (plan.overflowQty > 0 ? 1 : 0);
-        const collapse = dense || shouldCollapse(tokens, minSep, selected ? 16 : 13);
+        // Near never falls back to pip — typed cream chits only.
+        const collapse = dense;
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
         rec.pip.position.set(rec.homeX, rec.height + 4.8, rec.homeZ);

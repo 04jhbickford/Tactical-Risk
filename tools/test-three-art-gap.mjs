@@ -196,6 +196,10 @@ check('spike mid pip ignores type / primaryType',
   !/primaryType\(stacks\)/.test(spike)
   && /pipTexture\(owner, total\)/.test(spike)
   && !/makePipTexture\([^)]+type/.test(spike));
+check('near never collapses typed chits back to pip',
+  /Near never falls back to pip/.test(spike)
+  && /const collapse = dense;/.test(spike)
+  && !/dense \|\| shouldCollapse/.test(spike));
 check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
 check('ocean shelf + grain', /oceanShelf/.test(palette) && /OCEAN_GRAIN/.test(palette));
 check('gold select emissive on land', /0xC4A35A/.test(spike) && /emissiveIntensity/.test(spike));
@@ -221,6 +225,9 @@ check('idle Confirm is Select a territory', /Select a territory/.test(chrome));
 check('named Confirm colon form', /Confirm: \$\{land\.name\}/.test(chrome));
 check('preview gate stays ?three=1', /isThreeSpikeRequested/.test(spike));
 check('support types are FAC/AA', isSupportType('factory') && isSupportType('aaGun') && !isSupportType('infantry'));
+check('p22 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-390.png'));
+check('p22 mid HUD 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-hud-390.png'));
+check('p22 near select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-near-select-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);

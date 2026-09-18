@@ -308,20 +308,20 @@ function drawCreamToken(ctx, cx, cy, s, faction) {
   ctx.fillStyle = sideGrad;
   ctx.fill();
 
-  // Faction rim painted on the side + lip.
+  // Faction rim painted on the side + lip — thick enough to read at 64px.
   ctx.save();
   ctx.beginPath();
   ctx.ellipse(cx, cy + side * 0.18, rx, ry, 0, 0, Math.PI * 2);
   ctx.strokeStyle = faction || '#8E8F8C';
-  ctx.lineWidth = Math.max(6, s * 0.16);
+  ctx.lineWidth = Math.max(10, s * 0.22);
   ctx.stroke();
   ctx.restore();
 
-  // Cream #F0E6D2 top face.
+  // Cream #F0E6D2 top face — not blown white, not grey figurine.
   const top = ctx.createLinearGradient(cx - rx, cy - ry, cx + rx, cy + ry);
-  top.addColorStop(0, '#FFF8EC');
-  top.addColorStop(0.38, CREAM);
-  top.addColorStop(1, '#D8C8AC');
+  top.addColorStop(0, mixRgb(CREAM, '#FFFFFF', 0.18));
+  top.addColorStop(0.42, CREAM);
+  top.addColorStop(1, mixRgb(CREAM, '#8A7355', 0.18));
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
   ctx.fillStyle = top;
@@ -331,14 +331,14 @@ function drawCreamToken(ctx, cx, cy, s, faction) {
   ctx.beginPath();
   ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
   ctx.strokeStyle = '#1A1610';
-  ctx.lineWidth = Math.max(3, s * 0.055);
+  ctx.lineWidth = Math.max(4, s * 0.07);
   ctx.stroke();
 
-  // Faction lip on the top edge.
+  // Faction lip on the top edge (2–3px screen at mid).
   ctx.beginPath();
-  ctx.ellipse(cx, cy, rx - 6, ry - 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy, rx - 7, ry - 6, 0, 0, Math.PI * 2);
   ctx.strokeStyle = faction || '#8E8F8C';
-  ctx.lineWidth = Math.max(4, s * 0.09);
+  ctx.lineWidth = Math.max(8, s * 0.16);
   ctx.stroke();
 
   // Toy sheen on cream plastic.
@@ -380,7 +380,18 @@ function paintCreamChit(ctx, {
   if (shadow) drawContactShadow(ctx, cx, cy, s);
   drawCreamToken(ctx, cx, cy, s, faction);
   // Near only. Mid/far pass glyph:null — ZERO type parade.
-  if (glyph) drawTypeGlyph(ctx, glyph, cx, cy, s);
+  if (glyph) {
+    drawTypeGlyph(ctx, glyph, cx, cy, s);
+  } else {
+    // Faction identity pip in the cream face — not a soldier/type mark.
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, s * 0.16, s * 0.12, 0, 0, Math.PI * 2);
+    ctx.fillStyle = faction || '#8E8F8C';
+    ctx.fill();
+    ctx.strokeStyle = '#1A1610';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
 }
 
