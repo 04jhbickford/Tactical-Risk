@@ -1,0 +1,27 @@
+{
+  "version": "V2.81.51-three-polish.29",
+  "idle": {
+    "confirm": "rgba(30, 36, 32, 0.88)",
+    "copy": "Select a territory",
+    "class": "is-idle"
+  },
+  "zoom": "rgba(30, 36, 32, 0.62)",
+  "place": "rgba(30, 36, 32, 0.42)",
+  "confirmReady": {
+    "background": "rgb(196, 163, 90)",
+    "copy": "Confirm: Germany",
+    "class": "is-ready"
+  },
+  "lod": {
+    "mid": "mid",
+    "near": "near"
+  },
+  "roster": {
+    "germany": { "total": 10, "peekTotal": 10 },
+    "unitedKingdom": { "total": 8, "peekTotal": 8 },
+    "russia": { "total": 9, "peekTotal": 9 }
+  },
+  "peekIcons": "60px molded minis",
+  "liveVersion": "V2.81.51-three-polish.29",
+  "liveUrl": "https://tactical-risk20-git-cursor-three-681f88-james-projects-20d8de40.vercel.app/?three=1"
+}

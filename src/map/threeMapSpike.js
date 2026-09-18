@@ -1057,16 +1057,20 @@ export async function bootThreeMapSpike() {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
     },
-    frameNearGermany() {
-      const land = lands.find((t) => t.name === 'Germany');
+    frameNear(name) {
+      const land = lands.find((t) => t.name === name);
       const c = land && territoryCenter(land);
-      if (!c) return;
+      if (!c) return false;
       const p = worldToScene(c.x, c.y);
       camera.position.set(p.x, 58, p.z - 8);
       controls.target.set(p.x, 0, p.z);
       applyZoomCap();
       controls.update();
       syncDensity();
+      return true;
+    },
+    frameNearGermany() {
+      return window.__threeSpike.frameNear('Germany');
     },
     rosterOf(name) {
       const stacks = stacksFor(name, placements);

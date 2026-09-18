@@ -385,6 +385,8 @@ check('p29 parchment wash not solid biome fill',
 check('p29 printed ridge hatch reads at 390',
   /P29 HARD: printed mountain hatch/.test(terrain)
   && /rgba\(92, 68, 38, 0\.92\)/.test(terrain));
+check('p29 frameNear helper for faction stills',
+  /frameNear\(name\)/.test(spike) && /frameNearGermany/.test(spike));
 check('p28 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P28.md')));
 check('p29 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P29.md')));
 check('p28 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p28/SCORE.md')));
@@ -393,6 +395,15 @@ check('p28 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-lo
 check('p28 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-near-select-390.png'));
 check('p28 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/europe-near-units-390.png'));
 check('p28 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p28/vercel-live-mid-390.png'));
+check('p29 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p29/SCORE.md')));
+check('p29 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/europe-mid-390.png'));
+check('p29 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/europe-mid-hud-390.png'));
+check('p29 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/europe-near-select-390.png'));
+check('p29 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/europe-near-units-390.png'));
+check('p29 tray still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/europe-near-tray-390.png'));
+check('p29 second faction UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/uk-near-select-390.png'));
+check('p29 third faction SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/russia-near-select-390.png'));
+check('p29 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);
