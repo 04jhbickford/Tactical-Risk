@@ -366,6 +366,30 @@ export function addFoamCoast(group, territory, material, y = 0.03) {
   }
 }
 
+export function makeFoamBandMeshes(territory, material) {
+  const meshes = [];
+  if (!material || territory?.isWater) return meshes;
+  for (const poly of territory.polygons || []) {
+    const ring = simplifyRing(poly, 0.55);
+    if (!ring || ring.length < 4) continue;
+    const outer = inflateRing(ring, 5.2);
+    const inner = inflateRing(ring, 0.8);
+    const shape = shapeFromRing(outer);
+    const hole = shapeFromRing(inner);
+    shape.holes.push(hole);
+    const geom = new THREE.ShapeGeometry(shape, 1);
+    geom.rotateX(-Math.PI / 2);
+    applyPaperUVs(geom);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.y = 0.07;
+    mesh.renderOrder = 2;
+    mesh.userData.territory = territory;
+    mesh.userData.kind = 'foam-mask';
+    meshes.push(mesh);
+  }
+  return meshes;
+}
+
 export function makeBoardTexturePlane() {
   // Intentionally empty — a full-map textured quad was the neon-teal
   // rectangle / ghost-tile artifact. Ocean is a scene-level plane now.

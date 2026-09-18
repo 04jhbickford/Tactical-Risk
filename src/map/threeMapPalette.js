@@ -386,18 +386,18 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     aoMap: paperAO || null,
     aoMapIntensity: paperAO ? 0.72 : 0,
     color: tint,
-    roughness: 0.92,
+    roughness: 0.86,
     metalness: 0.0,
-    envMapIntensity: 0.12,
+    envMapIntensity: 0.28,
     transparent: false,
     side: THREE.DoubleSide,
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
-  if (top.normalMap) top.normalScale.set(0.55, 0.55);
+  if (top.normalMap) top.normalScale.set(0.82, 0.82);
   const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
-    roughness: 0.96,
+    roughness: 0.88,
     metalness: 0.0,
     transparent: false,
     side: THREE.DoubleSide,
@@ -421,13 +421,28 @@ export function makeOceanMaterial() {
     map: oceanMap,
     normalMap: oceanNormal || null,
     color: 0xffffff,
-    roughness: 0.58,
-    metalness: 0.08,
-    envMapIntensity: 0.22,
+    roughness: 0.40,
+    metalness: 0.16,
+    envMapIntensity: 0.62,
     transparent: false,
   });
-  if (mat.normalMap) mat.normalScale.set(0.32, 0.32);
+  if (mat.normalMap) mat.normalScale.set(0.55, 0.55);
   return mat;
+}
+
+export function makeFoamMaterial() {
+  makePaperTexture();
+  return new THREE.MeshStandardMaterial({
+    color: 0xd9d2c0,
+    map: paperTex,
+    transparent: true,
+    opacity: 0.40,
+    roughness: 0.78,
+    metalness: 0.03,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.18,
+  });
 }
 
 export function makeOceanMesh(width, height) {

@@ -271,9 +271,9 @@ const PATHS = {
 
 function drawContactShadow(ctx, cx, cy, s) {
   ctx.save();
-  ctx.fillStyle = 'rgba(18, 14, 10, 0.42)';
+  ctx.fillStyle = 'rgba(18, 14, 10, 0.55)';
   ctx.beginPath();
-  ctx.ellipse(cx + s * 0.04, cy + s * 0.82, s * 0.72, s * 0.16, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + s * 0.05, cy + s * 0.84, s * 0.82, s * 0.20, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }
@@ -320,7 +320,7 @@ function drawPlasticBody(ctx, pathFn, cx, cy, s, color) {
 
 function plasticBodyColor(faction) {
   // Cream plastic dyed with faction — sculpt stays, not a cream disc / grey matte.
-  return mixRgb(CREAM, faction || '#8E8F8C', 0.64);
+  return mixRgb(CREAM, faction || '#8E8F8C', 0.50);
 }
 
 function tintAtlasCell(img, cell, color) {

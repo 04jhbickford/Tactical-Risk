@@ -2,6 +2,19 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.14 (preview only, SCHEMA 11)
+
+James depth lock (~8:15pm): still vector/flat vs Poly/Root. Preview `?three=1` only. Do not merge.
+
+1. **Maps** — parchment albedo+normal/AO, printed ocean + specular (RoomEnvironment), coast foam mask band + foam hairline.
+2. **Light** — hemi + warm key + cool fill, ACES. Extrusion walls catch the key. No MeshBasic.
+3. **Units** — molded atlas + stronger contact shadow; select lift + ±2° yaw idle.
+4. **Keep** — pinch, STACK-LOD, Viz continent washes.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.14.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.13 (preview only, SCHEMA 11)
 
 ART-PIPELINE + AA-PALETTE continent lock. James: still vector/flat. Preview `?three=1` only. Do not merge. Quiet James. Tesla off.

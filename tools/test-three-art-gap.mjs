@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.13 ART-PIPELINE MeshStandard + Viz continent washes.
+// V2.81.51-three-polish.14 ART-PIPELINE depth: env spec, foam mask, select idle.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -46,7 +46,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.13', GAME_VERSION === 'V2.81.51-three-polish.13');
+check('GAME_VERSION is V2.81.51-three-polish.14', GAME_VERSION === 'V2.81.51-three-polish.14');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -102,8 +102,8 @@ check('land lids use wash map not flat side',
   && !/\[materials\.side, materials\.top/.test(art));
 check('board textures keep fiber (no mipmaps)', /generateMipmaps = false/.test(palette));
 check('land/ocean are MeshStandard not MeshBasic',
-  /MeshStandardMaterial/.test(palette) && /roughness: 0\.92/.test(palette)
-  && /roughness: 0\.58/.test(palette)
+  /MeshStandardMaterial/.test(palette) && /roughness: 0\.86/.test(palette)
+  && /roughness: 0\.40/.test(palette)
   && !/new THREE\.MeshBasicMaterial/.test(palette));
 check('parchment normal + AO maps',
   pngOk('assets/three/board/board-parchment-normal.png')
@@ -114,7 +114,9 @@ check('AA-PALETTE SoT on disk', existsSync(join(root, 'briefs/2026-09-17-three-a
 check('hemi + warm key + ACES',
   /HemisphereLight/.test(spike) && /DirectionalLight\(0xFFF6E4/.test(spike)
   && /ACESFilmicToneMapping/.test(spike));
-check('select idle bob/turn', /bobSelected/.test(spike) && /material.rotation = yaw/.test(spike));
+check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
+check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
+check('select idle bob/turn', /bobSelected/.test(spike) && /2 \* Math.PI \/ 180/.test(spike));
 check('tiny land bevel for crease AO', /bevelEnabled: true/.test(art));
 check('atlas board texture ref', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents-texture.png')
   || pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));

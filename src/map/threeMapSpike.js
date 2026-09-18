@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import { TerritoryMap } from './territoryMap.js';
 import {
@@ -26,12 +27,14 @@ import {
   simplifyRing,
   makeBorderLine,
   addFoamCoast,
+  makeFoamBandMeshes,
 } from './threeMapArt.js';
 import {
   PALETTE,
   FACTION_WASH,
   makeLandMaterials,
   makeOceanMesh,
+  makeFoamMaterial,
   loadBoardTextures,
   factionWash,
   regionWashFor,
@@ -267,8 +270,9 @@ export async function bootThreeMapSpike() {
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  const landBorderMat = makeLineMat(PALETTE.border, 0.7, 0.62);
-  const foamMat = makeLineMat(PALETTE.foam, 0.7, 0.4);
+  const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.68);
+  const foamMat = makeLineMat(PALETTE.foam, 2.2, 0.46);
+  const foamBandMat = makeFoamMaterial();
   const selectMat = makeLineMat(PALETTE.select, 2.85, 1);
   lineMats.push(landBorderMat, foamMat, selectMat);
 
@@ -318,7 +322,10 @@ export async function bootThreeMapSpike() {
         group.add(seal);
       }
       addTerritoryInk(group, land, landBorderMat, height + 0.05);
-      addFoamCoast(group, land, foamMat, 0.04);
+      addFoamCoast(group, land, foamMat, 0.05);
+      for (const band of makeFoamBandMeshes(land, foamBandMat)) {
+        group.add(band);
+      }
     }
   }
 
@@ -420,18 +427,23 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.64);
+  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.52);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFF6E4, 0.92);
-  key.position.set(-48, 86, -28);
+  const key = new THREE.DirectionalLight(0xFFF6E4, 1.18);
+  key.position.set(-62, 54, -36);
   scene.add(key);
   scene.add(key.target);
+  const fill = new THREE.DirectionalLight(0x9BB0B8, 0.28);
+  fill.position.set(46, 32, 22);
+  scene.add(fill);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
+  renderer.toneMappingExposure = 1.06;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.06).texture;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -757,8 +769,8 @@ export async function bootThreeMapSpike() {
   function bobSelected(now) {
     if (!selectedName) return;
     const t = now * 0.001;
-    const lift = 0.26 + Math.sin(t * 2.3) * 0.10;
-    const yaw = Math.sin(t * 1.55) * 0.035;
+    const lift = 0.46 + Math.sin(t * 2.1) * 0.12;
+    const yaw = Math.sin(t * 1.4) * (2 * Math.PI / 180);
     for (const rec of unitRecords) {
       if (rec.territory.name !== selectedName) continue;
       const sprites = [...rec.expanded, rec.pip, rec.overflow].filter((s) => s?.visible);
