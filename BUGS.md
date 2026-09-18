@@ -10,6 +10,8 @@ Exact tokens: Europe `#6B7A4A` · USSR `#8A7355` · Asia `#5F7A5A` · Africa `#B
 
 Stack: parchment+grain → continent wash (luma-matched ink @ 28%) → faction ownership 18% → ink borders → plastic units. Kill 70% solid colorize from .16.
 
+390 mid samples: Europe vs USSR 43 / Europe vs Africa 50 with parchment still dominant (not .16 solid ink). Stills in `qa-p17`.
+
 Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.17.
 
 ---
