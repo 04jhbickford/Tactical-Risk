@@ -2,6 +2,14 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.19 (preview only, SCHEMA 11)
+
+Fail-closed: .18 pip paint still averaged RGB 56 (fat atlas outline = black stamp at 390). Strip lum<0.16 halo; cream-lift the sculpt. Preview `?three=1` only.
+
+Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.19.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.18 (preview only, SCHEMA 11)
 
 Fail-closed 390 scorecard vs Poly/Root/TTR. p17 units still read as black SVG stamps. Preview `?three=1` only. Do not merge.

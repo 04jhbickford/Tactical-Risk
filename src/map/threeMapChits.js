@@ -341,9 +341,13 @@ function tintAtlasCell(img, cell, color) {
   const [tr, tg, tb] = hexRgb(color);
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] < 8) continue;
-    // Keep baked AO. Lift mid-greys to cream plastic — /168 crushed 390 to black stamps.
     const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
-    const shade = 0.46 + (lum ** 0.82) * 0.72;
+    // Baked atlas outline is a fat black halo — at 390 it is the whole sprite.
+    if (lum < 0.16) {
+      d[i + 3] = 0;
+      continue;
+    }
+    const shade = 0.62 + (lum ** 0.70) * 0.52;
     d[i] = Math.max(0, Math.min(255, tr * shade));
     d[i + 1] = Math.max(0, Math.min(255, tg * shade));
     d[i + 2] = Math.max(0, Math.min(255, tb * shade));
@@ -365,7 +369,7 @@ function factionRimFrom(tinted, faction) {
   const sd = src.data;
   const od = out.data;
   const [fr, fg, fb] = hexRgb(faction || '#8E8F8C');
-  const R = 6;
+  const R = 4;
   const R2 = R * R;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
