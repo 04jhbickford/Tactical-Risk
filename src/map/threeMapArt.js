@@ -172,6 +172,24 @@ export function simplifyRing(poly, epsilon = 0.7) {
   return ring.length >= 3 ? ring : poly;
 }
 
+export function smoothRing(ring, iters = 2) {
+  // Chaikin corner-cut so extruded lids don't read as sharp GIS polygons.
+  if (!ring || ring.length < 4) return ring;
+  let pts = ring;
+  for (let k = 0; k < iters; k++) {
+    const next = [];
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % n];
+      next.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25]);
+      next.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]);
+    }
+    pts = next;
+  }
+  return pts;
+}
+
 export function polygonCentroid(poly) {
   let area = 0;
   let cx = 0;
@@ -242,20 +260,21 @@ function shapeFromRing(ring) {
 export function makeLandMesh(territory, materials, height) {
   const shapes = [];
   for (const poly of territory.polygons || []) {
-    const ring = simplifyRing(poly, 0.45);
+    const ring = smoothRing(simplifyRing(poly, 0.32), 2);
     if (!ring) continue;
-    shapes.push(shapeFromRing(inflateRing(ring, 1.4)));
+    shapes.push(shapeFromRing(inflateRing(ring, 1.8)));
   }
   if (!shapes.length) return null;
 
   // Soft crease AO — thicker bevel so walls catch the warm key.
+  // P31: extra bevel + curve so lids don't read as sharp polygons.
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
     bevelEnabled: true,
-    bevelThickness: 0.24,
-    bevelSize: 0.22,
-    bevelSegments: 3,
-    curveSegments: 2,
+    bevelThickness: 0.34,
+    bevelSize: 0.30,
+    bevelSegments: 4,
+    curveSegments: 4,
   });
   geom.rotateX(-Math.PI / 2);
   sculptLandRelief(geom, territory, height);
@@ -264,6 +283,7 @@ export function makeLandMesh(territory, materials, height) {
   else applyPaperUVs(geom, territory);
   // r170 ExtrudeGeometry: group 0 = lids (top+bottom), group 1 = walls.
   // [side, top] hid the atlas fiber on 1px edges and left GIS-flat lids.
+  // P31: push land away from camera so plastic sprites never get eaten.
   const mats = [materials.top, materials.side];
   for (const mat of mats) {
     if (!mat) continue;
@@ -271,8 +291,8 @@ export function makeLandMesh(territory, materials, height) {
     mat.transparent = false;
     mat.depthWrite = true;
     mat.polygonOffset = true;
-    mat.polygonOffsetFactor = -1;
-    mat.polygonOffsetUnits = -1;
+    mat.polygonOffsetFactor = 1.5;
+    mat.polygonOffsetUnits = 2;
   }
   const mesh = new THREE.Mesh(geom, mats);
   mesh.userData.territory = territory;
@@ -289,10 +309,13 @@ export function makeLandSealMeshes(territory, material) {
   material.side = THREE.DoubleSide;
   material.transparent = false;
   material.depthWrite = true;
+  material.polygonOffset = true;
+  material.polygonOffsetFactor = 1.5;
+  material.polygonOffsetUnits = 2;
   for (const poly of territory.polygons || []) {
-    const ring = simplifyRing(poly, 0.35);
+    const ring = smoothRing(simplifyRing(poly, 0.28), 2);
     if (!ring) continue;
-    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 2.4)));
+    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 2.8)));
     geom.rotateX(-Math.PI / 2);
     if (getWorldLandTex()) applyWorldLandUVs(geom);
     else applyPaperUVs(geom, territory);
@@ -301,6 +324,42 @@ export function makeLandSealMeshes(territory, material) {
     mesh.renderOrder = 1;
     mesh.userData.territory = territory;
     mesh.userData.kind = 'land-seal';
+    meshes.push(mesh);
+  }
+  return meshes;
+}
+
+export function makeSelectWashMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0xc4a35a,
+    transparent: true,
+    opacity: 0.24,
+    roughness: 0.88,
+    metalness: 0,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    emissive: 0xc4a35a,
+    emissiveIntensity: 0.20,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+}
+
+export function makeSelectWashMeshes(territory, material, height) {
+  const meshes = [];
+  if (!territory || territory.isWater || !material) return meshes;
+  for (const poly of territory.polygons || []) {
+    const ring = smoothRing(simplifyRing(poly, 0.28), 2);
+    if (!ring) continue;
+    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 4.2)));
+    geom.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geom, material);
+    mesh.position.y = (height || BASE_LAND) + 0.28;
+    mesh.renderOrder = 8;
+    mesh.userData.territory = territory;
+    mesh.userData.kind = 'select-wash';
     meshes.push(mesh);
   }
   return meshes;
@@ -340,10 +399,17 @@ export function makeBorderLine(ring, y, material) {
   return line;
 }
 
-export function addTerritoryInk(group, territory, material, y) {
+export function addTerritoryInk(group, territory, material, y, continentMat) {
   for (const poly of territory.polygons || []) {
-    const ring = simplifyRing(poly);
+    const ring = smoothRing(simplifyRing(poly), 1);
     if (!ring) continue;
+    if (continentMat) {
+      const cline = makeBorderLine(ring, y - 0.02, continentMat);
+      cline.userData.territory = territory;
+      cline.userData.kind = 'continent-ink';
+      cline.renderOrder = 2;
+      group.add(cline);
+    }
     const line = makeBorderLine(ring, y, material);
     line.userData.territory = territory;
     line.renderOrder = 2;
