@@ -2,6 +2,26 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.35 (preview only, SCHEMA 11)
+
+James he-correct reopen after `.34` love-gate PASS. Exact: prettier, but weird
+color markings, hard to tell land vs sea, continents unreadable, East Med
+pieces fold under Italy on select. Preview `?three=1` only. Do not merge.
+Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Kill blotches** — rebake albedo: feathered theater joins, no oval stamps,
+   no baked +N pills, luma/chroma clamp. Painted PNG stays bound.
+2. **Land vs sea** — teal punch on ocean, quieter grain, sea-zone water meshes,
+   shrink coast shelf so Med is water not stained land.
+3. **Quiet continent washes** — AA-PALETTE hexes + 0.18 runtime punch on the
+   painted albedo (not .31 flood). Select gold still wins.
+4. **East Med z-order** — sea deck above adjacent land lid, pin south of Italy,
+   land polygonOffset 4.5, ships renderOrder 32.
+
+SCHEMA 11. GAME_VERSION V2.81.51-three-polish.35.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.34 (preview only, SCHEMA 11)
 
 Viz love-gate FAIL ~88% on `.33`: mid still was wash+stamp family, not a
