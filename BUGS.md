@@ -6,6 +6,8 @@
 
 Fail-closed: .19 cream sculpt is correct at 180px but mid 48px + contact blob still reads stamp. Mid pip 56px; no contact shadow on pips. Preview `?three=1` only.
 
+390 scorecard (pixel, not vision-posterize): near Germany crop 93% cream; mid Europe/USSR/Africa still split. Stills `qa-p20`.
+
 Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.20.
 
 ---
