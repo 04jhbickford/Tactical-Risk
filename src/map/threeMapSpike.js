@@ -35,6 +35,7 @@ import {
   makeCoastShelfMaterial,
   makeCoastShelfMeshes,
   addRiverLines,
+  addSeaLaneLines,
 } from './threeMapArt.js';
 import {
   PALETTE,
@@ -288,9 +289,14 @@ export async function bootThreeMapSpike() {
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
   const coastShelfMat = makeCoastShelfMaterial();
-  const riverMat = makeLineMat('#2E6470', 5.2, 0.95);
-  const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
-  lineMats.push(landBorderMat, foamMat, riverMat, selectMat);
+  const riverMat = makeLineMat('#3A4E52', 2.2, 0.46);
+  const selectMat = makeLineMat(PALETTE.select, 3.6, 0.86);
+  const seaLaneMat = makeLineMat('#B8B09A', 1.45, 0.38, {
+    dashed: true,
+    dashSize: 5.4,
+    gapSize: 7.2,
+  });
+  lineMats.push(landBorderMat, foamMat, riverMat, selectMat, seaLaneMat);
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
@@ -350,6 +356,7 @@ export async function bootThreeMapSpike() {
       }
     }
     addRiverLines(group, riverMat, 0.28);
+    addSeaLaneLines(group, territories.filter((t) => t.isWater), seaLaneMat, 0.05);
   }
 
   for (const group of wrapGroups) {
@@ -450,19 +457,19 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  // P29: lift hemi so parchment reads; keep warm-key-cool-fill sculpt without
-  // crushing Europe to a charcoal low-poly slab. MeshStandard only. No neon.
-  const hemi = new THREE.HemisphereLight(0xC5D2DC, 0x24343C, 0.58);
+  // P30: lift hemi + warm ground so floored parchment cannot fall to void.
+  // Keep warm-key-cool-fill sculpt. MeshStandard only. No neon.
+  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 0.78);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFE2B0, 1.22);
+  const key = new THREE.DirectionalLight(0xFFE2B0, 1.18);
   key.position.set(-96, 58, -28);
   key.target.position.set(WORLD_W * 0.42, 0, -WORLD_H * 0.38);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.42);
+  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.48);
   fill.position.set(72, 24, 44);
   scene.add(fill);
-  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.12);
+  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.16);
   bounce.position.set(12, -14, 22);
   scene.add(bounce);
 
@@ -470,7 +477,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.16;
+  renderer.toneMappingExposure = 1.22;
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
   renderer.domElement.id = 'threeCanvas';
@@ -665,10 +672,15 @@ export async function bootThreeMapSpike() {
 
   function setLandEmissive(name, hex) {
     const mats = landMats.get(name);
-    // Gold/amber select language only — never a blue glow ring.
+    // Soft gold ring/ink — never a candy yellow flood. never a blue glow ring.
     if (mats?.top?.emissive) {
-      mats.top.emissive.setHex(hex);
-      mats.top.emissiveIntensity = hex ? 0.58 : 0;
+      if (hex) {
+        mats.top.emissive.setHex(hex);
+        mats.top.emissiveIntensity = 0.16;
+      } else {
+        mats.top.emissive.setHex(0xc4b896);
+        mats.top.emissiveIntensity = 0.045;
+      }
     }
   }
 
@@ -1126,6 +1138,9 @@ export async function bootThreeMapSpike() {
         nearMinis: true,
         selectMinis: true,
         geoUnmirror: true,
+        evenParchment: true,
+        parchmentFloor: 0.48,
+        quietLanes: true,
       };
     },
   };

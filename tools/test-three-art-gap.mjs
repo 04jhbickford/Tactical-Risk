@@ -1,5 +1,5 @@
-// V2.81.51-three-polish.29 parchment GEO punch + faction plastic tint.
-// Chrome locks from .26. Run: node tools/test-three-art-gap.mjs
+// V2.81.51-three-polish.30 even parchment + quiet printed sea lanes.
+// Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
@@ -51,7 +51,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.29', GAME_VERSION === 'V2.81.51-three-polish.29');
+check('GAME_VERSION is V2.81.51-three-polish.30', GAME_VERSION === 'V2.81.51-three-polish.30');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -165,12 +165,12 @@ check('hemi + warm key + ACES',
   && /ACESFilmicToneMapping/.test(spike));
 check('key/fill drama: warm key + cool fill/hemi',
   /warm-key-cool-fill/.test(spike)
-  && /HemisphereLight\(0xC5D2DC, 0x24343C/.test(spike)
+  && /HemisphereLight\(0xD8D2C4, 0x5A5040/.test(spike)
   && /DirectionalLight\(0x7E9AAB/.test(spike)
-  && /1\.22/.test(spike));
-check('p29 hemi lift kills charcoal slab',
-  /HemisphereLight\(0xC5D2DC, 0x24343C, 0\.58\)/.test(spike)
-  && /toneMappingExposure = 1\.16/.test(spike));
+  && /1\.18/.test(spike));
+check('p30 hemi lift keeps floored parchment off void',
+  /HemisphereLight\(0xD8D2C4, 0x5A5040, 0\.78\)/.test(spike)
+  && /toneMappingExposure = 1\.22/.test(spike));
 check('parchment tooth punches at 390 mid',
   /TOOTH_STRENGTH = 0\.42/.test(palette)
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
@@ -369,7 +369,7 @@ check('world atlas UVs un-mirror mesh X onto orig map X',
   /Un-mirror/.test(terrain) && /origX = MAP_WIDTH - flippedX/.test(terrain));
 check('p28 louder mountain hatch + forest stipple',
   /drawRidgeHatch/.test(terrain) && /stampForestStipple/.test(terrain)
-  && /CAPITAL_ROUNDELS/.test(terrain) && /0x9ed4d4/.test(terrain));
+  && /CAPITAL_ROUNDELS/.test(terrain) && /0x6a8488/.test(terrain));
 check('p29 mini tint is luminance colorize (no primer-grey army)',
   /P29 HARD: luminance colorize/.test(chits)
   && /body = 0\.55 \+ sculpt \* 0\.75/.test(chits)
@@ -404,6 +404,39 @@ check('p29 tray still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/europ
 check('p29 second faction UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/uk-near-select-390.png'));
 check('p29 third faction SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/russia-near-select-390.png'));
 check('p29 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p29/vercel-live-mid-390.png'));
+check('p30 even parchment luma floor',
+  /PARCHMENT_LUMA_FLOOR = 0\.48/.test(terrain)
+  && /floorParchmentLuminance/.test(terrain)
+  && /P30 HARD: every land texel stays stained parchment/.test(terrain));
+check('p30 wash multiply cannot crush to void',
+  /P30: lighter multiply/.test(terrain)
+  && /globalAlpha = 0\.20/.test(terrain));
+check('p30 quiet printed sea lanes, not cyan neon',
+  /addSeaLaneLines/.test(art) && /addSeaLaneLines/.test(spike)
+  && /sea-lane/.test(art)
+  && /#B8B09A/.test(spike)
+  && /dashed: true/.test(spike)
+  && !/#2E6470/.test(spike)
+  && !/0x9ed4d4/.test(terrain));
+check('p30 select is soft gold ring, not candy flood',
+  /Soft gold ring\/ink/.test(spike)
+  && /emissiveIntensity = 0\.16/.test(spike)
+  && !/emissiveIntensity = hex \? 0\.58/.test(spike)
+  && /makeLineMat\(PALETTE\.select, 3\.6/.test(spike));
+check('p30 coast shelf is printed ink not neon turquoise',
+  /printed shelf ink/.test(terrain)
+  && /color: 0x6a8488/.test(terrain)
+  && /opacity: 0\.28/.test(terrain));
+check('p30 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P30.md')));
+check('p30 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p30/SCORE.md')));
+check('p30 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-mid-390.png'));
+check('p30 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-mid-hud-390.png'));
+check('p30 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-near-select-390.png'));
+check('p30 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-near-units-390.png'));
+check('p30 tray still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/europe-near-tray-390.png'));
+check('p30 second faction UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/uk-near-select-390.png'));
+check('p30 third faction SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/russia-near-select-390.png'));
+check('p30 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p30/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);

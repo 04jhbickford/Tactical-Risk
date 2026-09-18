@@ -306,16 +306,18 @@ export function makeLandSealMeshes(territory, material) {
   return meshes;
 }
 
-export function makeLineMat(color, linewidth, opacity = 0.72) {
+export function makeLineMat(color, linewidth, opacity = 0.72, opts = {}) {
   const mat = new LineMaterial({
     color,
     linewidth,
     worldUnits: false,
-    transparent: opacity < 0.99,
+    transparent: opacity < 0.99 || !!opts.dashed,
     opacity,
     depthTest: true,
     depthWrite: false,
-    dashed: false,
+    dashed: !!opts.dashed,
+    dashSize: opts.dashSize ?? 5.2,
+    gapSize: opts.gapSize ?? 6.4,
   });
   if (typeof window !== 'undefined') {
     mat.resolution.set(window.innerWidth || 1, window.innerHeight || 1);
@@ -440,6 +442,52 @@ export function addRiverLines(group, material, y = 0.22) {
     line.userData.kind = 'river';
     group.add(line);
   }
+}
+
+function seaCenterOf(territory) {
+  if (!territory) return null;
+  if (Array.isArray(territory.center) && territory.center.length >= 2) {
+    return { x: territory.center[0], y: territory.center[1] };
+  }
+  return territoryCenter(territory);
+}
+
+function addLaneSegment(group, a, b, material, y) {
+  let bx = b.x;
+  if (bx - a.x > MAP_WIDTH / 2) bx -= MAP_WIDTH;
+  if (a.x - bx > MAP_WIDTH / 2) bx += MAP_WIDTH;
+  const pa = worldToScene(a.x, a.y);
+  const pb = worldToScene(bx, b.y);
+  const geo = new LineGeometry();
+  geo.setPositions([pa.x, y, pa.z, pb.x, y, pb.z]);
+  const line = new Line2(geo, material);
+  line.computeLineDistances();
+  line.renderOrder = 2;
+  line.userData.kind = 'sea-lane';
+  group.add(line);
+}
+
+export function addSeaLaneLines(group, waters, material, y = 0.05) {
+  // P30 HARD: printed A&A sea-lane ink on ocean — dashed, muted, non-emissive.
+  if (!waters?.length || !material) return 0;
+  const seen = new Set();
+  const byName = new Map(waters.map((t) => [t.name, t]));
+  let n = 0;
+  for (const t of waters) {
+    for (const name of t.connections || []) {
+      const other = byName.get(name);
+      if (!other || !other.isWater) continue;
+      const key = t.name < name ? `${t.name}|${name}` : `${name}|${t.name}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const a = seaCenterOf(t);
+      const b = seaCenterOf(other);
+      if (!a || !b) continue;
+      addLaneSegment(group, a, b, material, y);
+      n += 1;
+    }
+  }
+  return n;
 }
 
 export function makeCoastAoMeshes(territory, material) {
