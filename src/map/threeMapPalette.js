@@ -446,10 +446,9 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const world = worldLandMap;
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
-  // light wash. P29: a touch more continent on the bake so Europe/Africa split
-  // after the hemi lift — still not a solid GIS fill.
-  const continentTint = mixHex('#ffffff', region, world ? 0.14 : CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.12 : OWNER_WASH_STRENGTH) : continentTint;
+  // light wash. P30: keep continent split but do not tint lids toward void.
+  const continentTint = mixHex('#ffffff', region, world ? 0.08 : CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.08 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: world ? null : (paperNormal || null),
@@ -458,11 +457,11 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     color: tint,
     roughness: 0.76,
     metalness: 0.0,
-    envMapIntensity: 0.20,
+    envMapIntensity: 0.14,
     transparent: false,
     side: THREE.DoubleSide,
-    emissive: 0x000000,
-    emissiveIntensity: 0,
+    emissive: 0xc4b896,
+    emissiveIntensity: 0.045,
   });
   if (top.normalMap) top.normalScale.set(TOOTH_NORMAL_MID, TOOTH_NORMAL_MID);
   const wall = new THREE.MeshStandardMaterial({
@@ -532,11 +531,11 @@ export function makeOceanMesh(width, height) {
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // Near-shelf verts lean turquoise; open sea goes ink-deep.
+    // Printed shelf vs deep — no cyan reef punch (P30 quiet lanes).
     const reef = 1 - t;
-    colors[i * 3] = shade * (0.86 + reef * 0.06);
-    colors[i * 3 + 1] = shade * (0.94 + reef * 0.14);
-    colors[i * 3 + 2] = shade * (0.92 + reef * 0.16);
+    colors[i * 3] = shade * (0.90 + reef * 0.04);
+    colors[i * 3 + 1] = shade * (0.93 + reef * 0.05);
+    colors[i * 3 + 2] = shade * (0.90 + reef * 0.04);
   }
   if (uv) {
     uv.needsUpdate = true;

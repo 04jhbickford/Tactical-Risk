@@ -85,15 +85,20 @@ const BIOME_OF = {
 };
 
 // P29: stain hexes for ink-on-parchment, not solid GIS fills.
+// P30: lift chroma toward paper so Central/Eastern lands cannot crush to void.
 const BIOME_HEX = {
   snow: '#E8E2D4',
-  lush: '#7A8A58',
-  forest: '#5A6E42',
+  lush: '#9AAA70',
+  forest: '#7A8E58',
   arid: '#C4A35A',
-  mountain: '#9A8A68',
-  hills: '#8A8458',
-  steppe: '#B09A68',
+  mountain: '#B0A078',
+  hills: '#A09868',
+  steppe: '#C4B080',
 };
+
+// P30 HARD: every land texel stays stained parchment after ACES + lighting.
+// Rec.709 luma floor — darker biome wash OK, black fill/void is not.
+export const PARCHMENT_LUMA_FLOOR = 0.48;
 
 const BIOME_HEIGHT = {
   mountain: 2.24,
@@ -376,8 +381,8 @@ function stampForestStipple(ctx, poly, w, h, count, seed) {
     const px = wxToU(cx + (n1 - 0.5) * 260) * w;
     const py = wyToV(cy + (n2 - 0.5) * 200) * h;
     const r = 3.4 + n3 * 5.2;
-    ctx.globalAlpha = 0.58 + n3 * 0.32;
-    ctx.fillStyle = n3 > 0.55 ? '#3A4A28' : '#2A3A1C';
+    ctx.globalAlpha = 0.42 + n3 * 0.22;
+    ctx.fillStyle = n3 > 0.55 ? '#5C6E44' : '#4A5A34';
     ctx.beginPath();
     ctx.ellipse(px, py, r * 0.95, r * 0.62, n1 * 1.2, 0, Math.PI * 2);
     ctx.fill();
@@ -429,26 +434,58 @@ function drawRidgeHatch(ctx, ridge, w, h) {
 }
 
 function drawRoundel(ctx, x, y, color, w, h) {
-  // P1: A&A control roundel — cream ring + faction bullseye, printed on paper.
+  // P1: printed A&A control emblem — cream disc, ink ring, faction bullseye.
   const px = wxToU(x) * w;
   const py = wyToV(y) * h;
   ctx.save();
   ctx.beginPath();
-  ctx.arc(px, py, 13.5, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(236, 228, 204, 0.94)';
+  ctx.arc(px, py, 15.2, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(236, 228, 204, 0.96)';
   ctx.fill();
   ctx.strokeStyle = '#2A2418';
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 2.1;
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(px, py, 8.2, 0, Math.PI * 2);
+  ctx.arc(px, py, 11.4, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(42, 36, 24, 0.35)';
+  ctx.lineWidth = 1.1;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(px, py, 8.6, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(px, py, 3.4, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(236, 228, 204, 0.62)';
+  ctx.arc(px, py, 4.0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(236, 228, 204, 0.70)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(px, py, 1.7, 0, Math.PI * 2);
+  ctx.fillStyle = '#2A2418';
   ctx.fill();
   ctx.restore();
+}
+
+function floorParchmentLuminance(ctx, w, h, floor = PARCHMENT_LUMA_FLOOR) {
+  // P30 HARD: lift crushed land texels back to stained paper.
+  // Run AFTER washes / stipple / tooth, BEFORE hatch / rivers / IPC ink.
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  const pr = 0xC4 / 255;
+  const pg = 0xB8 / 255;
+  const pb = 0x96 / 255;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255;
+    const g = d[i + 1] / 255;
+    const b = d[i + 2] / 255;
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if (y >= floor || y < 0.002) continue;
+    const lift = floor / y;
+    const t = (floor - y) / floor;
+    d[i] = Math.min(255, Math.round((r * lift * (1 - t * 0.32) + pr * t * 0.32) * 255));
+    d[i + 1] = Math.min(255, Math.round((g * lift * (1 - t * 0.32) + pg * t * 0.32) * 255));
+    d[i + 2] = Math.min(255, Math.round((b * lift * (1 - t * 0.32) + pb * t * 0.32) * 255));
+  }
+  ctx.putImageData(img, 0, 0);
 }
 
 function drawPolyline(ctx, pts, w, h, style, width) {
@@ -528,6 +565,7 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
 
   // P29 HARD: parchment ink wash — continent + biome stain the paper.
   // Never solid charcoal GIS fills (that was the .28 mid slab).
+  // P30: lighter multiply so Central/Eastern Europe cannot crush to void.
   for (const land of lands) {
     const biome = biomeFor(land);
     const continent = continentWash(land);
@@ -537,14 +575,14 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
       ctx.save();
       ctx.clip();
       ctx.globalCompositeOperation = 'multiply';
-      ctx.globalAlpha = 0.30;
+      ctx.globalAlpha = 0.20;
       ctx.fillStyle = continent;
       ctx.fill();
-      ctx.globalAlpha = 0.18;
+      ctx.globalAlpha = 0.12;
       ctx.fillStyle = climate;
       ctx.fill();
       ctx.globalCompositeOperation = 'soft-light';
-      ctx.globalAlpha = 0.26;
+      ctx.globalAlpha = 0.22;
       ctx.fillStyle = climate;
       ctx.fill();
       if (biome === 'snow') {
@@ -566,8 +604,8 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
         drawTileClipped(ctx, tiles.mountain, 0.16, 'multiply', 0.58);
       } else if (biome === 'lush') {
         ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.10;
-        ctx.fillStyle = '#6B7A4A';
+        ctx.globalAlpha = 0.06;
+        ctx.fillStyle = '#8A9A62';
         ctx.fill();
       } else if (biome === 'steppe') {
         drawTileClipped(ctx, tiles.arid, 0.22, 'soft-light', 0.7);
@@ -595,8 +633,15 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
     for (let y = 0; y < h; y += th) {
       for (let x = 0; x < w; x += tw) ctx.drawImage(parchmentImg, x, y, tw, th);
     }
+    // Gentle screen lift so multiply stains stay paper, not charcoal.
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 0.10;
+    for (let y = 0; y < h; y += th) {
+      for (let x = 0; x < w; x += tw) ctx.drawImage(parchmentImg, x, y, tw, th);
+    }
     ctx.restore();
   }
+  floorParchmentLuminance(ctx, w, h);
 
   // Soft SE mountain shadow + ridge hatch (printed relief, not a brown stamp).
   for (const ridge of RIDGES) {
@@ -620,9 +665,9 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
   }
 
   for (const river of RIVERS) {
-    drawPolyline(ctx, river.map(([x, y]) => [x + 3, y + 4]), w, h, 'rgba(22, 44, 52, 0.62)', 8.4);
-    drawPolyline(ctx, river, w, h, 'rgba(36, 78, 88, 0.95)', 5.8);
-    drawPolyline(ctx, river, w, h, 'rgba(150, 200, 208, 0.62)', 2.6);
+    drawPolyline(ctx, river.map(([x, y]) => [x + 3, y + 4]), w, h, 'rgba(36, 40, 32, 0.38)', 5.2);
+    drawPolyline(ctx, river, w, h, 'rgba(52, 64, 60, 0.62)', 3.2);
+    drawPolyline(ctx, river, w, h, 'rgba(120, 128, 116, 0.28)', 1.4);
   }
 
   for (const land of lands) {
@@ -710,23 +755,26 @@ export function sculptLandRelief(geometry, territory, height) {
 }
 
 export function makeCoastShelfMaterial() {
+  // P30: printed shelf ink, not emissive turquoise neon.
   return new THREE.MeshStandardMaterial({
-    color: 0x9ed4d4,
+    color: 0x6a8488,
     transparent: true,
-    opacity: 0.72,
-    roughness: 0.42,
-    metalness: 0.08,
+    opacity: 0.28,
+    roughness: 0.78,
+    metalness: 0.02,
     depthWrite: false,
     side: THREE.DoubleSide,
-    envMapIntensity: 0.32,
+    envMapIntensity: 0.12,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
   });
 }
 
 export function makeRiverMaterial() {
   return new THREE.LineBasicMaterial({
-    color: 0x4a7680,
+    color: 0x3a4e52,
     transparent: true,
-    opacity: 0.78,
+    opacity: 0.46,
     depthWrite: false,
   });
 }
