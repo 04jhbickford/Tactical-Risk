@@ -88,8 +88,8 @@ export const FACTION_WASH = {
 
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
-export const PAPER_UV = 48;
-export const OCEAN_UV = 56;
+export const PAPER_UV = 22;
+export const OCEAN_UV = 28;
 // Overlay + multiply punch — 8–14% is invisible at 390. Glance must read scanned board.
 export const GRAIN_STRENGTH = 0.86;
 
@@ -171,6 +171,10 @@ function canvasTex(canvas) {
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   tex.anisotropy = 8;
+  // Mipmaps average fiber to flat olive at 390 mid. Keep the tooth.
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
   return tex;
 }
@@ -298,8 +302,10 @@ export async function loadBoardTextures() {
   landSheets.clear();
   washMaps.clear();
   names.forEach((k, i) => {
+    // Atlas fiber is already in the wash. A second parchment overlay
+    // flattened the tooth into soft smoke / GIS olive at 390.
     washMaps.set(k, washes[i]
-      ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase, parchment)
+      ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase)
       : null);
   });
   return { paperTex, oceanMap };

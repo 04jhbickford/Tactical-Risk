@@ -4,11 +4,12 @@
 
 ## 9.18.26 — V2.81.51-three-polish.12 (preview only, SCHEMA 11)
 
-James HARD he-correct on polish.11 (~25%): vector/GIS board, simple icons, no image-gen texture, iPhone pinch dead. Preview `?three=1` only. Do not merge over live Canvas. Tesla off.
+Arc harsh QC on polish.11 (~50%): number-coins, charcoal ocean, flat GIS olive, Lucide silhouettes. Preview `?three=1` only. Do not merge. Tesla off.
 
-1. **Generated board** — scanned cardboard parchment + printed slate-teal ocean `#3D5A66`/`#4F6E78` + continent wash tiles (image-gen, then baked). Grain must read at 390.
-2. **Generated units** — photoreal molded A&A plastic atlases (INF/TNK/ART/FTR/BMB/AA/FAC/ships), thick outline, faction luminosity tint. Number-coins / Lucide stamps killed. Mid = one plastic + N; near ≤3–4 + `+K`.
-3. **iPhone pinch** — two-finger pinch in/out (Canvas parity) + pan. `TOUCH.DOLLY` was undefined in r170. Fit / +/- remain.
+1. **Atlas fiber** — bake `aa-board-continents-texture.png` as parchment + continent washes. High-pass paper tooth, not smoke blotches. r170 Extrude lids are group 0 so the map actually shows. No mipmaps (they flattened fiber at 390).
+2. **Ocean** — printed muted blue-grey from the atlas sea. Not charcoal.
+3. **Units** — molded faction plastic atlases (thick outline + contact shadow). Mid = one pip+N; near ≤3–4 typed + `+K`.
+4. **Pinch** — two-finger pinch + pan. Fit / +/- secondary.
 
 Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.12.
 
