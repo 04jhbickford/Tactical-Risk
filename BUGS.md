@@ -11,6 +11,8 @@
 3. **Units** — cream `#F0E6D2` molded plastic + faction rim (not a cream disc / number-coin). Mid pip+N; near ≤3–4 +K.
 4. **Feel** — iPhone pinch + gold select + frost L0 + named Confirm.
 
+390 scorecard (director ladder, BAR-POLYTOPIA-ROOT-TTR): land parchment + Risk-clear continents PASS; printed slate-teal ocean PASS; cream/faction plastics (not coins) PASS; mid pip+N / near typed +K PASS; frost L0 + named Confirm + gold select PASS. Honest gaps: units are atlas billboards not 3D meshes; foam is a rim band; env is RoomEnvironment.
+
 Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.15. Do not merge.
 
 ---
