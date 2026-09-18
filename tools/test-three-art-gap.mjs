@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.35 land/sea + continent wash + East Med z-order.
+// V2.81.51-three-polish.36 Imhof painted albedo + .35 war overlay holds.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.35', GAME_VERSION === 'V2.81.51-three-polish.35');
+check('GAME_VERSION is V2.81.51-three-polish.36', GAME_VERSION === 'V2.81.51-three-polish.36');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -189,7 +189,8 @@ check('parchment tooth punches at 390 mid',
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
   && /macro paper tooth/.test(palette)
   && /TOOTH_NORMAL_MID = 2\.05/.test(palette)
-  && /normalScale\.set\(TOOTH_NORMAL_MID/.test(palette));
+  && /IMHOF_NORMAL_SCALE = 0\.34/.test(palette)
+  && /normalScale\.set\(n, n\)/.test(palette));
 check('lod tooth is loud mid / clean near',
   /TOOTH_NORMAL_NEAR = 1\.08/.test(palette)
   && /TOOTH_ROUGH_NEAR = 0\.86/.test(palette)
@@ -598,11 +599,11 @@ check('p34 printed theater plates on disk',
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-asia-theater.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-world-painted.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-plate-forest.png'));
-check('p34 baker composites p34-gen through live masks',
-  /p34-europe-theater/.test(albedoBaker)
+check('p36 baker composites p36-gen through live masks',
+  /p36-europe-theater/.test(albedoBaker)
   && /stain is OFF/.test(albedoBaker)
-  && /draw_ridges/.test(albedoBaker)
-  && /alpha=0.90/.test(albedoBaker));
+  && /imhof_height/.test(albedoBaker)
+  && /alpha=0\.84/.test(albedoBaker));
 check('p34 inspect proves albedo bind (not hardcoded true)',
   /albedoBound/.test(spike)
   && /getWorldLandTex\(\)/.test(spike)
@@ -647,18 +648,27 @@ check('p34 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loo
 }
 
 check('p35 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P35.md')));
-check('p35 albedo rev is p35', /WORLD_LAND_ALBEDO_REV = 'p35'/.test(terrain));
-check('p35 painted albedo stays bound (not stain fallback)',
+check('p35 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md')));
+check('p35 required stills held',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/mid-land-sea.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/east-med-select-no-clip.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/china-select-hold.png'));
+check('p36 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P36.md')));
+check('p36 albedo rev is p36', /WORLD_LAND_ALBEDO_REV = 'p36'/.test(terrain));
+check('p36 painted albedo stays bound (not stain fallback)',
   /WORLD_LAND_ALBEDO/.test(terrain)
   && /loadWorldLandAlbedo/.test(terrain)
   && /stain is OFF/.test(terrain)
   && /color: tint/.test(palette)
+  && /imhofRelief/.test(spike)
   && !/world \? 0 : CONTINENT_CHROMA_PUNCH/.test(palette));
-check('p35 no IPC baked into albedo baker',
+check('p36 no IPC baked; plates are hero',
   /no IPC \/ \+N baked/.test(albedoBaker)
   && /kill_blotches/.test(albedoBaker)
   && /feather_box/.test(albedoBaker)
-  && /alpha=0\.36/.test(albedoBaker)
+  && /imhof_height/.test(albedoBaker)
+  && /grade_chroma/.test(albedoBaker)
+  && /alpha=0\.84/.test(albedoBaker)
   && !/img = draw_badges/.test(albedoBaker));
 check('p35 ocean stays teal, not parchment grain',
   /OCEAN_GRAIN = 0\.14/.test(palette)
@@ -691,6 +701,26 @@ check('p35 SCORE states four James bars',
   && /East Med z-order/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8'))
   && /shipsAboveItaly/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8'))
   && /3\.60/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p35/SCORE.md'), 'utf8')));
+check('p36 painted plates on disk',
+  pngOk('briefs/2026-09-17-three-art-gap/refs/p36-gen/p36-europe-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p36-gen/p36-asia-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p36-gen/p36-world-painted.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p36-gen/p36-plate-forest-mass.png'));
+check('p36 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md')));
+check('p36 required stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/mid-painted-relief.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/mid-vs-p35.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/mid-land-sea.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/mid-continents.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/east-med-select-no-clip.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/china-select-hold.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/japan-near-hold.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p36/vercel-live-mid-390.png'));
+check('p36 SCORE states Layer A + Layer B',
+  /Imhof/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
+  && /albedoBound/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
+  && /stainFallback/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
+  && /shipsAboveItaly/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

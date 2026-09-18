@@ -64,7 +64,7 @@ import {
   makeOverflowTexture,
   loadUnitAtlases,
 } from './threeMapChits.js';
-import { bakeWorldLandAtlas, getWorldLandTex } from './threeMapTerrain.js';
+import { bakeWorldLandAtlas, getWorldLandTex, getWorldLandNormal } from './threeMapTerrain.js';
 import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
@@ -258,7 +258,7 @@ export async function bootThreeMapSpike() {
   const placements = setup.classic?.unitPlacements || setup.unitPlacements || {};
   const lands = territories.filter((t) => !t.isWater);
   const worldLand = await bakeWorldLandAtlas(lands, getPaperImage());
-  setWorldLandMap(worldLand);
+  setWorldLandMap(worldLand, getWorldLandNormal());
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
   const landHeights = new Map();
@@ -1280,6 +1280,12 @@ export async function bootThreeMapSpike() {
         seaDeckClear: true,
         eastMedPinSouth: true,
         noBlotchAtlas: true,
+        albedoRev: albedo?.userData?.rev || null,
+        imhofRelief: !!(albedoBound && albedo?.userData?.imhofRelief),
+        landcoverBound: !!(albedoBound && albedo?.userData?.landcoverBound),
+        canvasTooth: !!(albedoBound && albedo?.userData?.canvasTooth),
+        paintedRelief: albedoBound,
+        normalBound: !!getWorldLandNormal(),
       };
     },
   };

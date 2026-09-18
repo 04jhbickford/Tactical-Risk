@@ -137,6 +137,7 @@ export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
 export const TOOTH_NORMAL_NEAR = 1.08;
+export const IMHOF_NORMAL_SCALE = 0.34;
 export const TOOTH_ROUGH_MID = 0.76;
 export const TOOTH_ROUGH_NEAR = 0.86;
 
@@ -169,8 +170,15 @@ let worldLandMap = null;
 const landSheets = new Map();
 const washMaps = new Map();
 
-export function setWorldLandMap(tex) {
+let worldLandNormalMap = null;
+
+export function setWorldLandMap(tex, normalTex = null) {
   worldLandMap = tex || null;
+  if (normalTex !== undefined) worldLandNormalMap = normalTex || null;
+}
+
+export function setWorldLandNormal(tex) {
+  worldLandNormalMap = tex || null;
 }
 
 export function getPaperImage() {
@@ -477,7 +485,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.04 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
-    normalMap: world ? null : (paperNormal || null),
+    normalMap: world ? (worldLandNormalMap || null) : (paperNormal || null),
     aoMap: world ? null : (paperAO || null),
     aoMapIntensity: world ? 0 : (paperAO ? 1.08 : 0),
     color: tint,
@@ -490,7 +498,10 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
-  if (top.normalMap) top.normalScale.set(TOOTH_NORMAL_MID, TOOTH_NORMAL_MID);
+  if (top.normalMap) {
+    const n = world && worldLandNormalMap ? IMHOF_NORMAL_SCALE : TOOTH_NORMAL_MID;
+    top.normalScale.set(n, n);
+  }
   const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
     roughness: 0.84,
@@ -596,7 +607,9 @@ export function makeOceanMesh(width, height) {
 
 export function applyLodTooth(landMats, band) {
   const near = band === 'near';
-  const n = near ? TOOTH_NORMAL_NEAR : TOOTH_NORMAL_MID;
+  const n = worldLandNormalMap
+    ? (near ? IMHOF_NORMAL_SCALE * 0.82 : IMHOF_NORMAL_SCALE)
+    : (near ? TOOTH_NORMAL_NEAR : TOOTH_NORMAL_MID);
   const r = near ? TOOTH_ROUGH_NEAR : TOOTH_ROUGH_MID;
   if (!landMats) return { n, r, near };
   for (const mats of landMats.values()) {

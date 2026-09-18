@@ -2,6 +2,24 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.36 (preview only, SCHEMA 11)
+
+James YES on Arc plan (t3026u). `.35` fixed readability; mid 390 still read as
+a soft wash over polygons. Preview `?three=1` only. Do not merge. Live Canvas
+untouched. Tesla off. Quiet James.
+
+1. **Layer A painting** — new image-gen Imhof + landcover plates composited
+   through live territory masks into `world-land-albedo.png` (4096×2340).
+   Theater plates are the hero (alpha 0.84). Soft-light stain OFF. Optional
+   Imhof normal companion. Fail-closed bind.
+2. **Layer B war** — `.35` holds: quiet continent grade, teal sea deck, China
+   outer-union, no labels/IPC, mid pip+N, Japan multi-type, Confirm gold,
+   East Med ships above Italy.
+
+SCHEMA 11. GAME_VERSION V2.81.51-three-polish.36.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.35 (preview only, SCHEMA 11)
 
 James he-correct reopen after `.34` love-gate PASS. Exact: prettier, but weird
