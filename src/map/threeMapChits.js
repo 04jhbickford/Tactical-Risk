@@ -73,7 +73,7 @@ function mixRgb(hex, toward, t) {
   const a = hexRgb(hex);
   const b = hexRgb(toward);
   const m = a.map((v, i) => Math.round(v + (b[i] - v) * t));
-  return `rgb(${m[0]},${m[1]},${m[2]})`;
+  return `#${m.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
 function drawBadge(ctx, x, y, label, scale) {
@@ -323,48 +323,6 @@ function plasticBodyColor(faction) {
   return mixRgb(CREAM, faction || '#8E8F8C', 0.12);
 }
 
-function ringFromAlpha(tinted, hex, inner, outer) {
-  // Screen-space 2–3px ring. Not a filled 1.10× silhouette.
-  const w = tinted.width;
-  const h = tinted.height;
-  const src = tinted.getContext('2d').getImageData(0, 0, w, h);
-  const rim = document.createElement('canvas');
-  rim.width = w;
-  rim.height = h;
-  const rx = rim.getContext('2d');
-  const out = rx.createImageData(w, h);
-  const sd = src.data;
-  const od = out.data;
-  const [fr, fg, fb] = hexRgb(hex || '#1A1610');
-  const o2 = outer * outer;
-  const i2 = inner * inner;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      if (sd[i + 3] >= 16) continue;
-      let nearest = Infinity;
-      for (let dy = -outer; dy <= outer; dy++) {
-        for (let dx = -outer; dx <= outer; dx++) {
-          const dd = dx * dx + dy * dy;
-          if (dd > o2 || dd >= nearest) continue;
-          const xx = x + dx;
-          const yy = y + dy;
-          if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-          if (sd[(yy * w + xx) * 4 + 3] >= 16) nearest = dd;
-        }
-      }
-      if (nearest <= o2 && nearest >= i2) {
-        od[i] = fr;
-        od[i + 1] = fg;
-        od[i + 2] = fb;
-        od[i + 3] = 255;
-      }
-    }
-  }
-  rx.putImageData(out, 0, 0);
-  return rim;
-}
-
 function tintAtlasCell(img, cell, color) {
   const cols = cell.atlas === 'land' ? 4 : 2;
   const sw = img.width / cols;
@@ -374,7 +332,7 @@ function tintAtlasCell(img, cell, color) {
   const off = document.createElement('canvas');
   off.width = 256;
   off.height = 256;
-  const ox = off.getContext('2d');
+  const ox = off.getContext('2d', { willReadFrequently: true });
   ox.clearRect(0, 0, 256, 256);
   ox.drawImage(img, sx, sy, sw, sh, 0, 0, 256, 256);
   const pix = ox.getImageData(0, 0, 256, 256);
@@ -384,10 +342,10 @@ function tintAtlasCell(img, cell, color) {
     if (d[i + 3] < 8) continue;
     const lum = (0.30 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
     // Atlas is already cream-lifted. Keep sculpt; never floor to a black stamp.
-    const shade = 0.58 + lum * 0.50;
-    d[i] = Math.max(0, Math.min(255, (d[i] * 0.55) + (tr * shade) * 0.45));
-    d[i + 1] = Math.max(0, Math.min(255, (d[i + 1] * 0.55) + (tg * shade) * 0.45));
-    d[i + 2] = Math.max(0, Math.min(255, (d[i + 2] * 0.55) + (tb * shade) * 0.45));
+    const shade = 0.72 + lum * 0.38;
+    d[i] = Math.max(0, Math.min(255, (d[i] * 0.72) + (tr * shade) * 0.28));
+    d[i + 1] = Math.max(0, Math.min(255, (d[i + 1] * 0.72) + (tg * shade) * 0.28));
+    d[i + 2] = Math.max(0, Math.min(255, (d[i + 2] * 0.72) + (tb * shade) * 0.28));
   }
   ox.putImageData(pix, 0, 0);
   return off;
@@ -401,10 +359,18 @@ function drawPhotorealPlastic(ctx, type, cx, cy, s, color, faction) {
   const d = s * 2.20;
   const x = cx - d / 2;
   const y = cy - d / 2 - s * 0.02;
-  // Thick dark outline + faction rim OUTSIDE the cream sculpt.
-  ctx.drawImage(ringFromAlpha(tinted, '#1A1610', 0, 10), x, y, d, d);
-  ctx.drawImage(ringFromAlpha(tinted, faction, 10, 13), x, y, d, d);
+  // Outline lives OUTSIDE the alpha via drop-shadow so it cannot sit under
+  // the cream feather and collapse the 64px pip to a black stamp.
+  // ~8px on a 256 atlas ≈ 2px screen at mid.
+  ctx.save();
+  ctx.filter = [
+    'drop-shadow(0 0 2px #3A3228)',
+    'drop-shadow(0 0 2px #3A3228)',
+    'drop-shadow(0 0 1px #1A1610)',
+    `drop-shadow(0 0 1px ${faction || '#8E8F8C'})`,
+  ].join(' ');
   ctx.drawImage(tinted, x, y, d, d);
+  ctx.restore();
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
   const hi = ctx.createRadialGradient(cx - s * 0.30, cy - s * 0.46, s * 0.04, cx, cy, s * 1.15);

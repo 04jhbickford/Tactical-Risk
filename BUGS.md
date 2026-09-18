@@ -10,6 +10,8 @@ Fail-closed: Arc/Viz p20 live 390 still black silhouette stamps, GIS-flat parchm
 2. **Parchment** — flatten blotches + 96px tile blend + per-continent UV offset. No wallpaper seams.
 3. **Washes** — chroma-punched hex @ 28% so Europe olive / USSR tan / Africa ochre split at mid.
 
+390 stills in `qa-loop/p21/` — cream molded plastics at mid + near. mixRgb returns hex so atlas tint cannot collapse to grey.
+
 Open: Vercel `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.21.
 
 ---

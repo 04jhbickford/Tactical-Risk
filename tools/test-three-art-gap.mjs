@@ -70,9 +70,10 @@ check('mid pip is plastic not number-coin',
   /paintPiece\(ctx, \{/.test(chits) && /Never a numbered coin/.test(chits));
 check('no cream disc coin', !/drawCreamChit/.test(chits) && !/ctx.arc\(cx, cy/.test(chits));
 check('cream plastic body + faction tint', /plasticBodyColor/.test(chits) && /#F0E6D2/.test(chits));
-check('faction rim on cream plastic', /ringFromAlpha/.test(chits));
-check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /0\.58 \+ lum \* 0\.50/.test(chits) && /never floor to a black stamp/.test(chits));
-check('faction rim is a ring not a filled blob', /2–3px ring/.test(chits) && /ringFromAlpha/.test(chits) && !/d \* 1\.10/.test(chits));
+check('mixRgb returns hex so tint cannot collapse to grey', /padStart\(2, '0'\)/.test(chits) && !/return `rgb\(\$\{m\[0\]\}/.test(chits));
+check('faction rim on cream plastic', /drop-shadow\(0 0 1px \$\{faction/.test(chits));
+check('tint does not crush lum to black stamps', !/\/ 168/.test(chits) && /0\.72 \+ lum \* 0\.38/.test(chits) && /never floor to a black stamp/.test(chits));
+check('faction rim is a ring not a filled blob', /drop-shadow/.test(chits) && /cannot sit under/.test(chits) && !/d \* 1\.10/.test(chits));
 check('mid pip large enough to read sculpt', PIP_PX === 64);
 check('mid pip keeps soft contact shadow', /shadow: true/.test(chits) && /cream sculpt must still dominate/.test(chits));
 check('baker cream-lifts atlas (no baked black halo)',
