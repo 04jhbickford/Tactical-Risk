@@ -6,9 +6,9 @@
 
 Arc harsh QC on polish.11 (~50%): number-coins, charcoal ocean, flat GIS olive, Lucide silhouettes. Preview `?three=1` only. Do not merge. Tesla off.
 
-1. **Atlas fiber** — bake `aa-board-continents-texture.png` as parchment + continent washes. High-pass paper tooth, not smoke blotches. r170 Extrude lids are group 0 so the map actually shows. No mipmaps (they flattened fiber at 390).
-2. **Ocean** — printed muted blue-grey from the atlas sea. Not charcoal.
-3. **Units** — molded faction plastic atlases (thick outline + contact shadow). Mid = one pip+N; near ≤3–4 typed + `+K`.
+1. **Atlas fiber** — bake Arc `arc-parchment-grain-tile.png` as parchment + continent washes. Large paper blotches, not GIS olive. r170 Extrude lids are group 0. No mipmaps.
+2. **Ocean** — bake Arc `arc-ocean-print-tile.png` as printed muted blue-grey. Not charcoal.
+3. **Units** — bake Arc `arc-units-molded-atlas.png` toy plastics (INF/TNK/FTR/BMB) + prior ART/AA/FAC. Mid = one pip+N; near ≤3–4 typed + `+K`.
 4. **Pinch** — two-finger pinch + pan. Fit / +/- secondary.
 
 Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.12.

@@ -87,6 +87,9 @@ check('atlas board texture ref', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-
   || pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
 check('atlas plastic photo ref', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units-photo.png')
   || pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png'));
+check('Arc target unit atlas', pngOk('briefs/2026-09-17-three-art-gap/refs/arc-units-molded-atlas.png'));
+check('Arc target ocean tile', pngOk('briefs/2026-09-17-three-art-gap/refs/arc-ocean-print-tile.png'));
+check('Arc target parchment tile', pngOk('briefs/2026-09-17-three-art-gap/refs/arc-parchment-grain-tile.png'));
 check('select gold only', /select: '#C4A35A'/.test(palette));
 check('no neon teal leftover', !/#00ced1/i.test(palette) && !/#44C5BD/.test(palette));
 
