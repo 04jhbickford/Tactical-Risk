@@ -464,8 +464,8 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
   // light wash. P32: quiet continent tint — never a chocolate flood vs select gold.
-  const continentTint = mixHex('#ffffff', region, world ? 0.07 : CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.08 : OWNER_WASH_STRENGTH) : continentTint;
+  const continentTint = mixHex('#ffffff', region, world ? 0.035 : CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.05 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: world ? null : (paperNormal || null),

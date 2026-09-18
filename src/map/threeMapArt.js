@@ -15,6 +15,7 @@ import {
   makeCoastShelfMaterial,
   RIVERS,
 } from './threeMapTerrain.js';
+import { territoryOutlineRings } from './threeMapOutline.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
@@ -350,7 +351,8 @@ export function makeSelectWashMaterial() {
 export function makeSelectWashMeshes(territory, material, height) {
   const meshes = [];
   if (!territory || territory.isWater || !material) return meshes;
-  for (const poly of territory.polygons || []) {
+  // P33 HARD: outer union only — China must not flash an internal seam.
+  for (const poly of territoryOutlineRings(territory)) {
     const ring = smoothRing(simplifyRing(poly, 0.28), 2);
     if (!ring) continue;
     const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 4.2)));
@@ -400,7 +402,8 @@ export function makeBorderLine(ring, y, material) {
 }
 
 export function addTerritoryInk(group, territory, material, y, continentMat) {
-  for (const poly of territory.polygons || []) {
+  // P33 HARD: dissolve multipolygons — stroke the outer union, never every poly.
+  for (const poly of territoryOutlineRings(territory)) {
     const ring = smoothRing(simplifyRing(poly), 1);
     if (!ring) continue;
     if (continentMat) {
@@ -467,7 +470,7 @@ export function makeCoastAoMaterial() {
   });
 }
 
-export { makeCoastShelfMaterial };
+export { makeCoastShelfMaterial, territoryOutlineRings };
 
 export function makeCoastShelfMeshes(territory, material) {
   const meshes = [];
