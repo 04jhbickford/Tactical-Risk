@@ -2,6 +2,19 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.13 (preview only, SCHEMA 11)
+
+James texture lock (JAMES-HECORRECT-TEXTURE.md). Preview `?three=1` only. Do not merge.
+
+1. **Land** — bake `refs/board-parchment-macro-tile.png` as scanned cardboard punch (continent color on top of the blotches).
+2. **Ocean** — bake `refs/board-ocean-print-macro-tile.png` as printed muted blue-grey / slate-teal. Not charcoal.
+3. **Units** — bake `refs/units-molded-plastic-atlas-hi.png` into plastic atlases. Kill Lucide/vector + number discs.
+4. **iPhone pinch** — two-finger pinch + pan required. Mid = one plastic+N; near ≤3–4 + `+K`.
+
+Open: Vercel preview + `?three=1`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.13.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.12 (preview only, SCHEMA 11)
 
 James HARD he-correct on polish.11 (~25%): vector/GIS board, simple icons, no image-gen texture, iPhone pinch dead. Preview `?three=1` only. Do not merge over live Canvas. Tesla off.

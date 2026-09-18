@@ -9,5 +9,5 @@ Kill cream discs / Lucide stamps / number-coins.
 | `units-land-plastic.png` | 4×2 | INF, TNK, ART, FTR / BMB, AA, FAC |
 | `units-naval-plastic.png` | 2×2 | BB, CV / SS, TR |
 
-Regenerate: `python3 tools/bake-three-gen-art.py` (needs gen sources).
-Ref: `briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png`.
+Regenerate: `python3 tools/bake-james-texture-lock.py`
+SoT: `briefs/2026-09-17-three-art-gap/refs/units-molded-plastic-atlas-hi.png`.

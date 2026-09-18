@@ -88,8 +88,8 @@ export const FACTION_WASH = {
 
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
-export const PAPER_UV = 48;
-export const OCEAN_UV = 56;
+export const PAPER_UV = 32;
+export const OCEAN_UV = 40;
 // Overlay + multiply punch — 8–14% is invisible at 390. Glance must read scanned board.
 export const GRAIN_STRENGTH = 0.86;
 
@@ -298,8 +298,10 @@ export async function loadBoardTextures() {
   landSheets.clear();
   washMaps.clear();
   names.forEach((k, i) => {
+    // Washes already are the James macro parchment, color-locked. Do not
+    // overlay a second grain pass — that flattened the blotches at 390.
     washMaps.set(k, washes[i]
-      ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase, parchment)
+      ? imageToTex(washes[i], REGION_WASH[k] || PALETTE.landBase)
       : null);
   });
   return { paperTex, oceanMap };

@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.12 generated board/units + iPhone pinch + STACK-LOD.
+// V2.81.51-three-polish.13 James texture lock + iPhone pinch + STACK-LOD.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -45,7 +45,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.12', GAME_VERSION === 'V2.81.51-three-polish.12');
+check('GAME_VERSION is V2.81.51-three-polish.13', GAME_VERSION === 'V2.81.51-three-polish.13');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -54,6 +54,9 @@ check('generated ocean tile', pngOk('assets/three/board/board-ocean-tile.png'));
 check('generated Europe wash', pngOk('assets/three/board/wash-europe.png'));
 check('generated USSR wash', pngOk('assets/three/board/wash-ussr.png'));
 check('generated Africa wash', pngOk('assets/three/board/wash-africa.png'));
+check('James parchment macro ref', pngOk('briefs/2026-09-17-three-art-gap/refs/board-parchment-macro-tile.png'));
+check('James ocean macro ref', pngOk('briefs/2026-09-17-three-art-gap/refs/board-ocean-print-macro-tile.png'));
+check('James plastic atlas-hi ref', pngOk('briefs/2026-09-17-three-art-gap/refs/units-molded-plastic-atlas-hi.png'));
 check('continent ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
 check('plastic ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png'));
 
