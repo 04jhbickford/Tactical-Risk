@@ -189,7 +189,8 @@ check('parchment tooth punches at 390 mid',
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
   && /macro paper tooth/.test(palette)
   && /TOOTH_NORMAL_MID = 2\.05/.test(palette)
-  && /normalScale\.set\(TOOTH_NORMAL_MID/.test(palette));
+  && /IMHOF_NORMAL_SCALE = 0\.34/.test(palette)
+  && /normalScale\.set\(n, n\)/.test(palette));
 check('lod tooth is loud mid / clean near',
   /TOOTH_NORMAL_NEAR = 1\.08/.test(palette)
   && /TOOTH_ROUGH_NEAR = 0\.86/.test(palette)
@@ -598,11 +599,11 @@ check('p34 printed theater plates on disk',
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-asia-theater.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-world-painted.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-plate-forest.png'));
-check('p34 baker composites p34-gen through live masks',
-  /p34-europe-theater/.test(albedoBaker)
+check('p36 baker composites p36-gen through live masks',
+  /p36-europe-theater/.test(albedoBaker)
   && /stain is OFF/.test(albedoBaker)
-  && /draw_ridges/.test(albedoBaker)
-  && /alpha=0.90/.test(albedoBaker));
+  && /imhof_height/.test(albedoBaker)
+  && /alpha=0\.84/.test(albedoBaker));
 check('p34 inspect proves albedo bind (not hardcoded true)',
   /albedoBound/.test(spike)
   && /getWorldLandTex\(\)/.test(spike)
