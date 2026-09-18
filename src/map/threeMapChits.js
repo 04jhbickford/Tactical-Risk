@@ -400,8 +400,8 @@ function drawTypeGlyph(ctx, type, cx, cy, s) {
   // Recessed INTO cream plastic — carved cavity, not a stamp-on-disc / Lucide fill.
   const pathFn = PATHS[type];
   if (!pathFn) return;
-  const gs = s * 0.38;
-  const gy = cy + s * 0.04;
+  const gs = s * 0.52;
+  const gy = cy + s * 0.03;
   const strokePath = (dx, dy, style, width) => {
     ctx.save();
     ctx.translate(dx, dy);

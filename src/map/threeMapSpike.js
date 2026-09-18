@@ -275,7 +275,7 @@ export async function bootThreeMapSpike() {
   const foamMat = makeLineMat(PALETTE.foam, 2.2, 0.46);
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
-  const selectMat = makeLineMat(PALETTE.select, 4.6, 1);
+  const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
   lineMats.push(landBorderMat, foamMat, selectMat);
 
   for (const land of lands) {
@@ -647,7 +647,7 @@ export async function bootThreeMapSpike() {
     // Gold/amber select language only — never a blue glow ring.
     if (mats?.top?.emissive) {
       mats.top.emissive.setHex(hex);
-      mats.top.emissiveIntensity = hex ? 0.42 : 0;
+      mats.top.emissiveIntensity = hex ? 0.58 : 0;
     }
   }
 
@@ -683,7 +683,7 @@ export async function bootThreeMapSpike() {
   function drawSelectInk(territory) {
     clearSelectInk();
     if (!territory || territory.isWater) return;
-    const y = (landHeights.get(territory.name) || BASE_LAND) + 0.28;
+    const y = (landHeights.get(territory.name) || BASE_LAND) + 0.36;
     for (const group of wrapGroups) {
       if (!group.visible) continue;
       for (const poly of territory.polygons || []) {
