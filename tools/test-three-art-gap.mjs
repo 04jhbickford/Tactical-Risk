@@ -621,6 +621,30 @@ check('p33 SCORE states painted albedo + dissolve',
   /Painted world albedo/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
   && /Dissolve China select/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
   && /rings=1/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8')));
+check('p34 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p34/SCORE.md')));
+check('p34 mid painted still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/mid-painted.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/europe-mid-390.png'));
+check('p34 mid vs p32 leap stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/mid-vs-p32.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/mid-vs-p32-absdiff.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/asia-mid-vs-p32.png'));
+check('p34 China select hold still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/china-select-390.png'));
+check('p34 Japan near hold still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/near-japan-multitype-390.png'));
+check('p34 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/vercel-live-mid-390.png'));
+{
+  const score = readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p34/SCORE.md'), 'utf8');
+  const computed = readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p34/computed.json'), 'utf8');
+  check('p34 SCORE states leap + bound + dissolve',
+    /Painted world albedo leap/.test(score)
+    && /albedoBound/.test(score)
+    && /28\.97/.test(score)
+    && /rings=1/.test(score));
+  check('p34 computed proves live bind',
+    /"albedoBound": true/.test(computed)
+    && /"stainFallback": false/.test(computed)
+    && /4096/.test(computed)
+    && /V2.81.51-three-polish.34/.test(computed));
+}
 
 if (failures) {
   console.error(`\n${failures} failed`);
