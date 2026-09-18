@@ -10,9 +10,11 @@ import { PALETTE, REGION_WASH, USSR_LANDS, bonusContinent, mixHex } from './thre
 export const BAKE_W = 2048;
 export const BAKE_H = 1170;
 
-// P33 HARD: painted board albedo is the hero. Runtime stain is fallback only.
+// P34 HARD: painted board albedo is the hero. Stain bake is OFF — fail closed
+// if this PNG does not bind (no silent GIS wash fallback).
 export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
 export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
+export const WORLD_LAND_ALBEDO_REV = 'p34';
 
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',
@@ -678,18 +680,39 @@ async function textureFromImage(img) {
 }
 
 export async function loadWorldLandAlbedo() {
-  const img = await loadImage(WORLD_LAND_ALBEDO);
-  if (!img) return null;
+  const src = `${WORLD_LAND_ALBEDO}?v=${WORLD_LAND_ALBEDO_REV}`;
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error(`P34 fail-closed: ${src} failed to load`));
+    el.src = src;
+  });
+  if (!img.width || img.width < 4096) {
+    throw new Error(`P34 fail-closed: albedo too small ${img.width}×${img.height}`);
+  }
   const tex = await textureFromImage(img);
-  tex.userData = { paintedAlbedo: true, src: WORLD_LAND_ALBEDO };
+  tex.userData = {
+    paintedAlbedo: true,
+    src: WORLD_LAND_ALBEDO,
+    rev: WORLD_LAND_ALBEDO_REV,
+    width: img.width,
+    height: img.height,
+  };
   worldLandTex = tex;
+  console.log('[three-spike] painted albedo bound', img.width, img.height, src);
   return tex;
 }
 
 export async function bakeWorldLandAtlas(lands, parchmentImg) {
-  // P33 HARD: painted atlas is the hero. Soft-light stain is fallback only.
-  const painted = await loadWorldLandAlbedo();
-  if (painted) return painted;
+  // P34 HARD: painted atlas is the hero. Soft-light stain is OFF.
+  // Fail closed — do not silently fall back to the GIS wash bake.
+  void lands;
+  void parchmentImg;
+  return loadWorldLandAlbedo();
+}
+
+export async function bakeWorldLandAtlasFallback(lands, parchmentImg) {
+  // Kept for diagnostics only. P34 never calls this.
   await loadTerrainTiles();
   const w = BAKE_W;
   const h = BAKE_H;

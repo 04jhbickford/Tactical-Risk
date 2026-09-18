@@ -477,7 +477,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     envMapIntensity: world ? 0.06 : 0.14,
     transparent: false,
     side: THREE.DoubleSide,
-    // P33: painted albedo is the hero — idle parchment emissive washed it to GIS.
+    // P34: painted albedo is the hero — idle parchment emissive washed it to GIS.
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
@@ -492,7 +492,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   });
   const seal = new THREE.MeshStandardMaterial({
     map: sheet,
-    color: tint,
+    color: world ? 0xffffff : tint,
     roughness: 0.94,
     metalness: 0.0,
     side: THREE.DoubleSide,

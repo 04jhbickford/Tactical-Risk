@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""P33: bake a UV-aligned painted world land albedo.
+"""P34: bake a UV-aligned painted world land albedo.
 
 Layout is the live map (3500×2000) so applyWorldLandUVs sample 1:1.
-Hero art is image-gen plates (parchment / continent chroma / mountains /
-forests / coasts), composited through territory polygon masks.
+Hero art is image-gen printed-board plates (parchment / continent chroma /
+painted mountains / forest masses / coast tooth), composited through
+territory polygon masks. Soft-light stain is OFF.
 NOT a copyright scan. NOT a runtime fillStain wash.
 
 Usage:
@@ -16,20 +17,20 @@ import argparse
 import json
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'data' / 'territories.json'
 CONTINENTS = ROOT / 'data' / 'continents.json'
 BOARD = ROOT / 'assets' / 'three' / 'board'
-GEN = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p33-gen'
-OUT_GUIDE = GEN / 'world-land-guide.png'
+GEN34 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p34-gen'
+GEN33 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p33-gen'
+OUT_GUIDE = GEN34 / 'world-land-guide.png'
 OUT_ATLAS = BOARD / 'world-land-albedo.png'
 OUT_NORMAL = BOARD / 'world-land-normal.png'
 OUT_AO = BOARD / 'world-land-ao.png'
 
 MAP_W, MAP_H = 3500, 2000
-# 4096+ wide, same aspect as map so existing UVs stay honest.
 ATLAS_W = 4096
 ATLAS_H = 2340
 
@@ -73,6 +74,8 @@ RIDGES = [
     [(1550, 700), (1679, 600), (1905, 490)],
     [(1086, 160), (1070, 230), (1086, 280)],
 ]
+# Forest authorship lives in the theater plates + biome tiles.
+# Do NOT stamp oval blobs — Viz called .33 a wash+stamp family.
 RIVERS = [
     [(1195, 900), (1189, 1064), (1208, 1280), (1200, 1460)],
     [(912, 560), (960, 500), (1000, 400), (980, 260)],
@@ -166,51 +169,66 @@ def land_mask(lands, w, h, names=None, biomes=None, continents=None) -> Image.Im
     return mask
 
 
-def multiply_rgb(base: Image.Image, overlay: Image.Image, mask: Image.Image, strength=1.0):
-    b = base.copy()
-    o = overlay.resize(base.size, Image.Resampling.LANCZOS)
-    m = mask.resize(base.size, Image.Resampling.NEAREST)
-    if strength < 1:
-        m = m.point(lambda v: int(v * strength))
-    blended = Image.blend(b, ImageChops_multiply(b, o), 1.0)
-    return Image.composite(blended, b, m)
+def punch(img: Image.Image, color=1.22, contrast=1.18, sharp=1.10) -> Image.Image:
+    out = ImageEnhance.Color(img).enhance(color)
+    out = ImageEnhance.Contrast(out).enhance(contrast)
+    out = ImageEnhance.Sharpness(out).enhance(sharp)
+    return out
 
 
-def ImageChops_multiply(a: Image.Image, b: Image.Image) -> Image.Image:
-    from PIL import ImageChops
-    return ImageChops.multiply(a, b)
+def first_existing(*paths: Path) -> Path | None:
+    for p in paths:
+        if p and p.exists():
+            return p
+    return None
 
 
-def overlay_rgb(base: Image.Image, overlay: Image.Image, mask: Image.Image, alpha=0.55):
-    o = overlay.resize(base.size, Image.Resampling.LANCZOS)
-    m = mask.point(lambda v: int(v * alpha))
-    return Image.composite(o, base, m)
+def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y0, x1, y1, w, h, alpha=0.88):
+    rx0, ry0 = int(wx(x0, w)), int(wy(y0, h))
+    rx1, ry1 = int(wx(x1, w)), int(wy(y1, h))
+    box = (rx0, ry0, rx1, ry1)
+    fitted = punch(plate.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS))
+    region = img.crop(box)
+    mixed = Image.blend(region, fitted, alpha)
+    local = mask.crop(box)
+    img.paste(Image.composite(mixed, region, local), box)
+    return img
 
 
-def stain_hex(img: Image.Image, mask: Image.Image, rgb, alpha=0.42):
-    wash = Image.new('RGB', img.size, rgb)
-    m = mask.point(lambda v: int(v * alpha))
-    return Image.composite(wash, img, m)
+def paste_geo_crop(img, plate, mask, geo, uv, w, h, alpha=0.80):
+    pw, ph = plate.size
+    crop = plate.crop((
+        int(geo[0] * pw), int(geo[1] * ph),
+        int(geo[2] * pw), int(geo[3] * ph),
+    ))
+    return paste_theater(img, crop, mask, uv[0], uv[1], uv[2], uv[3], w, h, alpha)
 
 
-def draw_ridges(img: Image.Image, mountain: Image.Image | None, w, h):
-    from PIL import ImageChops
+def print_continent(paper: Image.Image, mask: Image.Image, rgb, strength=0.62) -> Image.Image:
+    wash = Image.new('RGB', paper.size, rgb)
+    stained = Image.blend(paper, ImageChops.multiply(paper, wash), strength)
+    return Image.composite(stained, paper, mask)
+
+
+def draw_ridges(img: Image.Image, mountain: Image.Image | None, land: Image.Image, w, h):
+    # Painted range masses — soft, no sausage-stick spines.
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     for ridge in RIDGES:
         pts = [(wx(x, w), wy(y, h)) for x, y in ridge]
-        d.line(pts, fill=(110, 96, 72, 210), width=max(18, w // 140), joint='curve')
-        d.line(pts, fill=(176, 160, 124, 160), width=max(8, w // 260), joint='curve')
-        for x, y in pts:
-            d.ellipse((x - 28, y - 18, x + 28, y + 18), fill=(120, 104, 78, 90))
+        for i, (x, y) in enumerate(pts):
+            d.ellipse((x - 48, y - 30, x + 48, y + 30), fill=(118, 98, 68, 70))
+            if i + 1 < len(pts):
+                nx, ny = pts[i + 1]
+                mx, my = (x + nx) / 2, (y + ny) / 2
+                d.ellipse((mx - 54, my - 32, mx + 54, my + 32), fill=(128, 108, 76, 58))
+        d.line(pts, fill=(176, 158, 118, 70), width=max(8, w // 280), joint='curve')
+    mass = layer.filter(ImageFilter.GaussianBlur(7.5))
     if mountain:
-        mt = tile_image(mountain.resize((512, 512), Image.Resampling.LANCZOS), w, h).convert('RGBA')
-        mt.putalpha(Image.new('L', (w, h), 150))
-        ridge_mask = layer.split()[-1].filter(ImageFilter.GaussianBlur(10))
-        mt.putalpha(ridge_mask)
-        img.paste(ImageChops.multiply(img, mt.convert('RGB')), (0, 0), ridge_mask)
-    highlight = layer.filter(ImageFilter.GaussianBlur(2))
-    img.paste(highlight.convert('RGB'), (0, 0), highlight.split()[-1])
+        mt = tile_image(mountain.resize((560, 560), Image.Resampling.LANCZOS), w, h)
+        ridge_a = ImageChops.multiply(mass.split()[-1], land)
+        img.paste(ImageChops.multiply(img, mt), (0, 0), ridge_a.point(lambda v: int(v * 0.32)))
+    img.paste(mass.convert('RGB'), (0, 0), ImageChops.multiply(mass.split()[-1], land))
     return img
 
 
@@ -218,18 +236,18 @@ def draw_rivers(img: Image.Image, w, h):
     d = ImageDraw.Draw(img, 'RGBA')
     for river in RIVERS:
         pts = [(wx(x, w), wy(y, h)) for x, y in river]
-        d.line([(p[0] + 1.2, p[1] + 1.6) for p in pts], fill=(36, 40, 32, 70), width=max(3, w // 700))
-        d.line(pts, fill=(52, 64, 60, 120), width=max(2, w // 900))
+        d.line([(p[0] + 1.2, p[1] + 1.6) for p in pts], fill=(36, 40, 32, 80), width=max(3, w // 700))
+        d.line(pts, fill=(52, 64, 60, 140), width=max(2, w // 900))
         d.line(pts, fill=(120, 128, 116, 70), width=1)
     return img
 
 
 def draw_coast(img: Image.Image, mask: Image.Image, w, h):
-    edge = mask.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(1.2))
+    edge = mask.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.8))
     foam = Image.new('RGB', (w, h), (0xD9, 0xD2, 0xC0))
-    shelf = Image.new('RGB', (w, h), (0x6A, 0x84, 0x88))
-    img = Image.composite(shelf, img, edge.point(lambda v: int(v * 0.35)))
-    img = Image.composite(foam, img, edge.point(lambda v: int(v * 0.55)))
+    ink = Image.new('RGB', (w, h), (0x3A, 0x34, 0x28))
+    img = Image.composite(ink, img, edge.point(lambda v: int(v * 0.42)))
+    img = Image.composite(foam, img, edge.point(lambda v: int(v * 0.62)))
     return img
 
 
@@ -245,16 +263,8 @@ def draw_badges(img: Image.Image, w, h):
         box = (px - 36, py - 16, px + 36, py + 16)
         d.rounded_rectangle(box, radius=8, fill=(237, 228, 204, 230), outline=wash, width=3)
         d.rounded_rectangle(box, radius=8, outline=(42, 36, 24), width=1)
-        text = f"+{badge['bonus']}"
-        d.text((px, py), text, fill=(42, 36, 24), font=font, anchor='mm')
+        d.text((px, py), f"+{badge['bonus']}", fill=(42, 36, 24), font=font, anchor='mm')
     return img
-
-
-def first_existing(*paths: Path) -> Path | None:
-    for p in paths:
-        if p and p.exists():
-            return p
-    return None
 
 
 def build_guide(lands, w=2048, h=1170) -> Image.Image:
@@ -281,86 +291,79 @@ def build_guide(lands, w=2048, h=1170) -> Image.Image:
             pts = poly_xy(poly, w, h)
             if len(pts) >= 3:
                 d.polygon(pts, fill=rgb)
-    # ridge hints for the painter — not labels
     for ridge in RIDGES:
         pts = [(wx(x, w), wy(y, h)) for x, y in ridge]
         d.line(pts, fill=(96, 80, 56), width=6)
     return img
 
 
-def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y0, x1, y1, w, h, alpha=0.55):
-    # Theater plates are crops of map space — paste into the matching UV rect.
-    rx0, ry0 = int(wx(x0, w)), int(wy(y0, h))
-    rx1, ry1 = int(wx(x1, w)), int(wy(y1, h))
-    box = (rx0, ry0, rx1, ry1)
-    fitted = plate.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS)
-    region = img.crop(box)
-    mixed = Image.blend(region, fitted, alpha)
-    local = mask.crop(box)
-    img.paste(Image.composite(mixed, region, local), box)
-    return img
-
-
 def build_atlas(lands) -> Image.Image:
-    from PIL import ImageChops
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(BOARD / 'board-parchment-tile.png')
-    mountain = load_rgb(first_existing(GEN / 'plate-mountain.png', BOARD / 'terrain-mountain.png'))
-    forest = load_rgb(first_existing(GEN / 'plate-forest.png', BOARD / 'terrain-forest.png'))
-    arid = load_rgb(first_existing(GEN / 'plate-arid.png', BOARD / 'terrain-arid.png'))
-    snow = load_rgb(first_existing(GEN / 'plate-snow.png', BOARD / 'terrain-snow.png'))
-    world = load_rgb(first_existing(GEN / 'world-painted.png', GEN / 'world-painted-16x9.png'))
-    europe = load_rgb(GEN / 'europe-theater.png')
-    asia = load_rgb(GEN / 'asia-theater.png')
+    mountain = load_rgb(first_existing(GEN34 / 'p34-plate-mountain.png', GEN33 / 'plate-mountain.png', BOARD / 'terrain-mountain.png'))
+    forest = load_rgb(first_existing(GEN34 / 'p34-plate-forest.png', GEN33 / 'plate-forest.png', BOARD / 'terrain-forest.png'))
+    arid = load_rgb(first_existing(GEN34 / 'p34-plate-arid.png', GEN33 / 'plate-arid.png', BOARD / 'terrain-arid.png'))
+    snow = load_rgb(first_existing(GEN34 / 'p34-plate-snow.png', GEN33 / 'plate-snow.png', BOARD / 'terrain-snow.png'))
+    world = load_rgb(first_existing(GEN34 / 'p34-world-painted.png', GEN33 / 'world-painted.png'))
+    europe = load_rgb(first_existing(GEN34 / 'p34-europe-theater.png', GEN33 / 'europe-theater.png'))
+    asia = load_rgb(first_existing(GEN34 / 'p34-asia-theater.png', GEN33 / 'asia-theater.png'))
+    if not europe or not asia:
+        raise SystemExit('P34 fail-closed: missing printed theater plates')
 
     paper = tile_image(parchment.resize((768, 768), Image.Resampling.LANCZOS), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
-    paper = ImageEnhance.Contrast(paper).enhance(1.08)
+    paper = ImageEnhance.Contrast(paper).enhance(1.12)
     img = paper.copy()
-
-    # Painted world (image-gen) is the hero — clipped to live land polygons.
     mask_all = land_mask(lands, w, h)
-    if not world:
-        raise SystemExit('P33 fail-closed: missing image-gen world-painted.png')
-    fitted = world.resize((w, h), Image.Resampling.LANCZOS)
-    fitted = ImageEnhance.Color(fitted).enhance(1.16)
-    fitted = ImageEnhance.Contrast(fitted).enhance(1.28)
-    fitted = ImageEnhance.Sharpness(fitted).enhance(1.18)
-    img = Image.composite(fitted, img, mask_all)
-    # Tiny paper tooth only — do not flatten the painting back to a wash.
-    img = Image.composite(ImageChops.soft_light(img, paper), img, mask_all.point(lambda v: 28))
 
-    # Regional theater paintings — UV-aligned crops, not full-bleed stretch.
-    if europe:
-        em = land_mask(lands, w, h, continents={'Europe', 'Africa', 'Middle East'})
-        img = paste_theater(img, europe, em, 620, 80, 1680, 1580, w, h, alpha=0.52)
-    if asia:
-        am = land_mask(lands, w, h, continents={'Asia', 'Oceania'})
-        img = paste_theater(img, asia, am, 1500, 200, 2700, 1100, w, h, alpha=0.42)
-
-    # Quiet printed chroma so Risk groups still split — painting stays hero.
+    # Printed continent paper — Europe olive / Africa ochre must split at a glance.
     for key, rgb in CONT_HEX.items():
         cm = land_mask(lands, w, h, continents={key})
-        img = stain_hex(img, cm, rgb, alpha=0.20)
+        img = Image.composite(print_continent(paper, cm, rgb, strength=0.70), img, cm)
+
+    # Theater paintings are the hero (high alpha). Soft-light stain is OFF.
+    em = land_mask(lands, w, h, continents={'Europe', 'Africa', 'Middle East'})
+    img = paste_theater(img, europe, em, 620, 80, 1680, 1580, w, h, alpha=0.90)
+    am = land_mask(lands, w, h, continents={'Asia', 'Oceania'})
+    img = paste_theater(img, asia, am, 1400, 140, 2750, 1650, w, h, alpha=0.86)
+
+    if world:
+        img = paste_geo_crop(
+            img, world, land_mask(lands, w, h, continents={'North America'}),
+            (0.04, 0.04, 0.32, 0.48), (2780, 60, 3500, 1020), w, h, alpha=0.78,
+        )
+        img = paste_geo_crop(
+            img, world, land_mask(lands, w, h, continents={'South America'}),
+            (0.10, 0.42, 0.30, 0.96), (70, 1080, 500, 1860), w, h, alpha=0.78,
+        )
 
     if forest:
-        fm = land_mask(lands, w, h, biomes={'forest'})
+        fm = land_mask(lands, w, h, biomes={'forest', 'lush'})
         tiled = tile_image(forest.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = multiply_rgb(img, tiled, fm, strength=0.38)
+        mixed = ImageChops.multiply(img, tiled)
+        img = Image.composite(mixed, img, fm.point(lambda v: int(v * 0.48)))
     if arid:
         dm = land_mask(lands, w, h, biomes={'arid'})
         tiled = tile_image(arid.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = overlay_rgb(img, tiled, dm, alpha=0.16)
+        img = Image.composite(Image.blend(img, tiled, 0.28), img, dm)
     if snow:
         sm = land_mask(lands, w, h, biomes={'snow'})
         tiled = tile_image(snow.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = overlay_rgb(img, tiled, sm, alpha=0.22)
+        img = Image.composite(Image.blend(img, tiled, 0.36), img, sm)
+    if mountain:
+        mm = land_mask(lands, w, h, biomes={'mountain', 'hills'})
+        tiled = tile_image(mountain.resize((640, 640), Image.Resampling.LANCZOS), w, h)
+        img = Image.composite(ImageChops.multiply(img, tiled), img, mm.point(lambda v: int(v * 0.38)))
 
-    # Ridge art lives in the image-gen world plate. Do not stroke brown bars
-    # on top — that read as sticks, not painted ranges.
+    img = draw_ridges(img, mountain, mask_all, w, h)
     img = draw_rivers(img, w, h)
     img = draw_coast(img, mask_all, w, h)
-    img = Image.composite(img, paper, mask_all)
-    img = ImageEnhance.Brightness(img).enhance(1.03)
+
+    # Residual paper tooth only — do not flatten the print back to a wash.
+    if parchment:
+        img = Image.composite(ImageChops.soft_light(img, paper), img, mask_all.point(lambda v: 16))
+
+    img = punch(img, color=1.18, contrast=1.14, sharp=1.08)
+    img = ImageEnhance.Brightness(img).enhance(0.96)
     img = Image.composite(img, paper, mask_all)
     img = draw_badges(img, w, h)
     return img
@@ -368,11 +371,9 @@ def build_atlas(lands) -> Image.Image:
 
 def bake_normal_ao(albedo: Image.Image):
     gray = albedo.convert('L')
-    edges = gray.filter(ImageFilter.FIND_EDGES)
     ao = ImageEnhance.Contrast(gray).enhance(0.55)
     ao = ImageEnhance.Brightness(ao).enhance(1.15)
     ao = ao.filter(ImageFilter.GaussianBlur(1.2))
-    # Cheap normal from Sobel-ish emboss.
     hx = gray.filter(ImageFilter.Kernel((3, 3), [-1, 0, 1, -2, 0, 2, -1, 0, 1], scale=1))
     hy = gray.filter(ImageFilter.Kernel((3, 3), [-1, -2, -1, 0, 0, 0, 1, 2, 1], scale=1))
     normal = Image.merge('RGB', (
@@ -390,7 +391,7 @@ def main():
     args = ap.parse_args()
     if not args.guide and not args.atlas:
         args.guide = args.atlas = True
-    GEN.mkdir(parents=True, exist_ok=True)
+    GEN34.mkdir(parents=True, exist_ok=True)
     lands = load_lands()
     if args.guide:
         guide = build_guide(lands)
@@ -401,7 +402,6 @@ def main():
         OUT_ATLAS.parent.mkdir(parents=True, exist_ok=True)
         atlas.save(OUT_ATLAS, 'PNG', optimize=True)
         print(f'wrote {OUT_ATLAS} {atlas.size}')
-        # Optional AO at half-res — skip the 7MB fake normal (print board is matte).
         _normal, ao = bake_normal_ao(atlas.resize((2048, 1170), Image.Resampling.LANCZOS))
         ao = ao.resize((ATLAS_W, ATLAS_H), Image.Resampling.BILINEAR)
         ao.save(OUT_AO, 'PNG', optimize=True)
