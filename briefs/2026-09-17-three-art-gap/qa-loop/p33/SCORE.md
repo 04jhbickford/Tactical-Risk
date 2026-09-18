@@ -56,5 +56,6 @@ inspect:      paintedAlbedo · dissolveSelect · noMapLabels · noBakedIpc · ja
 2. **Dissolve** — `src/map/threeMapOutline.js` raster-unions multipolygons. `addTerritoryInk` / `makeSelectWashMeshes` / `drawSelectInk` stroke those rings only. China 2 polys → 1 outline. Archipelagos keep multiple outer rings.
 3. **Labels** — `makeLabelTexture` / name sprites deleted. `drawIpcDot` is never called from the bake. Peek shows `{printIpc} IPC`.
 
-**Vercel:** https://tactical-risk20-lm4y0wt0n-james-projects-20d8de40.vercel.app/?three=1
+**Vercel:** https://tactical-risk20-j6wd6yccl-james-projects-20d8de40.vercel.app/?three=1  
+**Stable alias:** https://tactical-risk20-git-cursor-three-a12b9b-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/58 (stacked on PR57 / `.32`)
