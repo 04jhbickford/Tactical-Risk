@@ -47,7 +47,7 @@ inspect:      paintedMountains · unitNoClip · japanLod · selectClear · liveC
 - `russia-near-select-390.png` — SU green plastic (Asia bonus land)
 - `japan-near-select-390.png` — JP orange-red 3+K, no sea-ship overlap
 - `japan-near-units-390.png` — Japan closeup
-- `vercel-live-mid-390.png` — live `?three=1` (follow-up if needed)
+- `vercel-live-mid-390.png` — live `?three=1` = `V2.81.51-three-polish.31`
 - `computed.json` — machine-read CSS + inspect
 
 ## How each P0 was solved
@@ -57,5 +57,5 @@ inspect:      paintedMountains · unitNoClip · japanLod · selectClear · liveC
 4. **Select** — wash mesh + ink halo + thicker gold ring + emissive 0.30.
 5. **Continents** — `bonusContinent()` = `data/continents.json`. Hue-preserving luma floor so chroma survives. `+N` badges + continent outlines.
 
-**Vercel:** https://tactical-risk20-awwsskduf-james-projects-20d8de40.vercel.app/?three=1
+**Vercel:** https://tactical-risk20-rkwvn8kaf-james-projects-20d8de40.vercel.app/?three=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/56 (stacked on PR55 / `.30`)

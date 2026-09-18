@@ -493,6 +493,7 @@ check('p31 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31
 check('p31 Japan near multi-type still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/japan-near-select-390.png'));
 check('p31 UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/uk-near-select-390.png'));
 check('p31 SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/russia-near-select-390.png'));
+check('p31 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);
