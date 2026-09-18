@@ -2,6 +2,19 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.22 (preview only, SCHEMA 11)
+
+Arc+TR lock: `bc-95c6f821-15e2-53b5-a7c0-f720520dca52` is the only .22 worker.
+Fail-closed: p21 live 390 mid is a soldier/ship type parade on grey figurines; continent washes flatten to one khaki. Preview `?three=1` only. Do not merge. Live Canvas untouched.
+
+1. **MID** — one cream `#F0E6D2` plastic pip + faction rim + dark outline + contact shadow + total **N**. Kill ALL soldier/type parade at mid (no primaryType pip, no atlas figurine).
+2. **Near** — same cream chits with type glyphs (not grey figurines). Risk continent washes stay punched (runtime chroma 0.42).
+3. **P1** — parchment tooth, ocean shelf+grain, real frost glass, gold select emissive.
+
+390 stills in `qa-loop/p22/`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.22.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.21 (preview only, SCHEMA 11)
 
 Fail-closed: Arc/Viz p20 live 390 still black silhouette stamps, GIS-flat parchment, weak continent split. Preview `?three=1` only. Do not merge.

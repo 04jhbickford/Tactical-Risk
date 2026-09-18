@@ -59,7 +59,7 @@ export function sortStacks(stacks) {
   });
 }
 
-/** Mid/far mark uses one silhouette — priority type, not a number-coin. */
+/** Near roster only. Mid/far must never use this to pick a soldier/ship pip. */
 export function primaryType(stacks) {
   const sorted = sortStacks(stacks);
   return sorted[0]?.type || 'infantry';

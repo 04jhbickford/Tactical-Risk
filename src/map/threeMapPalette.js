@@ -62,6 +62,8 @@ export const REGION_WASH = {
   Oceania: '#7A6B8A',
 };
 export const CONTINENT_WASH_STRENGTH = 0.28;
+// Runtime multiply so Europe/USSR/Africa still split at 390 after lighting.
+export const CONTINENT_CHROMA_PUNCH = 0.42;
 
 export const USSR_LANDS = new Set([
   'Russia',
@@ -107,8 +109,9 @@ const PAPER_UV_SHIFT = {
 export const OCEAN_UV = 24;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
-export const GRAIN_MULTIPLY = 0.42;
+export const GRAIN_MULTIPLY = 0.52;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
+export const OCEAN_GRAIN = 0.40;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -253,7 +256,9 @@ function bakeParchment(img) {
   ctx.fillRect(0, 0, size, size);
   ctx.drawImage(grainCanvas, 0, 0);
   overlayPhoto(ctx, img, size, GRAIN_STRENGTH, 'overlay');
-  overlayPhoto(ctx, img, size, 0.28, 'multiply');
+  overlayPhoto(ctx, img, size, 0.36, 'multiply');
+  // P1: keep paper tooth at 390 — high-frequency fiber after blotch flatten.
+  overlayPhoto(ctx, grainCanvas, size, 0.22, 'soft-light');
   paperTex = canvasTex(canvas);
   return paperTex;
 }
@@ -281,8 +286,8 @@ function imageToTex(img, fallbackHex, grainImg = null, { srgb = true } = {}) {
 }
 
 function bakeOcean(img) {
-  // Printed slate-teal paper is already color-locked in the baker.
-  // Draw the tile as albedo — a second color crush reads charcoal.
+  // Printed slate-teal: deep #3D5A66 + shelf #4F6E78 + paper grain.
+  if (!grainCanvas) grainCanvas = bakeGrainField(512);
   const size = img ? (img.naturalWidth || img.width || 512) : 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -291,8 +296,24 @@ function bakeOcean(img) {
   ctx.fillStyle = PALETTE.oceanDeep;
   ctx.fillRect(0, 0, size, size);
   if (img) ctx.drawImage(img, 0, 0, size, size);
+  const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.08, size * 0.5, size * 0.5, size * 0.72);
+  shelf.addColorStop(0, PALETTE.oceanShelf);
+  shelf.addColorStop(0.55, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.45));
+  shelf.addColorStop(1, PALETTE.oceanDeep);
+  ctx.globalCompositeOperation = 'soft-light';
+  ctx.globalAlpha = 0.70;
+  ctx.fillStyle = shelf;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  overlayPhoto(ctx, grainCanvas, size, OCEAN_GRAIN, 'overlay');
+  overlayPhoto(ctx, grainCanvas, size, 0.22, 'multiply');
   oceanMap = canvasTex(canvas);
   return oceanMap;
+}
+
+function mixHexCss(a, b, t) {
+  return `#${mixHex(a, b, t).toString(16).padStart(6, '0')}`;
 }
 
 function bakeLandSheet(washHex) {
@@ -332,7 +353,8 @@ export async function loadBoardTextures() {
     loadImage(BOARD_TEX.oceanNormal),
     ...names.map((k) => loadImage(WASH_TEX[k])),
   ]);
-  paperTex = parchment ? imageToTex(parchment, '#C4B896') : bakeParchment(null);
+  if (!grainCanvas) grainCanvas = bakeGrainField(512);
+  paperTex = parchment ? imageToTex(parchment, '#C4B896', grainCanvas) : bakeParchment(null);
   oceanMap = bakeOcean(ocean);
   paperNormal = pN ? imageToTex(pN, '#8080ff', null, { srgb: false }) : null;
   paperAO = pAO ? imageToTex(pAO, '#ffffff', null, { srgb: false }) : null;
@@ -342,7 +364,7 @@ export async function loadBoardTextures() {
   names.forEach((k, i) => {
     const hex = REGION_WASH[k] || PALETTE.landBase;
     // Stack: parchment+grain → continent wash (baked). Faction is a color tint.
-    washMaps.set(k, imageToTex(washes[i], hex));
+    washMaps.set(k, imageToTex(washes[i], hex, grainCanvas));
   });
   return { paperTex, oceanMap, paperNormal, paperAO, oceanNormal };
 }
@@ -392,8 +414,9 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sideHex = mixHex(region, PALETTE.landShadow, 0.45);
   const key = continentKey(territory);
   const sheet = washMaps.get(key) || bakeLandSheet(washHex);
-  // Faction ownership sits ON the continent wash — never 100% replace it.
-  const tint = ownerHex ? mixHex('#ffffff', ownerHex, OWNER_WASH_STRENGTH) : 0xffffff;
+  // Punch continent chroma at runtime so Risk washes still split at 390.
+  const continentTint = mixHex('#ffffff', region, CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: paperNormal || null,
@@ -408,7 +431,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
-  if (top.normalMap) top.normalScale.set(0.82, 0.82);
+  if (top.normalMap) top.normalScale.set(1.15, 1.15);
   const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
     roughness: 0.88,
@@ -440,7 +463,7 @@ export function makeOceanMaterial() {
     envMapIntensity: 0.62,
     transparent: false,
   });
-  if (mat.normalMap) mat.normalScale.set(0.55, 0.55);
+  if (mat.normalMap) mat.normalScale.set(0.78, 0.78);
   return mat;
 }
 

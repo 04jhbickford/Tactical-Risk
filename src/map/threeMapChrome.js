@@ -75,10 +75,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-left:max(12px, env(safe-area-inset-left));
       padding-right:max(12px, env(safe-area-inset-right));
       display:flex; align-items:center; gap:8px;
-      background:rgba(30,36,32,0.58);
-      -webkit-backdrop-filter:blur(28px) saturate(1.2);
-      backdrop-filter:blur(28px) saturate(1.2);
-      border-bottom:1px solid rgba(255,255,255,0.08);
+      background:linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(30,36,32,0.38) 100%);
+      -webkit-backdrop-filter:blur(28px) saturate(1.65);
+      backdrop-filter:blur(28px) saturate(1.65);
+      border-bottom:1px solid rgba(255,255,255,0.22);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);
       color:#E8E2D4;
       pointer-events:none;
     }
@@ -86,15 +87,15 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-menu-btn {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.12);
-      background:rgba(30,36,32,0.55); color:#E8E2D4;
+      background:rgba(255,255,255,0.10); color:#E8E2D4;
       font-size:18px; cursor:pointer;
       -webkit-tap-highlight-color:transparent;
     }
     #three-l0 .three-l0-chip {
       min-height:44px; padding:0 12px; border-radius:999px;
       display:inline-flex; align-items:center; gap:6px;
-      background:rgba(255,255,255,0.06);
-      border:1px solid rgba(232,226,212,0.12);
+      background:rgba(255,255,255,0.10);
+      border:1px solid rgba(255,255,255,0.18);
       font:600 13px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:0.02em;
     }
@@ -122,12 +123,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek {
       display:none; pointer-events:none;
       min-height:44px; padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.62);
-      -webkit-backdrop-filter:blur(28px) saturate(1.2);
-      backdrop-filter:blur(28px) saturate(1.2);
+      background:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(30,36,32,0.42));
+      -webkit-backdrop-filter:blur(28px) saturate(1.65);
+      backdrop-filter:blur(28px) saturate(1.65);
       color:#E8E2D4;
-      border:1px solid rgba(255,255,255,0.08);
-      box-shadow:0 8px 24px rgba(0,0,0,0.35);
+      border:1px solid rgba(255,255,255,0.20);
+      box-shadow:0 8px 24px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.16);
     }
     #three-peek.is-on { display:block; }
     #three-peek strong {
@@ -158,10 +159,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-confirm {
       pointer-events:auto;
       min-height:50px; height:50px; width:100%;
-      border:1px solid rgba(255,255,255,0.08); border-radius:14px;
-      background:rgba(30,36,32,0.72); color:#c5c9d4;
-      -webkit-backdrop-filter:blur(24px) saturate(1.15);
-      backdrop-filter:blur(24px) saturate(1.15);
+      border:1px solid rgba(255,255,255,0.20); border-radius:14px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.16), rgba(30,36,32,0.46)); color:#c5c9d4;
+      -webkit-backdrop-filter:blur(28px) saturate(1.55);
+      backdrop-filter:blur(28px) saturate(1.55);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);
       font:600 17px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:-0.01em;
       cursor:default;
@@ -184,10 +186,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     html.three-spike.has-l2 #three-zoom { display:none; }
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(30,36,32,0.72);
-      -webkit-backdrop-filter:blur(20px);
-      backdrop-filter:blur(20px);
+      border:1px solid rgba(255,255,255,0.22);
+      background:linear-gradient(180deg, rgba(255,255,255,0.14), rgba(30,36,32,0.40));
+      -webkit-backdrop-filter:blur(20px) saturate(1.5);
+      backdrop-filter:blur(20px) saturate(1.5);
       color:#E8E2D4;
       font-size:20px; line-height:1; cursor:pointer;
       -webkit-tap-highlight-color:transparent;
