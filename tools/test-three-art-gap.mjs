@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.12 generated board/units + iPhone pinch + STACK-LOD.
+// V2.81.51-three-polish.13 James texture lock + iPhone pinch + STACK-LOD.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -27,6 +27,7 @@ const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
 const palette = readFileSync(join(root, 'src/map/threeMapPalette.js'), 'utf8');
 const spike = readFileSync(join(root, 'src/map/threeMapSpike.js'), 'utf8');
 const chrome = readFileSync(join(root, 'src/map/threeMapChrome.js'), 'utf8');
+const art = readFileSync(join(root, 'src/map/threeMapArt.js'), 'utf8');
 
 let failures = 0;
 const check = (label, cond) => {
@@ -45,7 +46,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.12', GAME_VERSION === 'V2.81.51-three-polish.12');
+check('GAME_VERSION is V2.81.51-three-polish.13', GAME_VERSION === 'V2.81.51-three-polish.13');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
 check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
@@ -54,6 +55,9 @@ check('generated ocean tile', pngOk('assets/three/board/board-ocean-tile.png'));
 check('generated Europe wash', pngOk('assets/three/board/wash-europe.png'));
 check('generated USSR wash', pngOk('assets/three/board/wash-ussr.png'));
 check('generated Africa wash', pngOk('assets/three/board/wash-africa.png'));
+check('James parchment macro ref', pngOk('briefs/2026-09-17-three-art-gap/refs/board-parchment-macro-tile.png'));
+check('James ocean macro ref', pngOk('briefs/2026-09-17-three-art-gap/refs/board-ocean-print-macro-tile.png'));
+check('James plastic atlas-hi ref', pngOk('briefs/2026-09-17-three-art-gap/refs/units-molded-plastic-atlas-hi.png'));
 check('continent ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-board-continents.png'));
 check('plastic ref on disk', pngOk('briefs/2026-09-17-three-art-gap/refs/aa-plastic-units.png'));
 
@@ -78,6 +82,9 @@ check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
 check('grain strength phone-visible', /GRAIN_STRENGTH = 0\.86/.test(palette));
 check('no greyscale contrastGrain', !/function contrastGrain/.test(palette));
 check('loads generated wash tiles', /WASH_TEX/.test(palette) && /wash-europe\.png/.test(palette));
+check('land lids use wash map not flat side',
+  /const mats = \[materials\.top, materials\.side\]/.test(art)
+  && !/\[materials\.side, materials\.top/.test(art));
 check('select gold only', /select: '#C4A35A'/.test(palette));
 check('no neon teal leftover', !/#00ced1/i.test(palette) && !/#44C5BD/.test(palette));
 
