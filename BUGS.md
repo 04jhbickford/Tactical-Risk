@@ -2,6 +2,25 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.34 (preview only, SCHEMA 11)
+
+Viz love-gate FAIL ~88% on `.33`: mid still was wash+stamp family, not a
+painted-atlas leap (modest absdiff vs `.32`). Inspect had hard-coded
+`paintedAlbedo: true`; stain bake could silently win. Preview `?three=1` only.
+Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Re-painted world albedo** — new printed-board Europe/Asia theaters + biome
+   plates composited through live land polygons into
+   `assets/three/board/world-land-albedo.png` (4096×2340). Soft-light stain OFF.
+2. **Fail-closed bind** — `loadWorldLandAlbedo` throws if the PNG misses or is
+   under 4096. Inspect reports live `albedoBound` / `albedoSize` / `stainFallback`.
+3. **Keep** dissolve China outer-union, no map labels/IPC, mid pip+N, Japan
+   multi-type, Confirm exclusive gold.
+
+SCHEMA 11. GAME_VERSION V2.81.51-three-polish.34.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.33 (preview only, SCHEMA 11)
 
 Locked diagnosis: geography was still a runtime Canvas2D wash, so James kept

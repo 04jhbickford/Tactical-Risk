@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.33 painted world albedo + dissolve select + no map labels.
+// V2.81.51-three-polish.34 painted world albedo leap + dissolve/labels held.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.33', GAME_VERSION === 'V2.81.51-three-polish.33');
+check('GAME_VERSION is V2.81.51-three-polish.34', GAME_VERSION === 'V2.81.51-three-polish.34');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -557,11 +557,13 @@ check('p33 albedo baker is image-gen + polygon clip',
   && /land_mask/.test(albedoBaker)
   && /NOT a copyright scan/.test(albedoBaker)
   && /ATLAS_W = 4096/.test(albedoBaker));
-check('p33 land samples painted albedo, stain is fallback',
+check('p34 land samples painted albedo, stain is OFF',
   /WORLD_LAND_ALBEDO/.test(terrain)
   && /loadWorldLandAlbedo/.test(terrain)
   && /painted atlas is the hero/.test(terrain)
-  && /FALLBACK ONLY/.test(terrain)
+  && /fail closed/.test(terrain)
+  && /stain is OFF/.test(terrain)
+  && /WORLD_LAND_ALBEDO_REV/.test(terrain)
   && /painted albedo is the hero/.test(palette)
   && /emissive: 0x000000/.test(palette));
 check('p33 no permanent name sprites',
@@ -590,11 +592,25 @@ check('p33 dissolve multipolygon select + ink',
     && isleRings.length >= 2);
 }
 check('p33 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P33.md')));
-check('p33 inspect flags painted albedo / dissolve / no labels',
-  /paintedAlbedo: true/.test(spike)
+check('p34 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P34.md')));
+check('p34 printed theater plates on disk',
+  pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-europe-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-asia-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-world-painted.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-plate-forest.png'));
+check('p34 baker composites p34-gen through live masks',
+  /p34-europe-theater/.test(albedoBaker)
+  && /stain is OFF/.test(albedoBaker)
+  && /draw_ridges/.test(albedoBaker)
+  && /alpha=0.90/.test(albedoBaker));
+check('p34 inspect proves albedo bind (not hardcoded true)',
+  /albedoBound/.test(spike)
+  && /getWorldLandTex\(\)/.test(spike)
+  && /stainFallback/.test(spike)
   && /dissolveSelect: true/.test(spike)
   && /noMapLabels: true/.test(spike)
-  && /noBakedIpc: true/.test(spike));
+  && /noBakedIpc: true/.test(spike)
+  && !/paintedAlbedo: true/.test(spike));
 check('p33 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md')));
 check('p33 mid painted board still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/europe-mid-390.png'));
 check('p33 China select no-internal-border still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/china-select-390.png'));
@@ -605,6 +621,30 @@ check('p33 SCORE states painted albedo + dissolve',
   /Painted world albedo/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
   && /Dissolve China select/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
   && /rings=1/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8')));
+check('p34 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p34/SCORE.md')));
+check('p34 mid painted still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/mid-painted.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/europe-mid-390.png'));
+check('p34 mid vs p32 leap stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/mid-vs-p32.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/mid-vs-p32-absdiff.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/asia-mid-vs-p32.png'));
+check('p34 China select hold still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/china-select-390.png'));
+check('p34 Japan near hold still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/near-japan-multitype-390.png'));
+check('p34 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p34/vercel-live-mid-390.png'));
+{
+  const score = readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p34/SCORE.md'), 'utf8');
+  const computed = readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p34/computed.json'), 'utf8');
+  check('p34 SCORE states leap + bound + dissolve',
+    /Painted world albedo leap/.test(score)
+    && /albedoBound/.test(score)
+    && /28\.97/.test(score)
+    && /rings=1/.test(score));
+  check('p34 computed proves live bind',
+    /"albedoBound": true/.test(computed)
+    && /"stainFallback": false/.test(computed)
+    && /4096/.test(computed)
+    && /V2.81.51-three-polish.34/.test(computed));
+}
 
 if (failures) {
   console.error(`\n${failures} failed`);

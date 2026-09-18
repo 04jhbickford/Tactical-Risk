@@ -62,7 +62,7 @@ import {
   makeOverflowTexture,
   loadUnitAtlases,
 } from './threeMapChits.js';
-import { bakeWorldLandAtlas } from './threeMapTerrain.js';
+import { bakeWorldLandAtlas, getWorldLandTex } from './threeMapTerrain.js';
 import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
@@ -1147,6 +1147,14 @@ export async function bootThreeMapSpike() {
     inspect() {
       const mats = pickables[0]?.material;
       const list = Array.isArray(mats) ? mats : [mats];
+      const albedo = getWorldLandTex();
+      const germanyTop = landMats.get('Germany')?.top;
+      const albedoBound = !!(
+        albedo?.userData?.paintedAlbedo
+        && germanyTop?.map === albedo
+        && albedo.image
+        && albedo.image.width >= 4096
+      );
       return {
         name: pickables[0]?.userData?.territory?.name,
         verts: pickables[0]?.geometry?.attributes?.position?.count,
@@ -1201,7 +1209,11 @@ export async function bootThreeMapSpike() {
         selectClear: true,
         liveContinents: true,
         continentCount: continents.length,
-        paintedAlbedo: true,
+        paintedAlbedo: albedoBound,
+        albedoBound,
+        albedoSrc: albedo?.userData?.src || null,
+        albedoSize: albedo?.image ? [albedo.image.width, albedo.image.height] : null,
+        stainFallback: !albedoBound,
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
