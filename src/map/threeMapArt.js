@@ -260,8 +260,8 @@ export function makeLandMesh(territory, materials, height) {
   const geom = new THREE.ExtrudeGeometry(shapes, {
     depth: height,
     bevelEnabled: true,
-    bevelThickness: 0.16,
-    bevelSize: 0.14,
+    bevelThickness: 0.22,
+    bevelSize: 0.20,
     bevelSegments: 2,
     curveSegments: 1,
   });

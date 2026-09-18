@@ -272,7 +272,7 @@ export async function bootThreeMapSpike() {
   const wrapGroups = createWrapGroups(board);
 
   const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.68);
-  const foamMat = makeLineMat(PALETTE.foam, 2.2, 0.46);
+  const foamMat = makeLineMat(PALETTE.foam, 1.15, 0.62);
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
   const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
@@ -432,24 +432,27 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  const hemi = new THREE.HemisphereLight(0xE8E0C8, 0x3D5A66, 0.44);
+  // P25: warmer raking key + cooler fill/hemi so land planes sculpt at mid.
+  // MeshStandard only. No neon. Continent washes stay the chroma, not the light.
+  const hemi = new THREE.HemisphereLight(0xC5D2DC, 0x24343C, 0.26);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFF6E4, 1.22);
-  key.position.set(-78, 64, -28);
+  const key = new THREE.DirectionalLight(0xFFE2B0, 1.68);
+  key.position.set(-110, 42, -40);
+  key.target.position.set(WORLD_W * 0.42, 0, -WORLD_H * 0.38);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x9BB0B8, 0.14);
-  fill.position.set(52, 26, 30);
+  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.28);
+  fill.position.set(72, 18, 44);
   scene.add(fill);
-  const bounce = new THREE.DirectionalLight(0xC4B896, 0.12);
-  bounce.position.set(8, -10, 18);
+  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.07);
+  bounce.position.set(12, -14, 22);
   scene.add(bounce);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 1.02;
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
   renderer.domElement.id = 'threeCanvas';
@@ -607,7 +610,7 @@ export async function bootThreeMapSpike() {
   let lodMode = null;
   let lastSelectForLod = null;
   let selectLiftStarted = 0;
-  const SELECT_LIFT_MS = 120;
+  const SELECT_LIFT_MS = 150;
   const SELECT_LIFT_PX = 3.2;
 
   function setPointerFromEvent(e) {
@@ -780,15 +783,22 @@ export async function bootThreeMapSpike() {
   }
 
   function liftSelected(now) {
-    // P24: one-shot 2–4px / ~120ms settle. No idle bob / yaw spin.
+    // P25: 2–4px lift then micro-settle (overshoot → rest) ≤150ms. No idle bob.
     if (!selectedName) return;
     const t = Math.min(1, (now - selectLiftStarted) / SELECT_LIFT_MS);
-    const eased = 1 - (1 - t) ** 3;
+    const rise = Math.min(1, t / 0.58);
+    const settle = t < 0.58 ? 0 : (t - 0.58) / 0.42;
+    const overshoot = 1.14;
+    const easedRise = 1 - (1 - rise) ** 3;
+    const easedSettle = settle * settle * (3 - 2 * settle);
+    const amp = t < 0.58
+      ? overshoot * easedRise
+      : overshoot + (1 - overshoot) * easedSettle;
     const dist = camera.position.distanceTo(controls.target);
     const h = renderer.domElement.clientHeight || window.innerHeight || 844;
     const lift = worldSizeFromScreen(SELECT_LIFT_PX, dist, camera.fov, h, {
       minPx: 2, maxPx: 4, maxWorld: 1.15, minWorld: 0.16,
-    }) * eased;
+    }) * amp;
     for (const rec of unitRecords) {
       if (rec.territory.name !== selectedName) continue;
       const sprites = [...rec.expanded, rec.pip, rec.overflow].filter((s) => s?.visible);
@@ -1078,6 +1088,9 @@ export async function bootThreeMapSpike() {
         confirmCopy: chrome.confirm.textContent,
         selectLiftMs: SELECT_LIFT_MS,
         moldedOutline: '≥2.5px',
+        keyFill: 'warm-key-cool-fill',
+        parchmentTooth: true,
+        plasticSpec: 'tight-lobe',
       };
     },
   };

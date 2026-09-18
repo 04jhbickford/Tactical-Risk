@@ -1,7 +1,7 @@
 // Injection-molded cream plastic chits for ?three=1. AA-PALETTE / STACK-LOD lock.
 // Face #F0E6D2 + deep bevel + thick dark outline (≥2.5px screen) + faction rim
-// + soft contact AO. Glyphs are recessed INTO the cream — not stamp-on-disc.
-// P22–P24 HARD: mid/far pip = cream token + N ONLY. ZERO type parade.
+// + soft contact AO + glossy toy-plastic specular lobe. Glyphs recessed INTO cream.
+// P22–P25 HARD: mid/far pip = cream token + N ONLY. ZERO type parade.
 // Near = same molded cream + type glyph. Kill grey figurines / atlas soldiers.
 
 import * as THREE from 'three';
@@ -380,19 +380,49 @@ function drawCreamToken(ctx, cx, cy, s, faction) {
   ctx.lineWidth = Math.max(2, s * 0.028);
   ctx.stroke();
 
-  // Tight plastic spec — injection sheen, not a bleached wash.
+  // P25: glossy toy-plastic specular — tight lobe + streak, not matte token.
+  // Keep cream #F0E6D2; do not bleach the face to white.
   ctx.save();
   tokenEllipse(ctx, cx, cy, rx - outlineW * 0.85, ry - outlineW * 0.75);
   ctx.clip();
-  const hi = ctx.createRadialGradient(
-    cx - rx * 0.34, cy - ry * 0.44, s * 0.02,
-    cx - rx * 0.08, cy - ry * 0.10, s * 0.62,
+  const spec = ctx.createRadialGradient(
+    cx - rx * 0.40, cy - ry * 0.50, 0,
+    cx - rx * 0.40, cy - ry * 0.50, s * 0.16,
   );
-  hi.addColorStop(0, 'rgba(255,255,255,0.34)');
-  hi.addColorStop(0.22, 'rgba(255,248,230,0.10)');
-  hi.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = hi;
+  spec.addColorStop(0, 'rgba(255,255,255,0.92)');
+  spec.addColorStop(0.16, 'rgba(255,252,244,0.62)');
+  spec.addColorStop(0.38, 'rgba(255,248,230,0.16)');
+  spec.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = spec;
   ctx.fillRect(cx - s, cy - s, s * 2, s * 2);
+  ctx.save();
+  ctx.translate(cx - rx * 0.34, cy - ry * 0.48);
+  ctx.rotate(-0.42);
+  const streak = ctx.createLinearGradient(-s * 0.24, 0, s * 0.24, 0);
+  streak.addColorStop(0, 'rgba(255,255,255,0)');
+  streak.addColorStop(0.35, 'rgba(255,255,255,0.42)');
+  streak.addColorStop(0.70, 'rgba(255,248,230,0.08)');
+  streak.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.ellipse(0, 0, s * 0.24, s * 0.05, 0, 0, Math.PI * 2);
+  ctx.fillStyle = streak;
+  ctx.fill();
+  ctx.restore();
+  ctx.restore();
+
+  // Cylinder wall catch-light — injection-molded side sheen.
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + side, rx, ry, 0, 0, Math.PI);
+  ctx.ellipse(cx, cy, rx, ry, 0, Math.PI, 0, true);
+  ctx.closePath();
+  ctx.clip();
+  const sideSpec = ctx.createLinearGradient(cx - rx * 0.55, cy, cx - rx * 0.18, cy + side);
+  sideSpec.addColorStop(0, 'rgba(255,255,255,0)');
+  sideSpec.addColorStop(0.45, 'rgba(255,248,230,0.34)');
+  sideSpec.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sideSpec;
+  ctx.fillRect(cx - rx * 0.62, cy - 2, rx * 0.38, side + ry);
   ctx.restore();
 }
 

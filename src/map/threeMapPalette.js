@@ -42,10 +42,10 @@ export const PALETTE = {
   boneText: '#E8E2D4',
   hud: '#1E2420',
   hudInk: '#E8E2D4',
-  sky: '#E8E0C8',
-  ground: '#5A6A58',
-  key: '#FFF6E4',
-  fill: '#D4C8A4',
+  sky: '#C5D2DC',
+  ground: '#24343C',
+  key: '#FFE2B0',
+  fill: '#7E9AAB',
   cream: '#F0E6D2',
 };
 
@@ -96,7 +96,7 @@ export const OWNER_WASH_STRENGTH = 0.18;
 
 export const OCEAN_DEEP = 0x3d5a66;
 export const OCEAN_SHELF = 0x4f6e78;
-export const PAPER_UV = 26;
+export const PAPER_UV = 20;
 const PAPER_UV_SHIFT = {
   Europe: [0.00, 0.00],
   USSR: [0.41, 0.17],
@@ -110,10 +110,11 @@ const PAPER_UV_SHIFT = {
 export const OCEAN_UV = 24;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
-export const GRAIN_MULTIPLY = 0.62;
+export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
-export const OCEAN_GRAIN = 0.46;
-export const OCEAN_OPEN_DARKEN = 0.40;
+export const OCEAN_GRAIN = 0.50;
+export const OCEAN_OPEN_DARKEN = 0.58;
+export const TOOTH_STRENGTH = 0.42;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -207,7 +208,8 @@ function canvasTex(canvas, { srgb = true } = {}) {
   return tex;
 }
 
-// Large-scale cardboard / pulp — designed to read at 390, not 1px speckle.
+// Macro cardboard tooth — mid-frequency fibers that read at 390 arm's-length.
+// Keep features ≥4px in a 512 tile so near does not turn into 1px speckle.
 function bakeGrainField(size = 512) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -216,21 +218,22 @@ function bakeGrainField(size = 512) {
   const img = ctx.createImageData(size, size);
   const d = img.data;
   const blotchPeriod = 7;
-  const fiberPeriod = 22;
+  const fiberPeriod = 18;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const blotch = fbm(x / 74, y / 62, blotchPeriod, 5);
-      const fiber = fbm(x / 14, y / 46, fiberPeriod, 3);
-      const pulp = fbm(x / 28 + 3.1, y / 24 + 1.7, 11, 3);
+      const blotch = fbm(x / 68, y / 56, blotchPeriod, 4);
+      const fiber = fbm(x / 10, y / 36, fiberPeriod, 3);
+      const weave = fbm(x / 7 + 1.3, y / 9 + 0.4, 16, 2);
+      const pulp = fbm(x / 24 + 3.1, y / 20 + 1.7, 11, 3);
       const fleck = wrapHash(x, y, size);
-      let v = 0.50 + blotch * 0.38 + fiber * 0.16 + (pulp - 0.5) * 0.10;
-      if (fleck > 0.992) v += 0.16;
-      if (fleck < 0.012) v -= 0.14;
-      v = Math.max(0.22, Math.min(1, v));
+      let v = 0.46 + blotch * 0.34 + fiber * 0.28 + (weave - 0.5) * 0.22 + (pulp - 0.5) * 0.10;
+      if (fleck > 0.994) v += 0.10;
+      if (fleck < 0.008) v -= 0.08;
+      v = Math.max(0.18, Math.min(1, v));
       const i = (y * size + x) * 4;
-      d[i] = Math.round(210 * v);
-      d[i + 1] = Math.round(196 * v);
-      d[i + 2] = Math.round(150 * v);
+      d[i] = Math.round(214 * v);
+      d[i + 1] = Math.round(198 * v);
+      d[i + 2] = Math.round(148 * v);
       d[i + 3] = 255;
     }
   }
@@ -258,10 +261,11 @@ function bakeParchment(img) {
   ctx.fillRect(0, 0, size, size);
   ctx.drawImage(grainCanvas, 0, 0);
   overlayPhoto(ctx, img, size, GRAIN_STRENGTH, 'overlay');
-  overlayPhoto(ctx, img, size, 0.36, 'multiply');
-  // P1: keep paper tooth at 390 — high-frequency fiber after blotch flatten.
-  overlayPhoto(ctx, grainCanvas, size, 0.34, 'soft-light');
-  overlayPhoto(ctx, grainCanvas, size, 0.16, 'multiply');
+  overlayPhoto(ctx, img, size, 0.40, 'multiply');
+  // P25: macro paper tooth at 390 mid — punch fiber, not 1px speckle.
+  overlayPhoto(ctx, grainCanvas, size, 0.48, 'soft-light');
+  overlayPhoto(ctx, grainCanvas, size, TOOTH_STRENGTH, 'overlay');
+  overlayPhoto(ctx, grainCanvas, size, 0.22, 'multiply');
   paperTex = canvasTex(canvas);
   return paperTex;
 }
@@ -279,8 +283,11 @@ function imageToTex(img, fallbackHex, grainImg = null, { srgb = true } = {}) {
     ctx.globalCompositeOperation = 'overlay';
     ctx.globalAlpha = GRAIN_STRENGTH;
     ctx.drawImage(grainImg, 0, 0, size, size);
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.globalAlpha = 0.46;
+    ctx.drawImage(grainImg, 0, 0, size, size);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = 0.34;
+    ctx.globalAlpha = 0.40;
     ctx.drawImage(grainImg, 0, 0, size, size);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -301,11 +308,11 @@ function bakeOcean(img) {
   if (img) ctx.drawImage(img, 0, 0, size, size);
   const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.06, size * 0.5, size * 0.5, size * 0.92);
   shelf.addColorStop(0, PALETTE.oceanShelf);
-  shelf.addColorStop(0.42, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.38));
-  shelf.addColorStop(0.78, PALETTE.oceanDeep);
-  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#1E3238', 0.42));
+  shelf.addColorStop(0.36, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.46));
+  shelf.addColorStop(0.68, PALETTE.oceanDeep);
+  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#152428', 0.62));
   ctx.globalCompositeOperation = 'soft-light';
-  ctx.globalAlpha = 0.82;
+  ctx.globalAlpha = 0.90;
   ctx.fillStyle = shelf;
   ctx.fillRect(0, 0, size, size);
   ctx.globalAlpha = 1;
@@ -333,8 +340,9 @@ function bakeLandSheet(washHex) {
   ctx.fillRect(0, 0, size, size);
   // Punch: overlay + multiply of large-scale cardboard. Must read at 390.
   overlayPhoto(ctx, grainCanvas, size, GRAIN_STRENGTH, 'overlay');
-  overlayPhoto(ctx, grainCanvas, size, 0.56, 'multiply');
-  if (paperTex?.image) overlayPhoto(ctx, paperTex.image, size, 0.48, 'soft-light');
+  overlayPhoto(ctx, grainCanvas, size, 0.58, 'multiply');
+  overlayPhoto(ctx, grainCanvas, size, TOOTH_STRENGTH, 'soft-light');
+  if (paperTex?.image) overlayPhoto(ctx, paperTex.image, size, 0.52, 'soft-light');
   const tex = canvasTex(canvas);
   landSheets.set(key, tex);
   return tex;
@@ -427,18 +435,18 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     aoMap: paperAO || null,
     aoMapIntensity: paperAO ? 1.08 : 0,
     color: tint,
-    roughness: 0.82,
+    roughness: 0.76,
     metalness: 0.0,
-    envMapIntensity: 0.24,
+    envMapIntensity: 0.20,
     transparent: false,
     side: THREE.DoubleSide,
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
-  if (top.normalMap) top.normalScale.set(1.55, 1.55);
+  if (top.normalMap) top.normalScale.set(2.05, 2.05);
   const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
-    roughness: 0.86,
+    roughness: 0.84,
     metalness: 0.0,
     envMapIntensity: 0.18,
     transparent: false,
@@ -463,9 +471,9 @@ export function makeOceanMaterial() {
     map: oceanMap,
     normalMap: oceanNormal || null,
     color: 0xffffff,
-    roughness: 0.46,
-    metalness: 0.12,
-    envMapIntensity: 0.48,
+    roughness: 0.40,
+    metalness: 0.14,
+    envMapIntensity: 0.42,
     transparent: false,
     vertexColors: true,
   });
@@ -501,7 +509,7 @@ export function makeOceanMesh(width, height) {
   for (let i = 0; i < pos.count; i++) {
     if (uv) uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
-    const t = Math.min(1, Math.max(0, (d - 48) / 170));
+    const t = Math.min(1, Math.max(0, (d - 36) / 150));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
     colors[i * 3] = shade;
     colors[i * 3 + 1] = shade * 0.98;
