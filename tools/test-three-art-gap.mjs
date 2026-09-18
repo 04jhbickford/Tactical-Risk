@@ -248,6 +248,12 @@ check('p22 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/eu
 check('p22 mid HUD 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-hud-390.png'));
 check('p22 near select 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-near-select-390.png'));
 check('p22 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/vercel-live-mid-390.png'));
+check('p23 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p23/europe-mid-390.png'));
+check('p23 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p23/europe-mid-hud-390.png'));
+check('p23 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p23/europe-near-select-390.png'));
+check('p23 near units closeup still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p23/europe-near-units-390.png'));
+check('p23 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p23/vercel-live-mid-390.png'));
+check('p23 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p23/SCORE.md')));
 
 if (failures) {
   console.error(`\n${failures} failed`);
