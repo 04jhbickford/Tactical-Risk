@@ -273,6 +273,11 @@ check('PLACE phase chip is quiet frost, never Confirm gold',
   && /PLACE must never wear Confirm gold/.test(chrome)
   && /#three-l0 \.three-l0-chip \{[\s\S]*?background:rgba\(30,36,32,0\.42\)/.test(chrome)
   && !/#three-phase[\s\S]{0,80}#C4A35A/.test(chrome));
+check('chrome gold fill is Confirm-only (no sheet/zoom/PLACE mustard)',
+  /#three-confirm\.is-ready:not\(:disabled\):not\(\.is-idle\) \{[\s\S]*?background:#C4A35A/.test(chrome)
+  && !/rgba\(196,163,90/.test(chrome)
+  && /P26: sheet hairline is quiet frost/.test(chrome)
+  && (chrome.match(/background:#C4A35A/g) || []).length === 1);
 check('chrome slate-teal page bg', /#3D5A66/.test(chrome));
 check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',

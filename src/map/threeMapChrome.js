@@ -220,7 +220,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       -webkit-backdrop-filter:blur(28px);
       backdrop-filter:blur(28px);
       color:#E8E2D4;
-      border-top:1px solid rgba(196,163,90,0.35);
+      /* P26: sheet hairline is quiet frost. Gold stays Confirm + select ring. */
+      border-top:1px solid rgba(255,255,255,0.12);
       border-radius:24px 24px 0 0;
     }
     #three-sheet.is-open { display:block; }

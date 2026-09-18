@@ -11,6 +11,7 @@ Local + live 390 stills in this folder. Fail-closed: idle CTA is **not** gold; z
 | Gold / `--cta-confirm` only on named Confirm | **PASS** | `Confirm: Germany` is `rgb(196, 163, 90)` / `#C4A35A` after select. `.is-ready:not(:disabled):not(.is-idle)` is the only gold fill. Select land ring stays gold. |
 | Zoom chrome quiet frost, never mustard | **PASS** | `+` `−` `Fit` computed `rgba(30, 36, 32, 0.62)` local + live. No white→parchment gradient. Not `#C4A35A`. |
 | PLACE chip quiet frost, never Confirm gold | **PASS** | `#three-phase` computed `rgba(30, 36, 32, 0.42)`. Same L0-family frost as seat/IPC. Viz fold-in. |
+| All other chrome quiet (no mustard leak) | **PASS** | Zoom + PLACE + L0 chips + L2 sheet hairline are frost/neutral. `#C4A35A` fill lives only on `.is-ready` Confirm. Select ring stays gold on the board. |
 | Mid = one cream pip + N ONLY | **PASS** | Cream tokens + N. No soldiers, ships, tanks, or type glyphs at mid. `paintPip` `glyph:null`. |
 | App Store glance @390 | **PASS** | Board dominates; L0 is a fade, not a slab; zoom recedes; idle CTA dark; Confirm exclusive gold when staged. Density/safe-area tightened (10–14px). No new chrome. |
 
