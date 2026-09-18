@@ -38,9 +38,10 @@ import {
   makeCoastShelfMeshes,
   addRiverLines,
   addSeaLaneLines,
+  addSeaZoneInk,
   makeSeaWaterMeshes,
 } from './threeMapArt.js';
-import { territoryOutlineRings } from './threeMapOutline.js';
+import { territoryOutlineRings, waterOutlineRings } from './threeMapOutline.js';
 import {
   PALETTE,
   FACTION_WASH,
@@ -321,7 +322,8 @@ export async function bootThreeMapSpike() {
     dashSize: 5.4,
     gapSize: 7.2,
   });
-  lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, ...continentMats.values());
+  const seaInkMat = makeLineMat('#5A4E3C', 1.55, 0.46);
+  lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, seaInkMat, ...continentMats.values());
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
@@ -381,6 +383,7 @@ export async function bootThreeMapSpike() {
         group.add(sea);
         pickables.push(sea);
       }
+      addSeaZoneInk(group, water, seaInkMat, 0.07);
     }
     addRiverLines(group, riverMat, 0.28);
     addSeaLaneLines(group, territories.filter((t) => t.isWater), seaLaneMat, 0.05);
@@ -408,14 +411,15 @@ export async function bootThreeMapSpike() {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
-          depthTest: !!t.isWater,
+          // P37: never depth-test against Italy's lid or the peek sheet.
+          depthTest: false,
           depthWrite: false,
           toneMapped: false,
         }));
         sprite.center.set(0.5, 0.16);
         sprite.scale.set(5.5, 5.5, 1);
         sprite.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
-        sprite.renderOrder = t.isWater ? 32 : 24;
+        sprite.renderOrder = t.isWater ? 36 : 24;
         sprite.userData.territory = t;
         sprite.userData.unitType = stack.type;
         sprite.userData.kind = 'chit';
@@ -428,14 +432,14 @@ export async function bootThreeMapSpike() {
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
-        depthTest: !!t.isWater,
+        depthTest: false,
         depthWrite: false,
         toneMapped: false,
       }));
       pip.center.set(0.5, 0.16);
       pip.scale.set(6.4, 6.4, 1);
       pip.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
-      pip.renderOrder = t.isWater ? 33 : 25;
+      pip.renderOrder = t.isWater ? 37 : 25;
       pip.userData.territory = t;
       pip.userData.kind = 'pip';
       pip.visible = false;
@@ -444,14 +448,14 @@ export async function bootThreeMapSpike() {
       const overflow = new THREE.Sprite(new THREE.SpriteMaterial({
         map: overflowTexture(1),
         transparent: true,
-        depthTest: !!t.isWater,
+        depthTest: false,
         depthWrite: false,
         toneMapped: false,
       }));
       overflow.center.set(0.5, 0.16);
       overflow.scale.set(4.2, 4.2, 1);
       overflow.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
-      overflow.renderOrder = t.isWater ? 33 : 25;
+      overflow.renderOrder = t.isWater ? 37 : 25;
       overflow.userData.territory = t;
       overflow.userData.kind = 'overflow';
       overflow.visible = false;
@@ -755,8 +759,11 @@ export async function bootThreeMapSpike() {
           selectInk.push(wash);
         }
       }
-      for (const poly of territoryOutlineRings(territory)) {
-        const ring = simplifyRing(poly, 0.28);
+      const rings = water
+        ? waterOutlineRings(territory)
+        : territoryOutlineRings(territory);
+      for (const poly of rings) {
+        const ring = simplifyRing(poly, water ? 0.85 : 0.28);
         if (!ring) continue;
         const halo = makeBorderLine(ring, y, selectHaloMat);
         halo.renderOrder = 9;
@@ -1175,6 +1182,53 @@ export async function bootThreeMapSpike() {
         pin: c,
       };
     },
+    frameAustralia(opts = {}) {
+      const land = lands.find((t) => t.name === 'Australia');
+      const c = land && territoryCenter(land);
+      if (!c) return false;
+      const p = worldToScene(c.x, c.y);
+      camera.position.set(p.x, opts.lift ?? 168, p.z - (opts.south ?? 22));
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      syncDensity();
+      return currentBand();
+    },
+    frameAfrica(opts = {}) {
+      const land = lands.find((t) => t.name === 'Belgian Congo')
+        || lands.find((t) => t.name === 'Congo')
+        || lands.find((t) => t.name === 'French Equatorial Africa');
+      const c = land && territoryCenter(land);
+      if (!c) return false;
+      const p = worldToScene(c.x, c.y);
+      camera.position.set(p.x, opts.lift ?? 198, p.z - (opts.south ?? 28));
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      syncDensity();
+      return currentBand();
+    },
+    frameCentralMed(opts = {}) {
+      const pin = SEA_ZONE_CENTERS['Central Mediteranean Sea Zone'];
+      if (!pin) return false;
+      const p = worldToScene(pin.x, pin.y);
+      camera.position.set(p.x, opts.lift ?? 78, p.z - (opts.south ?? 9));
+      controls.target.set(p.x, 1.2, p.z);
+      applyZoomCap();
+      controls.update();
+      window.__threeSpike.selectLand('Central Mediteranean Sea Zone');
+      syncDensity();
+      const rec = unitRecords.find((r) => r.territory.name === 'Central Mediteranean Sea Zone');
+      const italyH = landHeights.get('South Europe') || 0;
+      return {
+        band: currentBand(),
+        deck: rec?.height ?? null,
+        italyHeight: italyH,
+        shipsAboveItaly: !!(rec && rec.height > italyH + 0.4),
+        pin,
+        rings: waterOutlineRings(territories.find((t) => t.name === 'Central Mediteranean Sea Zone')).length,
+      };
+    },
     frameChina(opts = {}) {
       const land = lands.find((t) => t.name === 'China');
       const c = land && territoryCenter(land);
@@ -1226,7 +1280,7 @@ export async function bootThreeMapSpike() {
         europeNorthOnScreen,
         ukWestOfGermany,
         westEuropeWestOfGermany,
-        waterInk: false,
+        waterInk: true,
         foam: true,
         bevel: true,
         landSeal: true,
@@ -1281,11 +1335,17 @@ export async function bootThreeMapSpike() {
         eastMedPinSouth: true,
         noBlotchAtlas: true,
         albedoRev: albedo?.userData?.rev || null,
-        imhofRelief: !!(albedoBound && albedo?.userData?.imhofRelief),
+        imhofRelief: false,
+        watercolorParchment: !!(albedoBound && albedo?.userData?.watercolorParchment),
+        styleRef: albedo?.userData?.styleRef || null,
+        featheredJoins: !!(albedoBound && albedo?.userData?.featheredJoins),
+        evenLighting: !!(albedoBound && albedo?.userData?.evenLighting),
         landcoverBound: !!(albedoBound && albedo?.userData?.landcoverBound),
         canvasTooth: !!(albedoBound && albedo?.userData?.canvasTooth),
         paintedRelief: albedoBound,
         normalBound: !!getWorldLandNormal(),
+        unitBgUnified: true,
+        seaInkClosedRings: true,
       };
     },
   };

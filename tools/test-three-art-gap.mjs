@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.36 Imhof painted albedo + .35 war overlay holds.
+// V2.81.51-three-polish.37 STYLE REF watercolor + .36 war overlay holds.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.36', GAME_VERSION === 'V2.81.51-three-polish.36');
+check('GAME_VERSION is V2.81.51-three-polish.37', GAME_VERSION === 'V2.81.51-three-polish.37');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -93,7 +93,7 @@ check('mid pip stays cream token (not a mini parade)',
   && !/paintMoldedMini/.test(chits.slice(chits.indexOf('export function paintPip'))));
 check('near/tray uses molded plastic minis, not glyph-on-disc',
   /paintMoldedMini/.test(chits)
-  && /units-land-minis\.png/.test(chits)
+  && /units-land-plastic\.png/.test(chits)
   && /faction-tinted molded plastic/.test(chits)
   && /paintPiece[\s\S]*paintMoldedMini/.test(chits)
   && !/paintPiece[\s\S]{0,80}paintCreamChit/.test(chits));
@@ -144,7 +144,7 @@ check('ownership wash 15-22%', /OWNER_WASH_STRENGTH = 0\.18/.test(palette));
 check('faction wash SU/DE/UK/US/JP',
   /#8B3A3A/.test(palette) && /#5A5A52/.test(palette) && /#4A5C7A/.test(palette)
   && /#5C6B4A/.test(palette) && /#8A6B3A/.test(palette));
-check('ocean slate-teal AA-PALETTE', /oceanDeep: '#3D5A66'/.test(palette) && /oceanShelf: '#4F6E78'/.test(palette));
+check('ocean pale washed STYLE REF', /oceanDeep: '#A8B6B0'/.test(palette) && /oceanShelf: '#B8C4BC'/.test(palette));
 check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
 check('baked wash is albedo not 14% flatten',
   /imageToTex\(washes\[i\]/.test(palette) && !/GRAIN_MULTIPLY = 0\.14/.test(palette));
@@ -200,7 +200,7 @@ check('lod tooth is loud mid / clean near',
 check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
 check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
 check('soft coast AO band', /makeCoastAoMeshes/.test(art) && /makeCoastAoMeshes/.test(spike));
-check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.38/.test(palette) && /vertexColors/.test(palette));
+check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.16/.test(palette) && /vertexColors/.test(palette));
 check('foam coast is a hairline', /makeLineMat\(PALETTE\.foam, 1\.15/.test(spike));
 check('select stack lift 2-4px / 150ms micro-settle',
   /liftSelected/.test(spike)
@@ -306,7 +306,7 @@ check('chrome gold fill is Confirm-only (no sheet/zoom/PLACE mustard)',
   && !/rgba\(196,163,90/.test(chrome)
   && /P26: sheet hairline is quiet frost/.test(chrome)
   && (chrome.match(/background:#C4A35A/g) || []).length === 1);
-check('chrome slate-teal page bg', /#3D5A66/.test(chrome));
+check('chrome pale parchment-sea page bg', /#C4C8B8/.test(chrome));
 check('zoom clears peek (has-l1)', /has-l1 #three-zoom/.test(chrome));
 check('chrome peek is icon row not telegraph',
   /three-peek-unit/.test(chrome) && /pieceIconDataUrl/.test(chrome)
@@ -468,11 +468,11 @@ check('p31 live Risk bonus continents, no USSR remap',
   && !/if \(USSR_LANDS\.has\(territory\.name\)\) return REGION_WASH\.USSR/.test(terrain)
   && /CONTINENT_BADGES/.test(terrain)
   && /addTerritoryInk\(group, land, landBorderMat, height \+ 0\.05, continentMats/.test(spike));
-check('p31 units never depth-clipped by map',
-  /depthTest: !!t\.isWater/.test(spike)
+check('p37 units never depth-clipped by map or sheet',
+  /depthTest: false/.test(spike)
   && /sprite\.center\.set\(0\.5, 0\.16\)/.test(spike)
   && /polygonOffsetFactor = 4\.5/.test(art)
-  && /renderOrder = t\.isWater \? 32 : 24/.test(spike));
+  && /renderOrder = t\.isWater \? 36 : 24/.test(spike));
 check('p31 Japan / multi-type footprint LOD',
   DENSE_LANDS.has('Japan')
   && isSmallLand('Japan', { min: 286 })
@@ -554,7 +554,7 @@ check('p33 painted world albedo on disk (4096+)', (() => {
   return w >= 4096 && h >= 2048;
 })());
 check('p33 albedo baker is image-gen + polygon clip',
-  /world-painted\.png/.test(albedoBaker)
+  /p37-world-watercolor\.png/.test(albedoBaker)
   && /land_mask/.test(albedoBaker)
   && /NOT a copyright scan/.test(albedoBaker)
   && /ATLAS_W = 4096/.test(albedoBaker));
@@ -599,11 +599,11 @@ check('p34 printed theater plates on disk',
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-asia-theater.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-world-painted.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p34-gen/p34-plate-forest.png'));
-check('p36 baker composites p36-gen through live masks',
-  /p36-europe-theater/.test(albedoBaker)
+check('p37 baker composites STYLE REF through live masks',
+  /p37-oceania-style-lock/.test(albedoBaker)
+  && /paste_through_mask/.test(albedoBaker)
   && /stain is OFF/.test(albedoBaker)
-  && /imhof_height/.test(albedoBaker)
-  && /alpha=0\.84/.test(albedoBaker));
+  && /never a rectangular alpha/.test(albedoBaker));
 check('p34 inspect proves albedo bind (not hardcoded true)',
   /albedoBound/.test(spike)
   && /getWorldLandTex\(\)/.test(spike)
@@ -654,21 +654,20 @@ check('p35 required stills held',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/east-med-select-no-clip.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/china-select-hold.png'));
 check('p36 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P36.md')));
-check('p36 albedo rev is p36', /WORLD_LAND_ALBEDO_REV = 'p36'/.test(terrain));
-check('p36 painted albedo stays bound (not stain fallback)',
+check('p37 albedo rev is p37', /WORLD_LAND_ALBEDO_REV = 'p37'/.test(terrain));
+check('p37 painted albedo stays bound (not stain fallback)',
   /WORLD_LAND_ALBEDO/.test(terrain)
   && /loadWorldLandAlbedo/.test(terrain)
   && /stain is OFF/.test(terrain)
   && /color: tint/.test(palette)
-  && /imhofRelief/.test(spike)
+  && /watercolorParchment/.test(spike)
   && !/world \? 0 : CONTINENT_CHROMA_PUNCH/.test(palette));
-check('p36 no IPC baked; plates are hero',
-  /no IPC \/ \+N baked/.test(albedoBaker)
-  && /kill_blotches/.test(albedoBaker)
-  && /feather_box/.test(albedoBaker)
-  && /imhof_height/.test(albedoBaker)
+check('p37 no IPC baked; watercolor plates are hero',
+  /kill_blotches/.test(albedoBaker)
+  && /paste_through_mask/.test(albedoBaker)
+  && /even_land_luma/.test(albedoBaker)
   && /grade_chroma/.test(albedoBaker)
-  && /alpha=0\.84/.test(albedoBaker)
+  && /amount=0\.06/.test(albedoBaker)
   && !/img = draw_badges/.test(albedoBaker));
 check('p35 ocean stays teal, not parchment grain',
   /OCEAN_GRAIN = 0\.14/.test(palette)
@@ -721,6 +720,35 @@ check('p36 SCORE states Layer A + Layer B',
   && /albedoBound/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
   && /stainFallback/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8'))
   && /shipsAboveItaly/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p36/SCORE.md'), 'utf8')));
+
+check('p37 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P37.md')));
+check('p37 STYLE REF plates on disk',
+  pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-oceania-style-lock.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-world-watercolor.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-europe-africa-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-asia-continent.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-ocean-wash-tile.png'));
+check('p37 sea-zone ink is closed water rings',
+  /waterOutlineRings/.test(outlineSrc)
+  && /addSeaZoneInk/.test(art)
+  && /addSeaZoneInk/.test(spike)
+  && /sea-ink/.test(art)
+  && /waterInk: true/.test(spike)
+  && /Kill centroid-sized dots/.test(outlineSrc));
+check('p37 unit backgrounds unified (bare plastic)',
+  /keyBackdrop/.test(chits)
+  && /units-land-plastic\.png/.test(chits)
+  && /units-naval-plastic\.png/.test(chits)
+  && /unitBgUnified: true/.test(spike));
+check('p37 Med ships stay above Italy and unclipped',
+  /frameCentralMed/.test(spike)
+  && /frameAustralia/.test(spike)
+  && /depthTest: false/.test(spike)
+  && /renderOrder = t\.isWater \? 36 : 24/.test(spike));
+check('p37 Confirm gold + China hold stay',
+  /#three-confirm\.is-ready:not\(:disabled\):not\(\.is-idle\) \{[\s\S]*?background:#C4A35A/.test(chrome)
+  && /outer union only/.test(art)
+  && /noMapLabels: true/.test(spike));
 
 if (failures) {
   console.error(`\n${failures} failed`);

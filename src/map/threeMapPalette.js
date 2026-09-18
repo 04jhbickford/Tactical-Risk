@@ -28,11 +28,11 @@ export const PALETTE = {
   landGrain: '#B7AA82',
   landInk: '#3A3428',
   landBevel: '#8A7A58',
-  // AA-PALETTE slate-teal — printed A&A sea, not charcoal noise.
-  oceanDeep: '#3D5A66',
-  oceanShelf: '#4F6E78',
-  oceanReef: '#7AADB0',
-  oceanFog: '#3D5A66',
+  // P37 STYLE REF: pale washed watercolor sea, not slate-teal.
+  oceanDeep: '#A8B6B0',
+  oceanShelf: '#B8C4BC',
+  oceanReef: '#C4D0C6',
+  oceanFog: '#A8B6B0',
   foam: '#D9D2C0',
   border: '#3A3428',
   waterHair: '#3A3428',
@@ -111,8 +111,8 @@ export const FACTION_WASH = {
 };
 export const OWNER_WASH_STRENGTH = 0.18;
 
-export const OCEAN_DEEP = 0x3d5a66;
-export const OCEAN_SHELF = 0x4f6e78;
+export const OCEAN_DEEP = 0xa8b6b0;
+export const OCEAN_SHELF = 0xb8c4bc;
 export const PAPER_UV = 20;
 const PAPER_UV_SHIFT = {
   Europe: [0.00, 0.00],
@@ -131,8 +131,8 @@ export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 // P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
 export const OCEAN_GRAIN = 0.14;
-export const OCEAN_OPEN_DARKEN = 0.38;
-export const OCEAN_TEAL_PUNCH = 0.58;
+export const OCEAN_OPEN_DARKEN = 0.16;
+export const OCEAN_TEAL_PUNCH = 0.18;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
@@ -337,7 +337,7 @@ function imageToTex(img, fallbackHex, grainImg = null, { srgb = true } = {}) {
 }
 
 function bakeOcean(img) {
-  // Printed slate-teal: deep #3D5A66 + shelf #4F6E78 + paper grain.
+  // P37 STYLE REF: pale washed parchment sea. Never slate-teal candy.
   if (!grainCanvas) grainCanvas = bakeGrainField(512);
   const size = img ? (img.naturalWidth || img.width || 512) : 512;
   const canvas = document.createElement('canvas');
@@ -352,7 +352,7 @@ function bakeOcean(img) {
   shelf.addColorStop(0.22, PALETTE.oceanShelf);
   shelf.addColorStop(0.52, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.40));
   shelf.addColorStop(0.78, PALETTE.oceanDeep);
-  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#152428', 0.62));
+  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#8A9A92', 0.28));
   ctx.globalCompositeOperation = 'soft-light';
   ctx.globalAlpha = 0.90;
   ctx.fillStyle = shelf;
@@ -528,7 +528,7 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0x6e8c94,
+    color: 0xb4c4bc,
     roughness: 0.46,
     metalness: 0.10,
     envMapIntensity: 0.28,
@@ -541,9 +541,9 @@ export function makeOceanMaterial() {
 
 export function makeSeaWaterMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0x2f4c56,
+    color: 0xa8b8b0,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.28,
     roughness: 0.52,
     metalness: 0.08,
     depthWrite: false,
@@ -587,9 +587,9 @@ export function makeOceanMesh(width, height) {
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
     // P35: keep the whole basin teal — shelf brightening made Med look like land.
-    colors[i * 3] = shade * 0.52;
-    colors[i * 3 + 1] = shade * 0.68;
-    colors[i * 3 + 2] = shade * 0.72;
+    colors[i * 3] = shade * 0.78;
+    colors[i * 3 + 1] = shade * 0.84;
+    colors[i * 3 + 2] = shade * 0.82;
   }
   if (uv) {
     uv.needsUpdate = true;

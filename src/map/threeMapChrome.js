@@ -52,7 +52,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
-      background:#3D5A66; overflow:hidden;
+      background:#C4C8B8; overflow:hidden;
       font-family:-apple-system,"SF Pro Text","SF Pro Display","Segoe UI",sans-serif;
       -webkit-font-smoothing:antialiased;
     }
@@ -129,7 +129,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       padding-right:max(14px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;
       pointer-events:none;
-      background:linear-gradient(0deg, rgba(30,36,32,0.42) 0%, transparent 70%);
+      background:linear-gradient(0deg, rgba(30,36,32,0.22) 0%, transparent 52%);
     }
     #three-peek {
       display:none; pointer-events:none;

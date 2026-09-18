@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""P36: bake a UV-aligned painted world land albedo.
+"""P37: bake a UV-aligned watercolor-parchment world land albedo.
 
 Layout is the live map (3500×2000) so applyWorldLandUVs sample 1:1.
-Hero art is image-gen printed-board plates (Imhof relief + landcover masses
-+ parchment tooth), composited through territory polygon masks.
-Soft-light stain is OFF (invisible residual only).
+Hero art is STYLE REF watercolor plates (Oceania parchment lock),
+composited through live territory masks with feathered joins.
+NO rectangular paste boxes. Soft-light stain is OFF.
 NOT a copyright scan. NOT a runtime fillStain wash.
 
 Usage:
@@ -23,14 +23,16 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'data' / 'territories.json'
 CONTINENTS = ROOT / 'data' / 'continents.json'
 BOARD = ROOT / 'assets' / 'three' / 'board'
+GEN37 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p37-gen'
 GEN36 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p36-gen'
 GEN34 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p34-gen'
 GEN33 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p33-gen'
-OUT_GUIDE = GEN36 / 'world-land-guide.png'
+OUT_GUIDE = GEN37 / 'world-land-guide.png'
 OUT_ATLAS = BOARD / 'world-land-albedo.png'
 OUT_NORMAL = BOARD / 'world-land-normal.png'
 OUT_AO = BOARD / 'world-land-ao.png'
-OUT_HEIGHT = GEN36 / 'world-land-height.png'
+OUT_HEIGHT = GEN37 / 'world-land-height.png'
+OUT_OCEAN = BOARD / 'board-ocean-tile.png'
 
 MAP_W, MAP_H = 3500, 2000
 ATLAS_W = 4096
@@ -101,8 +103,10 @@ BADGES = [
     {'name': 'South America', 'bonus': 12, 'x': 292, 'y': 1476},
     {'name': 'Oceania', 'bonus': 39, 'x': 2472, 'y': 1284},
 ]
-PARCHMENT = (0xC4, 0xB8, 0x96)
-OCEAN = (0x3D, 0x5A, 0x66)
+PARCHMENT = (0xC8, 0xB8, 0x96)
+OCEAN = (0xB8, 0xC4, 0xBE)
+STYLE_TARGET = (198, 180, 148)
+LAND_LUMA_TARGET = 172.0
 
 
 def load_lands():
@@ -306,6 +310,7 @@ def first_existing(*paths: Path) -> Path | None:
 
 
 def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y0, x1, y1, w, h, alpha=0.38):
+    # Kept for --guide diagnostics. P37 atlas never uses rectangular feather boxes.
     rx0, ry0 = int(wx(x0, w)), int(wy(y0, h))
     rx1, ry1 = int(wx(x1, w)), int(wy(y1, h))
     box = (rx0, ry0, rx1, ry1)
@@ -315,6 +320,104 @@ def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y
     local = ImageChops.multiply(mask.crop(box), feather_box(w, h, rx0, ry0, rx1, ry1, 70).crop(box))
     img.paste(Image.composite(mixed, region, local), box)
     return img
+
+
+def match_parchment(img: Image.Image, target=STYLE_TARGET, amount=0.12) -> Image.Image:
+    """Quiet mean shift so theater joins share a family. Keep watercolor chroma."""
+    try:
+        import numpy as np
+    except ImportError:
+        return img
+    arr = np.asarray(img, dtype=np.float32)
+    mean = arr.reshape(-1, 3).mean(axis=0)
+    tgt = np.array(target, dtype=np.float32)
+    shifted = arr + (tgt - mean) * amount
+    return Image.fromarray(np.clip(shifted, 0, 255).astype('uint8'), 'RGB')
+
+
+def even_land_luma(img: Image.Image, land: Image.Image, target=LAND_LUMA_TARGET, amount=0.28) -> Image.Image:
+    """Even lighting. Lift only crushed voids — do not flatten watercolor."""
+    try:
+        import numpy as np
+    except ImportError:
+        return img
+    arr = np.asarray(img, dtype=np.float32)
+    m = (np.asarray(land) > 8)
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    lift = np.clip((target - yv) / max(1.0, target), 0, 1) * amount
+    lift = np.where(m & (yv < target - 8), lift, 0.0)
+    parchment = np.array(STYLE_TARGET, dtype=np.float32)
+    arr = arr + (parchment - arr) * lift[..., None]
+    return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
+
+
+def tileable_paper(src: Image.Image, size=768) -> Image.Image:
+    """Crop vignette edges, then blend seams. A worn-edge tile becomes a plate grid."""
+    w, h = src.size
+    inset = int(min(w, h) * 0.12)
+    cropped = src.crop((inset, inset, w - inset, h - inset)).resize((size, size), Image.Resampling.LANCZOS)
+    try:
+        import numpy as np
+        arr = np.array(cropped, dtype=np.float32)
+        blend = 72
+        out = arr.copy()
+        for i in range(blend):
+            t = (i + 1) / (blend + 1)
+            out[i] = out[i] * t + out[size - blend + i] * (1 - t)
+            out[size - blend + i] = out[i]
+            out[:, i] = out[:, i] * t + out[:, size - blend + i] * (1 - t)
+            out[:, size - blend + i] = out[:, i]
+        return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+    except ImportError:
+        return cropped
+
+
+def match_to_region(plate: Image.Image, dest: Image.Image, mask: Image.Image) -> Image.Image:
+    """Shift plate mean to the destination land mean so a box cannot flash."""
+    try:
+        import numpy as np
+    except ImportError:
+        return plate
+    parr = np.asarray(plate, dtype=np.float32)
+    darr = np.asarray(dest, dtype=np.float32)
+    m = np.asarray(mask) > 12
+    if int(m.sum()) < 80:
+        return plate
+    src_mean = parr.reshape(-1, 3).mean(axis=0)
+    dst_mean = darr[m].mean(axis=0)
+    dst_chroma = float(dst_mean.max() - dst_mean.min())
+    if dst_chroma < 14:
+        return plate
+    return Image.fromarray(np.clip(parr + (dst_mean - src_mean) * 0.40, 0, 255).astype('uint8'), 'RGB')
+
+
+def paste_through_mask(img, plate, mask, dest_uv, src_frac, w, h, alpha=0.78, blur=56):
+    """Place a plate into game UV. Alpha is the live land/continent mask only.
+
+    dest_uv is positioning. It is never a rectangular alpha — that was the
+    Australia / Africa plate-seam fail in .33–.36.
+    """
+    if plate is None or mask is None:
+        return img
+    pw, ph = plate.size
+    crop = plate.crop((
+        int(src_frac[0] * pw), int(src_frac[1] * ph),
+        int(src_frac[2] * pw), int(src_frac[3] * ph),
+    ))
+    rx0, ry0 = int(wx(dest_uv[0], w)), int(wy(dest_uv[1], h))
+    rx1, ry1 = int(wx(dest_uv[2], w)), int(wy(dest_uv[3], h))
+    if rx1 <= rx0 or ry1 <= ry0:
+        return img
+    fitted = crop.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS)
+    box_mask = Image.new('L', (w, h), 0)
+    box_mask.paste(Image.new('L', (rx1 - rx0, ry1 - ry0), 255), (rx0, ry0))
+    local = ImageChops.multiply(mask, box_mask)
+    fitted = match_to_region(fitted, img.crop((rx0, ry0, rx1, ry1)), local.crop((rx0, ry0, rx1, ry1)))
+    layer = img.copy()
+    layer.paste(fitted, (rx0, ry0))
+    feather = local.filter(ImageFilter.GaussianBlur(blur))
+    mixed = Image.blend(img, layer, alpha)
+    return Image.composite(mixed, img, feather)
 
 
 def paste_geo_crop(img, plate, mask, geo, uv, w, h, alpha=0.80):
@@ -359,11 +462,12 @@ def draw_rivers(img: Image.Image, w, h):
 
 
 def draw_coast(img: Image.Image, mask: Image.Image, w, h):
-    edge = mask.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.8))
-    foam = Image.new('RGB', (w, h), (0xD9, 0xD2, 0xC0))
-    ink = Image.new('RGB', (w, h), (0x3A, 0x34, 0x28))
-    img = Image.composite(ink, img, edge.point(lambda v: int(v * 0.42)))
-    img = Image.composite(foam, img, edge.point(lambda v: int(v * 0.62)))
+    # STYLE REF: thin sepia hand-ink + quiet cream foam. Never neon cyan.
+    edge = mask.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.7))
+    foam = Image.new('RGB', (w, h), (0xE4, 0xD8, 0xC0))
+    ink = Image.new('RGB', (w, h), (0x5A, 0x48, 0x34))
+    img = Image.composite(ink, img, edge.point(lambda v: int(v * 0.48)))
+    img = Image.composite(foam, img, edge.point(lambda v: int(v * 0.38)))
     return img
 
 
@@ -415,92 +519,123 @@ def build_guide(lands, w=2048, h=1170) -> Image.Image:
 
 def build_atlas(lands) -> Image.Image:
     w, h = ATLAS_W, ATLAS_H
-    parchment = load_rgb(BOARD / 'board-parchment-tile.png')
-    mountain = load_rgb(first_existing(GEN36 / 'p36-plate-mountain.png', GEN34 / 'p34-plate-mountain.png', BOARD / 'terrain-mountain.png'))
-    forest = load_rgb(first_existing(GEN36 / 'p36-plate-forest-mass.png', GEN36 / 'p36-plate-forest.png', GEN34 / 'p34-plate-forest.png'))
-    arid = load_rgb(first_existing(GEN36 / 'p36-plate-arid.png', GEN34 / 'p34-plate-arid.png', BOARD / 'terrain-arid.png'))
-    snow = load_rgb(first_existing(GEN36 / 'p36-plate-tundra.png', GEN34 / 'p34-plate-snow.png', BOARD / 'terrain-snow.png'))
-    steppe = load_rgb(first_existing(GEN36 / 'p36-plate-steppe.png'))
-    jungle = load_rgb(first_existing(GEN36 / 'p36-plate-jungle.png'))
-    world = load_rgb(first_existing(GEN36 / 'p36-world-painted.png', GEN34 / 'p34-world-painted.png', GEN33 / 'world-painted.png'))
-    europe = load_rgb(first_existing(GEN36 / 'p36-europe-theater.png', GEN34 / 'p34-europe-theater.png', GEN33 / 'europe-theater.png'))
-    asia = load_rgb(first_existing(GEN36 / 'p36-asia-theater.png', GEN34 / 'p34-asia-theater.png', GEN33 / 'asia-theater.png'))
-    if not europe or not asia:
-        raise SystemExit('P36 fail-closed: missing painted theater plates')
+    parchment = load_rgb(first_existing(BOARD / 'board-parchment-tile.png', GEN37 / 'p37-parchment-grain-tile.png'))
+    world = load_rgb(first_existing(GEN37 / 'p37-world-watercolor.png'))
+    europe = load_rgb(first_existing(GEN37 / 'p37-europe-africa-theater.png'))
+    asia = load_rgb(first_existing(GEN37 / 'p37-asia-continent.png', GEN37 / 'p37-world-watercolor.png'))
+    oceania = load_rgb(first_existing(GEN37 / 'p37-oceania-style-lock.png'))
+    if not world or not europe or not oceania:
+        raise SystemExit('P37 fail-closed: missing STYLE REF watercolor plates')
 
-    paper = tile_image(parchment.resize((768, 768), Image.Resampling.LANCZOS), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
-    paper = ImageEnhance.Contrast(paper).enhance(1.12)
+    paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
+    paper = ImageEnhance.Color(paper).enhance(0.94)
     img = paper.copy()
     mask_all = land_mask(lands, w, h)
 
-    # Quiet continent underpaint only — identity, not the hero.
-    for key, rgb in CONT_HEX.items():
-        cm = land_mask(lands, w, h, continents={key})
-        img = Image.composite(print_continent(paper, cm, rgb, strength=0.36), img, cm)
+    # P37 HARD: no Risk-candy continent underpaint. STYLE REF is one wash family.
+    img = Image.composite(paper, img, mask_all)
 
-    # P36 HARD: painted plates are the hero (Imhof + landcover). Soft-light stain OFF.
-    # Historical p35 used alpha=0.36 and flattened the painting back to a wash.
+    world = match_parchment(world)
+    europe = match_parchment(europe)
+    asia = match_parchment(asia) if asia else world
+    oceania = match_parchment(oceania)
+
+    # Unifying watercolor base through ALL live land — never a rectangular box.
+    img = paste_through_mask(
+        img, world, mask_all,
+        (80, 40, 3420, 1960), (0.02, 0.04, 0.98, 0.94),
+        w, h, alpha=0.70, blur=36,
+    )
+
+    # Theater detail through continent masks only (feathered). Australia last.
     em = land_mask(lands, w, h, continents={'Europe', 'Africa', 'Middle East'})
-    img = paste_theater(img, europe, em, 620, 80, 1680, 1580, w, h, alpha=0.84)
-    am = land_mask(lands, w, h, continents={'Asia', 'Oceania'})
-    img = paste_theater(img, asia, am, 1400, 140, 2750, 1650, w, h, alpha=0.82)
+    img = paste_through_mask(
+        img, europe, em,
+        (560, 40, 1860, 1680), (0.02, 0.02, 0.98, 0.98),
+        w, h, alpha=0.88, blur=52,
+    )
+    am = land_mask(lands, w, h, continents={'Asia'})
+    img = paste_through_mask(
+        img, asia, am,
+        (1280, 20, 2680, 1320), (0.02, 0.02, 0.98, 0.98),
+        w, h, alpha=0.80, blur=72,
+    )
+    # Australia from STYLE REF — tight land crop, never a sea-filled Oceania box.
+    aus = land_mask(lands, w, h, names={'Australia'})
+    img = paste_through_mask(
+        img, oceania, aus,
+        (2094, 1460, 2619, 1933), (0.24, 0.30, 0.74, 0.76),
+        w, h, alpha=0.96, blur=28,
+    )
+    nz = land_mask(lands, w, h, names={'New Zealand'})
+    img = paste_through_mask(
+        img, oceania, nz,
+        (2676, 1659, 2861, 1932), (0.80, 0.42, 0.96, 0.78),
+        w, h, alpha=0.92, blur=18,
+    )
+    ng = land_mask(lands, w, h, names={'New Guinea', 'East Indies', 'Borneo Celebes'})
+    img = paste_through_mask(
+        img, oceania, ng,
+        (1972, 1217, 2629, 1454), (0.08, 0.02, 0.70, 0.30),
+        w, h, alpha=0.90, blur=22,
+    )
+    nam = land_mask(lands, w, h, continents={'North America'})
+    img = paste_through_mask(
+        img, world, nam,
+        (2760, 40, 3500, 1120), (0.02, 0.06, 0.30, 0.50),
+        w, h, alpha=0.84, blur=48,
+    )
+    sam = land_mask(lands, w, h, continents={'South America'})
+    img = paste_through_mask(
+        img, world, sam,
+        (40, 1040, 560, 1900), (0.10, 0.46, 0.32, 0.94),
+        w, h, alpha=0.84, blur=48,
+    )
 
-    if world:
-        img = paste_geo_crop(
-            img, world, land_mask(lands, w, h, continents={'North America'}),
-            (0.04, 0.04, 0.32, 0.48), (2780, 60, 3500, 1020), w, h, alpha=0.78,
-        )
-        img = paste_geo_crop(
-            img, world, land_mask(lands, w, h, continents={'South America'}),
-            (0.10, 0.42, 0.30, 0.96), (70, 1080, 500, 1860), w, h, alpha=0.78,
-        )
-        img = paste_theater(img, world, mask_all, 0, 0, MAP_W, MAP_H, w, h, alpha=0.22)
-
-    # Landcover masses — canopy/sand/steppe/tundra tooth, never icon trees.
-    if forest:
-        fm = land_mask(lands, w, h, biomes={'forest', 'lush'})
-        tiled = tile_image(forest.resize((640, 640), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, ImageChops.multiply(img, tiled), 0.22), img, fm)
-    if jungle:
-        jm = land_mask(lands, w, h, biomes={'jungle'})
-        tiled = tile_image(jungle.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, ImageChops.multiply(img, tiled), 0.16), img, jm)
-    if arid:
-        dm = land_mask(lands, w, h, biomes={'arid'})
-        tiled = tile_image(arid.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, tiled, 0.14), img, dm)
-    if steppe:
-        sm = land_mask(lands, w, h, biomes={'steppe'})
-        tiled = tile_image(steppe.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, tiled, 0.16), img, sm)
-    if snow:
-        tm = land_mask(lands, w, h, biomes={'snow'})
-        tiled = tile_image(snow.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, tiled, 0.20), img, tm)
-
-    # Luma-preserving continent grade — readable at 390 without flattening relief.
+    # Quiet continent hint only — STYLE REF family, not hard tiles.
     for key, rgb in CONT_HEX.items():
         cm = land_mask(lands, w, h, continents={key})
-        img = grade_chroma(img, cm, rgb, amount=0.16)
+        img = grade_chroma(img, cm, rgb, amount=0.06)
 
     height = imhof_height(w, h)
-    img = apply_imhof(img, mask_all, height, strength=0.42)
+    # STYLE REF uses peak hatching, not Imhof volume blobs.
     img = draw_coast(img, mask_all, w, h)
-    img = kill_blotches(img, mask_all, 86)
+    img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.28)
+    img = kill_blotches(img, mask_all, 80)
 
-    # Visible canvas tooth (not the p35 residual-14 wash).
     if parchment:
         tooth = ImageChops.soft_light(img, paper)
-        img = Image.composite(tooth, img, mask_all.point(lambda v: 46))
+        img = Image.composite(tooth, img, mask_all.point(lambda v: 22))
 
-    img = punch(img, color=1.05, contrast=1.10, sharp=1.06)
+    img = punch(img, color=1.02, contrast=1.06, sharp=1.04)
     img = Image.composite(img, paper, mask_all)
-    # P36 HARD: no IPC / +N baked into the land atlas. 3D continent chips stay.
     void = draw_badges
     void = draw_rivers
     void = draw_ridges
+    void = height
     img.info['imhof_height'] = height
     return img
+
+
+def bake_ocean_wash():
+    tile = load_rgb(GEN37 / 'p37-ocean-wash-tile.png')
+    if not tile:
+        return
+    tile = tile.resize((768, 768), Image.Resampling.LANCZOS)
+    tile = ImageEnhance.Color(tile).enhance(0.78)
+    tile = ImageEnhance.Contrast(tile).enhance(0.92)
+    try:
+        import numpy as np
+        arr = np.array(tile, dtype=np.float32)
+        lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
+        lum = np.clip((lum - 0.08) / 0.70, 0.42, 1.20)
+        target = np.array([0xB2, 0xC0, 0xB8], dtype=np.float32)
+        tile = Image.fromarray(np.clip(arr * 0.45 + (target * lum[..., None]) * 0.55, 0, 255).astype('uint8'), 'RGB')
+    except ImportError:
+        pass
+    OUT_OCEAN.parent.mkdir(parents=True, exist_ok=True)
+    tile.save(OUT_OCEAN, 'PNG', optimize=True)
+    print(f'wrote {OUT_OCEAN} {tile.size}')
 
 
 def bake_normal_ao(albedo: Image.Image, height: Image.Image | None = None):
@@ -526,6 +661,7 @@ def main():
     args = ap.parse_args()
     if not args.guide and not args.atlas:
         args.guide = args.atlas = True
+    GEN37.mkdir(parents=True, exist_ok=True)
     GEN36.mkdir(parents=True, exist_ok=True)
     GEN34.mkdir(parents=True, exist_ok=True)
     lands = load_lands()
@@ -539,6 +675,7 @@ def main():
         OUT_ATLAS.parent.mkdir(parents=True, exist_ok=True)
         atlas.save(OUT_ATLAS, 'PNG', optimize=True)
         print(f'wrote {OUT_ATLAS} {atlas.size}')
+        bake_ocean_wash()
         normal, ao = bake_normal_ao(atlas, height)
         ao.save(OUT_AO, 'PNG', optimize=True)
         normal.save(OUT_NORMAL, 'PNG', optimize=True)
