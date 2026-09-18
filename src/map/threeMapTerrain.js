@@ -1,0 +1,562 @@
+// Preview-only geography for ?three=1.
+// Steal Civ/Polytopia TERRAIN LITERACY (biome, relief, forest clumps,
+// coast shelf, rivers, undulation). Do NOT steal hex/low-poly/diorama art.
+// Material language stays A&A parchment + Risk continent washes.
+
+import * as THREE from 'three';
+import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
+import { PALETTE, REGION_WASH, USSR_LANDS, mixHex } from './threeMapPalette.js';
+
+export const BAKE_W = 2048;
+export const BAKE_H = 1170;
+
+export const TERRAIN_TEX = {
+  forest: 'assets/three/board/terrain-forest.png',
+  mountain: 'assets/three/board/terrain-mountain.png',
+  arid: 'assets/three/board/terrain-arid.png',
+  snow: 'assets/three/board/terrain-snow.png',
+};
+
+// Climate — not flat continent fills. Snow → lush → arid, plus relief.
+export const BIOME = {
+  snow: 'snow',
+  lush: 'lush',
+  forest: 'forest',
+  arid: 'arid',
+  mountain: 'mountain',
+  hills: 'hills',
+  steppe: 'steppe',
+};
+
+const BIOME_OF = {
+  'Finland Norway': 'snow',
+  Sweden: 'snow',
+  'Evenki National Okrug': 'snow',
+  Alaska: 'snow',
+  'West Canada': 'snow',
+  'Soviet Far East': 'snow',
+  'Karelia S.S.R.': 'forest',
+  'East Canada': 'forest',
+  Brazil: 'forest',
+  Congo: 'forest',
+  'French Equatorial Africa': 'forest',
+  'French Indo China': 'forest',
+  'New Guinea': 'forest',
+  'East Indies': 'forest',
+  'Borneo Celebes': 'forest',
+  'West Europe': 'lush',
+  'United Kingdom': 'lush',
+  Eire: 'lush',
+  'East US': 'lush',
+  Mexico: 'lush',
+  Panama: 'lush',
+  Cuba: 'lush',
+  'South Africa': 'lush',
+  Madagascar: 'lush',
+  Germany: 'hills',
+  'East Europe': 'hills',
+  Japan: 'hills',
+  Manchuria: 'hills',
+  Spain: 'hills',
+  Switzerland: 'mountain',
+  'South Europe': 'mountain',
+  China: 'mountain',
+  India: 'mountain',
+  'Argentina-Chile': 'mountain',
+  Peru: 'mountain',
+  'West US': 'mountain',
+  Novosibirsk: 'mountain',
+  Mongolia: 'hills',
+  Kwangtung: 'hills',
+  Algeria: 'arid',
+  'Anglo Sudan Egypt': 'arid',
+  'French West Africa': 'arid',
+  'Saudi Arabia': 'arid',
+  Persia: 'arid',
+  'Syria Jordan': 'arid',
+  'Kazakh S.S.R.': 'arid',
+  Australia: 'arid',
+  'Italian East Africa': 'arid',
+  'Kenya-Rhodesia': 'arid',
+  Turkey: 'steppe',
+  'Ukraine S.S.R.': 'steppe',
+  Russia: 'steppe',
+  Columbia: 'lush',
+};
+
+const BIOME_HEX = {
+  snow: '#D6D0C2',
+  lush: '#6B7A4A',
+  forest: '#4A5E3A',
+  arid: '#C4A35A',
+  mountain: '#8A7A5C',
+  hills: '#7A7348',
+  steppe: '#9A8A58',
+};
+
+const BIOME_HEIGHT = {
+  mountain: 1.82,
+  hills: 1.18,
+  forest: 0.92,
+  snow: 0.98,
+  steppe: 0.80,
+  lush: 0.76,
+  arid: 0.68,
+};
+
+const BIOME_LIFT = {
+  mountain: 0.62,
+  hills: 0.28,
+  forest: 0.12,
+  snow: 0.16,
+  steppe: 0.10,
+  lush: 0.09,
+  arid: 0.07,
+};
+
+// Printed IPC homage (classic A&A board language). Sits on paper, not HUD.
+export const PRINT_IPC = {
+  Germany: 10,
+  'United Kingdom': 8,
+  'West Europe': 6,
+  'South Europe': 6,
+  'East Europe': 3,
+  'Ukraine S.S.R.': 3,
+  'Karelia S.S.R.': 3,
+  Russia: 8,
+  'East US': 12,
+  'West US': 10,
+  'East Canada': 3,
+  India: 3,
+  Japan: 8,
+  China: 2,
+  'Anglo Sudan Egypt': 2,
+  Brazil: 3,
+  Australia: 2,
+  'South Africa': 2,
+  Persia: 2,
+  Manchuria: 3,
+  'French Indo China': 2,
+  Algeria: 1,
+  Spain: 2,
+  Sweden: 2,
+  'Finland Norway': 2,
+  Switzerland: 0,
+};
+
+// World-space ridge polylines (map pixels). Alps / Himalayas / Rockies / Andes.
+export const RIDGES = [
+  [[980, 620], [994, 605], [1040, 630], [1098, 685], [1160, 660]], // Alps
+  [[1700, 820], [1798, 800], [1900, 760], [2024, 720], [2140, 700]], // Himalaya
+  [[3200, 200], [3263, 279], [3300, 480], [3328, 722]], // Rockies
+  [[220, 1230], [204, 1411], [275, 1613]], // Andes
+  [[1550, 700], [1679, 600], [1905, 490]], // Altai / Kazakh
+  [[1085, 180], [1067, 280], [1085, 229]], // Scandes
+];
+
+// Thin drainage into sea — recessed printed-ink rivers, not Civ city chrome.
+export const RIVERS = [
+  [[1195, 900], [1189, 1064], [1208, 1280], [1200, 1460]], // Nile
+  [[912, 560], [960, 500], [1000, 400], [980, 260]], // Rhine
+  [[1000, 630], [1100, 560], [1211, 492], [1360, 500]], // Danube
+  [[1550, 420], [1693, 289], [1820, 210]], // Volga
+  [[1905, 490], [1989, 240], [1989, 120]], // Yenisei
+  [[2024, 740], [2140, 800], [2260, 860]], // Yangtze
+  [[1798, 947], [1880, 1000], [1960, 1040]], // Ganges
+  [[125, 700], [140, 860], [180, 1080]], // Mississippi
+  [[420, 1360], [300, 1365], [180, 1320]], // Amazon
+  [[1126, 1453], [1080, 1320], [1013, 1188]], // Congo
+  [[3263, 279], [3100, 200], [3000, 160]], // Mackenzie
+  [[1399, 471], [1480, 520], [1558, 700]], // Dnieper / Don
+];
+
+const tiles = { forest: null, mountain: null, arid: null, snow: null };
+let worldLandTex = null;
+
+function loadImage(src) {
+  return new Promise((resolve) => {
+    if (!src) {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+function hashName(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+function wrapHash(ix, iy, period) {
+  const x = ((ix % period) + period) % period;
+  const y = ((iy % period) + period) % period;
+  let n = x * 374761393 + y * 668265263;
+  n = (n ^ (n >> 13)) * 1274126177;
+  return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+}
+
+function valueNoise(x, y, period) {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = x - x0;
+  const fy = y - y0;
+  const sx = fx * fx * (3 - 2 * fx);
+  const sy = fy * fy * (3 - 2 * fy);
+  const n00 = wrapHash(x0, y0, period);
+  const n10 = wrapHash(x0 + 1, y0, period);
+  const n01 = wrapHash(x0, y0 + 1, period);
+  const n11 = wrapHash(x0 + 1, y0 + 1, period);
+  return n00 + (n10 - n00) * sx + (n01 - n00) * sy + (n11 - n01 - n10 + n00) * sx * sy;
+}
+
+export function fbm(x, y, period = 16, octaves = 4) {
+  let sum = 0;
+  let amp = 0.5;
+  let freq = 1;
+  let norm = 0;
+  for (let i = 0; i < octaves; i++) {
+    const p = Math.max(2, Math.round(period / freq));
+    sum += valueNoise(x * freq, y * freq, p) * amp;
+    norm += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return sum / (norm || 1);
+}
+
+export function biomeFor(territory) {
+  if (!territory || territory.isWater) return 'lush';
+  if (BIOME_OF[territory.name]) return BIOME_OF[territory.name];
+  if (USSR_LANDS.has(territory.name)) return 'steppe';
+  const c = territory.continent || '';
+  if (c === 'Africa' || c === 'Middle East') return 'arid';
+  if (c === 'Asia') return 'steppe';
+  if (c === 'Europe') return 'lush';
+  if (c === 'Oceania') return 'lush';
+  return 'lush';
+}
+
+export function biomeHex(biome) {
+  return BIOME_HEX[biome] || BIOME_HEX.lush;
+}
+
+export function heightForBiome(biome) {
+  return BIOME_HEIGHT[biome] || 0.76;
+}
+
+export function landHeightForTerrain(territory) {
+  return heightForBiome(biomeFor(territory));
+}
+
+export function printIpc(territory) {
+  if (!territory || territory.isWater) return 0;
+  if (PRINT_IPC[territory.name] != null) return PRINT_IPC[territory.name];
+  return territory.production > 1 ? territory.production : 1;
+}
+
+function continentWash(territory) {
+  if (!territory) return REGION_WASH.Europe;
+  if (USSR_LANDS.has(territory.name)) return REGION_WASH.USSR;
+  return REGION_WASH[territory.continent] || PALETTE.landBase;
+}
+
+function wxToU(x) {
+  return x / MAP_WIDTH;
+}
+function wyToV(y) {
+  return y / MAP_HEIGHT;
+}
+
+function pathPoly(ctx, poly, w, h) {
+  if (!poly || poly.length < 3) return false;
+  ctx.beginPath();
+  ctx.moveTo(wxToU(poly[0][0]) * w, wyToV(poly[0][1]) * h);
+  for (let i = 1; i < poly.length; i++) {
+    ctx.lineTo(wxToU(poly[i][0]) * w, wyToV(poly[i][1]) * h);
+  }
+  ctx.closePath();
+  return true;
+}
+
+function drawTileClipped(ctx, img, alpha, mode, scale = 1) {
+  if (!img) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.globalCompositeOperation = mode;
+  const tw = (img.naturalWidth || img.width || 512) * scale;
+  const th = (img.naturalHeight || img.height || 512) * scale;
+  const cw = ctx.canvas.width;
+  const ch = ctx.canvas.height;
+  for (let y = -th * 0.2; y < ch + th; y += th * 0.92) {
+    for (let x = -tw * 0.2; x < cw + tw; x += tw * 0.92) {
+      ctx.drawImage(img, x, y, tw, th);
+    }
+  }
+  ctx.restore();
+}
+
+function stampClumps(ctx, img, poly, w, h, count, seed) {
+  if (!img || !poly) return;
+  ctx.save();
+  if (!pathPoly(ctx, poly, w, h)) {
+    ctx.restore();
+    return;
+  }
+  ctx.clip();
+  let sx = 0;
+  let sy = 0;
+  for (const [x, y] of poly) {
+    sx += x;
+    sy += y;
+  }
+  const cx = sx / poly.length;
+  const cy = sy / poly.length;
+  const tw = 220;
+  const th = 220;
+  for (let i = 0; i < count; i++) {
+    const n1 = wrapHash(seed + i * 17, seed + i * 31, 97);
+    const n2 = wrapHash(seed + i * 53, seed + i * 11, 97);
+    const n3 = wrapHash(seed + i * 7, seed + i * 71, 97);
+    const px = wxToU(cx + (n1 - 0.5) * 220) * w - tw / 2;
+    const py = wyToV(cy + (n2 - 0.5) * 180) * h - th / 2;
+    ctx.globalAlpha = 0.42 + n3 * 0.28;
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(img, px, py, tw * (0.7 + n3 * 0.5), th * (0.7 + n1 * 0.5));
+  }
+  ctx.restore();
+}
+
+function drawPolyline(ctx, pts, w, h, style, width) {
+  if (!pts || pts.length < 2) return;
+  ctx.save();
+  ctx.strokeStyle = style;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(wxToU(pts[0][0]) * w, wyToV(pts[0][1]) * h);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(wxToU(pts[i][0]) * w, wyToV(pts[i][1]) * h);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawIpcDot(ctx, x, y, value, w, h) {
+  if (!value) return;
+  const px = wxToU(x) * w;
+  const py = wyToV(y) * h;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(px, py, 7.5, 0, Math.PI * 2);
+  ctx.fillStyle = '#E8DFC8';
+  ctx.fill();
+  ctx.strokeStyle = '#3A3428';
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
+  ctx.fillStyle = '#3A3428';
+  ctx.font = '700 9px "Segoe UI", serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(value), px, py + 0.5);
+  ctx.restore();
+}
+
+export async function loadTerrainTiles() {
+  if (tiles.forest && tiles.mountain) return tiles;
+  const [forest, mountain, arid, snow] = await Promise.all([
+    loadImage(TERRAIN_TEX.forest),
+    loadImage(TERRAIN_TEX.mountain),
+    loadImage(TERRAIN_TEX.arid),
+    loadImage(TERRAIN_TEX.snow),
+  ]);
+  tiles.forest = forest;
+  tiles.mountain = mountain;
+  tiles.arid = arid;
+  tiles.snow = snow;
+  return tiles;
+}
+
+export async function bakeWorldLandAtlas(lands, parchmentImg) {
+  await loadTerrainTiles();
+  const w = BAKE_W;
+  const h = BAKE_H;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = PALETTE.landBase;
+  ctx.fillRect(0, 0, w, h);
+  if (parchmentImg) {
+    const tw = parchmentImg.naturalWidth || parchmentImg.width || 512;
+    const th = parchmentImg.naturalHeight || parchmentImg.height || 512;
+    for (let y = 0; y < h; y += th) {
+      for (let x = 0; x < w; x += tw) ctx.drawImage(parchmentImg, x, y, tw, th);
+    }
+  }
+
+  for (const land of lands) {
+    const biome = biomeFor(land);
+    const continent = continentWash(land);
+    const climate = biomeHex(biome);
+    const mixed = `#${mixHex(continent, climate, 0.48).toString(16).padStart(6, '0')}`;
+    for (const poly of land.polygons || []) {
+      if (!pathPoly(ctx, poly, w, h)) continue;
+      ctx.save();
+      ctx.clip();
+      ctx.globalAlpha = 0.86;
+      ctx.fillStyle = mixed;
+      ctx.fill();
+      if (biome === 'snow') drawTileClipped(ctx, tiles.snow, 0.62, 'soft-light', 0.55);
+      else if (biome === 'arid') drawTileClipped(ctx, tiles.arid, 0.70, 'multiply', 0.62);
+      else if (biome === 'forest') {
+        drawTileClipped(ctx, tiles.forest, 0.22, 'multiply', 0.70);
+      } else if (biome === 'mountain' || biome === 'hills') {
+        drawTileClipped(ctx, tiles.mountain, biome === 'mountain' ? 0.58 : 0.32, 'multiply', 0.48);
+      } else if (biome === 'lush') {
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = '#6B7A4A';
+        ctx.fill();
+      } else if (biome === 'steppe') {
+        drawTileClipped(ctx, tiles.arid, 0.22, 'soft-light', 0.7);
+      }
+      ctx.restore();
+      if (biome === 'forest') {
+        stampClumps(ctx, tiles.forest, poly, w, h, 5, hashName(land.name));
+      } else if (biome === 'lush' && hashName(land.name) % 3 === 0) {
+        stampClumps(ctx, tiles.forest, poly, w, h, 2, hashName(land.name));
+      }
+    }
+  }
+
+  // Soft SE mountain shadow + ridge hatch (printed relief, not a brown stamp).
+  for (const ridge of RIDGES) {
+    drawPolyline(ctx, ridge.map(([x, y]) => [x + 14, y + 16]), w, h, 'rgba(48, 36, 22, 0.28)', 18);
+    drawPolyline(ctx, ridge, w, h, 'rgba(72, 58, 36, 0.55)', 7);
+    if (tiles.mountain) {
+      ctx.save();
+      ctx.globalAlpha = 0.40;
+      ctx.globalCompositeOperation = 'multiply';
+      const mid = ridge[Math.floor(ridge.length / 2)];
+      ctx.drawImage(
+        tiles.mountain,
+        wxToU(mid[0]) * w - 90,
+        wyToV(mid[1]) * h - 70,
+        200,
+        160,
+      );
+      ctx.restore();
+    }
+  }
+
+  for (const river of RIVERS) {
+    drawPolyline(ctx, river, w, h, 'rgba(62, 96, 108, 0.72)', 2.4);
+    drawPolyline(ctx, river, w, h, 'rgba(122, 168, 176, 0.35)', 1.1);
+  }
+
+  for (const land of lands) {
+    const v = printIpc(land);
+    if (!v) continue;
+    let sx = 0;
+    let sy = 0;
+    let n = 0;
+    for (const poly of land.polygons || []) {
+      for (const [x, y] of poly) {
+        sx += x;
+        sy += y;
+        n += 1;
+      }
+    }
+    if (!n) continue;
+    drawIpcDot(ctx, sx / n + 18, sy / n + 22, v, w, h);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  worldLandTex = tex;
+  return tex;
+}
+
+export function getWorldLandTex() {
+  return worldLandTex;
+}
+
+export function applyWorldLandUVs(geometry) {
+  const pos = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  if (!pos || !uv) return;
+  const SCALE = 0.1;
+  for (let i = 0; i < pos.count; i++) {
+    const wx = pos.getX(i) / SCALE;
+    const wy = -pos.getZ(i) / SCALE;
+    uv.setXY(i, wx / MAP_WIDTH, 1 - wy / MAP_HEIGHT);
+  }
+  uv.needsUpdate = true;
+  geometry.setAttribute('uv2', uv.clone());
+}
+
+export function sculptLandRelief(geometry, territory, height) {
+  const biome = biomeFor(territory);
+  const amp = BIOME_LIFT[biome] || 0.08;
+  const seed = hashName(territory?.name) * 0.0017;
+  const pos = geometry.attributes.position;
+  if (!pos) return;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < height * 0.58) continue;
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const n = fbm(x * 0.22 + seed, z * 0.22 + seed, 14, 4);
+    let lift = (n - 0.42) * amp;
+    if (biome === 'mountain') {
+      const ridge = Math.pow(Math.max(0, n - 0.38), 1.25) * 0.72;
+      lift += ridge;
+    } else if (biome === 'hills') {
+      lift += Math.max(0, n - 0.5) * 0.22;
+    } else if (biome === 'forest') {
+      lift += Math.max(0, n - 0.62) * 0.10;
+    }
+    pos.setY(i, y + lift);
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+export function makeCoastShelfMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0x7aadb0,
+    transparent: true,
+    opacity: 0.34,
+    roughness: 0.48,
+    metalness: 0.08,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.28,
+  });
+}
+
+export function makeRiverMaterial() {
+  return new THREE.LineBasicMaterial({
+    color: 0x4a7680,
+    transparent: true,
+    opacity: 0.78,
+    depthWrite: false,
+  });
+}

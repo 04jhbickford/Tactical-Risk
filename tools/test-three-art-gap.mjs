@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.26 quiet zoom chrome + App Store glance + LOD tooth.
+// V2.81.51-three-polish.27 geography + molded minis. Chrome locks from .26.
 // Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -29,6 +29,7 @@ const palette = readFileSync(join(root, 'src/map/threeMapPalette.js'), 'utf8');
 const spike = readFileSync(join(root, 'src/map/threeMapSpike.js'), 'utf8');
 const chrome = readFileSync(join(root, 'src/map/threeMapChrome.js'), 'utf8');
 const art = readFileSync(join(root, 'src/map/threeMapArt.js'), 'utf8');
+const terrain = readFileSync(join(root, 'src/map/threeMapTerrain.js'), 'utf8');
 const baker = readFileSync(join(root, 'tools/bake-james-hecorrect.py'), 'utf8');
 
 let failures = 0;
@@ -48,10 +49,14 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.26', GAME_VERSION === 'V2.81.51-three-polish.26');
+check('GAME_VERSION is V2.81.51-three-polish.27', GAME_VERSION === 'V2.81.51-three-polish.27');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
-check('land plastic atlas is real PNG', pngOk('assets/three/units/units-land-plastic.png'));
-check('naval plastic atlas is real PNG', pngOk('assets/three/units/units-naval-plastic.png'));
+check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
+check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
+check('terrain forest tile', pngOk('assets/three/board/terrain-forest.png'));
+check('terrain mountain tile', pngOk('assets/three/board/terrain-mountain.png'));
+check('terrain arid tile', pngOk('assets/three/board/terrain-arid.png'));
+check('terrain snow tile', pngOk('assets/three/board/terrain-snow.png'));
 check('generated parchment tile', pngOk('assets/three/board/board-parchment-tile.png'));
 check('generated ocean tile', pngOk('assets/three/board/board-ocean-tile.png'));
 check('generated Europe wash', pngOk('assets/three/board/wash-europe.png'));
@@ -65,19 +70,20 @@ check('plastic atlas cells INF/TNK/ART/FTR',
   && /armour: \{ atlas: 'land', col: 1, row: 0 \}/.test(chits)
   && /artillery: \{ atlas: 'land', col: 2, row: 0 \}/.test(chits)
   && /fighter: \{ atlas: 'land', col: 3, row: 0 \}/.test(chits));
-check('paintCreamChit is the only unit mark', /paintCreamChit/.test(chits) && /drawCreamToken/.test(chits));
-check('mid pip is cream chit + N, ZERO type parade',
-  /ZERO type parade/.test(chits)
-  && /glyph: null/.test(chits)
+check('mid pip stays cream token (not a mini parade)',
+  /drawCreamToken/.test(chits)
   && /paintPip/.test(chits)
-  && !/drawPhotorealPlastic/.test(chits)
-  && !/tintAtlasCell/.test(chits));
-check('near chits keep type glyphs on cream', /glyph: type/.test(chits) && /drawTypeGlyph/.test(chits));
-check('glyphs recessed INTO cream, not stamp-on-disc',
-  /Recessed INTO cream plastic/.test(chits)
-  && /mixRgb\(CREAM, '#5A4A32'/.test(chits)
-  && !/ctx\.fillStyle = '#2C2820'/.test(chits)
-  && /not a stamp-on-disc/.test(chits));
+  && /glyph: null/.test(chits)
+  && /ZERO type parade/.test(chits)
+  && !/paintMoldedMini/.test(chits.slice(chits.indexOf('export function paintPip'))));
+check('near/tray uses molded plastic minis, not glyph-on-disc',
+  /paintMoldedMini/.test(chits)
+  && /units-land-minis\.png/.test(chits)
+  && /faction-tinted molded plastic/.test(chits)
+  && /paintPiece[\s\S]*paintMoldedMini/.test(chits)
+  && !/paintPiece[\s\S]{0,80}paintCreamChit/.test(chits));
+check('peek roster uses the same mini paint',
+  /pieceIconDataUrl/.test(chrome) && /paintPiece/.test(chits));
 check('cream plastic face #F0E6D2', /#F0E6D2/.test(chits) && /CREAM/.test(chits));
 check('molded bevel + thick outline ≥2.5px screen',
   /Emboss \/ bevel/.test(chits)
@@ -88,7 +94,7 @@ check('faction rim + dark outline on cream token',
 check('mixRgb returns hex so tint cannot collapse to grey', /padStart\(2, '0'\)/.test(chits) && !/return `rgb\(\$\{m\[0\]\}/.test(chits));
 check('mid pip large enough to read token', PIP_PX === 64);
 check('mid pip keeps contact shadow', /shadow: true/.test(chits) && /drawContactShadow/.test(chits));
-check('no grey figurine atlas paint', !/drawPhotorealPlastic/.test(chits) && !/drawImage\(tinted/.test(chits));
+check('no photoreal photo-scan figurine path', !/drawPhotorealPlastic/.test(chits));
 check('baker cream-lifts atlas (no baked black halo)',
   /def cream_lift/.test(baker) && /def strip_black_halo/.test(baker) && !/MaxFilter\(11\)/.test(baker));
 check('baker flattens parchment blotches', /def flatten_blotch/.test(baker) && /make_tileable\(parchment, 96\)/.test(baker));
@@ -325,6 +331,25 @@ check('p26 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-lo
 check('p26 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-near-select-390.png'));
 check('p26 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/europe-near-units-390.png'));
 check('p26 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p26/vercel-live-mid-390.png'));
+check('p27 geography module on disk', existsSync(join(root, 'src/map/threeMapTerrain.js')));
+check('biome climate washes snow/lush/arid',
+  /BIOME/.test(terrain) && /snow/.test(terrain) && /arid/.test(terrain) && /forest/.test(terrain)
+  && /bakeWorldLandAtlas/.test(terrain));
+check('mountain relief + soft shadow',
+  /sculptLandRelief/.test(terrain) && /RIDGES/.test(terrain) && /Soft SE mountain shadow/.test(terrain));
+check('forest as massed clumps, not a green blob',
+  /stampClumps/.test(terrain) && /terrain-forest/.test(terrain));
+check('coast shelf turquoise fringe',
+  /makeCoastShelfMeshes/.test(art) && /oceanReef/.test(palette) && /#7AADB0/.test(palette));
+check('rivers / inland water',
+  /RIVERS/.test(terrain) && /addRiverLines/.test(art) && /Nile/.test(terrain));
+check('land undulation sculpt',
+  /sculptLandRelief/.test(art) && /BIOME_LIFT/.test(terrain) && /landUndulation/.test(spike));
+check('world land atlas bake wired',
+  /bakeWorldLandAtlas/.test(spike) && /setWorldLandMap/.test(spike) && /applyWorldLandUVs/.test(art));
+check('IPC dots printed on paper', /PRINT_IPC/.test(terrain) && /drawIpcDot/.test(terrain));
+check('no low-poly Civ chrome stolen',
+  !/ROMA/.test(terrain) && !/hex-sawtooth/.test(art) && !/tilt-shift/.test(spike));
 
 if (failures) {
   console.error(`\n${failures} failed`);

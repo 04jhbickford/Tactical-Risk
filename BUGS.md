@@ -2,6 +2,18 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.27 (preview only, SCHEMA 11)
+
+James he-correct REOPENED love-gate: map still missing geography; near/tray units not original molded pieces. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Geography** — printed A&A parchment + Risk continent language, plus Civ-class terrain literacy (mechanics only, not low-poly/diorama art): biome washes (snow→lush→arid), mountain relief + soft SE shadow, forest as massed clumps, turquoise coast shelf vs deep ocean, rivers, land undulation. IPC dots printed on paper.
+2. **Units LOD** — mid stays cream pip+N. Near/tray/peek = faction-tinted molded plastic minis (INF/TNK/plane/ship). Kill recessed glyph-on-disc as the near hero.
+3. **Chrome locks from .26** — idle CTA quiet-dark; gold ONLY Confirm staged + select ring; quiet zoom/PLACE frost.
+
+390 stills in `qa-loop/p27/`. SCHEMA 11. GAME_VERSION V2.81.51-three-polish.27.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.26 (preview only, SCHEMA 11)
 
 Arc love-gate ~92% on .25 — FAIL <95%. P0s of .25 passed; glance vs Poly/Root/TTR still short: zoom cluster mustard/gold vs Confirm accent, slight “web preview” tell, L0 frost a touch slabby. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
