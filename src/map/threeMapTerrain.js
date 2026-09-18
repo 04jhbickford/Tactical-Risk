@@ -53,11 +53,11 @@ const BIOME_OF = {
   Cuba: 'lush',
   'South Africa': 'lush',
   Madagascar: 'lush',
-  Germany: 'hills',
-  'East Europe': 'hills',
+  Germany: 'lush',
+  'East Europe': 'lush',
   Japan: 'hills',
   Manchuria: 'hills',
-  Spain: 'hills',
+  Spain: 'arid',
   Switzerland: 'mountain',
   'South Europe': 'mountain',
   China: 'mountain',
@@ -253,7 +253,16 @@ export function heightForBiome(biome) {
   return BIOME_HEIGHT[biome] || 0.76;
 }
 
+const HEIGHT_OF = {
+  Germany: 1.12,
+  'East Europe': 1.08,
+  Spain: 1.05,
+  Switzerland: 1.88,
+  'South Europe': 1.82,
+};
+
 export function landHeightForTerrain(territory) {
+  if (territory && HEIGHT_OF[territory.name] != null) return HEIGHT_OF[territory.name];
   return heightForBiome(biomeFor(territory));
 }
 
@@ -413,28 +422,30 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
       if (!pathPoly(ctx, poly, w, h)) continue;
       ctx.save();
       ctx.clip();
-      ctx.globalAlpha = 0.86;
+      ctx.globalAlpha = 1;
       ctx.fillStyle = mixed;
       ctx.fill();
-      if (biome === 'snow') drawTileClipped(ctx, tiles.snow, 0.62, 'soft-light', 0.55);
-      else if (biome === 'arid') drawTileClipped(ctx, tiles.arid, 0.70, 'multiply', 0.62);
+      if (biome === 'snow') drawTileClipped(ctx, tiles.snow, 0.70, 'soft-light', 0.55);
+      else if (biome === 'arid') drawTileClipped(ctx, tiles.arid, 0.78, 'multiply', 0.62);
       else if (biome === 'forest') {
-        drawTileClipped(ctx, tiles.forest, 0.22, 'multiply', 0.70);
-      } else if (biome === 'mountain' || biome === 'hills') {
-        drawTileClipped(ctx, tiles.mountain, biome === 'mountain' ? 0.58 : 0.32, 'multiply', 0.48);
+        drawTileClipped(ctx, tiles.forest, 0.18, 'multiply', 0.70);
+      } else if (biome === 'mountain') {
+        drawTileClipped(ctx, tiles.mountain, 0.70, 'multiply', 0.42);
+      } else if (biome === 'hills') {
+        drawTileClipped(ctx, tiles.mountain, 0.18, 'multiply', 0.55);
       } else if (biome === 'lush') {
         ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = 0.18;
+        ctx.globalAlpha = 0.28;
         ctx.fillStyle = '#6B7A4A';
         ctx.fill();
       } else if (biome === 'steppe') {
-        drawTileClipped(ctx, tiles.arid, 0.22, 'soft-light', 0.7);
+        drawTileClipped(ctx, tiles.arid, 0.28, 'soft-light', 0.7);
       }
       ctx.restore();
       if (biome === 'forest') {
-        stampClumps(ctx, tiles.forest, poly, w, h, 5, hashName(land.name));
-      } else if (biome === 'lush' && hashName(land.name) % 3 === 0) {
-        stampClumps(ctx, tiles.forest, poly, w, h, 2, hashName(land.name));
+        stampClumps(ctx, tiles.forest, poly, w, h, 7, hashName(land.name));
+      } else if (biome === 'lush' && hashName(land.name) % 2 === 0) {
+        stampClumps(ctx, tiles.forest, poly, w, h, 3, hashName(land.name));
       }
     }
   }
@@ -460,8 +471,8 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
   }
 
   for (const river of RIVERS) {
-    drawPolyline(ctx, river, w, h, 'rgba(62, 96, 108, 0.72)', 2.4);
-    drawPolyline(ctx, river, w, h, 'rgba(122, 168, 176, 0.35)', 1.1);
+    drawPolyline(ctx, river, w, h, 'rgba(48, 86, 96, 0.82)', 3.6);
+    drawPolyline(ctx, river, w, h, 'rgba(122, 168, 176, 0.42)', 1.6);
   }
 
   for (const land of lands) {
@@ -543,7 +554,7 @@ export function makeCoastShelfMaterial() {
   return new THREE.MeshStandardMaterial({
     color: 0x7aadb0,
     transparent: true,
-    opacity: 0.34,
+    opacity: 0.46,
     roughness: 0.48,
     metalness: 0.08,
     depthWrite: false,

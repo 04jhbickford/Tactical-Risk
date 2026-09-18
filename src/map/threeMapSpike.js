@@ -287,7 +287,7 @@ export async function bootThreeMapSpike() {
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
   const coastShelfMat = makeCoastShelfMaterial();
-  const riverMat = makeLineMat('#4A7680', 1.65, 0.78);
+  const riverMat = makeLineMat('#4A7680', 2.35, 0.88);
   const selectMat = makeLineMat(PALETTE.select, 5.6, 1);
   lineMats.push(landBorderMat, foamMat, riverMat, selectMat);
 

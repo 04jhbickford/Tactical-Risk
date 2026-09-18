@@ -350,6 +350,12 @@ check('world land atlas bake wired',
 check('IPC dots printed on paper', /PRINT_IPC/.test(terrain) && /drawIpcDot/.test(terrain));
 check('no low-poly Civ chrome stolen',
   !/ROMA/.test(terrain) && !/hex-sawtooth/.test(art) && !/tilt-shift/.test(spike));
+check('p27 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p27/SCORE.md')));
+check('p27 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/europe-mid-390.png'));
+check('p27 mid HUD idle CTA still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/europe-mid-hud-390.png'));
+check('p27 near select Confirm still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/europe-near-select-390.png'));
+check('p27 near units still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/europe-near-units-390.png'));
+check('p27 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p27/vercel-live-mid-390.png'));
 
 if (failures) {
   console.error(`\n${failures} failed`);

@@ -445,8 +445,8 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries continent + biome. Owner stays a light wash.
   // Fallback path still punches Risk chroma at 390.
-  const continentTint = mixHex('#ffffff', region, world ? 0.10 : CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.10 : OWNER_WASH_STRENGTH) : continentTint;
+  const continentTint = mixHex('#ffffff', region, world ? 0.22 : CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.12 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: world ? null : (paperNormal || null),
