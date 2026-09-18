@@ -10,6 +10,10 @@ import { PALETTE, REGION_WASH, USSR_LANDS, bonusContinent, mixHex } from './thre
 export const BAKE_W = 2048;
 export const BAKE_H = 1170;
 
+// P33 HARD: painted board albedo is the hero. Runtime stain is fallback only.
+export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
+export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
+
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',
   mountain: 'assets/three/board/terrain-mountain.png',
@@ -660,7 +664,32 @@ export async function loadTerrainTiles() {
   return tiles;
 }
 
+async function textureFromImage(img) {
+  const tex = new THREE.Texture(img);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export async function loadWorldLandAlbedo() {
+  const img = await loadImage(WORLD_LAND_ALBEDO);
+  if (!img) return null;
+  const tex = await textureFromImage(img);
+  tex.userData = { paintedAlbedo: true, src: WORLD_LAND_ALBEDO };
+  worldLandTex = tex;
+  return tex;
+}
+
 export async function bakeWorldLandAtlas(lands, parchmentImg) {
+  // P33 HARD: painted atlas is the hero. Soft-light stain is fallback only.
+  const painted = await loadWorldLandAlbedo();
+  if (painted) return painted;
   await loadTerrainTiles();
   const w = BAKE_W;
   const h = BAKE_H;
@@ -678,6 +707,7 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
     }
   }
 
+  // P33: this stain stack is FALLBACK ONLY. Hero art is WORLD_LAND_ALBEDO.
   // P29 HARD: parchment ink wash — continent + biome stain the paper.
   // Never solid charcoal GIS fills (that was the .28 mid slab).
   // P30: lighter multiply so Central/Eastern Europe cannot crush to void.
@@ -788,26 +818,12 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
     drawPolyline(ctx, river, w, h, 'rgba(120, 128, 116, 0.28)', 1.4);
   }
 
-  for (const land of lands) {
-    const v = printIpc(land);
-    if (!v) continue;
-    let sx = 0;
-    let sy = 0;
-    let n = 0;
-    for (const poly of land.polygons || []) {
-      for (const [x, y] of poly) {
-        sx += x;
-        sy += y;
-        n += 1;
-      }
-    }
-    if (!n) continue;
-    const cx = sx / n;
-    const cy = sy / n;
-    drawIpcDot(ctx, cx + 18, cy + 22, v, w, h);
-    const roundel = CAPITAL_ROUNDELS[land.name];
-    if (roundel) drawRoundel(ctx, cx - 22, cy - 10, roundel, w, h);
-  }
+  // P33 HARD: never bake IPC fillText / names onto the land atlas.
+  // Counts live in HUD/peek. Capital roundels stay off the paper too.
+  void lands;
+  void drawIpcDot;
+  void drawRoundel;
+  void CAPITAL_ROUNDELS;
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;

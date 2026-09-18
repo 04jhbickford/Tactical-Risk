@@ -39,6 +39,7 @@ import {
   addRiverLines,
   addSeaLaneLines,
 } from './threeMapArt.js';
+import { territoryOutlineRings } from './threeMapOutline.js';
 import {
   PALETTE,
   FACTION_WASH,
@@ -145,17 +146,6 @@ const LAND_ANCHORS = {
   Japan: JAPAN_HOME_CENTER,
 };
 
-const LABEL_OFFSETS = {
-  'Eire': { x: 0, y: -18 },
-  'United Kingdom': { x: 0, y: -18 },
-  'Germany': { x: 0, y: -16 },
-  'West Europe': { x: 0, y: -14 },
-  'South Europe': { x: 8, y: 12 },
-  'East Europe': { x: 0, y: -14 },
-  'Ukraine S.S.R.': { x: 10, y: -16 },
-  'Anglo Sudan Egypt': { x: 0, y: 18 },
-};
-
 export function isThreeSpikeRequested(search = typeof location !== 'undefined' ? location.search : '') {
   const v = String(new URLSearchParams(search).get('three') || '').toLowerCase();
   return v === '1' || v === 'true' || v === 'yes';
@@ -211,25 +201,6 @@ function ownerPlastic(owner) {
 
 function chitTextureFor(type, ownerColor, quantity) {
   return makeChitTexture(type, ownerColor, quantity);
-}
-
-function makeLabelTexture(name) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 320;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 320, 64);
-  ctx.font = '600 20px "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.strokeStyle = 'rgba(21, 34, 40, 0.72)';
-  ctx.lineWidth = 4;
-  ctx.strokeText(name, 160, 32);
-  ctx.fillStyle = '#efe6d6';
-  ctx.fillText(name, 160, 32);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }
 
 export async function bootThreeMapSpike() {
@@ -360,11 +331,6 @@ export async function bootThreeMapSpike() {
     if (!textureCache.has(key)) textureCache.set(key, makeOverflowTexture(plus));
     return textureCache.get(key);
   }
-  function labelTexture(name) {
-    const key = `label|${name}`;
-    if (!textureCache.has(key)) textureCache.set(key, makeLabelTexture(name));
-    return textureCache.get(key);
-  }
 
   reportStartupStatus('Building Three.js board…', 62);
   for (const group of wrapGroups) {
@@ -460,26 +426,7 @@ export async function bootThreeMapSpike() {
       overflow.userData.kind = 'overflow';
       overflow.visible = false;
       group.add(overflow);
-
-      let label = null;
-      if (!t.isWater) {
-        const labTex = labelTexture(t.name);
-        label = new THREE.Sprite(new THREE.SpriteMaterial({
-          map: labTex,
-          transparent: true,
-          depthTest: false,
-          depthWrite: false,
-        }));
-        const lo = LABEL_OFFSETS[t.name] || { x: 0, y: -36 };
-        const lp = worldToScene(center.x + lo.x, center.y + lo.y);
-        label.center.set(0.5, 0.5);
-        label.scale.set(24, 4.8, 1);
-        label.position.set(lp.x, height + 1.4, lp.z);
-        label.renderOrder = 22;
-        label.userData.territory = t;
-        label.userData.kind = 'label';
-        group.add(label);
-      }
+      // P33 HARD: permanent name sprites are gone. Peek holds the name.
 
       unitRecords.push({
         territory: t,
@@ -487,7 +434,7 @@ export async function bootThreeMapSpike() {
         expanded,
         pip,
         overflow,
-        label,
+        label: null,
         center,
         homeX: x,
         homeZ: z,
@@ -719,8 +666,8 @@ export async function bootThreeMapSpike() {
         mats.top.emissive.setHex(hex);
         mats.top.emissiveIntensity = 0.30;
       } else {
-        mats.top.emissive.setHex(0xc4b896);
-        mats.top.emissiveIntensity = 0.045;
+        mats.top.emissive.setHex(0x000000);
+        mats.top.emissiveIntensity = 0;
       }
     }
   }
@@ -773,7 +720,7 @@ export async function bootThreeMapSpike() {
         group.add(wash);
         selectInk.push(wash);
       }
-      for (const poly of territory.polygons || []) {
+      for (const poly of territoryOutlineRings(territory)) {
         const ring = simplifyRing(poly, 0.28);
         if (!ring) continue;
         const halo = makeBorderLine(ring, y, selectHaloMat);
@@ -852,15 +799,7 @@ export async function bootThreeMapSpike() {
             });
           });
         }
-        if (rec.label) {
-          const hide = rec.territory.isWater
-            || selected
-            || rec.stacks.length > 0;
-          rec.label.visible = !hide;
-          const lo = LABEL_OFFSETS[rec.territory.name] || { x: 0, y: 28 };
-          const lp = worldToScene(rec.center.x + lo.x, rec.center.y + lo.y);
-          rec.label.position.set(lp.x, rec.height + 1.2, lp.z - 3.4);
-        }
+        if (rec.label) rec.label.visible = false;
       }
       const byHome = new Map();
       for (const m of movers) {
@@ -1177,6 +1116,24 @@ export async function bootThreeMapSpike() {
       syncDensity();
       return currentBand() === 'mid';
     },
+    frameChina(opts = {}) {
+      const land = lands.find((t) => t.name === 'China');
+      const c = land && territoryCenter(land);
+      if (!c) return false;
+      const p = worldToScene(c.x, c.y);
+      const lift = opts.lift ?? 118;
+      camera.position.set(p.x, lift, p.z - 14);
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      window.__threeSpike.selectLand('China');
+      syncDensity();
+      return {
+        band: currentBand(),
+        rings: territoryOutlineRings(land).length,
+        polys: (land.polygons || []).length,
+      };
+    },
     continents,
     rosterOf(name) {
       const stacks = stacksFor(name, placements);
@@ -1244,6 +1201,10 @@ export async function bootThreeMapSpike() {
         selectClear: true,
         liveContinents: true,
         continentCount: continents.length,
+        paintedAlbedo: true,
+        dissolveSelect: true,
+        noMapLabels: true,
+        noBakedIpc: true,
       };
     },
   };

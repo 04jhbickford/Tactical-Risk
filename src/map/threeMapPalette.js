@@ -464,21 +464,22 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
   // light wash. P32: quiet continent tint — never a chocolate flood vs select gold.
-  const continentTint = mixHex('#ffffff', region, world ? 0.07 : CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.08 : OWNER_WASH_STRENGTH) : continentTint;
+  const continentTint = mixHex('#ffffff', region, world ? 0 : CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.03 : OWNER_WASH_STRENGTH) : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: world ? null : (paperNormal || null),
     aoMap: world ? null : (paperAO || null),
     aoMapIntensity: world ? 0 : (paperAO ? 1.08 : 0),
-    color: tint,
+    color: world ? 0xffffff : tint,
     roughness: 0.76,
     metalness: 0.0,
-    envMapIntensity: 0.14,
+    envMapIntensity: world ? 0.06 : 0.14,
     transparent: false,
     side: THREE.DoubleSide,
-    emissive: 0xc4b896,
-    emissiveIntensity: 0.045,
+    // P33: painted albedo is the hero — idle parchment emissive washed it to GIS.
+    emissive: 0x000000,
+    emissiveIntensity: 0,
   });
   if (top.normalMap) top.normalScale.set(TOOTH_NORMAL_MID, TOOTH_NORMAL_MID);
   const wall = new THREE.MeshStandardMaterial({

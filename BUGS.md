@@ -2,6 +2,27 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.33 (preview only, SCHEMA 11)
+
+Locked diagnosis: geography was still a runtime Canvas2D wash, so James kept
+seeing “the same slight wash.” Preview `?three=1` only. Do not merge. Live
+Canvas untouched. Tesla off. Quiet James. James YES on strategy.
+
+1. **Painted world albedo** — image-gen world + Europe/Asia theaters composited
+   through live land polygons into `assets/three/board/world-land-albedo.png`
+   (4096×2340). MeshStandard samples it. fillStain stack is fallback only.
+2. **Dissolve multipolygon select + ink** — China and any multi-poly land
+   stroke the outer union only (`territoryOutlineRings`). No internal seam.
+3. **No permanent map labels** — name sprites gone; IPC `fillText` not baked.
+   Counts/values live in HUD/peek. Continent +N chips stay.
+
+Keep: mid pip+N, Japan multi-type LOD, quiet lanes, Confirm exclusive gold,
+idle quiet-dark, quiet continent +N.
+
+SCHEMA 11. GAME_VERSION V2.81.51-three-polish.33.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.32 (preview only, SCHEMA 11)
 
 Viz love-gate FAIL ~92% on `.31`. Asia mid still was pip-only so Japan multi-type

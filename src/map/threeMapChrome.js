@@ -5,6 +5,7 @@ import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import { formatUnitName } from '../utils/unitNames.js';
 import { pieceIconDataUrl } from './threeMapChits.js';
 import { plasticFor } from './threeMapChits.js';
+import { printIpc } from './threeMapTerrain.js';
 
 const TYPE_SHORT = {
   infantry: 'INF',
@@ -350,9 +351,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       const unitLine = unitType
         ? `${formatUnitName(unitType)}`
         : '';
+      const ipcLine = !land.isWater ? `${printIpc(land)} IPC` : '';
       const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
       api.peek.innerHTML = `<strong>${land.name}</strong>
-        <div class="three-peek-meta">${[owner, unitLine].filter(Boolean).join(' · ')}</div>
+        <div class="three-peek-meta">${[owner, ipcLine, unitLine].filter(Boolean).join(' · ')}</div>
         ${iconRowHtml(stacks)}`;
       api.peek.dataset.rosterTotal = String(rosterTotal);
       if (!api.isSheetOpen()) api.peek.classList.add('is-on');

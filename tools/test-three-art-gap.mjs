@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.32 Japan multi-type LOD + quiet continent wash.
+// V2.81.51-three-polish.33 painted world albedo + dissolve select + no map labels.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -42,6 +42,10 @@ const chrome = readFileSync(join(root, 'src/map/threeMapChrome.js'), 'utf8');
 const art = readFileSync(join(root, 'src/map/threeMapArt.js'), 'utf8');
 const terrain = readFileSync(join(root, 'src/map/threeMapTerrain.js'), 'utf8');
 const baker = readFileSync(join(root, 'tools/bake-james-hecorrect.py'), 'utf8');
+const albedoBaker = readFileSync(join(root, 'tools/bake-world-land-albedo.py'), 'utf8');
+const outlineSrc = readFileSync(join(root, 'src/map/threeMapOutline.js'), 'utf8');
+const { territoryOutlineRings } = await import(pathToFileURL(join(root, 'src/map/threeMapOutline.js')));
+const territories = JSON.parse(readFileSync(join(root, 'data/territories.json'), 'utf8'));
 
 let failures = 0;
 const check = (label, cond) => {
@@ -60,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.32', GAME_VERSION === 'V2.81.51-three-polish.32');
+check('GAME_VERSION is V2.81.51-three-polish.33', GAME_VERSION === 'V2.81.51-three-polish.33');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -365,7 +369,10 @@ check('land undulation sculpt',
   /sculptLandRelief/.test(art) && /BIOME_LIFT/.test(terrain) && /landUndulation/.test(spike));
 check('world land atlas bake wired',
   /bakeWorldLandAtlas/.test(spike) && /setWorldLandMap/.test(spike) && /applyWorldLandUVs/.test(art));
-check('IPC dots printed on paper', /PRINT_IPC/.test(terrain) && /drawIpcDot/.test(terrain));
+check('IPC values live in peek, not baked on paper',
+  /printIpc\(land\)/.test(chrome) && /IPC/.test(chrome)
+  && /never bake IPC fillText/.test(terrain)
+  && !/drawIpcDot\(ctx, cx/.test(terrain));
 check('no low-poly Civ chrome stolen',
   !/ROMA/.test(terrain) && !/hex-sawtooth/.test(art) && !/tilt-shift/.test(spike));
 check('p27 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p27/SCORE.md')));
@@ -536,6 +543,68 @@ check('p32 SCORE states Japan LOD proven',
   /Japan multi-type LOD/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8'))
   && /\*\*PASS\*\*/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8'))
   && /near-japan-multitype-390\.png/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p32/SCORE.md'), 'utf8')));
+
+check('p33 painted world albedo on disk (4096+)', (() => {
+  const p = join(root, 'assets/three/board/world-land-albedo.png');
+  if (!pngOk('assets/three/board/world-land-albedo.png')) return false;
+  const buf = readFileSync(p);
+  const w = buf.readUInt32BE(16);
+  const h = buf.readUInt32BE(20);
+  return w >= 4096 && h >= 2048;
+})());
+check('p33 albedo baker is image-gen + polygon clip',
+  /world-painted\.png/.test(albedoBaker)
+  && /land_mask/.test(albedoBaker)
+  && /NOT a copyright scan/.test(albedoBaker)
+  && /ATLAS_W = 4096/.test(albedoBaker));
+check('p33 land samples painted albedo, stain is fallback',
+  /WORLD_LAND_ALBEDO/.test(terrain)
+  && /loadWorldLandAlbedo/.test(terrain)
+  && /painted atlas is the hero/.test(terrain)
+  && /FALLBACK ONLY/.test(terrain)
+  && /painted albedo is the hero/.test(palette)
+  && /emissive: 0x000000/.test(palette));
+check('p33 no permanent name sprites',
+  /permanent name sprites are gone/.test(spike)
+  && !/labelTexture\(t\.name\)/.test(spike)
+  && !/makeLabelTexture\(name\)/.test(spike)
+  && !/kind = 'label'/.test(spike));
+check('p33 dissolve multipolygon select + ink',
+  /territoryOutlineRings/.test(outlineSrc)
+  && /rasterUnionRings/.test(outlineSrc)
+  && /outer union only/.test(art)
+  && /dissolve multipolygons/.test(art)
+  && /territoryOutlineRings\(territory\)/.test(spike)
+  && /frameChina/.test(spike));
+{
+  const china = territories.find((t) => t.name === 'China');
+  const rings = territoryOutlineRings(china);
+  check('p33 China union is one outer ring (no internal seam)',
+    (china?.polygons || []).length === 2
+    && rings.length === 1
+    && rings[0].length >= 12);
+  const philippines = territories.find((t) => t.name === 'Philippines');
+  const isleRings = territoryOutlineRings(philippines);
+  check('p33 archipelago keeps multiple outer rings',
+    (philippines?.polygons || []).length >= 4
+    && isleRings.length >= 2);
+}
+check('p33 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P33.md')));
+check('p33 inspect flags painted albedo / dissolve / no labels',
+  /paintedAlbedo: true/.test(spike)
+  && /dissolveSelect: true/.test(spike)
+  && /noMapLabels: true/.test(spike)
+  && /noBakedIpc: true/.test(spike));
+check('p33 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md')));
+check('p33 mid painted board still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/europe-mid-390.png'));
+check('p33 China select no-internal-border still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/china-select-390.png'));
+check('p33 Japan near multi-type held still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/near-japan-multitype-390.png'));
+check('p33 Japan mid pip still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/japan-mid-390.png'));
+check('p33 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p33/vercel-live-mid-390.png'));
+check('p33 SCORE states painted albedo + dissolve',
+  /Painted world albedo/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
+  && /Dissolve China select/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8'))
+  && /rings=1/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p33/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);
