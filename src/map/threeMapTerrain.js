@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
-import { PALETTE, REGION_WASH, USSR_LANDS, bonusContinent } from './threeMapPalette.js';
+import { PALETTE, REGION_WASH, USSR_LANDS, bonusContinent, mixHex } from './threeMapPalette.js';
 
 export const BAKE_W = 2048;
 export const BAKE_H = 1170;
@@ -286,11 +286,20 @@ export function printIpc(territory) {
   return territory.production > 1 ? territory.production : 1;
 }
 
+export const CONTINENT_FILL_ALPHA = 0.12;
+export const CONTINENT_OVERLAY_ALPHA = 0.09;
+export const CONTINENT_OUTLINE_ALPHA = 0.52;
+
 function continentWash(territory) {
   // P31 HARD: live Risk bonus continents. USSR_LANDS stay Asia, not a 8th wash.
   if (!territory) return REGION_WASH.Europe;
   const key = bonusContinent(territory) || 'Europe';
   return REGION_WASH[key] || PALETTE.landBase;
+}
+
+function quietContinentWash(hex) {
+  // Mix toward parchment so multiply cannot crush Europe into chocolate.
+  return `#${mixHex(hex, PALETTE.landBase, 0.62).toString(16).padStart(6, '0')}`;
 }
 
 // Printed +N chips at bonus-group centroids (data/continents.json).
@@ -429,7 +438,7 @@ function paintMountainMass(ctx, ridge, w, h, tile) {
   for (let i = 0; i < ridge.length; i++) {
     const px = wxToU(ridge[i][0]) * w;
     const py = wyToV(ridge[i][1]) * h;
-    ctx.ellipse(px, py, 108, 72, 0.2, 0, Math.PI * 2);
+    ctx.ellipse(px, py, 124, 84, 0.2, 0, Math.PI * 2);
   }
   for (let i = 0; i < ridge.length - 1; i++) {
     const ax = wxToU(ridge[i][0]) * w;
@@ -438,18 +447,25 @@ function paintMountainMass(ctx, ridge, w, h, tile) {
     const by = wyToV(ridge[i + 1][1]) * h;
     const mx = (ax + bx) / 2;
     const my = (ay + by) / 2;
-    ctx.ellipse(mx, my, 120, 78, 0.15, 0, Math.PI * 2);
+    ctx.ellipse(mx, my, 138, 92, 0.15, 0, Math.PI * 2);
   }
   ctx.clip();
   if (tile) {
     ctx.globalCompositeOperation = 'multiply';
     ctx.globalAlpha = 0.55;
-    const tw = 420;
-    const th = 320;
+    const tw = 460;
+    const th = 350;
     for (let i = 0; i < ridge.length; i++) {
       const px = wxToU(ridge[i][0]) * w;
       const py = wyToV(ridge[i][1]) * h;
       ctx.drawImage(tile, px - tw / 2, py - th / 2, tw, th);
+    }
+    for (let i = 0; i < ridge.length - 1; i++) {
+      const ax = wxToU(ridge[i][0]) * w;
+      const ay = wyToV(ridge[i][1]) * h;
+      const bx = wxToU(ridge[i + 1][0]) * w;
+      const by = wyToV(ridge[i + 1][1]) * h;
+      ctx.drawImage(tile, (ax + bx) / 2 - tw / 2, (ay + by) / 2 - th / 2, tw, th);
     }
   }
   for (let i = 0; i < ridge.length; i++) {
@@ -670,8 +686,10 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
       if (!pathPoly(ctx, poly, w, h)) continue;
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
-      fillFeathered(ctx, poly, w, h, continent, 0.38);
-      fillFeathered(ctx, poly, w, h, climate, 0.08);
+      fillFeathered(ctx, poly, w, h, quietContinentWash(continent), CONTINENT_FILL_ALPHA);
+      fillFeathered(ctx, poly, w, h, climate, 0.06);
+      ctx.globalCompositeOperation = 'overlay';
+      fillFeathered(ctx, poly, w, h, continent, CONTINENT_OVERLAY_ALPHA);
       if (!pathPoly(ctx, poly, w, h)) {
         ctx.restore();
         continue;
@@ -711,9 +729,9 @@ export async function bakeWorldLandAtlas(lands, parchmentImg) {
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = continent;
-        ctx.globalAlpha = 0.40;
+        ctx.globalAlpha = CONTINENT_OUTLINE_ALPHA;
         ctx.lineJoin = 'round';
-        ctx.lineWidth = 3.8;
+        ctx.lineWidth = 4.4;
         ctx.stroke();
         ctx.restore();
       }

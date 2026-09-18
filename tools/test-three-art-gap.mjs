@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.31 painted board + live Risk continents + no-clip LOD.
+// V2.81.51-three-polish.32 Japan multi-type LOD + quiet continent wash.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -31,6 +31,8 @@ const {
   isSmallLand,
   territoryFootprint,
   DENSE_LANDS,
+  JAPAN_HOME_CENTER,
+  denseFootprint,
 } = await import(pathToFileURL(join(root, 'src/map/threeMapDensity.js')));
 
 const chits = readFileSync(join(root, 'src/map/threeMapChits.js'), 'utf8');
@@ -58,7 +60,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.31', GAME_VERSION === 'V2.81.51-three-polish.31');
+check('GAME_VERSION is V2.81.51-three-polish.32', GAME_VERSION === 'V2.81.51-three-polish.32');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -119,15 +121,15 @@ check('faction plastic DE/SU/UK/US/JP',
   /#6A6C68/.test(palette) && /#2F7A2A/.test(palette) && /#B89050/.test(palette)
   && /#4E6828/.test(palette) && /#D24A1C/.test(palette));
 
-check('continent Europe dusty steel (live bonus)', /Europe: '#4E7388'/.test(palette));
-check('continent USSR leftover only, not a bonus group', /USSR: '#8A7355'/.test(palette));
-check('continent Africa ochre', /Africa: '#B08948'/.test(palette));
-check('continent Asia olive (includes Russia/Ukraine)', /Asia: '#6A8A3C'/.test(palette));
-check('continent NA green', /'North America': '#6A8B6E'/.test(palette));
-check('continent SA cocoa', /'South America': '#8A6848'/.test(palette));
-check('continent Pacific slate', /Oceania: '#7A7B8A'/.test(palette));
-check('continent ME dusty gold', /'Middle East': '#C4A068'/.test(palette));
-check('continent wash 18-28%', /CONTINENT_WASH_STRENGTH = 0\.28/.test(palette));
+check('continent Europe dusty steel (live bonus)', /Europe: '#7A98A4'/.test(palette));
+check('continent USSR leftover only, not a bonus group', /USSR: '#A09078'/.test(palette));
+check('continent Africa ochre', /Africa: '#C4A878'/.test(palette));
+check('continent Asia olive (includes Russia/Ukraine)', /Asia: '#8A9A62'/.test(palette));
+check('continent NA green', /'North America': '#8A9E88'/.test(palette));
+check('continent SA cocoa', /'South America': '#A88868'/.test(palette));
+check('continent Pacific slate', /Oceania: '#8A8B98'/.test(palette));
+check('continent ME dusty gold', /'Middle East': '#D0B888'/.test(palette));
+check('continent wash quiet stain', /CONTINENT_WASH_STRENGTH = 0\.12/.test(palette));
 check('Viz wash is 18-28% over parchment not solid',
   /WASH_STRENGTH = 0\.28/.test(baker)
   && /np\.clip\(strength.*0\.18, 0\.28\)/.test(baker)
@@ -260,7 +262,7 @@ check('near never collapses typed chits back to pip',
 check('select or near shows molded minis; mid idle stays pip',
   showMinis('near', false) && showMinis('mid', true) && !showMinis('mid', false)
   && !showMinis('far', false) && PIECE_PX >= 96);
-check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
+check('continent chroma punch at runtime', /CONTINENT_CHROMA_PUNCH = 0\.12/.test(palette));
 check('ocean shelf + grain', /oceanShelf/.test(palette) && /OCEAN_GRAIN/.test(palette));
 check('gold select emissive on land', /0xC4A35A/.test(spike) && /emissiveIntensity/.test(spike));
 check('iPhone two-finger pinch',
@@ -316,7 +318,7 @@ check('peek roster total stays synced to map stacks',
   /dataset\.rosterTotal/.test(chrome)
   && /rosterOf/.test(spike)
   && /stackTotal/.test(spike));
-check('continent punch holds at near', /LOD-invariant/.test(palette) && /CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
+check('continent punch holds at near', /LOD-invariant/.test(palette) && /CONTINENT_CHROMA_PUNCH/.test(palette));
 check('preview gate stays ?three=1', /isThreeSpikeRequested/.test(spike));
 check('support types are FAC/AA', isSupportType('factory') && isSupportType('aaGun') && !isSupportType('infantry'));
 check('p22 mid 390 still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p22/europe-mid-390.png'));
@@ -395,7 +397,7 @@ check('p31 painted mountains, not hatch-tick ridges',
   && !/drawRidgeHatch/.test(terrain)
   && !/tick = 28/.test(terrain));
 check('p29 frameNear helper for faction stills',
-  /frameNear\(name\)/.test(spike) && /frameNearGermany/.test(spike));
+  /frameNear\(name/.test(spike) && /frameNearGermany/.test(spike));
 check('p28 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P28.md')));
 check('p29 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P29.md')));
 check('p28 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p28/SCORE.md')));
@@ -494,6 +496,35 @@ check('p31 Japan near multi-type still', pngOk('briefs/2026-09-17-three-art-gap/
 check('p31 UK tan still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/uk-near-select-390.png'));
 check('p31 SU green still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/russia-near-select-390.png'));
 check('p31 vercel live mid still', pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p31/vercel-live-mid-390.png'));
+check('p32 quiet continent wash under select gold',
+  /CONTINENT_FILL_ALPHA = 0\.12/.test(terrain)
+  && /CONTINENT_OVERLAY_ALPHA = 0\.09/.test(terrain)
+  && /quietContinentWash/.test(terrain)
+  && /CONTINENT_CHROMA_PUNCH = 0\.12/.test(palette)
+  && /CONTINENT_WASH_STRENGTH = 0\.12/.test(palette)
+  && /quiet continent tint/.test(palette)
+  && /Europe: '#7A98A4'/.test(palette)
+  && !/fillFeathered\(ctx, poly, w, h, continent, 0\.38\)/.test(terrain)
+  && !/CONTINENT_CHROMA_PUNCH = 0\.42/.test(palette));
+check('p32 Japan home-island frame, not sea-zone centroid',
+  JAPAN_HOME_CENTER.x === 2562
+  && JAPAN_HOME_CENTER.y === 718
+  && /LAND_ANCHORS/.test(spike)
+  && /frameMidJapan/.test(spike)
+  && /lift: 84/.test(spike)
+  && /'Japan Sea Zone': \{ x: 2695/.test(spike)
+  && /water pin — keep east of home islands/.test(spike)
+  && /applyLiveContinents/.test(spike));
+check('p32 Japan multi-type pieces are tighter than .31 bbox cap',
+  footprintPiecePx({ min: 286 }, 'near', true, 4, 'Japan') <= 48
+  && pieceWorldCap(13.5, { min: 286 }, 4, 'Japan') < pieceWorldCap(13.5, { min: 286 }, 4)
+  && denseFootprint('Japan', { min: 286 }).min === 92
+  && packPitchFor(4, 6, { min: 286 }, 'Japan') < packPitchFor(4, 6, { min: 286 }));
+check('p32 inspect proves Japan LOD + quiet wash',
+  /japanHome: true/.test(spike)
+  && /quietContinentWash: true/.test(spike)
+  && /japanLod: true/.test(spike));
+check('p32 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P32.md')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

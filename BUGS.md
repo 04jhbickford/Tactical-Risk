@@ -2,6 +2,25 @@
 
 ---
 
+## 9.18.26 — V2.81.51-three-polish.32 (preview only, SCHEMA 11)
+
+Viz love-gate FAIL ~92% on `.31`. Asia mid still was pip-only so Japan multi-type
+LOD was unproven; Europe +30 chocolate flood rivaled select gold. Preview
+`?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+1. **Japan multi-type LOD** — home-island pin `JAPAN_HOME_CENTER` (2562, 718),
+   near frame at lift 84 (island + ocean, still `near`), tighter/smaller JP
+   minis. Mid idle stays pip+N. Sea Zone water pin 2695/750 kept.
+2. **Quiet continent wash** — fill 0.12 + overlay 0.09, punch 0.12, lighter
+   stain hexes. Identity = tint + outline + `+N` badge. Under select gold.
+3. **Keep** — painted mountains (slightly denser mass), no-clip, Confirm gold
+   exclusive, live `continents.json`.
+
+390 stills in `qa-loop/p32/` including required `near-japan-multitype-390.png`.
+SCHEMA 11. GAME_VERSION V2.81.51-three-polish.32.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.28 (preview only, SCHEMA 11)
 
 Viz love-gate FAIL ~72% on `.27`. Near/tray still read as ring-discs + flat glyphs; GEO still weak vs A&A board. Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.

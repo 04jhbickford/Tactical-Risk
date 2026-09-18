@@ -74,6 +74,7 @@ import {
   pieceWorldCap,
   isSmallLand,
   territoryFootprint,
+  JAPAN_HOME_CENTER,
   separatePoints,
   isDenseBand,
   nearLayout,
@@ -103,7 +104,7 @@ const SEA_ZONE_CENTERS = {
   'Hawaii Sea Zone': { x: 3062, y: 960 },
   'Wake Island Sea Zone': { x: 2764, y: 1003 },
   'Okinawa Sea Zone': { x: 2569, y: 943 },
-  'Japan Sea Zone': { x: 2695, y: 750 },
+  'Japan Sea Zone': { x: 2695, y: 750 }, // water pin — keep east of home islands
   'New Zealand Sea Zone': { x: 2964, y: 1658 },
   'South Pacific Sea Zone': { x: 2992, y: 1314 },
   'Solomon Islands Sea Zone': { x: 2778, y: 1288 },
@@ -140,6 +141,10 @@ const LAND_UNIT_OFFSETS = {
   'East Canada': { x: 60, y: 0 },
 };
 
+const LAND_ANCHORS = {
+  Japan: JAPAN_HOME_CENTER,
+};
+
 const LABEL_OFFSETS = {
   'Eire': { x: 0, y: -18 },
   'United Kingdom': { x: 0, y: -18 },
@@ -167,6 +172,8 @@ function isCoarsePointer() {
 function unitAnchor(territory) {
   const sea = SEA_ZONE_CENTERS[territory.name];
   if (territory.isWater && sea) return { x: sea.x, y: sea.y, area: 1 };
+  const pin = LAND_ANCHORS[territory.name];
+  if (pin && !territory.isWater) return { x: pin.x, y: pin.y, area: 1 };
   const center = territoryCenter(territory);
   if (!center) return null;
   const off = LAND_UNIT_OFFSETS[territory.name];
@@ -174,6 +181,16 @@ function unitAnchor(territory) {
     return { x: center.x + off.x, y: center.y + off.y, area: center.area };
   }
   return center;
+}
+
+function applyLiveContinents(list, bonusGroups) {
+  const of = new Map();
+  for (const c of bonusGroups || []) {
+    for (const n of c.territories || []) of.set(n, c.name);
+  }
+  for (const t of list || []) {
+    if (of.has(t.name)) t.continent = of.get(t.name);
+  }
 }
 
 function stacksFor(name, placements) {
@@ -235,6 +252,7 @@ export async function bootThreeMapSpike() {
     continents = await cRes.json();
     setup = await sRes.json();
     unitDefs = await uRes.json();
+    applyLiveContinents(territories, continents);
   } catch (err) {
     console.error(err);
     reportStartupError('Three.js spike could not load territory data.');
@@ -307,7 +325,7 @@ export async function bootThreeMapSpike() {
   const continentMats = new Map();
   for (const [name, hex] of Object.entries(REGION_WASH)) {
     if (name === 'USSR') continue;
-    continentMats.set(name, makeLineMat(hex, 3.4, 0.62));
+    continentMats.set(name, makeLineMat(hex, 3.8, 0.74));
   }
   const seaLaneMat = makeLineMat('#B8B09A', 1.45, 0.38, {
     dashed: true,
@@ -707,11 +725,12 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  function screenScale(kind, footprint, typeCount = 1) {
+  function screenScale(kind, footprint, typeCount = 1, name = '') {
     const dist = camera.position.distanceTo(controls.target);
     const h = renderer.domElement.clientHeight || window.innerHeight || 844;
-    const px = footprintPiecePx(footprint, kind === 'pip' ? 'mid' : 'near', kind !== 'pip', typeCount);
-    const small = (footprint?.min || 200) < 140;
+    const px = footprintPiecePx(footprint, kind === 'pip' ? 'mid' : 'near', kind !== 'pip', typeCount, name);
+    const small = isSmallLand(name, footprint);
+    const japan = name === 'Japan';
     if (kind === 'pip') {
       return worldSizeFromScreen(px, dist, camera.fov, h, {
         minPx: small ? 40 : PIP_MIN_PX,
@@ -720,11 +739,11 @@ export async function bootThreeMapSpike() {
       });
     }
     const world = worldSizeFromScreen(px, dist, camera.fov, h, {
-      minPx: small ? 50 : 68,
-      maxPx: small ? 76 : PIECE_MAX_PX,
-      maxWorld: small ? 7.0 : 13.5,
+      minPx: japan ? 42 : (small ? 50 : 68),
+      maxPx: japan ? 58 : (small ? 76 : PIECE_MAX_PX),
+      maxWorld: japan ? 5.2 : (small ? 7.0 : 13.5),
     });
-    return pieceWorldCap(world, footprint, typeCount);
+    return pieceWorldCap(world, footprint, typeCount, name);
   }
 
   function screenGap(tokenWorld) {
@@ -785,9 +804,10 @@ export async function bootThreeMapSpike() {
         const selected = rec.territory.name === selectedName;
         const footprint = rec.footprint || { min: 200 };
         const typeCount = rec.stacks.length;
-        const pipS = screenScale('pip', footprint, 1);
-        const pieceS = screenScale('piece', footprint, Math.max(1, Math.min(4, typeCount)));
-        const small = isSmallLand(rec.territory.name, footprint) || typeCount >= 4;
+        const pipS = screenScale('pip', footprint, 1, rec.territory.name);
+        const pieceS = screenScale('piece', footprint, Math.max(1, Math.min(4, typeCount)), rec.territory.name);
+        const small = isSmallLand(rec.territory.name, footprint) || typeCount >= 4
+          || rec.territory.name === 'Japan';
         // STACK-LOD / P22 HARD: mid/far idle = ONE cream pip+N. ZERO type parade.
         // Near OR select = molded plastic minis ≤3–4 +K. Roster lives in peek.
         const dense = isDenseBand(band);
@@ -816,7 +836,7 @@ export async function bootThreeMapSpike() {
         if (!collapse) {
           const shown = rec.expanded.filter((s) => s.visible);
           if (rec.overflow?.visible) shown.push(rec.overflow);
-          const pitch = packPitchFor(shown.length, pieceS, footprint);
+          const pitch = packPitchFor(shown.length, pieceS, footprint, rec.territory.name);
           const spots = (small ? clusterPack : spiralPack)(shown.length, pitch);
           const minSep = screenGap(pieceS * (small ? 0.72 : 1));
           shown.forEach((sprite, i) => {
@@ -1122,23 +1142,40 @@ export async function bootThreeMapSpike() {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
     },
-    frameNear(name) {
+    frameNear(name, opts = {}) {
       const land = lands.find((t) => t.name === name);
-      const c = land && territoryCenter(land);
+      const pin = LAND_ANCHORS[name];
+      const c = pin || (land && territoryCenter(land));
       if (!c) return false;
       const p = worldToScene(c.x, c.y);
-      camera.position.set(p.x, 58, p.z - 8);
+      const japan = name === 'Japan';
+      // Japan: stay NEAR (<92) but pull back so home islands + ocean read.
+      // y=58 cropped Japan into a land blob and failed the love-gate.
+      const lift = opts.lift ?? (japan ? 84 : 58);
+      const south = opts.south ?? (japan ? 12 : 8);
+      camera.position.set(p.x, lift, p.z - south);
       controls.target.set(p.x, 0, p.z);
       applyZoomCap();
       controls.update();
       syncDensity();
-      return true;
+      return currentBand();
     },
     frameNearGermany() {
       return window.__threeSpike.frameNear('Germany');
     },
     frameNearJapan() {
-      return window.__threeSpike.frameNear('Japan');
+      const band = window.__threeSpike.frameNear('Japan', { lift: 84, south: 12 });
+      window.__threeSpike.selectLand('Japan');
+      return band === 'near';
+    },
+    frameMidJapan() {
+      const p = worldToScene(JAPAN_HOME_CENTER.x, JAPAN_HOME_CENTER.y);
+      camera.position.set(p.x, 168, p.z - 22);
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      syncDensity();
+      return currentBand() === 'mid';
     },
     continents,
     rosterOf(name) {
@@ -1202,6 +1239,8 @@ export async function bootThreeMapSpike() {
         noHatchRidges: true,
         unitNoClip: true,
         japanLod: true,
+        japanHome: true,
+        quietContinentWash: true,
         selectClear: true,
         liveContinents: true,
         continentCount: continents.length,
