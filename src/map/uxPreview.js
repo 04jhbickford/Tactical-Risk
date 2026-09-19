@@ -40,6 +40,7 @@ import {
   battleCard,
   inspectPlay,
   dismissGuide,
+  tryCombatMove,
   driveCombatMove,
   driveBattleMid,
   driveAirChoice,
@@ -396,6 +397,14 @@ export async function bootUxPreview() {
       territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
       const marks = highlights(play);
       const byName = (name) => territories.find((t) => t.name === name);
+      const pulse = 0.55 + 0.45 * Math.sin((performance.now() || Date.now()) / 420);
+      for (const name of marks.origins || []) {
+        strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          dashed: false,
+          width: 2.4 + pulse * 2.2,
+        });
+      }
       for (const name of marks.legal || []) {
         strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
           color: SELECT_GOLD,
@@ -437,13 +446,17 @@ export async function bootUxPreview() {
         selectedName: selected?.name || null,
         stacksExpanded,
         factionColors,
+        glowNames: marks.origins || [],
+        glowPulse: pulse,
       });
       ctx.restore();
     }
   }
 
   function loop() {
-    if (camera.dirty || camera._targetX !== null) {
+    const marks = highlights(play);
+    const pulsing = (marks.origins || []).length > 0;
+    if (camera.dirty || camera._targetX !== null || pulsing) {
       camera.dirty = false;
       paint();
     }
@@ -525,7 +538,7 @@ export async function bootUxPreview() {
       owners: Object.keys(owners).length,
       placements: Object.keys(placements).length,
       continents: continents.length,
-      idleConfirm: 'Select your stack',
+      idleConfirm: 'Try combat move',
       confirmGold: SELECT_GOLD,
       stress: stressOn,
       play: inspectPlay(play),
@@ -574,6 +587,13 @@ export async function bootUxPreview() {
     layouts: currentLayouts,
     chrome,
     playInspect: () => inspectPlay(play),
+    tryCombatMove: () => {
+      tryCombatMove(play);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
     reset: () => {
       resetScenario(play);
       syncSelectionFromPlay();

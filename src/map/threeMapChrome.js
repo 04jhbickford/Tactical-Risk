@@ -213,6 +213,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       backdrop-filter:none;
       box-shadow:inset 0 1px 0 rgba(255,248,230,0.28);
     }
+    #three-confirm.is-try:not(:disabled) {
+      background:rgba(30,36,32,0.88); color:#F4EFE4; cursor:pointer;
+      border:1.5px solid #C4A35A;
+      box-shadow:inset 0 1px 0 rgba(255,248,230,0.16), 0 0 0 1px rgba(196,163,90,0.28);
+    }
     #three-zoom {
       position:absolute; right:max(10px, env(safe-area-inset-right));
       bottom:calc(74px + env(safe-area-inset-bottom, 0px));
@@ -240,17 +245,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-guide {
       display:none; pointer-events:auto;
       min-height:36px; padding:8px 10px; border-radius:12px;
-      background:rgba(30,36,32,0.42);
+      background:rgba(30,36,32,0.62);
       -webkit-backdrop-filter:saturate(1.35) blur(16px);
       backdrop-filter:saturate(1.35) blur(16px);
-      border:1px solid rgba(255,255,255,0.10);
-      color:#E8E2D4;
-      font:500 13px/1.35 -apple-system,"SF Pro Text",sans-serif;
-      display:none;
+      border:1px solid rgba(196,163,90,0.42);
+      color:#F4EFE4;
+      font:600 13px/1.3 -apple-system,"SF Pro Text",sans-serif;
       align-items:flex-start; gap:8px;
     }
     #three-guide.is-on { display:flex; }
-    #three-guide span { flex:1; }
+    #three-guide span { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     #three-guide button {
       flex:0 0 auto; width:36px; height:36px; margin:-4px -4px 0 0;
       border:0; border-radius:10px; background:transparent; color:#c8c0b0;
@@ -323,7 +327,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-l0 .three-l0-ver { display:none; }
       #three-peek .three-peek-unit { width:48px; height:48px; }
       #three-peek .three-peek-unit img { width:40px; height:40px; }
-      #three-guide { font-size:12px; }
+      #three-guide { font-size:11px; }
       #three-battle strong { font-size:16px; }
       #three-battle .three-die { width:26px; height:26px; }
     }
@@ -427,21 +431,29 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     setConfirmIdle(label = 'Select your stack') {
       api.confirm.disabled = true;
-      api.confirm.classList.remove('is-ready');
+      api.confirm.classList.remove('is-ready', 'is-try');
       api.confirm.classList.add('is-idle');
+      api.confirm.textContent = label;
+      api.confirm.style.removeProperty('background');
+      api.confirm.style.removeProperty('color');
+    },
+    setConfirmTry(label = 'Try combat move') {
+      api.confirm.disabled = false;
+      api.confirm.classList.remove('is-ready', 'is-idle');
+      api.confirm.classList.add('is-try');
       api.confirm.textContent = label;
       api.confirm.style.removeProperty('background');
       api.confirm.style.removeProperty('color');
     },
     setConfirmReady(label) {
       api.confirm.disabled = false;
-      api.confirm.classList.remove('is-idle');
+      api.confirm.classList.remove('is-idle', 'is-try');
       api.confirm.classList.add('is-ready');
       api.confirm.textContent = label;
     },
     setConfirmReplay(label) {
       api.confirm.disabled = false;
-      api.confirm.classList.remove('is-ready');
+      api.confirm.classList.remove('is-ready', 'is-try');
       api.confirm.classList.add('is-idle');
       api.confirm.textContent = label;
       api.confirm.style.removeProperty('background');
@@ -529,6 +541,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       }
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
       else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
+      else if (enabled) api.setConfirmTry(label || 'Try combat move');
       else api.setConfirmIdle(label || 'Select your stack');
       api.syncLayers();
     },

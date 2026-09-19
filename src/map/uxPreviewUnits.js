@@ -454,6 +454,8 @@ export function renderPreviewStacks(ctx, {
   selectedName,
   stacksExpanded,
   factionColors,
+  glowNames = [],
+  glowPulse = 1,
 }) {
   const layouts = layoutAllPreviewStacks({
     territories,
@@ -462,9 +464,22 @@ export function renderPreviewStacks(ctx, {
     selectedName,
     stacksExpanded,
   });
+  const glow = new Set(glowNames || []);
+  const pulse = Number.isFinite(glowPulse) ? glowPulse : 1;
   for (const layout of layouts) {
     const color = factionColors?.get(layout.owner) || FACTION_FALLBACK[layout.owner] || '#4A4A4A';
+    const glowing = glow.has(layout.name);
     for (const tok of layout.tokens) {
+      if (glowing) {
+        ctx.save();
+        ctx.shadowColor = `rgba(196, 163, 90, ${0.35 + 0.45 * pulse})`;
+        ctx.shadowBlur = Math.max(10, tok.size * (0.7 + 0.55 * pulse));
+        ctx.beginPath();
+        ctx.arc(tok.x, tok.y, tok.size * 0.62, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(196, 163, 90, ${0.10 + 0.16 * pulse})`;
+        ctx.fill();
+        ctx.restore();
+      }
       if (tok.kind === 'overflow') {
         drawOverflowChip(ctx, tok.x, tok.y, tok.size, `+${tok.quantity}`);
         continue;

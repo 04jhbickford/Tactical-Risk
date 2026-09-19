@@ -17,12 +17,17 @@ import {
   guideCopy,
   battleCard,
   inspectPlay,
+  tryCombatMove,
   driveCombatMove,
   driveBattleMid,
   driveAirChoice,
   driveLanded,
   resetScenario,
   stackQty,
+  destLegal,
+  isCombatMoveIdle,
+  COMBAT_MOVE_START,
+  TRY_COMBAT_MOVE_LABEL,
 } from '../src/map/uxPreviewScenario.js';
 
 let failures = 0;
@@ -35,12 +40,17 @@ function assert(cond, msg) {
 
 const move = createScenario();
 assert(move.phase === PHASE.COMBAT_MOVE, 'starts combat move');
-assert(confirmLabel(move) === 'Select your stack', 'idle label');
+assert(isCombatMoveIdle(move) === true, 'idle start');
+assert(confirmLabel(move) === TRY_COMBAT_MOVE_LABEL, 'idle Try CTA');
 assert(confirmGold(move) === false, 'idle not gold');
-assert(confirmEnabled(move) === false, 'idle disabled');
+assert(confirmEnabled(move) === true, 'idle Try enabled');
+assert(highlights(move).origins.includes(SCENARIO.origin), 'idle origin pulse');
+assert(guideCopy(move) === COMBAT_MOVE_START, 'one-line start tip');
 
 tapLand(move, SCENARIO.origin);
 assert(move.selected === SCENARIO.origin, 'origin selected');
+assert(isCombatMoveIdle(move) === false, 'manual path leaves idle');
+assert(confirmEnabled(move) === false, 'mid-select Confirm waits for dest');
 assert(confirmLabel(move) === 'Pick infantry, then a dest', 'need units');
 
 pickUnit(move, 'fighter');
@@ -52,11 +62,15 @@ assert(move.destPicked == null, 'no dest without ground');
 pickUnit(move, 'infantry');
 assert(move.selectedUnits.infantry === 3, 'inf staged');
 assert(highlights(move).legal.includes(SCENARIO.dest), 'finland legal');
-assert(guideCopy(move).includes('Karelia'), 'brief guide');
+assert(destLegal(move) === false, 'legal dest not picked yet');
+assert(confirmGold(move) === false, 'gold waits for dest tap');
+assert(guideCopy(move) === COMBAT_MOVE_START, 'tip stays one line');
 
 tapLand(move, SCENARIO.dest);
 assert(move.destPicked === SCENARIO.dest, 'dest picked');
-assert(confirmGold(move) === true, 'confirm gold on staged move');
+assert(destLegal(move) === true, 'dest legal immediately');
+assert(confirmGold(move) === true, 'confirm gold as soon as dest is legal');
+assert(confirmEnabled(move) === true, 'confirm enabled on dest');
 assert(confirmLabel(move) === `Confirm: Move to ${SCENARIO.dest}`, 'named dest confirm');
 
 confirm(move);
@@ -114,6 +128,21 @@ assert(stackQty(move.placements[SCENARIO.dest], 'fighter', 'Russians') === 0, 'f
 assert(confirmGold(move) === false, 'done confirm not gold — does not stick');
 assert(confirmEnabled(move) === true, 'replay enabled');
 assert(confirmLabel(move).includes('Landed in Russia'), 'landed label');
+
+const tryMove = createScenario();
+tryCombatMove(tryMove);
+assert(tryMove.selected === SCENARIO.dest, 'Try stages dest');
+assert(tryMove.destPicked === SCENARIO.dest, 'Try picks dest');
+assert(tryMove.selectedUnits.infantry === 3, 'Try stages INF');
+assert(tryMove.selectedUnits.fighter === 1, 'Try stages FTR');
+assert(destLegal(tryMove) === true, 'Try dest legal');
+assert(confirmGold(tryMove) === true, 'Try shows gold Confirm');
+assert(confirmLabel(tryMove) === `Confirm: Move to ${SCENARIO.dest}`, 'Try named Confirm');
+
+const tryViaConfirm = createScenario();
+confirm(tryViaConfirm);
+assert(destLegal(tryViaConfirm) === true, 'idle Confirm is Try');
+assert(confirmGold(tryViaConfirm) === true, 'idle Confirm then gold');
 
 const mid = createScenario();
 driveBattleMid(mid);

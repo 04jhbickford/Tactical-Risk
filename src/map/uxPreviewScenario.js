@@ -39,11 +39,14 @@ export const LEGAL_GOLD = '#C4A35A';
 export const LAND_TEAL = '#5BA8A0';
 
 export const GUIDE = {
-  [PHASE.COMBAT_MOVE]: 'Tap Karelia, pick INF + FTR, tap Finland, Confirm.',
+  [PHASE.COMBAT_MOVE]: 'Tap your stack → units → enemy land → Confirm',
   [PHASE.BATTLE]: 'One Confirm at a time — AA, then dice, then hits.',
   [PHASE.AIR_LAND]: 'Teal lands can take the fighter. Tap one, Confirm.',
   [PHASE.DONE]: 'Fighter landed. Confirm is idle — Replay if you want.',
 };
+
+export const COMBAT_MOVE_START = 'Tap your stack → units → enemy land → Confirm';
+export const TRY_COMBAT_MOVE_LABEL = 'Try combat move';
 
 const DEMO_ROLLS = {
   aa: [4],
@@ -302,10 +305,26 @@ export function pickUnit(state, type) {
   return state;
 }
 
+export function isCombatMoveIdle(state) {
+  return !!state
+    && state.phase === PHASE.COMBAT_MOVE
+    && !state.destPicked
+    && !pickedCount(state.selectedUnits)
+    && state.selected !== state.origin;
+}
+
+export function destLegal(state) {
+  return !!state
+    && state.phase === PHASE.COMBAT_MOVE
+    && !!state.destPicked
+    && hasGround(state.selectedUnits);
+}
+
 export function confirmEnabled(state) {
   if (!state) return false;
   if (state.phase === PHASE.COMBAT_MOVE) {
-    return !!state.destPicked && hasGround(state.selectedUnits);
+    // Gold Confirm as soon as dest is legal. Idle Try is the start affordance.
+    return destLegal(state) || isCombatMoveIdle(state);
   }
   if (state.phase === PHASE.BATTLE) return !!state.battle;
   if (state.phase === PHASE.AIR_LAND) return !!state.landingDest && !state.landed;
@@ -315,15 +334,17 @@ export function confirmEnabled(state) {
 
 export function confirmGold(state) {
   if (!state || state.phase === PHASE.DONE) return false;
+  if (state.phase === PHASE.COMBAT_MOVE) return destLegal(state);
   return confirmEnabled(state);
 }
 
 export function confirmLabel(state) {
-  if (!state) return 'Select your stack';
+  if (!state) return TRY_COMBAT_MOVE_LABEL;
   if (state.phase === PHASE.COMBAT_MOVE) {
-    if (state.destPicked && hasGround(state.selectedUnits)) {
+    if (destLegal(state)) {
       return `Confirm: Move to ${state.dest}`;
     }
+    if (isCombatMoveIdle(state)) return TRY_COMBAT_MOVE_LABEL;
     if (state.selected !== state.origin) return 'Select your stack';
     if (!hasGround(state.selectedUnits)) return 'Pick infantry, then a dest';
     return 'Tap Finland Norway';
@@ -358,11 +379,15 @@ export function highlights(state) {
     origin: null,
     dest: null,
     legal: [],
+    origins: [],
     landable: [],
     selected: state?.selected || null,
   };
   if (!state) return out;
   if (state.phase === PHASE.COMBAT_MOVE) {
+    if (isCombatMoveIdle(state)) {
+      out.origins = [state.origin];
+    }
     if (state.selected === state.origin || pickedCount(state.selectedUnits)) {
       out.origin = state.origin;
     }
@@ -585,9 +610,18 @@ export function resetScenario(state) {
   return state;
 }
 
+export function tryCombatMove(state) {
+  if (!state || state.phase !== PHASE.COMBAT_MOVE) return state;
+  return driveCombatMove(state);
+}
+
 export function confirm(state) {
   if (!state || !confirmEnabled(state)) return state;
-  if (state.phase === PHASE.COMBAT_MOVE) return applyCombatMove(state);
+  if (state.phase === PHASE.COMBAT_MOVE) {
+    if (destLegal(state)) return applyCombatMove(state);
+    if (isCombatMoveIdle(state)) return tryCombatMove(state);
+    return state;
+  }
   if (state.phase === PHASE.BATTLE) {
     const step = state.battle?.step;
     if (step === BATTLE_STEP.AA_READY) return rollAA(state);
@@ -704,6 +738,8 @@ export function inspectPlay(state) {
     confirmLabel: confirmLabel(state),
     confirmGold: confirmGold(state),
     confirmEnabled: confirmEnabled(state),
+    destLegal: destLegal(state),
+    idle: isCombatMoveIdle(state),
     guideOn: !!state?.guideOn,
     guide: guideCopy(state),
     battleStep: state?.battle?.step || null,

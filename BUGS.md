@@ -2,6 +2,18 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.4 combat-move start @390
+
+James: Combat Move phase was already on; the START was not discoverable
+on the hybrid mobile preview. He-correct. Preview only. Hold merge.
+
+Fix (UX only): one-line tip “Tap your stack → units → enemy land → Confirm”
+(dismiss ×, no Got it), pulse/glow on the Karelia origin stack at idle,
+and a single-thumb **Try combat move** that pre-stages the pocket attack.
+Gold Confirm appears as soon as dest is legal.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.3 mobile combat / battle / air-land
 
 James: keep playing Three UX. Give him a combat move, a battle, and an
