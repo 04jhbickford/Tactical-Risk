@@ -144,7 +144,7 @@ check('ownership wash 15-22%', /OWNER_WASH_STRENGTH = 0\.18/.test(palette));
 check('faction wash SU/DE/UK/US/JP',
   /#8B3A3A/.test(palette) && /#5A5A52/.test(palette) && /#4A5C7A/.test(palette)
   && /#5C6B4A/.test(palette) && /#8A6B3A/.test(palette));
-check('ocean pale washed STYLE REF', /oceanDeep: '#A8B6B0'/.test(palette) && /oceanShelf: '#B8C4BC'/.test(palette));
+check('ocean pale washed STYLE REF', /oceanDeep: '#C4C2B0'/.test(palette) && /oceanShelf: '#D0CCC0'/.test(palette));
 check('no charcoal ocean leftover', !/#7A90A0/.test(palette));
 check('baked wash is albedo not 14% flatten',
   /imageToTex\(washes\[i\]/.test(palette) && !/GRAIN_MULTIPLY = 0\.14/.test(palette));
@@ -158,8 +158,8 @@ check('land lids use wash map not flat side',
   && !/\[materials\.side, materials\.top/.test(art));
 check('board textures keep fiber (no mipmaps)', /generateMipmaps = false/.test(palette));
 check('land/ocean are MeshStandard not MeshBasic',
-  /MeshStandardMaterial/.test(palette) && /roughness: 0\.76/.test(palette)
-  && /roughness: 0\.46/.test(palette)
+  /MeshStandardMaterial/.test(palette) && /roughness: world \? 0\.88 : 0\.76/.test(palette)
+  && /roughness: 0\.86/.test(palette)
   && /vertexColors: true/.test(palette)
   && !/new THREE\.MeshBasicMaterial/.test(palette));
 check('parchment normal + AO maps',
@@ -180,16 +180,16 @@ check('key/fill drama: warm key + cool fill/hemi',
   /warm-key-cool-fill/.test(spike)
   && /HemisphereLight\(0xD8D2C4, 0x5A5040/.test(spike)
   && /DirectionalLight\(0x7E9AAB/.test(spike)
-  && /1\.18/.test(spike));
-check('p30 hemi lift keeps floored parchment off void',
-  /HemisphereLight\(0xD8D2C4, 0x5A5040, 0\.78\)/.test(spike)
-  && /toneMappingExposure = 1\.22/.test(spike));
+  && /0\.72/.test(spike));
+check('p37 paper-preserving lights keep STYLE REF watercolor',
+  /HemisphereLight\(0xD8D2C4, 0x5A5040, 0\.56\)/.test(spike)
+  && /toneMappingExposure = 0\.96/.test(spike));
 check('parchment tooth punches at 390 mid',
   /TOOTH_STRENGTH = 0\.42/.test(palette)
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
   && /macro paper tooth/.test(palette)
   && /TOOTH_NORMAL_MID = 2\.05/.test(palette)
-  && /IMHOF_NORMAL_SCALE = 0\.34/.test(palette)
+  && /IMHOF_NORMAL_SCALE = 0\.16/.test(palette)
   && /normalScale\.set\(n, n\)/.test(palette));
 check('lod tooth is loud mid / clean near',
   /TOOTH_NORMAL_NEAR = 1\.08/.test(palette)
@@ -200,7 +200,7 @@ check('lod tooth is loud mid / clean near',
 check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
 check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
 check('soft coast AO band', /makeCoastAoMeshes/.test(art) && /makeCoastAoMeshes/.test(spike));
-check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.16/.test(palette) && /vertexColors/.test(palette));
+check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.08/.test(palette) && /vertexColors/.test(palette));
 check('foam coast is a hairline', /makeLineMat\(PALETTE\.foam, 1\.15/.test(spike));
 check('select stack lift 2-4px / 150ms micro-settle',
   /liftSelected/.test(spike)

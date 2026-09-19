@@ -28,11 +28,11 @@ export const PALETTE = {
   landGrain: '#B7AA82',
   landInk: '#3A3428',
   landBevel: '#8A7A58',
-  // P37 STYLE REF: pale washed watercolor sea, not slate-teal.
-  oceanDeep: '#A8B6B0',
-  oceanShelf: '#B8C4BC',
-  oceanReef: '#C4D0C6',
-  oceanFog: '#A8B6B0',
+  // P37 STYLE REF: warm pale washed parchment sea — not slate-teal, not candy.
+  oceanDeep: '#C4C2B0',
+  oceanShelf: '#D0CCC0',
+  oceanReef: '#D8D4C6',
+  oceanFog: '#C4C2B0',
   foam: '#D9D2C0',
   border: '#3A3428',
   waterHair: '#3A3428',
@@ -131,13 +131,13 @@ export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 // P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
 export const OCEAN_GRAIN = 0.14;
-export const OCEAN_OPEN_DARKEN = 0.16;
-export const OCEAN_TEAL_PUNCH = 0.18;
+export const OCEAN_OPEN_DARKEN = 0.08;
+export const OCEAN_TEAL_PUNCH = 0.06;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
 export const TOOTH_NORMAL_NEAR = 1.08;
-export const IMHOF_NORMAL_SCALE = 0.34;
+export const IMHOF_NORMAL_SCALE = 0.16;
 export const TOOTH_ROUGH_MID = 0.76;
 export const TOOTH_ROUGH_NEAR = 0.86;
 
@@ -352,7 +352,7 @@ function bakeOcean(img) {
   shelf.addColorStop(0.22, PALETTE.oceanShelf);
   shelf.addColorStop(0.52, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.40));
   shelf.addColorStop(0.78, PALETTE.oceanDeep);
-  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#8A9A92', 0.28));
+  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#B8B4A4', 0.22));
   ctx.globalCompositeOperation = 'soft-light';
   ctx.globalAlpha = 0.90;
   ctx.fillStyle = shelf;
@@ -481,17 +481,21 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
   const sheet = world || washMaps.get(key) || bakeLandSheet(washHex);
   // World bake already carries parchment + continent + biome. Owner stays a
   // light wash. P32: quiet continent tint — never a chocolate flood vs select gold.
-  const continentTint = mixHex('#ffffff', region, CONTINENT_CHROMA_PUNCH);
-  const tint = ownerHex ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, world ? 0.04 : OWNER_WASH_STRENGTH) : continentTint;
+  // P37: STYLE REF watercolor is the continent read. Risk multiply
+  // flattened sage coasts / tan interiors into pale tiles.
+  const continentTint = world ? 0xffffff : mixHex('#ffffff', region, CONTINENT_CHROMA_PUNCH);
+  const tint = ownerHex && !world
+    ? mixHex(`#${continentTint.toString(16).padStart(6, '0')}`, ownerHex, OWNER_WASH_STRENGTH)
+    : continentTint;
   const top = new THREE.MeshStandardMaterial({
     map: sheet,
     normalMap: world ? (worldLandNormalMap || null) : (paperNormal || null),
     aoMap: world ? null : (paperAO || null),
     aoMapIntensity: world ? 0 : (paperAO ? 1.08 : 0),
     color: tint,
-    roughness: 0.76,
+    roughness: world ? 0.88 : 0.76,
     metalness: 0.0,
-    envMapIntensity: world ? 0.06 : 0.14,
+    envMapIntensity: world ? 0 : 0.14,
     transparent: false,
     side: THREE.DoubleSide,
     // P34: painted albedo is the hero — idle parchment emissive washed it to GIS.
@@ -528,10 +532,10 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0xb4c4bc,
-    roughness: 0.46,
-    metalness: 0.10,
-    envMapIntensity: 0.28,
+    color: 0xc8c4b4,
+    roughness: 0.86,
+    metalness: 0.0,
+    envMapIntensity: 0.04,
     transparent: false,
     vertexColors: true,
   });
@@ -541,11 +545,11 @@ export function makeOceanMaterial() {
 
 export function makeSeaWaterMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0xa8b8b0,
+    color: 0xc8c4b4,
     transparent: true,
-    opacity: 0.28,
-    roughness: 0.52,
-    metalness: 0.08,
+    opacity: 0.16,
+    roughness: 0.88,
+    metalness: 0.0,
     depthWrite: false,
     depthTest: true,
     side: THREE.DoubleSide,
@@ -587,9 +591,9 @@ export function makeOceanMesh(width, height) {
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
     // P35: keep the whole basin teal — shelf brightening made Med look like land.
-    colors[i * 3] = shade * 0.78;
-    colors[i * 3 + 1] = shade * 0.84;
-    colors[i * 3 + 2] = shade * 0.82;
+    colors[i * 3] = shade * 0.90;
+    colors[i * 3 + 1] = shade * 0.88;
+    colors[i * 3 + 2] = shade * 0.78;
   }
   if (uv) {
     uv.needsUpdate = true;

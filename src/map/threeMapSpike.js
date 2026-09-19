@@ -322,7 +322,7 @@ export async function bootThreeMapSpike() {
     dashSize: 5.4,
     gapSize: 7.2,
   });
-  const seaInkMat = makeLineMat('#5A4E3C', 1.55, 0.46);
+  const seaInkMat = makeLineMat('#4A3C2C', 2.15, 0.78);
   lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, seaInkMat, ...continentMats.values());
 
   for (const land of lands) {
@@ -383,7 +383,7 @@ export async function bootThreeMapSpike() {
         group.add(sea);
         pickables.push(sea);
       }
-      addSeaZoneInk(group, water, seaInkMat, 0.07);
+      addSeaZoneInk(group, water, seaInkMat, 0.16);
     }
     addRiverLines(group, riverMat, 0.28);
     addSeaLaneLines(group, territories.filter((t) => t.isWater), seaLaneMat, 0.05);
@@ -479,19 +479,20 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  // P30: lift hemi + warm ground so floored parchment cannot fall to void.
-  // Keep warm-key-cool-fill sculpt. MeshStandard only. No neon.
-  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 0.78);
+  // P37: paper-preserving key. ACES 1.22 + hemi 0.78 + key 1.18 blew
+  // STYLE REF watercolor to pale cream. Keep warm-key-cool-fill sculpt.
+  // MeshStandard only. No neon.
+  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 0.56);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFE2B0, 1.18);
+  const key = new THREE.DirectionalLight(0xFFE2B0, 0.72);
   key.position.set(-96, 58, -28);
   key.target.position.set(WORLD_W * 0.42, 0, -WORLD_H * 0.38);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.48);
+  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.26);
   fill.position.set(72, 24, 44);
   scene.add(fill);
-  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.16);
+  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.12);
   bounce.position.set(12, -14, 22);
   scene.add(bounce);
 
@@ -499,7 +500,7 @@ export async function bootThreeMapSpike() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.22;
+  renderer.toneMappingExposure = 0.96;
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
   renderer.domElement.id = 'threeCanvas';
@@ -1330,7 +1331,7 @@ export async function bootThreeMapSpike() {
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
-        continentPunch: 0.22,
+        continentPunch: albedoBound ? 0 : 0.22,
         seaDeckClear: true,
         eastMedPinSouth: true,
         noBlotchAtlas: true,

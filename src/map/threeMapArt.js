@@ -546,7 +546,7 @@ export function addSeaZoneInk(group, territory, material, y = 0.06) {
     const line = makeBorderLine(ring, y, material);
     line.userData.territory = territory;
     line.userData.kind = 'sea-ink';
-    line.renderOrder = 2;
+    line.renderOrder = 8;
     group.add(line);
     n += 1;
   }

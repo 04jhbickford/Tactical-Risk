@@ -322,7 +322,7 @@ def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y
     return img
 
 
-def match_parchment(img: Image.Image, target=STYLE_TARGET, amount=0.12) -> Image.Image:
+def match_parchment(img: Image.Image, target=STYLE_TARGET, amount=0.04) -> Image.Image:
     """Quiet mean shift so theater joins share a family. Keep watercolor chroma."""
     try:
         import numpy as np
@@ -335,8 +335,8 @@ def match_parchment(img: Image.Image, target=STYLE_TARGET, amount=0.12) -> Image
     return Image.fromarray(np.clip(shifted, 0, 255).astype('uint8'), 'RGB')
 
 
-def even_land_luma(img: Image.Image, land: Image.Image, target=LAND_LUMA_TARGET, amount=0.28) -> Image.Image:
-    """Even lighting. Lift only crushed voids — do not flatten watercolor."""
+def even_land_luma(img: Image.Image, land: Image.Image, target=LAND_LUMA_TARGET, amount=0.14) -> Image.Image:
+    """Even lighting. Scale luma only — never mix sage/tan toward parchment."""
     try:
         import numpy as np
     except ImportError:
@@ -344,10 +344,10 @@ def even_land_luma(img: Image.Image, land: Image.Image, target=LAND_LUMA_TARGET,
     arr = np.asarray(img, dtype=np.float32)
     m = (np.asarray(land) > 8)
     yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
-    lift = np.clip((target - yv) / max(1.0, target), 0, 1) * amount
-    lift = np.where(m & (yv < target - 8), lift, 0.0)
-    parchment = np.array(STYLE_TARGET, dtype=np.float32)
-    arr = arr + (parchment - arr) * lift[..., None]
+    # Only crushed voids (Africa blotch class). Leave watercolor midtones.
+    need = m & (yv < 118)
+    scale = np.where(need, 1.0 + ((target - yv) / max(1.0, target)) * amount, 1.0)
+    arr = arr * scale[..., None]
     return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
@@ -466,8 +466,8 @@ def draw_coast(img: Image.Image, mask: Image.Image, w, h):
     edge = mask.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.7))
     foam = Image.new('RGB', (w, h), (0xE4, 0xD8, 0xC0))
     ink = Image.new('RGB', (w, h), (0x5A, 0x48, 0x34))
-    img = Image.composite(ink, img, edge.point(lambda v: int(v * 0.48)))
-    img = Image.composite(foam, img, edge.point(lambda v: int(v * 0.38)))
+    img = Image.composite(ink, img, edge.point(lambda v: int(v * 0.72)))
+    img = Image.composite(foam, img, edge.point(lambda v: int(v * 0.28)))
     return img
 
 
@@ -600,14 +600,15 @@ def build_atlas(lands) -> Image.Image:
     height = imhof_height(w, h)
     # STYLE REF uses peak hatching, not Imhof volume blobs.
     img = draw_coast(img, mask_all, w, h)
-    img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.28)
-    img = kill_blotches(img, mask_all, 80)
+    img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.14)
+    img = kill_blotches(img, mask_all, 72)
+    img = draw_ridges(img, None, mask_all, w, h)
 
     if parchment:
         tooth = ImageChops.soft_light(img, paper)
-        img = Image.composite(tooth, img, mask_all.point(lambda v: 22))
+        img = Image.composite(tooth, img, mask_all.point(lambda v: 28))
 
-    img = punch(img, color=1.02, contrast=1.06, sharp=1.04)
+    img = punch(img, color=1.18, contrast=1.12, sharp=1.10)
     img = Image.composite(img, paper, mask_all)
     void = draw_badges
     void = draw_rivers
@@ -629,8 +630,8 @@ def bake_ocean_wash():
         arr = np.array(tile, dtype=np.float32)
         lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
         lum = np.clip((lum - 0.08) / 0.70, 0.42, 1.20)
-        target = np.array([0xB2, 0xC0, 0xB8], dtype=np.float32)
-        tile = Image.fromarray(np.clip(arr * 0.45 + (target * lum[..., None]) * 0.55, 0, 255).astype('uint8'), 'RGB')
+        target = np.array([0xC8, 0xC4, 0xB4], dtype=np.float32)
+        tile = Image.fromarray(np.clip(arr * 0.52 + (target * lum[..., None]) * 0.48, 0, 255).astype('uint8'), 'RGB')
     except ImportError:
         pass
     OUT_OCEAN.parent.mkdir(parents=True, exist_ok=True)
