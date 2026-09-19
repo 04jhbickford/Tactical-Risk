@@ -1,5 +1,5 @@
 import { isUxPreviewRequested, stripPreviewParams } from '../src/map/uxPreviewFlag.js';
-import { lodBandFromZoom } from '../src/map/uxPreviewUnits.js';
+import { lodBandFromZoom, shouldExpandPreview } from '../src/map/uxPreviewUnits.js';
 import { showMinis } from '../src/map/threeMapDensity.js';
 
 function assert(cond, msg) {
@@ -20,5 +20,7 @@ assert(lodBandFromZoom(1.2) === 'near', 'near');
 assert(showMinis('mid', false) === false, 'mid idle collapse');
 assert(showMinis('mid', true) === true, 'mid select expand');
 assert(showMinis('near', false) === true, 'near expand');
+assert(shouldExpandPreview('far', false, true) === false, 'far ignores expand toggle');
+assert(shouldExpandPreview('near', false, false) === true, 'near still expands');
 
 console.log('ux-preview flag + STACK-LOD checks passed');

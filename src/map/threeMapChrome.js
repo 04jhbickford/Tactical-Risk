@@ -151,10 +151,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       color:#c8c0b0;
     }
     #three-peek .three-peek-row {
-      display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;
+      display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;
     }
     #three-peek .three-peek-unit {
-      position:relative; width:68px; height:68px;
+      position:relative; width:56px; height:56px;
       display:inline-flex; align-items:center; justify-content:center;
       background:rgba(240,230,210,0.16);
       border:1px solid rgba(255,255,255,0.10);
@@ -165,7 +165,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek .three-peek-unit.is-picked {
       box-shadow:0 0 0 2px #C4A35A;
     }
-    #three-peek .three-peek-unit img { width:60px; height:60px; display:block; }
+    #three-peek .three-peek-unit img { width:48px; height:48px; display:block; }
     #three-peek .three-peek-unit b {
       position:absolute; right:-2px; bottom:-2px;
       min-width:16px; height:16px; padding:0 4px;
@@ -231,23 +231,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       -webkit-tap-highlight-color:transparent;
     }
     #three-zoom button[data-zoom="fit"] { font-size:12px; letter-spacing:0.02em; }
-    #three-phase-guide {
-      display:none; pointer-events:auto;
-      padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.42);
-      -webkit-backdrop-filter:saturate(1.35) blur(18px);
-      backdrop-filter:saturate(1.35) blur(18px);
-      border:1px solid rgba(255,255,255,0.12);
-      color:#E8E2D4;
-    }
-    #three-phase-guide.is-on { display:block; }
-    #three-phase-guide p { margin:0 0 8px; font:400 13px/1.35 -apple-system,"SF Pro Text",sans-serif; }
-    #three-phase-guide button {
-      min-height:44px; padding:0 14px; border-radius:10px;
-      border:1px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.06); color:#E8E2D4;
-      font:600 14px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
-    }
+    #three-phase-guide { display:none !important; }
     #three-sheet {
       display:none; position:absolute; left:0; right:0; bottom:0; z-index:40;
       max-height:min(52dvh, 420px);
@@ -271,6 +255,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
     @media (max-width:430px) {
       #three-l0 .three-l0-ver { display:none; }
+      #three-peek .three-peek-unit { width:48px; height:48px; }
+      #three-peek .three-peek-unit img { width:40px; height:40px; }
     }
   `;
   document.head.appendChild(style);
@@ -301,10 +287,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const bottom = document.createElement('div');
   bottom.id = 'three-bottom';
   bottom.innerHTML = `
-    <div id="three-phase-guide">
-      <p>Tap a land to inspect. Confirm stays gold only when a territory is staged. Stacks collapse to pip+N at mid zoom.</p>
-      <button type="button" id="three-guide-dismiss">Got it</button>
-    </div>
     <button type="button" id="three-stack-toggle" aria-pressed="false">Expand stacks</button>
     <div id="three-peek"></div>
     <button type="button" id="three-confirm" class="is-idle" disabled>Select a territory</button>
@@ -321,7 +303,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   `;
   document.body.appendChild(sheet);
 
-  const guide = bottom.querySelector('#three-phase-guide');
   const stackToggle = bottom.querySelector('#three-stack-toggle');
 
   const api = {
@@ -336,7 +317,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     ipcEl: l0.querySelector('#three-ipc'),
     pipEl: l0.querySelector('#three-seat-pip'),
     menuBtn: l0.querySelector('#three-menu-btn'),
-    guide,
+    guide: null,
+    guideOn: false,
     stackToggle,
     stacksExpanded: false,
     onStackToggle: null,
@@ -387,8 +369,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       stackToggle.textContent = api.stacksExpanded ? 'Collapse stacks' : 'Expand stacks';
       api.syncLayers();
     },
-    showGuide(on = true) {
-      guide.classList.toggle('is-on', !!on);
+    showGuide(_on = false) {
+      api.guideOn = false;
+      return false;
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
       if (api.isSheetOpen()) {
@@ -453,11 +436,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     api.setStacksExpanded(!api.stacksExpanded);
     if (typeof api.onStackToggle === 'function') api.onStackToggle(api.stacksExpanded);
   });
-  guide.addEventListener('pointerdown', (e) => e.stopPropagation());
-  guide.querySelector('#three-guide-dismiss').addEventListener('click', (e) => {
-    e.stopPropagation();
-    api.showGuide(false);
-  });
   api.peek.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-unit-type]');
     if (!chip) return;
@@ -465,6 +443,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
   });
   api.setStacksExpanded(false);
-  api.showGuide(true);
+  api.showGuide(false);
   return api;
 }

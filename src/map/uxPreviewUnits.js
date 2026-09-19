@@ -1,14 +1,15 @@
 // Main-branch unit chits + STACK-LOD for the UX preview. Preview only.
+// Square chits pack at full pitch (piece + gap). No mid/far continent blobs.
 
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { UnitRenderer } from './unitRenderer.js';
 import {
   showMinis,
-  nearLayout,
-  clusterPack,
   sortStacks,
   territoryFootprint,
-  footprintPiecePx,
+  isDenseLand,
+  isSmallLand,
+  denseFootprint,
   JAPAN_HOME_CENTER,
 } from './threeMapDensity.js';
 
@@ -19,6 +20,16 @@ const FACTION_FALLBACK = {
   Japanese: '#FF8C00',
   Americans: '#556B2F',
 };
+
+export const PREVIEW_CHIT_GAP = 4;
+export const PREVIEW_WORLD_CAP_FAR = 26;
+export const PREVIEW_WORLD_CAP_MID = 28;
+export const PREVIEW_WORLD_CAP_NEAR = 36;
+
+export const STRESS_LAND_TYPES = [
+  'infantry', 'armour', 'artillery', 'fighter', 'bomber',
+  'tacticalBomber', 'aaGun', 'factory',
+];
 
 export function lodBandFromZoom(zoom) {
   const z = Number(zoom) || 0;
@@ -120,24 +131,286 @@ export function territoryCenter(territory) {
   return { x, y };
 }
 
-function screenPx(zoom, px) {
-  return Math.max(0.5, px / Math.max(0.12, zoom));
+export function stressStacks(owner = 'Japanese', types = STRESS_LAND_TYPES) {
+  return types.map((type, i) => ({
+    type,
+    quantity: i + 1,
+    owner,
+  }));
 }
 
-function drawCountBadge(ctx, x, y, text, zoom) {
-  const fontSize = screenPx(zoom, 12);
+/** Far stays pip+N. Mid expand is selected-only. Near shows typed stacks. */
+export function shouldExpandPreview(band, selected, stacksExpanded) {
+  if (showMinis(band, selected)) return true;
+  return !!stacksExpanded && band !== 'far';
+}
+
+export function previewMaxTyped(name, footprint) {
+  if (name === 'Japan' || isSmallLand(name, footprint)) return 2;
+  if (isDenseLand(name, footprint) || (footprint?.min || 999) < 180) return 3;
+  return 4;
+}
+
+export function previewTypeLayout(stacks, { name = '', footprint = null, expand = false } = {}) {
+  const sorted = sortStacks(stacks);
+  if (!sorted.length) return { shown: [], overflowQty: 0, collapse: true };
+  if (!expand) {
+    return { shown: [sorted[0]], overflowQty: 0, collapse: true };
+  }
+  const cap = previewMaxTyped(name, footprint);
+  if (sorted.length <= cap) {
+    return { shown: sorted, overflowQty: 0, collapse: false };
+  }
+  const shownCount = Math.max(1, cap - 1);
+  const shown = sorted.slice(0, shownCount);
+  const hidden = sorted.slice(shownCount);
+  const overflowQty = hidden.reduce((n, s) => n + (Number(s.quantity) || 0), 0);
+  return { shown, overflowQty, collapse: false };
+}
+
+export function previewChitWorldSize({
+  zoom,
+  footprint,
+  name = '',
+  tokenCount = 1,
+  expand = false,
+} = {}) {
+  const z = Math.max(0.12, Number(zoom) || 0.4);
+  const band = lodBandFromZoom(z);
+  let css = 12;
+  if (band === 'far') css = expand ? 12 : 10;
+  else if (band === 'mid') css = expand ? 14 : 12;
+  else css = expand ? 30 : 24;
+  if (name === 'Japan' || isSmallLand(name, footprint)) css *= 0.82;
+
+  let world = css / z;
+  const worldCap = band === 'near'
+    ? PREVIEW_WORLD_CAP_NEAR
+    : band === 'mid'
+      ? PREVIEW_WORLD_CAP_MID
+      : PREVIEW_WORLD_CAP_FAR;
+  world = Math.min(world, worldCap);
+
+  const n = Math.max(1, tokenCount);
+  const min = denseFootprint(name, footprint)?.min || footprint?.min || 200;
+  const inset = name === 'Japan' ? 0.56 : isDenseLand(name, footprint) ? 0.66 : 0.80;
+  const cols = n <= 1 ? 1 : n <= 4 ? 2 : 3;
+  const rows = Math.ceil(n / cols);
+  const gap = PREVIEW_CHIT_GAP;
+  const maxFit = Math.min(
+    (min * inset - gap * Math.max(0, cols - 1)) / cols,
+    (min * inset - gap * Math.max(0, rows - 1)) / rows,
+  );
+  world = Math.min(world, Math.max(8, maxFit));
+  return Math.max(name === 'Japan' ? 9 : 11, world);
+}
+
+/** Axis-aligned square pack. Center distance is always `pitch` on-grid. */
+export function chitGridPack(n, pitch) {
+  const p = Math.max(0, Number(pitch) || 0);
+  if (n <= 0) return [];
+  if (n === 1) return [{ x: 0, y: 0 }];
+  if (n === 2) {
+    return [
+      { x: -p / 2, y: 0 },
+      { x: p / 2, y: 0 },
+    ];
+  }
+  if (n === 3) {
+    const h = p * Math.sqrt(3) / 2;
+    return [
+      { x: 0, y: -h / 2 },
+      { x: -p / 2, y: h / 2 },
+      { x: p / 2, y: h / 2 },
+    ];
+  }
+  const cols = n <= 4 ? 2 : 3;
+  const rows = Math.ceil(n / cols);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(i / cols);
+    const c = i % cols;
+    const inRow = Math.min(cols, n - r * cols);
+    const x0 = -((inRow - 1) * p) / 2;
+    const y0 = -((rows - 1) * p) / 2;
+    out.push({ x: x0 + c * p, y: y0 + r * p });
+  }
+  return out;
+}
+
+export function tokenSeparation(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+export function tokensNeededGap(a, b, gap = PREVIEW_CHIT_GAP) {
+  return (Number(a.size) + Number(b.size)) / 2 + gap;
+}
+
+export function maxTokenOverlap(tokens, gap = PREVIEW_CHIT_GAP) {
+  let worst = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    for (let j = i + 1; j < tokens.length; j++) {
+      const need = tokensNeededGap(tokens[i], tokens[j], gap);
+      const d = tokenSeparation(tokens[i], tokens[j]);
+      worst = Math.max(worst, need - d);
+    }
+  }
+  return worst;
+}
+
+function shrinkForeignOverlaps(layouts, gap = PREVIEW_CHIT_GAP) {
+  for (let iter = 0; iter < 8; iter++) {
+    let hit = false;
+    for (let i = 0; i < layouts.length; i++) {
+      for (let j = i + 1; j < layouts.length; j++) {
+        const aToks = layouts[i].tokens;
+        const bToks = layouts[j].tokens;
+        for (const a of aToks) {
+          for (const b of bToks) {
+            const need = tokensNeededGap(a, b, gap);
+            const d = tokenSeparation(a, b);
+            if (d + 0.05 >= need) continue;
+            hit = true;
+            const floorA = layouts[i].name === 'Japan' ? 9 : 11;
+            const floorB = layouts[j].name === 'Japan' ? 9 : 11;
+            a.size = Math.max(floorA, a.size * 0.88);
+            b.size = Math.max(floorB, b.size * 0.88);
+          }
+        }
+      }
+    }
+    if (!hit) break;
+  }
+  return layouts;
+}
+
+export function layoutPreviewTerritory({
+  territory,
+  stacks,
+  zoom,
+  selected = false,
+  stacksExpanded = false,
+} = {}) {
+  const name = territory?.name || '';
+  const center = territoryCenter(territory);
+  const footprint = territoryFootprint(territory);
+  const band = lodBandFromZoom(zoom);
+  const expand = shouldExpandPreview(band, selected, stacksExpanded);
+  const owner = stackOwner(stacks, territory);
+  const total = stackTotal(stacks);
+  const typeLayout = previewTypeLayout(stacks, { name, footprint, expand });
+  const n = typeLayout.shown.length + (typeLayout.overflowQty > 0 ? 1 : 0);
+  const size = previewChitWorldSize({
+    zoom,
+    footprint,
+    name,
+    tokenCount: Math.max(1, n),
+    expand,
+  });
+  const pitch = size + PREVIEW_CHIT_GAP;
+  const pts = chitGridPack(Math.max(1, n), pitch);
+  const tokens = typeLayout.shown.map((stack, i) => {
+    const pt = pts[i] || { x: 0, y: 0 };
+    return {
+      kind: 'chit',
+      type: stack.type,
+      quantity: stack.quantity,
+      owner: stack.owner || owner,
+      x: (center?.x || 0) + pt.x,
+      y: (center?.y || 0) + pt.y,
+      size,
+    };
+  });
+  if (typeLayout.overflowQty > 0) {
+    const pt = pts[typeLayout.shown.length] || { x: pitch, y: 0 };
+    tokens.push({
+      kind: 'overflow',
+      type: 'overflow',
+      quantity: typeLayout.overflowQty,
+      owner,
+      x: (center?.x || 0) + pt.x,
+      y: (center?.y || 0) + pt.y,
+      size: Math.max(10, size * 0.72),
+    });
+  }
+  return {
+    name,
+    territory,
+    center,
+    footprint,
+    band,
+    expand,
+    owner,
+    total,
+    size,
+    tokens,
+    overlap: maxTokenOverlap(tokens),
+  };
+}
+
+export function layoutAllPreviewStacks({
+  territories,
+  placements,
+  zoom,
+  selectedName = null,
+  stacksExpanded = false,
+} = {}) {
+  const layouts = [];
+  for (const t of territories || []) {
+    const stacks = placements?.[t.name];
+    if (!stacks?.length) continue;
+    layouts.push(layoutPreviewTerritory({
+      territory: t,
+      stacks,
+      zoom,
+      selected: t.name === selectedName,
+      stacksExpanded,
+    }));
+  }
+  shrinkForeignOverlaps(layouts);
+  return layouts;
+}
+
+export function overlapReport(layouts) {
+  let inner = 0;
+  let foreign = 0;
+  for (const layout of layouts || []) {
+    inner = Math.max(inner, maxTokenOverlap(layout.tokens));
+  }
+  for (let i = 0; i < (layouts || []).length; i++) {
+    for (let j = i + 1; j < layouts.length; j++) {
+      for (const a of layouts[i].tokens) {
+        for (const b of layouts[j].tokens) {
+          const need = tokensNeededGap(a, b);
+          const d = tokenSeparation(a, b);
+          foreign = Math.max(foreign, need - d);
+        }
+      }
+    }
+  }
+  return {
+    inner: Number(inner.toFixed(3)),
+    foreign: Number(foreign.toFixed(3)),
+    clean: inner <= 0.05 && foreign <= 0.05,
+  };
+}
+
+function drawCountBadge(ctx, x, y, text, piece) {
+  const fontSize = Math.max(7, Math.min(12, piece * 0.34));
   ctx.font = `700 ${fontSize}px -apple-system, "SF Pro Text", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const padX = screenPx(zoom, 5);
-  const h = fontSize + screenPx(zoom, 4);
+  const padX = Math.max(2.5, piece * 0.08);
+  const h = fontSize + Math.max(2, piece * 0.08);
   const w = Math.max(h, ctx.measureText(text).width + padX * 2);
+  const bx = x + piece * 0.28;
+  const by = y + piece * 0.28;
   ctx.fillStyle = '#1A1610';
   ctx.beginPath();
-  ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+  ctx.roundRect(bx - w / 2, by - h / 2, w, h, h / 2);
   ctx.fill();
   ctx.fillStyle = '#F4EFE4';
-  ctx.fillText(text, x, y);
+  ctx.fillText(text, bx, by);
 }
 
 function drawChit(ctx, img, x, y, size, ownerColor) {
@@ -145,7 +418,7 @@ function drawChit(ctx, img, x, y, size, ownerColor) {
   ctx.save();
   ctx.fillStyle = ownerColor || '#4A4A4A';
   ctx.strokeStyle = 'rgba(20,16,10,0.88)';
-  ctx.lineWidth = Math.max(1.2, size * 0.06);
+  ctx.lineWidth = Math.max(1.1, size * 0.06);
   ctx.beginPath();
   ctx.roundRect(x - size / 2, y - size / 2, size, size, size * 0.16);
   ctx.fill();
@@ -153,6 +426,23 @@ function drawChit(ctx, img, x, y, size, ownerColor) {
   if (img?.complete && img.naturalWidth > 0) {
     ctx.drawImage(img, x - size / 2 + pad, y - size / 2 + pad, size - pad * 2, size - pad * 2);
   }
+  ctx.restore();
+}
+
+function drawOverflowChip(ctx, x, y, size, text) {
+  ctx.save();
+  ctx.fillStyle = '#1A1610';
+  ctx.strokeStyle = 'rgba(244,239,228,0.28)';
+  ctx.lineWidth = Math.max(1, size * 0.06);
+  ctx.beginPath();
+  ctx.roundRect(x - size / 2, y - size / 2, size, size, size * 0.5);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#F4EFE4';
+  ctx.font = `700 ${Math.max(8, size * 0.36)}px -apple-system, "SF Pro Text", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, x, y);
   ctx.restore();
 }
 
@@ -165,61 +455,53 @@ export function renderPreviewStacks(ctx, {
   stacksExpanded,
   factionColors,
 }) {
-  const band = lodBandFromZoom(zoom);
-  for (const t of territories) {
-    const stacks = placements[t.name];
-    if (!stacks?.length) continue;
-    const center = territoryCenter(t);
-    if (!center) continue;
-    const selected = t.name === selectedName;
-    const expand = stacksExpanded || showMinis(band, selected);
-    const owner = stackOwner(stacks, t);
-    const color = factionColors?.get(owner) || FACTION_FALLBACK[owner] || '#4A4A4A';
-    const total = stackTotal(stacks);
-    const footprint = territoryFootprint(t);
-    if (!expand) {
-      const pip = screenPx(zoom, footprintPiecePx(footprint, band, false, 1, t.name));
-      const img = images?.[owner]?.[sortStacks(stacks)[0]?.type];
-      drawChit(ctx, img, center.x, center.y, pip, color);
-      drawCountBadge(ctx, center.x + pip * 0.42, center.y + pip * 0.42, String(total), zoom);
-      continue;
-    }
-    const layout = nearLayout(stacks);
-    const n = layout.shown.length + (layout.overflowQty > 0 ? 1 : 0);
-    const piece = screenPx(zoom, footprintPiecePx(footprint, band, true, layout.shown.length, t.name));
-    const pitch = piece * 0.72;
-    const pts = clusterPack(n, pitch);
-    layout.shown.forEach((stack, i) => {
-      const pt = pts[i] || { x: 0, z: 0 };
-      const img = images?.[stack.owner || owner]?.[stack.type];
-      const px = center.x + pt.x;
-      const py = center.y + pt.z;
-      drawChit(ctx, img, px, py, piece, factionColors?.get(stack.owner || owner) || color);
-      drawCountBadge(ctx, px + piece * 0.38, py + piece * 0.38, String(stack.quantity), zoom);
-    });
-    if (layout.overflowQty > 0) {
-      const pt = pts[layout.shown.length] || { x: piece * 0.7, z: 0 };
-      drawCountBadge(ctx, center.x + pt.x, center.y + pt.z, `+${layout.overflowQty}`, zoom);
+  const layouts = layoutAllPreviewStacks({
+    territories,
+    placements,
+    zoom,
+    selectedName,
+    stacksExpanded,
+  });
+  for (const layout of layouts) {
+    const color = factionColors?.get(layout.owner) || FACTION_FALLBACK[layout.owner] || '#4A4A4A';
+    for (const tok of layout.tokens) {
+      if (tok.kind === 'overflow') {
+        drawOverflowChip(ctx, tok.x, tok.y, tok.size, `+${tok.quantity}`);
+        continue;
+      }
+      const img = images?.[tok.owner]?.[tok.type];
+      const tokColor = factionColors?.get(tok.owner) || color;
+      drawChit(ctx, img, tok.x, tok.y, tok.size, tokColor);
+      const label = layout.expand ? String(tok.quantity) : String(layout.total);
+      drawCountBadge(ctx, tok.x, tok.y, label, tok.size);
     }
   }
 }
 
-export function hitTestPreviewStack(worldX, worldY, { territories, placements, zoom, selectedName, stacksExpanded }) {
-  const band = lodBandFromZoom(zoom);
-  const radius = screenPx(zoom, 36);
+export function hitTestPreviewStack(worldX, worldY, {
+  territories,
+  placements,
+  zoom,
+  selectedName,
+  stacksExpanded,
+}) {
+  const layouts = layoutAllPreviewStacks({
+    territories,
+    placements,
+    zoom,
+    selectedName,
+    stacksExpanded,
+  });
   let best = null;
-  let bestD = radius;
-  for (const t of territories) {
-    const stacks = placements[t.name];
-    if (!stacks?.length) continue;
-    const center = territoryCenter(t);
-    if (!center) continue;
-    const expand = stacksExpanded || showMinis(band, t.name === selectedName);
-    const d = Math.hypot(worldX - center.x, worldY - center.y);
-    const reach = expand ? radius * 1.8 : radius;
-    if (d <= reach && d <= bestD) {
-      bestD = d;
-      best = t;
+  let bestD = Infinity;
+  for (const layout of layouts) {
+    for (const tok of layout.tokens) {
+      const d = Math.hypot(worldX - tok.x, worldY - tok.y);
+      const reach = tok.size * 0.58;
+      if (d <= reach && d <= bestD) {
+        bestD = d;
+        best = layout.territory;
+      }
     }
   }
   return best;

@@ -6,7 +6,17 @@ import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
 import { injectThreeChrome } from './threeMapChrome.js';
-import { lodBandFromZoom, preloadUnitImages, renderPreviewStacks, hitTestPreviewStack, territoryCenter } from './uxPreviewUnits.js';
+import {
+  lodBandFromZoom,
+  preloadUnitImages,
+  renderPreviewStacks,
+  hitTestPreviewStack,
+  territoryCenter,
+  layoutAllPreviewStacks,
+  overlapReport,
+  stressStacks,
+  STRESS_LAND_TYPES,
+} from './uxPreviewUnits.js';
 import {
   dismissStartupLoader,
   reportStartupError,
@@ -96,8 +106,17 @@ export async function bootUxPreview() {
   const mapRenderer = new MapRenderer();
   const territoryRenderer = new TerritoryRenderer(territories, continents);
   const territoryMap = new TerritoryMap(territories);
-  const placements = setup.classic?.unitPlacements || {};
+  const placements = { ...(setup.classic?.unitPlacements || {}) };
   const owners = setup.classic?.territoryOwners || {};
+  const stressOn = (() => {
+    const params = new URLSearchParams(location.search);
+    const v = String(params.get('stress') || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  })();
+  if (stressOn) {
+    placements.Japan = stressStacks('Japanese', STRESS_LAND_TYPES);
+    placements.Germany = stressStacks('Germans', STRESS_LAND_TYPES);
+  }
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
   const russians = factions.find((f) => f.id === 'Russians');
@@ -310,10 +329,38 @@ export async function bootUxPreview() {
   paint();
   requestAnimationFrame(loop);
 
+  function currentLayouts() {
+    return layoutAllPreviewStacks({
+      territories,
+      placements,
+      zoom: camera.zoom,
+      selectedName: selected?.name || null,
+      stacksExpanded,
+    });
+  }
+
+  function frameNamed(name, zoom = 1.15) {
+    const t = territories.find((x) => x.name === name);
+    const c = t && territoryCenter(t);
+    camera.zoom = zoom;
+    if (c) {
+      camera.x = c.x;
+      camera.y = c.y;
+    }
+    camera.onResize();
+    camera.dirty = true;
+    return t?.name || null;
+  }
+
   const inspect = () => {
     const band = lodBandFromZoom(camera.zoom);
     const chinaT = territories.find((t) => t.name === 'China');
     const germany = territories.find((t) => t.name === 'Germany');
+    const japan = territories.find((t) => t.name === 'Japan');
+    const layouts = currentLayouts();
+    const japanLayout = layouts.find((l) => l.name === 'Japan');
+    const germanyLayout = layouts.find((l) => l.name === 'Germany');
+    const overlap = overlapReport(layouts);
     return {
       artSource: 'main',
       uxSource: 'threePreview',
@@ -323,22 +370,41 @@ export async function bootUxPreview() {
       schema: SCHEMA_VERSION,
       mapSize: { w: MAP_WIDTH, h: MAP_HEIGHT },
       tiles: { base: mapRenderer.baseCount, relief: mapRenderer.reliefCount, smallMap: !!mapRenderer.smallMap },
+      worldPlate: false,
       lod: band,
+      zoom: Number(camera.zoom.toFixed(3)),
       stacksExpanded,
       selected: selected?.name || null,
       selectOutlineOnly: true,
       selectColor: SELECT_GOLD,
+      guideOn: false,
+      vizP1Coach: false,
+      iconPack: 'noOverlap',
+      overlap,
       china: chinaT ? {
         name: 'China',
         polys: chinaT.polygons.length,
         rings: selectRingCount(chinaT, territoryRenderer),
       } : null,
-      germany: germany ? territoryCenter(germany) : null,
+      germany: germany ? {
+        ...territoryCenter(germany),
+        tokens: germanyLayout?.tokens.length || 0,
+        piece: germanyLayout ? Number(germanyLayout.size.toFixed(2)) : null,
+        expand: !!germanyLayout?.expand,
+      } : null,
+      japan: japan ? {
+        ...territoryCenter(japan),
+        tokens: japanLayout?.tokens.length || 0,
+        piece: japanLayout ? Number(japanLayout.size.toFixed(2)) : null,
+        expand: !!japanLayout?.expand,
+        overlap: japanLayout ? Number(japanLayout.overlap.toFixed(3)) : 0,
+      } : null,
       owners: Object.keys(owners).length,
       placements: Object.keys(placements).length,
       continents: continents.length,
       idleConfirm: 'Select a territory',
       confirmGold: SELECT_GOLD,
+      stress: stressOn,
     };
   };
 
@@ -350,21 +416,22 @@ export async function bootUxPreview() {
       return t?.name || null;
     },
     frameEurope: fitEurope,
-    frameNear: () => {
-      camera.zoom = 1.15;
-      const g = territories.find((t) => t.name === 'Germany');
-      const c = g && territoryCenter(g);
-      if (c) {
-        camera.x = c.x;
-        camera.y = c.y;
-      }
-      camera.dirty = true;
-    },
+    frameNear: () => frameNamed('Germany', 1.15),
+    frameJapan: () => frameNamed('Japan', 1.15),
+    frameNamed,
     setStacksExpanded: (on) => {
       stacksExpanded = !!on;
       chrome.setStacksExpanded(stacksExpanded);
       camera.dirty = true;
     },
+    stressMaxTypes: (name = 'Japan') => {
+      const owner = name === 'Germany' ? 'Germans' : 'Japanese';
+      placements[name] = stressStacks(owner, STRESS_LAND_TYPES);
+      camera.dirty = true;
+      return placements[name].length;
+    },
+    overlapReport: () => overlapReport(currentLayouts()),
+    layouts: currentLayouts,
     chrome,
   };
 
