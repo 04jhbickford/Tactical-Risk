@@ -28,3 +28,11 @@ startCue=tip+originPulse+try
 1. Idle: gold pulse on **Karelia**. Tip strip + outlined **Try combat move**.
 2. Manual: tap Karelia → INF + FTR chips → Finland → gold **Confirm: Move to Finland Norway**.
 3. Or thumb **Try combat move** (same staged attack), then gold Confirm.
+
+## Stills @390
+- `combat-move-idle-390.png` — pulse + tip + Try
+- `combat-move-confirm-390.png` — dest legal, Confirm gold
+
+**Vercel:** https://tactical-risk20-88upzedbz-james-projects-20d8de40.vercel.app/?three=1
+**Git alias:** https://tactical-risk20-git-cursor-mobil-9c9397-james-projects-20d8de40.vercel.app/?three=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · hold merge)

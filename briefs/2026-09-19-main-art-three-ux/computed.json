@@ -20,8 +20,11 @@
   "vizP1Coach": false,
   "guideOn": true,
   "guideBlocksBoard": false,
-  "vercel": "https://tactical-risk20-jj7jpthqb-james-projects-20d8de40.vercel.app/?three=1",
+  "vercel": "https://tactical-risk20-88upzedbz-james-projects-20d8de40.vercel.app/?three=1",
+  "gitAlias": "https://tactical-risk20-git-cursor-mobil-9c9397-james-projects-20d8de40.vercel.app/?three=1",
   "stills": [
+    "combat-move-idle-390.png",
+    "combat-move-confirm-390.png",
     "combat-move-select-390.png",
     "battle-mid-390.png",
     "air-land-choice-390.png",
