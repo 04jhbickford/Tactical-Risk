@@ -122,6 +122,7 @@ assert(dests.includes(DEST), 'Finland is a legal dest');
 assert(dests.includes('Ukraine S.S.R.'), 'Ukraine is a legal dest');
 assert(dests.includes('East Europe'), 'East Europe is a legal dest');
 assert(!dests.includes(LAND), 'Russia is not a combat dest');
+assert(!dests.includes('Germany'), 'mixed land+air cannot list air-only Germany');
 assert(highlights(move).legal.includes(DEST), 'gold legal highlight');
 tapLand(move, DEST);
 assert(move.destPicked === DEST, 'dest picked');
@@ -211,6 +212,19 @@ assert(qty(move, LAND, 'infantry', 'Russians') >= 1, 'NCM infantry arrived');
 assert(canEndPhase(move) === true, 'NCM Done when remaining air = 0');
 confirm(move);
 assert(move.gameState.currentPlayer.id === 'Germans', 'NCM End Phase collects + nextTurn');
+
+// --- S4 chrome notify must not wipe the battle sheet ---
+const notify = fresh();
+skipToCombatMove(notify);
+tapLand(notify, ORIGIN);
+adjustUnit(notify, 'infantry', 1);
+tapLand(notify, DEST);
+confirm(notify);
+notify.gameState.subscribe(() => chromeModel(notify));
+confirm(notify);
+assert(notify.gameState.turnPhase === TURN_PHASES.COMBAT, 'notify path entered combat');
+assert(notify.battle?.step === BATTLE_STEP.COMBAT_READY, 'notify path keeps battle');
+assert(confirmEnabled(notify) === true, 'notify path Confirm on');
 
 // --- S4 AA fail-close ---
 const aa = fresh();

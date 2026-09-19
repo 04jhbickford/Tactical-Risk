@@ -160,10 +160,10 @@ export function legalDests(play) {
     for (const to of adj) {
       const t = gs.territoryByName[to];
       if (ground && !t?.isWater && isEnemyLand(play, to)) dests.add(to);
-      if (sea && t?.isWater && isEnemyLand(play, to)) dests.add(to);
-      if (air && isEnemyLand(play, to)) dests.add(to);
+      if (sea && !ground && t?.isWater && isEnemyLand(play, to)) dests.add(to);
+      if (air && !ground && !sea && isEnemyLand(play, to)) dests.add(to);
     }
-    if (air) {
+    if (air && !ground && !sea) {
       let range = 1;
       for (const [type, qty] of Object.entries(picked)) {
         if (Number(qty) > 0 && play.unitDefs[type]?.isAir) {
@@ -181,10 +181,10 @@ export function legalDests(play) {
     for (const to of adj) {
       const t = gs.territoryByName[to];
       if (ground && !t?.isWater && isFriendlyLand(play, to)) dests.add(to);
-      if (sea && t?.isWater && isFriendlyLand(play, to)) dests.add(to);
-      if (air && isFriendlyLand(play, to)) dests.add(to);
+      if (sea && !ground && t?.isWater && isFriendlyLand(play, to)) dests.add(to);
+      if (air && !ground && !sea && isFriendlyLand(play, to)) dests.add(to);
     }
-    if (air) {
+    if (air && !ground && !sea) {
       let range = 1;
       for (const [type, qty] of Object.entries(picked)) {
         if (Number(qty) > 0 && play.unitDefs[type]?.isAir) {
@@ -308,9 +308,9 @@ export function syncPlay(play) {
       play.battle = null;
       play.landing = null;
     }
-    if (phase === TURN_PHASES.COMBAT && isHumanTurn(play) && !play.battle && !play.landing) {
-      enterCombat(play);
-    }
+  }
+  if (phase === TURN_PHASES.COMBAT && isHumanTurn(play) && !play.battle && !play.landing) {
+    enterCombat(play);
   }
   return play;
 }
@@ -845,8 +845,8 @@ export function confirm(play) {
     return play;
   }
   if (canEndPhase(play)) {
-    play.gameState.nextPhase();
     resetUi(play);
+    play.gameState.nextPhase();
     syncPlay(play);
   }
   return play;
