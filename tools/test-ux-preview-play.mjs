@@ -122,6 +122,13 @@ assert(!move.battle.pendingAtt.infantry, 'no cheapest INF auto-assign');
 assert(confirmEnabled(move) === false, 'take hits disabled until assign');
 assert(confirmLabel(move) === 'Assign casualties', 'assign hint');
 assert(battleCard(move).pickers?.length >= 1, 'casualty picker shown');
+assert(move.battle.defAuto === true, 'THEY auto in local/solo');
+assert((move.battle.pendingDef.infantry || 0) === 2, 'THEY auto INF×2');
+assert(!battleCard(move).pickers?.some((p) => p.side === 'def'), 'no THEY picker local');
+assert(battleCard(move).diceGroups?.length === 2, 'ATK and DEF dice groups');
+assert(battleCard(move).diceGroups[0].side === 'atk' && battleCard(move).diceGroups[0].hits === 2, 'ATK 2 hits labeled');
+assert(battleCard(move).diceGroups[1].side === 'def' && battleCard(move).diceGroups[1].hits === 1, 'DEF 1 hit labeled');
+assert(/attacker/i.test(battleCard(move).body) && /defender/i.test(battleCard(move).body), 'You/They mapped');
 
 pickLoss(move, 'att', 'fighter');
 assert(move.battle.pendingAtt.fighter === 1, 'chose fighter');

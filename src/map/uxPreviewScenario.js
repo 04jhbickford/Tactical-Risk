@@ -447,23 +447,39 @@ export function lossesReady(state) {
   const dest = state.placements[state.dest] || [];
   const att = lossMenu(dest, 'Russians', battle.defenseHits);
   const def = lossMenu(dest, 'Germans', battle.attackHits);
-  return assignedCount(battle.pendingAtt) === att.need
-    && assignedCount(battle.pendingDef) === def.need;
+  const attOk = att.need <= 0 || assignedCount(battle.pendingAtt) === att.need;
+  const defOk = def.need <= 0 || assignedCount(battle.pendingDef) === def.need;
+  return attOk && defOk;
 }
 
-export function pickLoss(state, side, type) {
+export function pickLoss(state, side, type, delta) {
   const battle = state?.battle;
   if (!battle || battle.step !== BATTLE_STEP.COMBAT_RESULT) return state;
   const dest = state.placements[state.dest] || [];
   const owner = side === 'att' ? 'Russians' : 'Germans';
   const hits = side === 'att' ? battle.defenseHits : battle.attackHits;
   const menu = lossMenu(dest, owner, hits);
-  if (menu.forced || menu.need <= 0) return state;
+  if (menu.need <= 0) return state;
+  // Local/solo auto-fills THEY. Don't let a stray tap unset it.
+  if (side === 'def' && (battle.defAuto || battle.defForced)) return state;
+  if (menu.forced) return state;
   const key = side === 'att' ? 'pendingAtt' : 'pendingDef';
   const cur = { ...(battle[key] || {}) };
   const have = stackQty(dest, type, owner);
   if (have <= 0) return state;
   const thisN = Number(cur[type]) || 0;
+  const step = Number(delta);
+  if (Number.isFinite(step) && step !== 0) {
+    const used = assignedCount(cur);
+    if (step > 0 && thisN < have && used < menu.need) {
+      cur[type] = thisN + 1;
+    } else if (step < 0 && thisN > 0) {
+      cur[type] = thisN - 1;
+      if (cur[type] <= 0) delete cur[type];
+    }
+    battle[key] = cur;
+    return state;
+  }
   if (menu.need === 1) {
     battle[key] = thisN > 0 ? {} : { [type]: 1 };
     return state;
@@ -691,9 +707,12 @@ function rollCombat(state) {
   const attMenu = lossMenu(dest, 'Russians', defenseHits);
   const defMenu = lossMenu(dest, 'Germans', attackHits);
   battle.pendingAtt = attMenu.forced ? cheapestLosses(dest, 'Russians', defenseHits) : {};
-  battle.pendingDef = defMenu.forced ? cheapestLosses(dest, 'Germans', attackHits) : {};
+  // Local / solo: THEY (defender) is auto-assigned. Waiting on inert
+  // THEY chips soft-locked Confirm after YOU had already picked.
+  battle.pendingDef = cheapestLosses(dest, 'Germans', attackHits);
   battle.attForced = attMenu.forced;
-  battle.defForced = defMenu.forced;
+  battle.defForced = true;
+  battle.defAuto = true;
   battle.step = BATTLE_STEP.COMBAT_RESULT;
   battle.log.push(`R${battle.round} ATK ${attackHits} · DEF ${defenseHits}`);
   return state;
@@ -855,31 +874,43 @@ export function battleCard(state) {
   if (step === BATTLE_STEP.COMBAT_RESULT) {
     const dest = state.placements[state.dest] || [];
     const attMenu = lossMenu(dest, 'Russians', battle.defenseHits);
-    const defMenu = lossMenu(dest, 'Germans', battle.attackHits);
+    const theyLoss = formatLoss(battle.pendingDef);
+    const youNeed = attMenu.need;
+    const theyNeed = Math.min(battle.attackHits, totalQty(combatUnits(dest, 'Germans')));
+    const youAssigned = assignedCount(battle.pendingAtt);
+    const youLine = attMenu.forced || youAssigned >= youNeed
+      ? `You (attacker) take ${formatLoss(battle.pendingAtt) || 'none'} (from DEF hits)`
+      : `You (attacker) assign ${youNeed} (from DEF hits)`;
+    const theyLine = `They (defender) take ${theyLoss || theyNeed || 'none'} (from ATK hits${battle.defAuto ? ', auto' : ''})`;
     return {
       kicker: `Round ${battle.round}`,
       title: `ATK ${battle.attackHits} · DEF ${battle.defenseHits}`,
-      body: attMenu.forced && defMenu.forced
-        ? `Hits: you −${formatLoss(battle.pendingAtt)} · they −${formatLoss(battle.pendingDef)}`
-        : 'Tap a unit to take each hit — do not auto-pick',
-      dice: [
-        ...battle.attackDice.map((d) => ({ ...d, side: 'atk' })),
-        ...battle.defenseDice.map((d) => ({ ...d, side: 'def' })),
+      body: `${youLine} · ${theyLine}`,
+      diceGroups: [
+        {
+          side: 'atk',
+          label: 'ATK',
+          hits: battle.attackHits,
+          dice: (battle.attackDice || []).map((d) => ({ ...d, side: 'atk' })),
+        },
+        {
+          side: 'def',
+          label: 'DEF',
+          hits: battle.defenseHits,
+          dice: (battle.defenseDice || []).map((d) => ({ ...d, side: 'def' })),
+        },
       ],
+      theyAuto: battle.defAuto
+        ? { label: `They (defender) take ${theyLoss || 'none'}`, taken: { ...(battle.pendingDef || {}) } }
+        : null,
       pickers: [
         !attMenu.forced && attMenu.need > 0 ? {
           side: 'att',
-          label: `You assign ${attMenu.need}`,
+          label: `You (attacker) assign ${attMenu.need}`,
           need: attMenu.need,
           taken: { ...(battle.pendingAtt || {}) },
           units: attMenu.units,
-        } : null,
-        !defMenu.forced && defMenu.need > 0 ? {
-          side: 'def',
-          label: `They assign ${defMenu.need}`,
-          need: defMenu.need,
-          taken: { ...(battle.pendingDef || {}) },
-          units: defMenu.units,
+          steppers: attMenu.need > 1,
         } : null,
       ].filter(Boolean),
     };
@@ -969,6 +1000,7 @@ export function inspectPlay(state) {
     lossesReady: lossesReady(state),
     pendingAtt: { ...(state?.battle?.pendingAtt || {}) },
     pendingDef: { ...(state?.battle?.pendingDef || {}) },
+    defAuto: !!state?.battle?.defAuto,
     battleStep: state?.battle?.step || null,
     aaHits: state?.battle?.aaHits ?? null,
     attackHits: state?.battle?.attackHits ?? null,

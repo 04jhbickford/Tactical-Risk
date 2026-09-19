@@ -62,18 +62,25 @@ export function rectFromElement(el) {
   };
 }
 
+export function zoomShouldHide({ hasL1 = false, hasL2 = false, hasBattle = false } = {}) {
+  return !!(hasL1 || hasL2 || hasBattle);
+}
+
 export function chromeHitRectsFrom(api = {}) {
   const els = [];
   const push = (el) => {
     if (el) els.push(el);
   };
-  push(api.zoom);
-  push(api.l0);
-  if (api.isSheetOpen?.() || api.sheet?.classList?.contains('is-open')) {
-    push(api.sheet);
-  }
   const peekOn = api.peek?.classList?.contains('is-on');
   const battleOn = api.battleEl?.classList?.contains('is-on');
+  const sheetOpen = api.isSheetOpen?.() || api.sheet?.classList?.contains('is-open');
+  // Unit sheet / battle / match sheet own the lower chrome. Leave zoom
+  // out of the hit list so Fit / + / − cannot steal INF/ART/TNK steppers.
+  if (!zoomShouldHide({ hasL1: peekOn, hasL2: sheetOpen, hasBattle: battleOn })) {
+    push(api.zoom);
+  }
+  push(api.l0);
+  if (sheetOpen) push(api.sheet);
   if (peekOn) push(api.peek);
   if (battleOn) push(api.battleEl);
   if (peekOn || battleOn) push(api.bottom);

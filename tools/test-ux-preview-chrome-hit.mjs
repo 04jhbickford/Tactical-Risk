@@ -7,6 +7,7 @@ import {
   sealChromeEvent,
   clientPointOf,
   eventElement,
+  zoomShouldHide,
 } from '../src/map/threeChromeEvents.js';
 
 let failures = 0;
@@ -79,6 +80,11 @@ assert(shouldIgnoreMapHit({
   clientY: touch.y,
   rects: [peek],
 }) === true, 'touch on INF + ignored by map');
+
+assert(zoomShouldHide({ hasL1: true }) === true, 'hide zoom while unit sheet open');
+assert(zoomShouldHide({ hasBattle: true }) === true, 'hide zoom during battle');
+assert(zoomShouldHide({ hasL2: true }) === true, 'hide zoom on match sheet');
+assert(zoomShouldHide({}) === false, 'zoom visible on open map');
 
 if (failures) {
   console.error(`${failures} ux-preview chrome-hit checks failed`);

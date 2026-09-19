@@ -19,6 +19,8 @@ import {
   driveAirChoice,
   lossesReady,
   stackQty,
+  pickLoss,
+  assignedCount,
 } from '../src/map/uxPreviewScenario.js';
 import { isMaxBattleRequested } from '../src/map/uxPreviewFlag.js';
 
@@ -69,10 +71,32 @@ assert(mid.phase === PHASE.BATTLE, 'max entered battle');
 assert(mid.battle.step === 'combatResult', 'first-round result');
 assert(mid.battle.attackHits === 2, 'scripted 2 ATK hits');
 assert(mid.battle.defenseHits === 1, 'scripted 1 DEF hit');
-assert(lossesReady(mid) === false, 'mixed types — optional casualties');
-assert(battleCard(mid).pickers?.length >= 1, 'casualty pickers shown');
-assert(mid.battle.defForced === false, 'defender has a choice');
+assert(lossesReady(mid) === false, 'mixed types — optional YOU casualties');
+assert(battleCard(mid).pickers?.length === 1, 'YOU picker only in local/solo');
+assert(battleCard(mid).pickers[0].side === 'att', 'picker is attacker');
+assert(mid.battle.defAuto === true, 'THEY auto-assigned');
+assert(mid.battle.defForced === true, 'THEY treated as forced local');
 assert(mid.battle.attForced === false, 'attacker has a choice');
+assert(assignedCount(mid.battle.pendingDef) === 2, 'THEY take 2 auto');
+assert(!battleCard(mid).pickers?.some((p) => p.side === 'def'), 'no inert THEY chips');
+assert(battleCard(mid).diceGroups?.length === 2, 'separate ATK/DEF dice');
+assert(battleCard(mid).diceGroups[0].label === 'ATK', 'ATK label');
+assert(battleCard(mid).diceGroups[1].label === 'DEF', 'DEF label');
+assert(/from DEF hits/.test(battleCard(mid).body), 'YOU mapped to attacker/DEF hits');
+assert(/from ATK hits/.test(battleCard(mid).body), 'THEY mapped to defender/ATK hits');
+
+pickLoss(mid, 'att', 'artillery');
+assert(mid.battle.pendingAtt.artillery === 1, 'YOU ART−1');
+assert(lossesReady(mid) === true, 'YOUR assign unlocks Confirm');
+assert(confirmEnabled(mid) === true, 'Confirm after YOU only');
+assert(confirmLabel(mid) === 'Confirm: Take hits', 'hits CTA after YOU');
+pickLoss(mid, 'def', 'fighter');
+assert((mid.battle.pendingDef.fighter || 0) === 0, 'THEY tap is inert when auto');
+assert(assignedCount(mid.battle.pendingDef) === 2, 'THEY stay auto');
+pickLoss(mid, 'att', 'artillery', -1);
+assert(!mid.battle.pendingAtt.artillery, 'YOU stepper − clears ART');
+pickLoss(mid, 'att', 'artillery', 1);
+assert(mid.battle.pendingAtt.artillery === 1, 'YOU stepper + assigns ART');
 
 const air = createScenario({ max: true });
 driveAirChoice(air);

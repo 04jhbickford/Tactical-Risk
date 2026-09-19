@@ -10,6 +10,7 @@ import {
   chromeHitRectsFrom,
   isPointInAnyRect,
   sealChromeControl,
+  zoomShouldHide,
 } from './threeChromeEvents.js';
 
 const TYPE_SHORT = {
@@ -150,10 +151,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-bottom {
       position:absolute; left:0; right:0; bottom:0; z-index:32;
-      padding:0 14px calc(16px + env(safe-area-inset-bottom, 0px));
-      padding-left:max(14px, env(safe-area-inset-left));
-      padding-right:max(14px, env(safe-area-inset-right));
-      display:flex; flex-direction:column; gap:8px;
+      padding:0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+      padding-left:max(10px, env(safe-area-inset-left));
+      padding-right:max(10px, env(safe-area-inset-right));
+      display:flex; flex-direction:column; gap:6px;
       pointer-events:none;
       background:linear-gradient(0deg, rgba(30,36,32,0.42) 0%, transparent 70%);
     }
@@ -161,10 +162,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     html.three-spike.has-battle #three-bottom,
     html.three-spike.has-l2 #three-bottom {
       pointer-events:auto;
+      z-index:42;
     }
     #three-peek {
       display:none; pointer-events:none;
-      min-height:44px; padding:8px 12px; border-radius:12px;
+      min-height:0; padding:8px 10px; border-radius:12px;
       background:rgba(30,36,32,0.36);
       -webkit-backdrop-filter:saturate(1.35) blur(18px);
       backdrop-filter:saturate(1.35) blur(18px);
@@ -175,12 +177,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek.is-on { display:block; pointer-events:auto; }
     #three-peek strong {
       display:block;
-      font:600 17px/1.2 -apple-system,"SF Pro Text",sans-serif;
+      font:600 15px/1.15 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:-0.01em;
     }
     #three-peek .three-peek-meta {
-      margin-top:2px;
-      font:400 13px/1.3 -apple-system,"SF Pro Text",sans-serif;
+      margin-top:1px;
+      font:400 11px/1.25 -apple-system,"SF Pro Text",sans-serif;
       color:#c8c0b0;
     }
     #three-peek .three-peek-row {
@@ -217,38 +219,40 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font-variant-numeric:tabular-nums; text-align:center;
     }
     #three-peek .three-steppers {
-      display:flex; flex-direction:column; gap:8px; margin-top:10px;
+      display:flex; flex-direction:column; gap:4px; margin-top:6px;
     }
-    #three-peek .three-steppers.is-fat .three-stepper { min-height:44px; padding:2px 6px; }
-    #three-peek .three-steppers.is-fat .three-step { width:40px; height:40px; }
+    #three-peek .three-steppers.is-fat .three-stepper { min-height:34px; padding:1px 6px; }
+    #three-peek .three-steppers.is-fat .three-step { width:34px; height:34px; font-size:18px; }
+    #three-peek .three-steppers.is-fat .three-stepper img { width:26px; height:26px; }
+    #three-peek .three-steppers.is-fat .three-stepper em { flex-basis:28px; font-size:11px; }
     #three-peek .three-stepper {
-      display:flex; align-items:center; gap:10px;
-      min-height:52px; padding:4px 8px;
+      display:flex; align-items:center; gap:8px;
+      min-height:40px; padding:2px 6px;
       background:rgba(240,230,210,0.12);
       border:1px solid rgba(255,255,255,0.14);
-      border-radius:14px;
+      border-radius:10px;
     }
-    #three-peek .three-stepper img { width:40px; height:40px; display:block; }
+    #three-peek .three-stepper img { width:32px; height:32px; display:block; }
     #three-peek .three-stepper em {
-      flex:0 0 36px;
-      font:700 13px/1 -apple-system,"SF Pro Text",sans-serif;
+      flex:0 0 32px;
+      font:700 12px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:0.04em; color:#F4E8C4; font-style:normal;
     }
     #three-peek .three-stepper-ctrls {
-      margin-left:auto; display:flex; align-items:center; gap:6px;
+      margin-left:auto; display:flex; align-items:center; gap:4px;
     }
     #three-peek .three-step {
-      width:44px; height:44px; border-radius:12px;
+      width:36px; height:36px; border-radius:10px;
       border:1px solid rgba(255,255,255,0.16);
       background:rgba(30,36,32,0.55); color:#F4E8C4;
-      font:700 22px/1 -apple-system,"SF Pro Text",sans-serif;
+      font:700 18px/1 -apple-system,"SF Pro Text",sans-serif;
       cursor:pointer; -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
     }
     #three-peek .three-step:disabled { opacity:0.35; cursor:default; }
     #three-peek .three-step-count {
-      min-width:52px; text-align:center;
-      font:700 16px/1 -apple-system,"SF Pro Text",sans-serif;
+      min-width:44px; text-align:center;
+      font:700 14px/1 -apple-system,"SF Pro Text",sans-serif;
       font-variant-numeric:tabular-nums lining-nums;
       color:#F4EFE4;
     }
@@ -270,7 +274,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-confirm.is-idle,
     #three-confirm:disabled {
       pointer-events:auto;
-      min-height:62px; height:62px; width:100%;
+      min-height:52px; height:52px; width:100%;
       border:1px solid rgba(255,255,255,0.10); border-radius:16px;
       background:rgba(30,36,32,0.88); color:rgba(232,226,212,0.55);
       -webkit-backdrop-filter:blur(24px) saturate(1.15);
@@ -291,14 +295,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-zoom {
       position:absolute; right:max(10px, env(safe-area-inset-right));
       bottom:calc(88px + env(safe-area-inset-bottom, 0px));
-      z-index:36; display:flex; flex-direction:column; gap:8px;
+      z-index:28; display:flex; flex-direction:column; gap:8px;
       pointer-events:auto;
     }
     html.three-spike.has-l1 #three-zoom,
-    html.three-spike.has-battle #three-zoom {
-      bottom:calc(208px + env(safe-area-inset-bottom, 0px));
+    html.three-spike.has-battle #three-zoom,
+    html.three-spike.has-l2 #three-zoom {
+      display:none !important;
     }
-    html.three-spike.has-l2 #three-zoom { display:none; }
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.12);
@@ -348,7 +352,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-battle {
       display:none; pointer-events:none;
-      padding:10px 12px; border-radius:12px;
+      padding:8px 10px; border-radius:12px;
       background:rgba(30,36,32,0.55);
       -webkit-backdrop-filter:saturate(1.35) blur(18px);
       backdrop-filter:saturate(1.35) blur(18px);
@@ -362,46 +366,87 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       letter-spacing:0.08em; text-transform:uppercase; color:#C4A35A;
     }
     #three-battle strong {
-      display:block; margin-top:4px;
-      font:600 17px/1.2 -apple-system,"SF Pro Text",sans-serif;
+      display:block; margin-top:3px;
+      font:600 16px/1.15 -apple-system,"SF Pro Text",sans-serif;
     }
     #three-battle .three-battle-body {
-      margin-top:4px; font:400 13px/1.35 -apple-system,"SF Pro Text",sans-serif;
+      margin-top:3px; font:400 12px/1.3 -apple-system,"SF Pro Text",sans-serif;
       color:#c8c0b0;
     }
+    #three-battle .three-dice-block { margin-top:6px; }
+    #three-battle .three-dice-label {
+      font:700 11px/1 -apple-system,sans-serif;
+      letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;
+    }
+    #three-battle .three-dice-block.is-atk .three-dice-label { color:#C4A35A; }
+    #three-battle .three-dice-block.is-def .three-dice-label { color:#7EB6C9; }
     #three-battle .three-dice {
-      display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;
+      display:flex; flex-wrap:wrap; gap:4px; margin-top:0;
+      max-height:64px; overflow-y:auto; -webkit-overflow-scrolling:touch;
     }
     #three-battle .three-die {
-      width:28px; height:28px; border-radius:8px;
+      width:22px; height:22px; border-radius:6px;
       display:inline-flex; align-items:center; justify-content:center;
       background:rgba(240,230,210,0.14);
       border:1px solid rgba(255,255,255,0.12);
-      font:700 13px/1 -apple-system,sans-serif;
+      font:700 11px/1 -apple-system,sans-serif;
       font-variant-numeric:tabular-nums;
     }
     #three-battle .three-die.is-hit {
       background:#C4A35A; color:#1E2420; border-color:transparent;
     }
-    #three-battle .three-die.is-def { opacity:0.88; }
-    #three-battle .three-pickers { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+    #three-battle .three-die.is-atk {
+      background:rgba(196,163,90,0.16);
+      border-color:rgba(196,163,90,0.38);
+    }
+    #three-battle .three-die.is-atk.is-hit {
+      background:#C4A35A; color:#1E2420; border-color:transparent;
+    }
+    #three-battle .three-die.is-def {
+      background:rgba(126,182,201,0.16);
+      border-color:rgba(126,182,201,0.40);
+    }
+    #three-battle .three-die.is-def.is-hit {
+      background:#7EB6C9; color:#1E2420; border-color:transparent;
+    }
+    #three-battle .three-pickers { margin-top:6px; display:flex; flex-direction:column; gap:6px; }
     #three-battle .three-picker-label {
       font:600 11px/1 -apple-system,sans-serif; letter-spacing:0.04em;
-      text-transform:uppercase; color:#C4A35A; margin-bottom:4px;
+      text-transform:uppercase; color:#C4A35A; margin-bottom:3px;
     }
-    #three-battle .three-picker-row { display:flex; flex-wrap:wrap; gap:6px; }
+    #three-battle .three-picker-label.is-def { color:#7EB6C9; }
+    #three-battle .three-picker-row { display:flex; flex-wrap:wrap; gap:4px; }
     #three-battle .three-loss {
-      min-width:56px; min-height:48px; padding:4px 8px; border-radius:12px;
+      min-width:48px; min-height:36px; padding:3px 7px; border-radius:10px;
       border:1.5px solid rgba(255,255,255,0.16);
       background:rgba(240,230,210,0.12); color:#E8E2D4;
-      font:700 12px/1.2 -apple-system,"SF Pro Text",sans-serif;
+      font:700 11px/1.15 -apple-system,"SF Pro Text",sans-serif;
       cursor:pointer; -webkit-tap-highlight-color:transparent;
     }
     #three-battle .three-loss.is-on {
       background:#C4A35A; color:#1E2420; border-color:transparent;
     }
-    html.three-spike.has-battle #three-zoom,
-    html.three-spike.has-l2 #three-zoom { display:none; }
+    #three-battle .three-loss-step {
+      display:inline-flex; align-items:center; gap:4px;
+      min-height:36px; padding:2px 6px; border-radius:10px;
+      border:1.5px solid rgba(255,255,255,0.16);
+      background:rgba(240,230,210,0.12); color:#E8E2D4;
+    }
+    #three-battle .three-loss-step em {
+      font:700 11px/1 -apple-system,"SF Pro Text",sans-serif;
+      font-style:normal; min-width:28px;
+    }
+    #three-battle .three-loss-step .three-step {
+      width:32px; height:32px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.16);
+      background:rgba(30,36,32,0.55); color:#F4E8C4;
+      font:700 16px/1 -apple-system,"SF Pro Text",sans-serif;
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    #three-battle .three-loss-step .three-step:disabled { opacity:0.35; }
+    #three-battle .three-they-auto {
+      margin-top:2px; font:500 11px/1.3 -apple-system,sans-serif; color:#7EB6C9;
+    }
     html.three-spike.has-battle #three-stack-toggle { display:none; }
     #three-sheet {
       display:none; position:absolute; left:0; right:0; bottom:0; z-index:40;
@@ -427,14 +472,28 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
     @media (max-width:430px) {
       #three-l0 .three-l0-ver { display:none; }
-      #three-peek .three-peek-unit { width:60px; height:70px; }
-      #three-peek .three-peek-unit img { width:40px; height:40px; }
+      #three-peek { padding:6px 8px; }
+      #three-peek strong { font-size:14px; }
+      #three-peek .three-peek-meta { font-size:11px; }
+      #three-peek .three-peek-unit { width:52px; height:60px; }
+      #three-peek .three-peek-unit img { width:34px; height:34px; }
+      #three-peek .three-steppers { gap:3px; margin-top:5px; }
+      #three-peek .three-stepper,
+      #three-peek .three-steppers.is-fat .three-stepper { min-height:32px; padding:0 4px; }
+      #three-peek .three-step,
+      #three-peek .three-steppers.is-fat .three-step { width:32px; height:32px; font-size:17px; }
+      #three-peek .three-stepper img,
+      #three-peek .three-steppers.is-fat .three-stepper img { width:24px; height:24px; }
+      #three-peek .three-step-count { min-width:38px; font-size:13px; }
       #three-phase-strip .three-step { font-size:11px; }
       #three-confirm, #three-confirm.is-idle, #three-confirm:disabled {
-        min-height:64px; height:64px; font-size:16px;
+        min-height:48px; height:48px; font-size:15px; border-radius:12px;
       }
-      #three-battle strong { font-size:16px; }
-      #three-battle .three-die { width:26px; height:26px; }
+      #three-battle { padding:7px 8px; }
+      #three-battle strong { font-size:15px; }
+      #three-battle .three-die { width:20px; height:20px; font-size:10px; }
+      #three-battle .three-dice { max-height:56px; gap:3px; }
+      #three-battle .three-loss { min-width:44px; min-height:32px; }
     }
   `;
   document.head.appendChild(style);
@@ -539,6 +598,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       document.documentElement.classList.toggle('has-l2', l2);
       document.documentElement.classList.toggle('has-battle', battleOn);
       document.documentElement.classList.toggle('has-stacks', api.stacksExpanded);
+      const hideZoom = zoomShouldHide({ hasL1: l1, hasL2: l2, hasBattle: battleOn });
+      if (api.zoom) {
+        api.zoom.hidden = hideZoom;
+        api.zoom.setAttribute('aria-hidden', hideZoom ? 'true' : 'false');
+        api.zoom.style.display = hideZoom ? 'none' : '';
+      }
     },
     setSheetOpen(open) {
       sheet.classList.toggle('is-open', !!open);
@@ -600,26 +665,54 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         api.syncLayers();
         return;
       }
-      const dice = (card.dice || []).map((d) => {
-        const hit = d.hit ? ' is-hit' : '';
-        const side = d.side === 'def' ? ' is-def' : '';
-        return `<span class="three-die${hit}${side}" title="${d.type || ''}">${d.face}</span>`;
+      const groups = card.diceGroups?.length
+        ? card.diceGroups
+        : (card.dice?.length ? [{ side: 'mix', label: '', hits: null, dice: card.dice }] : []);
+      const diceHtml = groups.map((g) => {
+        const sideCls = g.side === 'def' ? ' is-def' : (g.side === 'atk' ? ' is-atk' : '');
+        const dice = (g.dice || []).map((d) => {
+          const hit = d.hit ? ' is-hit' : '';
+          const dieSide = d.side === 'def' ? ' is-def' : (d.side === 'atk' ? ' is-atk' : sideCls);
+          return `<span class="three-die${hit}${dieSide}" title="${d.type || ''}">${d.face}</span>`;
+        }).join('');
+        const hits = Number.isFinite(g.hits)
+          ? ` · ${g.hits} hit${g.hits === 1 ? '' : 's'}`
+          : '';
+        const label = (g.label || hits)
+          ? `<div class="three-dice-label">${g.label || 'Dice'}${hits}</div>`
+          : '';
+        return `<div class="three-dice-block${sideCls}">${label}<div class="three-dice">${dice}</div></div>`;
       }).join('');
       const pickers = (card.pickers || []).map((p) => {
         const chips = (p.units || []).map((u) => {
           const n = Number(p.taken?.[u.type]) || 0;
+          const have = Number(u.quantity) || 0;
           const on = n > 0 ? ' is-on' : '';
           const short = shortType(u.type);
+          if (p.steppers) {
+            const used = Object.values(p.taken || {}).reduce((s, q) => s + (Number(q) || 0), 0);
+            return `<div class="three-loss-step">
+              <em>${short}</em>
+              <button type="button" class="three-step" data-loss-side="${p.side}" data-loss-type="${u.type}" data-loss-step="-1" ${n <= 0 ? 'disabled' : ''} aria-label="Fewer ${short}">−</button>
+              <span class="three-step-count">${n}</span>
+              <button type="button" class="three-step" data-loss-side="${p.side}" data-loss-type="${u.type}" data-loss-step="1" ${n >= have || used >= p.need ? 'disabled' : ''} aria-label="More ${short}">+</button>
+            </div>`;
+          }
           return `<button type="button" class="three-loss${on}" data-loss-side="${p.side}" data-loss-type="${u.type}">${short}${n ? ` −${n}` : ''}</button>`;
         }).join('');
-        return `<div><div class="three-picker-label">${p.label}</div><div class="three-picker-row">${chips}</div></div>`;
+        const sideCls = p.side === 'def' ? ' is-def' : '';
+        return `<div><div class="three-picker-label${sideCls}">${p.label}</div><div class="three-picker-row">${chips}</div></div>`;
       }).join('');
+      const theyAuto = card.theyAuto
+        ? `<div class="three-they-auto">${card.theyAuto.label}</div>`
+        : '';
       api.battleEl.innerHTML = `
         <p class="three-battle-kicker">${card.kicker || 'Battle'}</p>
         <strong>${card.title || ''}</strong>
         <div class="three-battle-body">${card.body || ''}</div>
-        ${dice ? `<div class="three-dice">${dice}</div>` : ''}
-        ${pickers ? `<div class="three-pickers">${pickers}</div>` : ''}`;
+        ${diceHtml}
+        ${pickers ? `<div class="three-pickers">${pickers}</div>` : ''}
+        ${theyAuto}`;
       api.battleEl.classList.add('is-on');
       api.wirePeekButtons();
       api.syncLayers();
@@ -678,11 +771,15 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const activate = (e) => {
           e.stopPropagation();
           if (e.cancelable) e.preventDefault();
+          if (chip.disabled) return;
           const now = Date.now();
           if (now - last < 280) return;
           last = now;
           if (typeof api.onLossPick === 'function') {
-            api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType);
+            const step = chip.dataset.lossStep != null && chip.dataset.lossStep !== ''
+              ? Number(chip.dataset.lossStep)
+              : undefined;
+            api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType, step);
           }
         };
         chip.onpointerdown = activate;
@@ -814,8 +911,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
   });
   bindSealedActivate(api.battleEl, '[data-loss-type]', (e, chip) => {
+    if (chip.disabled) return;
     if (typeof api.onLossPick === 'function') {
-      api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType);
+      const step = chip.dataset.lossStep != null && chip.dataset.lossStep !== ''
+        ? Number(chip.dataset.lossStep)
+        : undefined;
+      api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType, step);
     }
   });
   bindSealedActivate(api.guideEl, '[data-guide="dismiss"]', () => {

@@ -2,6 +2,25 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.8 sheet / casualty / combat IA
+
+James he-correct on hybrid Three tip (PR76 / preview.7-max). HOLD MERGE.
+Ground truth stills: zoom Fit overlapping INF/ART/TNK +/−; ROUND 1 ATK 2 · DEF 1
+with YOU ART−1 selected but Assign casualties disabled; THEY inert; one unlabeled die grid.
+
+A) Unit sheet open hides + / − / Fit. Peek + bottom sit above leftover chrome and
+   swallow touches (no Congo steal under INF +).
+B) Local/solo auto-assigns THEY (defender). Confirm gold after YOU assign enough.
+   Chip toggles + loss steppers still work for YOUR hits.
+C) 390 unit sheet denser: shorter rows, less padding, 48px Confirm, more map.
+D) Combat IA: ATK (gold) vs DEF (steel) dice groups with hit counts. Body maps
+   You = attacker losses from DEF hits, They = defender losses from ATK hits.
+
+Keep: partial +/−, air-land planes-only, no Try, max seed `?three=1&max=1`.
+Preview only. Do not merge to main.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.7-max fat Karelia→Ukraine
 
 James wanted a bigger battle sim on the preview.7 / PR76 tip.

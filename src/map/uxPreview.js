@@ -272,8 +272,8 @@ export async function bootUxPreview() {
     paintChrome();
     camera.dirty = true;
   };
-  chrome.onLossPick = (side, type) => {
-    pickLoss(play, side, type);
+  chrome.onLossPick = (side, type, delta) => {
+    pickLoss(play, side, type, delta);
     paintChrome();
     camera.dirty = true;
   };
@@ -654,6 +654,11 @@ export async function bootUxPreview() {
       continents: continents.length,
       idleConfirm: 'Select units',
       tryCombatMove: false,
+      zoomHidden: !!(
+        document.documentElement.classList.contains('has-l1')
+        || document.documentElement.classList.contains('has-l2')
+        || document.documentElement.classList.contains('has-battle')
+      ),
       maxBattle,
       maxQuery: '?three=1&max=1',
       maxAliases: ['?three=1&max=1', '?three=1&stress=1', '?three=1&demo=max'],
@@ -697,8 +702,8 @@ export async function bootUxPreview() {
       return { ...(play.selectedUnits || {}) };
     },
     blocksMapAt: (x, y) => chrome.blocksMapAt(x, y),
-    pickLoss: (side, type) => {
-      pickLoss(play, side, type);
+    pickLoss: (side, type, delta) => {
+      pickLoss(play, side, type, delta);
       paintChrome();
       camera.dirty = true;
       return inspectPlay(play);
