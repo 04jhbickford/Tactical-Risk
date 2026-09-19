@@ -166,7 +166,7 @@ function makePlacementTable({
 
 console.log('=== V2.72 version + leftover-unit pass predicate ===');
 {
-  check('GAME_VERSION is V2.81.54', GAME_VERSION === 'V2.81.54');
+  check('GAME_VERSION is V2.81.55', GAME_VERSION === 'V2.81.55');
   check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
   check('round cap allows Done with leftovers still in the pool',
     canFinishPlacementRound({
@@ -675,7 +675,7 @@ console.log('=== V2.75: seated local human counts as present for AI ===');
     ) === false);
 }
 
-console.log('=== V2.81.54 combatTelemetry persists on the game doc ===');
+console.log('=== V2.81.55 combatTelemetry persists on the game doc ===');
 {
   const gs = new GameState({ risk: { factions: [] } }, [], []);
   gs.round = 3;

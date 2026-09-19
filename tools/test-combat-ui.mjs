@@ -127,7 +127,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.54', GAME_VERSION === 'V2.81.54');
+check('GAME_VERSION is V2.81.55', GAME_VERSION === 'V2.81.55');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
@@ -428,7 +428,7 @@ console.log('=== V2.81.45 phone combat sheet (odds / select / resolve) ===');
   document.documentElement.classList.remove('mobile-shell');
 }
 
-console.log('=== V2.81.54 AA wipe fail-close + telemetry ===');
+console.log('=== V2.81.55 AA wipe fail-close + telemetry ===');
 {
   check('countLivingUnits ignores qty 0 and excluded AA',
     countLivingUnits([{ type: 'fighter', quantity: 2 }, { type: 'aaGun', quantity: 1 }]) === 3
