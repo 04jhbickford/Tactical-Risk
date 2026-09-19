@@ -476,16 +476,17 @@ export function pickLoss(state, side, type) {
   const have = stackQty(dest, type, owner);
   if (have <= 0) return state;
   const thisN = Number(cur[type]) || 0;
+  const used = assignedCount(cur);
+  // HUD often delivers pointerdown + click (or a rebuilt-node ghost tap)
+  // for one gesture. Once YOU/THEY already hold a legal count that
+  // includes this type, ignore the echo — do not toggle back to 0.
+  if (used === menu.need && thisN > 0) return state;
   if (menu.need === 1) {
-    battle[key] = thisN > 0 ? {} : { [type]: 1 };
+    battle[key] = { [type]: 1 };
     return state;
   }
-  const used = assignedCount(cur);
   if (thisN < have && used < menu.need) {
     cur[type] = thisN + 1;
-  } else if (thisN > 0) {
-    cur[type] = thisN - 1;
-    if (cur[type] <= 0) delete cur[type];
   } else if (used >= menu.need && thisN === 0) {
     const donor = Object.keys(cur).find((t) => t !== type && (Number(cur[t]) || 0) > 0);
     if (donor) {
@@ -493,6 +494,9 @@ export function pickLoss(state, side, type) {
       if (cur[donor] <= 0) delete cur[donor];
       cur[type] = 1;
     }
+  } else if (thisN > 0) {
+    cur[type] = thisN - 1;
+    if (cur[type] <= 0) delete cur[type];
   }
   battle[key] = cur;
   return state;
@@ -505,6 +509,8 @@ export function confirmEnabled(state) {
   }
   if (state.phase === PHASE.BATTLE) {
     if (!state.battle) return false;
+    // Solo / local: YOU matching required hits is enough. THEY is
+    // cheapest-auto and must never gate this button.
     if (state.battle.step === BATTLE_STEP.COMBAT_RESULT) return lossesReady(state);
     return true;
   }
@@ -1012,6 +1018,8 @@ export function inspectPlay(state) {
     guide: guideCopy(state),
     legalDests: legalDests(state),
     lossesReady: lossesReady(state),
+    youReady: sideLossesReady(state, 'att'),
+    theyReady: sideLossesReady(state, 'def'),
     pendingAtt: { ...(state?.battle?.pendingAtt || {}) },
     pendingDef: { ...(state?.battle?.pendingDef || {}) },
     battleStep: state?.battle?.step || null,

@@ -85,8 +85,17 @@ assert(mid.battle.pendingAtt.artillery === 1, 'YOU ART −1');
 assert(lossesReady(mid) === true, 'YOU pick is enough');
 assert(confirmEnabled(mid) === true, 'Confirm gold after YOU only');
 assert(confirmLabel(mid) === 'Confirm: Take hits', 'hits CTA after YOU');
+pickLoss(mid, 'att', 'artillery');
+assert(mid.battle.pendingAtt.artillery === 1, 're-tap ART does not toggle off');
+assert(confirmEnabled(mid) === true, 'Confirm stays gold after HUD echo tap');
+const theyBefore = { ...mid.battle.pendingDef };
+mid.battle.pendingDef = {};
+assert(lossesReady(mid) === true, 'empty THEY does not unready YOU');
+assert(confirmEnabled(mid) === true, 'THEY must not gate Confirm');
+mid.battle.pendingDef = theyBefore;
 pickLoss(mid, 'def', 'armour');
 assert(mid.battle.pendingDef.armour === 1, 'THEY tap still registers');
+assert(confirmEnabled(mid) === true, 'THEY retap keeps Confirm');
 
 const air = createScenario({ max: true });
 driveAirChoice(air);

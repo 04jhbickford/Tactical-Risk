@@ -274,7 +274,15 @@ export async function bootUxPreview() {
   };
   chrome.onLossPick = (side, type) => {
     pickLoss(play, side, type);
-    paintChrome();
+    const card = battleCard(play);
+    if (typeof chrome.updatePickers === 'function') chrome.updatePickers(card);
+    else chrome.setBattle(card);
+    chrome.applyConfirm({
+      replay: play.phase === PHASE.DONE,
+      enabled: confirmEnabled(play),
+      gold: confirmGold(play),
+      label: confirmLabel(play),
+    });
     camera.dirty = true;
   };
   chrome.onGuideDismiss = () => {
@@ -699,7 +707,15 @@ export async function bootUxPreview() {
     blocksMapAt: (x, y) => chrome.blocksMapAt(x, y),
     pickLoss: (side, type) => {
       pickLoss(play, side, type);
-      paintChrome();
+      const card = battleCard(play);
+      if (typeof chrome.updatePickers === 'function') chrome.updatePickers(card);
+      else chrome.setBattle(card);
+      chrome.applyConfirm({
+        replay: play.phase === PHASE.DONE,
+        enabled: confirmEnabled(play),
+        gold: confirmGold(play),
+        label: confirmLabel(play),
+      });
       camera.dirty = true;
       return inspectPlay(play);
     },

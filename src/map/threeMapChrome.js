@@ -687,6 +687,32 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.wirePeekButtons();
       api.syncLayers();
     },
+    updatePickers(card) {
+      if (!card || !api.battleEl.classList.contains('is-on')) {
+        api.setBattle(card);
+        return;
+      }
+      for (const p of card.pickers || []) {
+        const row = api.battleEl.querySelector(`.three-picker[data-loss-side="${p.side}"]`);
+        if (!row) continue;
+        for (const u of p.units || []) {
+          const chip = row.querySelector(`[data-loss-type="${u.type}"]`);
+          if (!chip) continue;
+          const n = Number(p.taken?.[u.type]) || 0;
+          chip.classList.toggle('is-on', n > 0);
+          chip.textContent = `${shortType(u.type)}${n ? ` −${n}` : ''}`;
+        }
+      }
+    },
+    applyConfirm({ replay = false, enabled = false, gold = false, label = '' } = {}) {
+      if (replay) {
+        api.setConfirmReplay(label || 'Replay scenario');
+        return;
+      }
+      // gold is cosmetic; enabled is the only gate. YOU-ready must light Confirm.
+      if (enabled || gold) api.setConfirmReady(label || 'Confirm');
+      else api.setConfirmIdle(label || 'Select units');
+    },
     setStacksExpanded(on) {
       api.stacksExpanded = !!on;
       stackToggle.setAttribute('aria-pressed', api.stacksExpanded ? 'true' : 'false');
@@ -735,23 +761,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         chip.ontouchstart = activate;
         chip.onclick = activate;
       });
-      api.battleEl.querySelectorAll('[data-loss-type]').forEach((chip) => {
-        stamp(chip);
-        let last = 0;
-        const activate = (e) => {
-          e.stopPropagation();
-          if (e.cancelable) e.preventDefault();
-          const now = Date.now();
-          if (now - last < 280) return;
-          last = now;
-          if (typeof api.onLossPick === 'function') {
-            api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType);
-          }
-        };
-        chip.onpointerdown = activate;
-        chip.ontouchstart = activate;
-        chip.onclick = activate;
-      });
+      // Loss chips: bindSealedActivate(#three-battle, [data-loss-type]) is
+      // the only handler. Per-chip pointerdown+click here double-fired
+      // pickLoss and toggled a 1-hit YOU assign back to 0 (P0.2).
     },
     paintPlay({
       land = null,
@@ -808,9 +820,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         }
         if (!api.isSheetOpen()) api.peek.classList.add('is-on');
       }
-      if (replay) api.setConfirmReplay(label || 'Replay scenario');
-      else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
-      else api.setConfirmIdle(label || 'Select units');
+      api.applyConfirm({ replay, enabled, gold, label });
       api.wirePeekButtons();
       api.syncLayers();
     },

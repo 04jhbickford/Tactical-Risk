@@ -2,6 +2,24 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.9 P0.2 casualty Confirm soft-lock
+
+Viz FAIL ~75% on preview.8: sole killer P0.2. James / t3110 class.
+
+YOU assigned enough (ART−1 when DEF scored 1) but **Assign casualties /
+Confirm: Take hits stayed disabled**. Preview.8 made `lossesReady` YOU-only
+and cheapest-auto THEY, but a single HUD tap double-fired `pickLoss`.
+For need=1 that **toggled the assign back to 0**, so Confirm never lit.
+
+Hotfix: re-tap of a legal YOU pick is a no-op (no toggle-off). One
+loss-chip handler. Confirm enables from YOU count alone — THEY can stay
+cheapest-auto / tappable and must not gate. Keep zoom-hidden, dense
+sheet, ATK gold / DEF steel, max seed, steppers, planes-only land.
+
+Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.8 max-tip he-correct
 
 James from Karelia combat-move + ROUND 1 stills on PR76 `?three=1&max=1`.
