@@ -62,7 +62,8 @@ guideOn:      false
 - `japan-near-390.png` — Japan near, INF + overflow, no overlap
 - `japan-stress-8types-390.png` — 8 kinds → INF + +35, peek scroll
 - `germany-stress-8types-390.png` — 8 kinds → 3 typed + +29
+- `vercel-live-mid-390.png` — live preview `?three=1` @390
 
-**Vercel:** https://tactical-risk20-c9eaf9jfh-james-projects-20d8de40.vercel.app/?three=1
-**Stress:** https://tactical-risk20-c9eaf9jfh-james-projects-20d8de40.vercel.app/?three=1&stress=1
+**Vercel:** https://tactical-risk20-jf9tdzzn4-james-projects-20d8de40.vercel.app/?three=1  (HTTP 200)
+**Stress:** https://tactical-risk20-jf9tdzzn4-james-projects-20d8de40.vercel.app/?three=1&stress=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/68 (draft · do not merge)
