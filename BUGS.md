@@ -2,6 +2,15 @@
 
 ---
 
+## 9.19.26 — V2.81.55-ux-solo.2 S2–S6 (preview only)
+
+Phase shell + combat-move + combat/casualties + air land + NCM on
+`?three=1&solo=1` via `threeSoloPlay.js` (real GameState). Tech/Buy
+are End Phase skips. Purchase/mobilize/tech/win still stubbed.
+Pocket `?three=1&max=1` kept. Do not merge. STOP before S7–S9.
+
+---
+
 ## 9.19.26 — V2.81.55-ux-solo.1 S0+S1 (preview only)
 
 S0: main V2.81.54 AA-wipe + V2.81.55 game-log brought onto PR76.  

@@ -42,5 +42,6 @@ export function prepareClassicSoloState(gameState) {
     && (!gameState.turnPhase || gameState.turnPhase === SETUP_TURN_PHASE)) {
     gameState.turnPhase = TURN_PHASES.DEVELOP_TECH;
   }
+  gameState._initFriendlyTerritoriesAtTurnStart?.();
   return gameState;
 }

@@ -820,9 +820,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       battle = null,
       replay = false,
       route = '',
+      phaseStrip = undefined,
+      phaseStripCurrent = 1,
     } = {}) {
       api.setGuide('', false);
-      api.setPhaseStrip([], 0);
+      if (phaseStrip !== undefined) api.setPhaseStrip(phaseStrip, phaseStripCurrent);
       api.setBattle(battle);
       if (battle) {
         api.peek.classList.remove('is-on');

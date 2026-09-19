@@ -1,5 +1,5 @@
 // Classic 1942 solo vs AI under Three chrome.
-// S1: cold start + seats + IPC/capitals + inspect board. Phases still thin.
+// S2–S6: phase shell, combat-move, combat/casualties, air land, NCM.
 // Preview only. Do not merge to main. Do not grow uxPreviewScenario.js.
 
 import { Camera, MAP_WIDTH } from './camera.js';
@@ -33,6 +33,18 @@ import {
   inspectSolo,
   DEFAULT_HUMAN_SEAT,
 } from './threeSoloMatch.js';
+import {
+  createSoloPlay,
+  tapLand,
+  adjustUnit,
+  adjustLanding,
+  adjustLoss,
+  confirm as confirmPlay,
+  chromeModel,
+  inspectPlay,
+  highlights,
+  LAND_TEAL,
+} from './threeSoloPlay.js';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -128,12 +140,18 @@ export async function bootThreeSolo() {
   });
   chrome.setSeat(human?.name || DEFAULT_HUMAN_SEAT, human?.color || '#B22222');
 
+  let play = createSoloPlay(gameState, unitDefs);
   let aiController = null;
   function wireAI() {
     if (aiController) return aiController;
     aiController = new AIController();
     aiController.setUnitDefs(unitDefs);
     aiController.setCanAct(() => true);
+    aiController.setOnStatusUpdate((message) => {
+      play.aiStatus = message;
+      paintChrome();
+      camera.dirty = true;
+    });
     aiController.setGameState(gameState);
     return aiController;
   }
@@ -188,26 +206,41 @@ export async function bootThreeSolo() {
     chrome.setPhase(TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY');
     chrome.setSeat(current?.name || you?.name || '—', current?.color || you?.color);
     chrome.setIpc(gameState.getIPCs(you?.id) || 0);
-    const land = selected;
-    const stacks = land ? (gameState.units[land.name] || []) : [];
+    const model = chromeModel(play, territories);
+    selected = landByName(play.selected) || selected;
     chrome.paintPlay({
-      land,
-      stacks,
-      label: current?.isAI
-        ? `${current.name} thinking…`
-        : `${TURN_PHASE_NAMES[gameState.turnPhase] || 'Phase'} · S2 next`,
-      gold: false,
-      enabled: false,
-      guide: '',
-      guideOn: false,
-      battle: null,
-      replay: false,
-      route: 'Classic 1942 · inspect',
+      land: model.land,
+      stacks: model.stacks,
+      steppers: model.steppers,
+      airLand: model.airLand,
+      label: model.label,
+      gold: model.gold,
+      enabled: model.enabled,
+      battle: model.battle,
+      route: model.route,
+      phaseStrip: model.phaseStrip,
+      phaseStripCurrent: model.phaseStripCurrent,
     });
   }
 
   chrome.onStackToggle = (on) => {
     stacksExpanded = on;
+    camera.dirty = true;
+  };
+  chrome.onUnitStep = (type, delta) => {
+    if (play.landing) adjustLanding(play, type, delta);
+    else adjustUnit(play, type, delta);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onLossStep = (side, type, delta) => {
+    adjustLoss(play, side, type, delta);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onLossPick = (side, type) => {
+    adjustLoss(play, side, type, 1);
+    paintChrome();
     camera.dirty = true;
   };
   chrome.onNewGameVsAI = () => {
@@ -218,6 +251,8 @@ export async function bootThreeSolo() {
     bindState(startClassicSolo(setup, territories, continents));
     if (aiController) aiController.setGameState(gameState);
     else wireAI();
+    play = createSoloPlay(gameState, unitDefs);
+    play.aiStatus = null;
     selected = null;
     gameState.autoSave();
     paintChrome();
@@ -267,7 +302,8 @@ export async function bootThreeSolo() {
   }
 
   function selectLand(next) {
-    selected = next || null;
+    tapLand(play, next?.name);
+    selected = landByName(play.selected) || next || null;
     paintChrome();
     camera.dirty = true;
   }
@@ -356,6 +392,13 @@ export async function bootThreeSolo() {
     if (btn.dataset.zoom === 'fit') fitEurope();
     else camera.zoomBy(btn.dataset.zoom);
   });
+  bindSealedActivate(chrome.confirm, null, () => {
+    if (chrome.confirm.disabled) return;
+    confirmPlay(play);
+    selected = landByName(play.selected);
+    paintChrome();
+    camera.dirty = true;
+  });
 
   function paint() {
     camera.update();
@@ -385,9 +428,43 @@ export async function bootThreeSolo() {
       territoryRenderer.renderOwnershipOverlays(ctx, camera.zoom);
       territoryRenderer.renderTerrainTexture(ctx, camera.zoom);
       territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
-      if (selected) {
-        strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom, {
+      const marks = highlights(play);
+      const byName = (name) => territories.find((t) => t.name === name);
+      const wave = 0.5 + 0.5 * Math.sin(performance.now() / 280);
+      const pulsing = new Set(marks.pulse || []);
+      for (const name of marks.legal || []) {
+        ctx.save();
+        if (pulsing.has(name)) ctx.globalAlpha = 0.42 + 0.58 * wave;
+        strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
           color: SELECT_GOLD,
+          dashed: true,
+          width: pulsing.has(name) ? 3.4 + 1.2 * wave : 2.6,
+        });
+        ctx.restore();
+      }
+      for (const name of marks.landable || []) {
+        strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
+          color: LAND_TEAL,
+          dashed: true,
+          width: 2.8,
+        });
+      }
+      if (marks.origin) {
+        strokeSelectOutline(ctx, byName(marks.origin), territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          width: 3.2,
+        });
+      }
+      if (marks.dest) {
+        strokeSelectOutline(ctx, byName(marks.dest), territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          width: 3.6,
+        });
+      }
+      if (selected && selected.name !== marks.origin && selected.name !== marks.dest) {
+        const landColor = (marks.landable || []).includes(selected.name) ? LAND_TEAL : SELECT_GOLD;
+        strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom, {
+          color: landColor,
           width: 3.2,
         });
       }
@@ -405,7 +482,8 @@ export async function bootThreeSolo() {
   }
 
   function loop() {
-    if (camera.dirty || camera._targetX !== null) {
+    const pulsing = highlights(play).pulse?.length > 0;
+    if (camera.dirty || camera._targetX !== null || pulsing) {
       camera.dirty = false;
       paint();
     }
@@ -421,11 +499,38 @@ export async function bootThreeSolo() {
 
   window.__threeSolo = {
     version: GAME_VERSION,
-    inspect: () => inspectSolo(gameState),
+    inspect: () => ({ ...inspectSolo(gameState), play: inspectPlay(play) }),
+    playInspect: () => inspectPlay(play),
     selectLand: (name) => {
       const t = landByName(name);
       if (t) selectLand(t);
-      return t?.name || null;
+      return inspectPlay(play);
+    },
+    adjustUnit: (type, delta = 1) => {
+      if (play.landing) adjustLanding(play, type, delta);
+      else adjustUnit(play, type, delta);
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
+    adjustLanding: (type, delta = 1) => {
+      adjustLanding(play, type, delta);
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
+    adjustLoss: (side, type, delta = 1) => {
+      adjustLoss(play, side, type, delta);
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
+    confirm: () => {
+      confirmPlay(play);
+      selected = landByName(play.selected);
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
     },
     newGame: () => {
       startMatch();
@@ -433,6 +538,7 @@ export async function bootThreeSolo() {
     },
     chrome,
     gameState,
+    play,
   };
 
   return window.__threeSolo;

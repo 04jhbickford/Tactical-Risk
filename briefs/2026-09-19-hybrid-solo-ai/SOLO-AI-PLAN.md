@@ -1,8 +1,8 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** S0 + S1 landed. **STOP before S2.** Hold merge.  
+**Status:** S0–S6 landed. **STOP before S7–S9.** Hold merge. Ready for Arc.  
 **Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.55-ux-solo.1` · SCHEMA 11  
+**Tip:** `V2.81.55-ux-solo.2` · SCHEMA 11  
 **Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
 **Solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
 **Live main:** https://tactical-risk20.vercel.app/ · `V2.81.55` · SCHEMA 11  
@@ -10,11 +10,25 @@
 
 ## S0 / S1 landed (2026-09-19)
 
-**S0** — Cherry-picked main `b98a4df` (V2.81.54 AA-wipe fail-close) and `e99f629` (V2.81.55 game-log / diagnostics) onto this side branch. Tip UX kept. `GAME_VERSION` is `V2.81.55-ux-solo.1`.
+**S0** — Cherry-picked main `b98a4df` (V2.81.54 AA-wipe fail-close) and `e99f629` (V2.81.55 game-log / diagnostics) onto this side branch. Tip UX kept.
 
-**S1** — `?three=1&solo=1` and menu **New Game vs AI** boot real `GameState` classic 1942: 1 human (Russians) + 4 medium AI, historical capitals stamped, live IPC, Develop Tech chrome, inspect-only board. Pocket `?three=1&max=1` unchanged (`uxPreviewScenario.js` not grown).
+**S1** — `?three=1&solo=1` and menu **New Game vs AI** boot real `GameState` classic 1942: 1 human (Russians) + 4 medium AI, historical capitals stamped. Pocket `?three=1&max=1` unchanged (`uxPreviewScenario.js` not grown).
 
-**Still stubbed (S2+):** End Phase / purchase / combat-move / combat / NCM / mobilize / win. Confirm is idle. AI is wired but waits on the human seat.
+## S2–S6 landed (2026-09-19) — STOP before S7–S9
+
+Adapter is `src/map/threeSoloPlay.js` (GameState + AIController + autosave behind Three chrome). Do not grow `uxPreviewScenario.js`.
+
+| Slice | Landed |
+|---|---|
+| **S2** | L0 chip + strip from `TURN_PHASE_NAMES` / `STRIP_SHORT`. Confirm **End Phase** when legal. Live IPC. AI status on Confirm when it is not the human seat. Empty combat / mobilize skipped via `nextPhase`. |
+| **S3** | Combat-move: legal origins/dests, tile +/−, Confirm attack → `moveUnits` + enqueue. |
+| **S4** | Combat queue, AA (hit on 1, cheapest air, wipe fail-close), YOU tiles / THEY cheapest, gold Confirm, multi-round, real dice. Naval queue auto-`resolveCombat` so land is not wedged. |
+| **S5** | Planes-only sheet, partial type/count + dest (`.11` IA), `applyAirLandings`. |
+| **S6** | NCM friendly dests (dest tap wins when units are already picked). Done when `remainingAirLandingsToAssign` = 0. |
+
+**Still stubbed (S7–S9):** purchase / mobilize tiles (Tech + Buy are skip-only End Phase). Tech dice sheet. Win chrome / New Game polish. Human can fight and move vs AI, then sit through AI turns; they cannot buy, research, or place yet.
+
+**How far a human can play:** Develop Tech skip → Purchase skip → Combat Move → Combat (AA / casualties / take) → Air Land → NCM → (mobilize skip) → income / German AI. Repeat those phases each Russian turn. Pocket `?three=1&max=1` unchanged.
 
 This brief tells Arc how to port a **real solo match vs AI** onto the tip `.11` Three UX without rewriting the rules engine and without touching lobby / multiplayer / `main`.
 
@@ -274,6 +288,6 @@ A playtester on a **390-wide** viewport, **no lobby**, can:
 
 ## Kickoff note for Phase 2
 
-**S0 + S1 DONE. STOP — ready for Arc pause before S2.**
+**S0–S6 DONE. STOP — ready for Arc before S7–S9.**
 
-Do not start S2 (phase shell / End Phase) until the next yes. Hold PR76 merge.
+Do not start S7 (purchase / mobilize), S8 (tech sheet), or S9 (win / New Game polish) until the next yes. Hold PR76 merge.
