@@ -613,10 +613,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const ipcLine = !land.isWater ? `${printIpc(land)} IPC` : '';
         const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
         const stagedMap = { ...(staged || {}) };
-        if (unitType && !stagedMap[unitType]) stagedMap[unitType] = 1;
-        if (Array.isArray(unitTypes)) {
-          for (const t of unitTypes) {
-            if (t && !stagedMap[t]) stagedMap[t] = 1;
+        if (!battle?.casualties) {
+          if (unitType && !stagedMap[unitType]) stagedMap[unitType] = 1;
+          if (Array.isArray(unitTypes)) {
+            for (const t of unitTypes) {
+              if (t && !stagedMap[t]) stagedMap[t] = 1;
+            }
           }
         }
         api.peek.innerHTML = `<strong>${land.name}</strong>

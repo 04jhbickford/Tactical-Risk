@@ -403,6 +403,14 @@ export function pickUnit(state, type) {
 }
 
 export function adjustUnit(state, type, delta) {
+  if (state?.phase === PHASE.BATTLE && state.battle?.step === BATTLE_STEP.CASUALTIES) {
+    if (Number(delta) > 0) return pickCasualty(state, type, 'att');
+    const pending = state.battle.pendingAtt || {};
+    const cur = Number(pending[type]) || 0;
+    if (cur <= 1) delete pending[type];
+    else pending[type] = cur - 1;
+    return state;
+  }
   if (!state || state.phase !== PHASE.COMBAT_MOVE) return state;
   const have = stackQty(state.placements[state.origin], type, attackerOf(state));
   if (have <= 0) return state;
