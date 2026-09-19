@@ -1,4 +1,4 @@
-// V2.81.52-three-polish.40b basemap-under-ink. Select outline-only, no interior wash.
+// V2.81.52-three-polish.41 silhouette-first. Select outline-only, no interior wash.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.52-three-polish.40b', GAME_VERSION === 'V2.81.52-three-polish.40b');
+check('GAME_VERSION is V2.81.52-three-polish.41', GAME_VERSION === 'V2.81.52-three-polish.41');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -923,13 +923,8 @@ check('p40 baker is bbox+feather, mask paint off',
   && /never paste_through_mask for color/.test(albedoBaker)
   && /p40-oceania/.test(albedoBaker)
   && !/img = paste_through_mask\(/.test(albedoBaker));
-check('p40 runtime flags + select outline only',
-  /WORLD_LAND_ALBEDO_REV = 'p40b'/.test(terrain)
-  && /strategy: 'basemapUnderInk'/.test(terrain)
-  && /maskPaintOff: true/.test(terrain)
-  && /oceanCoastalRipples: true/.test(terrain)
-  && /styleRef: 'oceania-beautiful'/.test(terrain)
-  && /selectOutlineOnly: true/.test(spike)
+check('p40 select outline-only held',
+  /selectOutlineOnly: true/.test(spike)
   && /selectWash: false/.test(spike)
   && /selectFill: false/.test(spike)
   && /selectEmissiveWash: false/.test(spike)
@@ -960,6 +955,61 @@ check('p40 SCORE states invert + four P0 gates',
   && /maskPaintOff/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p40/SCORE.md'), 'utf8'))
   && /oceanCoastalRipples/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p40/SCORE.md'), 'utf8'))
   && /styleRef=oceania-beautiful/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p40/SCORE.md'), 'utf8')));
+
+check('p41 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P41.md')));
+check('p41 silhouette guide + STYLE REF on disk',
+  pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/silhouette-guide.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/silhouette-guide.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/style-ref-imagine-world.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/style-ref-oceania-beautiful.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/p41-world-into-silhouette-b.png'));
+check('p41 baker is silhouette-first, mask paint off',
+  /GEN41/.test(albedoBaker)
+  && /silhouetteFirst/.test(albedoBaker)
+  && /watercolor_into_silhouette/.test(albedoBaker)
+  && /wrap_standard_world_to_game/.test(albedoBaker)
+  && /register_plate_to_silhouette/.test(albedoBaker)
+  && /build_silhouette_guide/.test(albedoBaker)
+  && /coastRegistered/.test(albedoBaker)
+  && /maskPaintOff/.test(albedoBaker)
+  && /basemapUnderInk/.test(albedoBaker)
+  && /never paste_through_mask for color/.test(albedoBaker)
+  && !/img = paste_through_mask\(/.test(albedoBaker));
+check('p41 runtime flags + select outline only',
+  /WORLD_LAND_ALBEDO_REV = 'p41'/.test(terrain)
+  && /strategy: 'silhouetteFirst'/.test(terrain)
+  && /silhouetteFirst: true/.test(terrain)
+  && /coastRegistered: true/.test(terrain)
+  && /maskPaintOff: true/.test(terrain)
+  && /basemapUnderInk: true/.test(terrain)
+  && /oceanCoastalRipples: true/.test(terrain)
+  && /styleRef: 'grok-imagine-world'/.test(terrain)
+  && /selectOutlineOnly: true/.test(spike)
+  && /selectWash: false/.test(spike)
+  && /selectFill: false/.test(spike)
+  && /selectEmissiveWash: false/.test(spike)
+  && /oceanNoHatch: true/.test(spike)
+  && /unitCountOne: true/.test(spike)
+  && /opaquePlastic: true/.test(spike)
+  && /stackToggle: true/.test(spike));
+check('p41 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md')));
+check('p41 required stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/silhouette-guide.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/mid-vs-style-ref.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/coast-register-aus.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/coast-register-med.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/coast-register-uk.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/ocean-ripples.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/select-on-art.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/land-borders-ink.png'));
+check('p41 SCORE states silhouette-first + four P0 gates',
+  /albedoRev=p41/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
+  && /strategy=silhouetteFirst/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
+  && /coastRegistered/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
+  && /basemapUnderInk/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
+  && /maskPaintOff/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
+  && /selectOutlineOnly/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
+  && /styleRef=grok-imagine-world/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

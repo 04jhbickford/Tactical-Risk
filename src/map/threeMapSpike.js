@@ -1463,6 +1463,8 @@ export async function bootThreeMapSpike() {
         maskOnlyComposite: false,
         maskPaintOff: !!(albedoBound && albedo?.userData?.maskPaintOff),
         basemapUnderInk: !!(albedoBound && albedo?.userData?.basemapUnderInk),
+        silhouetteFirst: !!(albedoBound && albedo?.userData?.silhouetteFirst),
+        coastRegistered: !!(albedoBound && albedo?.userData?.coastRegistered),
         strategy: albedo?.userData?.strategy || null,
         oceanCoastalRipples: !!(albedoBound && albedo?.userData?.oceanCoastalRipples),
         selectOutlineOnly: true,
