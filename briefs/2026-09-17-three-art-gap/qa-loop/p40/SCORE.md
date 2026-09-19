@@ -60,5 +60,5 @@ unitCountOne  opaquePlastic  stackToggle  seaInkClosedRings
 
 **One line:** mask paint off → basemap under ink.
 
-**Vercel:** (preview URL after deploy)
-**PR:** stacked on PR64 / `.39b`
+**Vercel:** https://tactical-risk20-l2v69lmur-james-projects-20d8de40.vercel.app/?three=1  
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/65 (stacked on PR64 / `.39b`)
