@@ -55,4 +55,6 @@ Demo dice: AA miss · every combat round 2 ATK / 1 DEF hits. YOU assign the 1 at
 - `c-compact-sheet-390.png` — denser 390 sheet, more map
 - `d-combat-atk-def-dice-390.png` — labeled ATK/DEF dice + You/They
 
-**PR:** draft on hybrid lineage · do not merge to main
+**Vercel (fat):** https://tactical-risk20-git-cursor-hybri-86f6e9-james-projects-20d8de40.vercel.app/?three=1&max=1
+**Vercel (small):** https://tactical-risk20-git-cursor-hybri-86f6e9-james-projects-20d8de40.vercel.app/?three=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/78 (draft · hybrid lineage · do not merge to main)

@@ -28,11 +28,11 @@
   "tryCombatMove": false,
   "guideOn": false,
   "guideBlocksBoard": false,
-  "vercel": "https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1",
+  "vercel": "https://tactical-risk20-git-cursor-hybri-86f6e9-james-projects-20d8de40.vercel.app/?three=1&max=1",
   "stills": [
-    "combat-move-origin-steppers-390.png",
-    "combat-move-inf-plus-390.png",
-    "combat-move-pick-target-390.png",
-    "max-karelia-ukraine-stacks-390.png"
+    "a-unit-sheet-no-zoom-390.png",
+    "b-you-assign-confirm-390.png",
+    "c-compact-sheet-390.png",
+    "d-combat-atk-def-dice-390.png"
   ]
 }

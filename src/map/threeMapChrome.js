@@ -353,6 +353,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-battle {
       display:none; pointer-events:none;
       padding:8px 10px; border-radius:12px;
+      max-height:min(42dvh, 340px);
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
       background:rgba(30,36,32,0.55);
       -webkit-backdrop-filter:saturate(1.35) blur(18px);
       backdrop-filter:saturate(1.35) blur(18px);
@@ -373,7 +375,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       margin-top:3px; font:400 12px/1.3 -apple-system,"SF Pro Text",sans-serif;
       color:#c8c0b0;
     }
-    #three-battle .three-dice-block { margin-top:6px; }
+    #three-battle .three-dice-block { margin-top:6px; padding-left:6px; }
+    #three-battle .three-dice-block.is-atk { border-left:3px solid #C4A35A; }
+    #three-battle .three-dice-block.is-def { border-left:3px solid #7EB6C9; }
     #three-battle .three-dice-label {
       font:700 11px/1 -apple-system,sans-serif;
       letter-spacing:0.06em; text-transform:uppercase; margin-bottom:4px;
@@ -381,11 +385,13 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-battle .three-dice-block.is-atk .three-dice-label { color:#C4A35A; }
     #three-battle .three-dice-block.is-def .three-dice-label { color:#7EB6C9; }
     #three-battle .three-dice {
-      display:flex; flex-wrap:wrap; gap:4px; margin-top:0;
-      max-height:64px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+      display:flex; flex-wrap:nowrap; gap:4px; margin-top:0;
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+      scrollbar-width:thin;
     }
     #three-battle .three-die {
       width:22px; height:22px; border-radius:6px;
+      flex:0 0 22px;
       display:inline-flex; align-items:center; justify-content:center;
       background:rgba(240,230,210,0.14);
       border:1px solid rgba(255,255,255,0.12);
@@ -489,10 +495,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-confirm, #three-confirm.is-idle, #three-confirm:disabled {
         min-height:48px; height:48px; font-size:15px; border-radius:12px;
       }
-      #three-battle { padding:7px 8px; }
+      #three-battle { padding:7px 8px; max-height:min(38dvh, 280px); }
       #three-battle strong { font-size:15px; }
-      #three-battle .three-die { width:20px; height:20px; font-size:10px; }
-      #three-battle .three-dice { max-height:56px; gap:3px; }
+      #three-battle .three-die { width:20px; height:20px; font-size:10px; flex:0 0 20px; }
+      #three-battle .three-dice { gap:3px; }
       #three-battle .three-loss { min-width:44px; min-height:32px; }
     }
   `;
