@@ -418,6 +418,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       background:#5B8CA8; color:#F4EFE4; border-color:transparent;
     }
     #three-battle .three-die.is-def { opacity:0.92; }
+    #three-battle .three-die-miss {
+      display:inline-flex; align-items:center; min-height:18px; padding:0 6px;
+      font:600 10px/1 -apple-system,"SF Pro Text",sans-serif;
+      color:rgba(232,226,212,0.62); letter-spacing:0.02em;
+    }
     #three-battle .three-pickers { margin-top:6px; display:flex; flex-direction:column; gap:6px; }
     #three-battle .three-picker-label {
       font:600 10px/1.2 -apple-system,sans-serif; letter-spacing:0.03em;
@@ -644,16 +649,25 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const side = d.side === 'def' ? ' is-def' : '';
         return `<span class="three-die${hit}${side}" title="${d.type || ''}">${d.face}</span>`;
       };
+      const compactDice = (dice = []) => {
+        const hits = dice.filter((d) => d.hit);
+        const miss = dice.length - hits.length;
+        const shown = (hits.length ? hits : dice.slice(0, 8)).map(dieHtml).join('');
+        const missEl = miss > 0 && hits.length
+          ? `<span class="three-die-miss">${miss} miss</span>`
+          : '';
+        return `${shown}${missEl}`;
+      };
       const lanes = Array.isArray(card.lanes) && card.lanes.length
         ? `<div class="three-lanes">${card.lanes.map((lane) => {
-          const dice = (lane.dice || []).map(dieHtml).join('');
           const hits = Number(lane.hits) || 0;
+          const dice = compactDice(lane.dice || []);
           return `<div class="three-lane is-${lane.side || 'atk'}">
             <div class="three-lane-head"><span>${lane.label || ''}</span><b>${hits} hit${hits === 1 ? '' : 's'}</b></div>
             ${dice ? `<div class="three-dice">${dice}</div>` : ''}
           </div>`;
         }).join('')}</div>`
-        : ((card.dice || []).length ? `<div class="three-dice">${card.dice.map(dieHtml).join('')}</div>` : '');
+        : ((card.dice || []).length ? `<div class="three-dice">${compactDice(card.dice)}</div>` : '');
       const pickers = (card.pickers || []).map((p) => {
         const chips = (p.units || []).map((u) => {
           const n = Number(p.taken?.[u.type]) || 0;
