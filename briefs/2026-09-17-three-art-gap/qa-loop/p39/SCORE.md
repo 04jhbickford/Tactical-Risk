@@ -59,5 +59,5 @@ unitCountOne  opaquePlastic  stackToggle  seaInkClosedRings
 
 **One line:** ocean hatch gone → coastal hand-ripples.
 
-**Vercel:** https://tactical-risk20-h39rpu06l-james-projects-20d8de40.vercel.app/?three=1  
+**Vercel:** https://tactical-risk20-olgblpaq4-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/64 (stacked on PR63 / `.38`)
