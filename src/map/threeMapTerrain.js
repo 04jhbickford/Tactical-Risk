@@ -697,7 +697,7 @@ export async function loadWorldLandAlbedo() {
   const tex = await textureFromImage(img);
   tex.userData = {
     paintedAlbedo: true,
-    styleRef: 'oceania-beautiful',
+    styleRef: 'grok-imagine-world',
     watercolorParchment: true,
     featheredJoins: true,
     evenLighting: true,
@@ -768,7 +768,7 @@ export async function loadWorldSeaAlbedo() {
     strategy: 'silhouetteFirst',
     silhouetteFirst: true,
     coastRegistered: true,
-    styleRef: 'oceania-beautiful',
+    styleRef: 'grok-imagine-world',
     src: WORLD_SEA_ALBEDO,
     rev: WORLD_LAND_ALBEDO_REV,
     width: img.width,

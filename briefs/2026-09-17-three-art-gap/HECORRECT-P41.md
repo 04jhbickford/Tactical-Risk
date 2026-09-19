@@ -1,6 +1,7 @@
 # James he-correct · polish.41 (19 Sep)
 Source: James t3058u after `.40b` — polygons do not match the background
 image; style still isn’t as good as the grok imagine / Oceania STYLE REF.
+Follow-up: James dropped the Grok Imagine WORLD hero plate. Fold in now.
 Preview `?three=1` only. Do not merge. Live Canvas untouched. Tesla off.
 Quiet James.
 
@@ -15,17 +16,21 @@ selectOutlineOnly (`selectWash=false`).
 2. GenerateImage quality still below the Oceania / Imagine STYLE REF
    when used as an unconstrained world paint.
 
-## NEW PATH — silhouette-first (fail-closed)
+## NEW PATH — silhouette-first + Imagine WORLD hero (fail-closed)
 1. From live `territories.json` render a **coast/silhouette guide** at
    atlas resolution (exact game land geometry). Saved to refs + QA still
    `silhouette-guide.png`.
-2. Cursor GenerateImage with BOTH STYLE REF (Oceania beautiful) AND the
-   silhouette guide. Paint antique watercolor *into* the silhouette.
-3. Bind as continuous hero basemap (`basemapUnderInk`). Territory ink
+2. **STYLE REF = Grok Imagine WORLD hero** (topographic parchment, raised
+   relief, hand-ripple seas). Oceania beautiful is secondary coastal
+   language only.
+3. Adapt THIS plate into the atlas: `wrap_standard_world_to_game` (Americas-left
+   → game wrap UV) then `register_plate_to_silhouette` so live coasts own
+   the paint. No political borders from the plate.
+4. Bind as continuous hero basemap (`basemapUnderInk`). Territory ink
    from the SAME `territories.json` — coasts register **by construction**.
-4. Sea: coastal hand-ripples following guide coasts; `oceanNoHatch` held.
-5. Select outline-only held from `.40b`.
-6. Held: unitCountOne, opaquePlastic, stack toggle, Cape even, Med,
+5. Sea: coastal hand-ripples following guide coasts; `oceanNoHatch` held.
+6. Select outline-only held from `.40b`.
+7. Held: unitCountOne, opaquePlastic, stack toggle, Cape even, Med,
    China outer-union, no labels/IPC, Confirm gold.
 
 ## Kill
@@ -33,22 +38,25 @@ selectOutlineOnly (`selectWash=false`).
 - Per-territory color masks
 - Select interior wash
 - Ocean tile hatch
+- Inventing a weaker GenerateImage world instead of this plate
 
 ## STYLE LOCK
-Oceania beautiful: aged parchment tooth, soft coastal greens → tan inland,
-hand-inked peak hatching, pale sea with FINE HAND-DRAWN RIPPLE LINES.
+Grok Imagine WORLD: topographic parchment, raised relief, hand-ripple seas.
+Oceania beautiful: secondary coastal sage / tan language only.
 
 ## P0 gates
 1. Coast registration — ink rings on painted coasts (zoom Aus, Med, UK).
    No floating borders.
-2. Mid beauty ≥ STYLE REF family and ≥ `.40b`.
+2. Mid beauty ≥ THIS Imagine plate family and ≥ `.40b`.
+   `mid-vs-style-ref.png` right-hand = Imagine WORLD plate.
 3. Ocean coastal hand-ripples.
 4. Select outline-only.
 
 ## Fail closed if
 - Painted coasts are real-world Earth (alternate coastlines)
 - Ink rings float off the paint
-- Mid still reads flat GIS / worse than STYLE REF family
+- Mid still reads flat GIS / worse than Imagine STYLE REF family
 - Ocean is textureless or hatch-tiled
 - Select re-tints the basemap
 - Live Canvas touched
+- Imagine plate soft-ignored / mid-vs-style-ref uses Oceania as STYLE REF

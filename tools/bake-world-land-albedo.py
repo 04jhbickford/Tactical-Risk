@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""P41: silhouette-first watercolor world albedo.
+"""P41: silhouette-first Imagine WORLD hero albedo.
 
 .40 free-painted a real-world basemap then overlaid territories.json
 rings → coast registration miss (James t3058u).
 
 P41 HARD — silhouetteFirst (fail-closed):
   1. Coast/silhouette guide from live territories.json at atlas res
-  2. GenerateImage paints antique watercolor INTO that silhouette
+  2. Grok Imagine WORLD hero plate (topographic parchment, raised relief,
+     hand-ripple seas) is the continuous hero. wrap_standard_world_to_game
+     + register_plate_to_silhouette warp/register it into wrap UV.
+     Oceania beautiful is secondary coastal language only.
   3. Bind continuous hero (basemapUnderInk). Ink rings from the SAME
-     territories.json — coasts register by construction
+     territories.json — coasts register to painted coasts.
   4. Sea: coastal hand-ripples following guide coasts; oceanNoHatch
   5. maskPaintOff — never paste_through_mask for per-territory color
   6. Select outline-only held from .40b
+  7. No political borders from the plate — territories.json ink only.
 
 Kill: free world paint without silhouette; per-territory color masks;
 select interior wash; ocean tile hatch.
@@ -949,6 +953,13 @@ def write_silhouette_set(lands) -> Image.Image:
     )
     if style_src and not (GEN41 / 'style-ref-oceania-beautiful.png').exists():
         shutil.copy2(style_src, GEN41 / 'style-ref-oceania-beautiful.png')
+    imagine_src = first_existing(
+        GEN41 / 'style-ref-imagine-world.png',
+        ROOT / 'uploads' / 'p41-kick' / '02-grok-imagine-world-hero.jpg',
+        Path('/opt/cursor/artifacts/assets/style-ref-imagine-world.png'),
+    )
+    if imagine_src and not (GEN41 / 'style-ref-imagine-world.png').exists():
+        shutil.copy2(imagine_src, GEN41 / 'style-ref-imagine-world.png')
     return guide
 
 
@@ -1090,14 +1101,236 @@ def pour_paint_into_silhouette(paint: Image.Image, base: Image.Image, land: Imag
     return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
 
 
+# Dest UV (game wrap) → src UV (Americas-left Imagine plate).
+# Applied through feathered LAND MASKS only — never a rectangular sea box.
+EAST_NA_NAMES = {'East Canada', 'East US', 'Cuba', 'Panama'}
+WEST_NA_NAMES = {'Alaska', 'West Canada', 'West US', 'Mexico'}
+JAPAN_NAMES = {'Japan', 'Okinawa'}
+OCEANIA_SOUTH = {
+    'Australia', 'New Guinea', 'East Indies',
+    'Borneo Celebes', 'Philippines', 'Solomon Islands', 'Caroline Islands',
+}
+WRAP_WINDOWS = [
+    ('asia',    {'continent': 'Asia'},                      (0.530, 0.100, 0.905, 0.520)),
+    ('me',      {'continent': 'Middle East'},               (0.525, 0.360, 0.645, 0.560)),
+    ('europe',  {'continent': 'Europe'},                    (0.425, 0.155, 0.565, 0.425)),
+    ('africa',  {'continent': 'Africa'},                    (0.450, 0.395, 0.595, 0.785)),
+    ('east_na', {'names': EAST_NA_NAMES},                   (0.165, 0.040, 0.330, 0.510)),
+    ('west_na', {'names': WEST_NA_NAMES},                   (0.025, 0.075, 0.185, 0.505)),
+    ('sa',      {'continent': 'South America'},             (0.145, 0.495, 0.292, 0.905)),
+    ('oceania', {'names': OCEANIA_SOUTH},                   (0.755, 0.545, 0.940, 0.820)),
+    ('japan',   {'names': JAPAN_NAMES},                     (0.830, 0.295, 0.895, 0.425)),
+    ('nz',      {'names': {'New Zealand'}},                 (0.905, 0.720, 0.955, 0.820)),
+]
+
+
+def bilinear_sample(src, gx, gy):
+    """src (sh,sw,3) float; gx/gy dest-shaped source UVs in 0–1."""
+    import numpy as np
+    sh, sw = src.shape[:2]
+    x = np.clip(gx * sw - 0.5, 0, sw - 1.001)
+    y = np.clip(gy * sh - 0.5, 0, sh - 1.001)
+    x0 = np.floor(x).astype(np.int32)
+    y0 = np.floor(y).astype(np.int32)
+    x1 = np.minimum(x0 + 1, sw - 1)
+    y1 = np.minimum(y0 + 1, sh - 1)
+    fx = (x - x0).astype(np.float32)[..., None]
+    fy = (y - y0).astype(np.float32)[..., None]
+    c00 = src[y0, x0]
+    c10 = src[y0, x1]
+    c01 = src[y1, x0]
+    c11 = src[y1, x1]
+    return (c00 * (1.0 - fx) + c10 * fx) * (1.0 - fy) + (c01 * (1.0 - fx) + c11 * fx) * fy
+
+
+def plate_land_mask_arr(img: Image.Image):
+    """Land-like pixels on the Imagine plate. Pale low-chroma = sea."""
+    import numpy as np
+    arr = np.asarray(img.convert('RGB'), dtype=np.float32)
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    chroma = arr.max(axis=2) - arr.min(axis=2)
+    return (yv < 200) & (
+        (arr[:, :, 0] - arr[:, :, 2] > 4)
+        | (arr[:, :, 1] - arr[:, :, 0] > 3)
+        | (chroma > 18)
+    )
+
+
+def kill_isoline_hatch(img: Image.Image) -> Image.Image:
+    """Lift closed contour rings in pale sea. oceanNoHatch — keep land relief."""
+    import numpy as np
+    arr = np.asarray(img.convert('RGB'), dtype=np.float32)
+    land = plate_land_mask_arr(img)
+    sea = ~land
+    out = arr
+    for radius, delta in ((7, 3.5), (14, 4.5), (22, 6.0)):
+        blur = np.asarray(
+            Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB').filter(
+                ImageFilter.GaussianBlur(radius)
+            ),
+            dtype=np.float32,
+        )
+        yv = out[:, :, 0] * 0.2126 + out[:, :, 1] * 0.7152 + out[:, :, 2] * 0.0722
+        by = blur[:, :, 0] * 0.2126 + blur[:, :, 1] * 0.7152 + blur[:, :, 2] * 0.0722
+        chroma = out.max(axis=2) - out.min(axis=2)
+        ink = sea & (yv > 128) & ((by - yv) > delta) & (chroma < 36)
+        mix = ink.astype(np.float32)[..., None]
+        out = out * (1.0 - mix) + blur * mix
+    return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+
+
+def wrap_standard_world_to_game(plate: Image.Image, w: int, h: int, lands=None) -> Image.Image:
+    """Circular-shift + land-mask windows: Americas-left plate → game wrap UV.
+
+    Plate: NA left, Old World center, Aus right (standard Imagine hero).
+    Game: East NA+SA left, EU/AF/Asia/Aus center, West NA right.
+    Fade Antarctica (no game land). No political borders copied.
+    Windows weight by feathered game land — never a rectangular sea box.
+    """
+    import numpy as np
+    src = np.asarray(plate.convert('RGB'), dtype=np.float32)
+    xx = (np.arange(w, dtype=np.float32) + 0.5) / w
+    yy = (np.arange(h, dtype=np.float32) + 0.5) / h
+    XX, YY = np.meshgrid(xx, yy)
+    # Base: circular shift at Mississippi + crop polar parchment / Antarctica.
+    split = 0.178
+    y0, y1 = 0.035, 0.855
+    gx = (XX + split) % 1.0
+    gy = y0 + YY * (y1 - y0)
+    # Right-south sea must stay open ocean, not wrapped Andes or plate-edge vignette.
+    right_south = np.clip((XX - 0.78) / 0.10, 0, 1) * np.clip((YY - 0.52) / 0.10, 0, 1)
+    gx = gx * (1.0 - right_south) + 0.40 * right_south
+    gy = gy * (1.0 - right_south) + 0.58 * right_south
+    if lands:
+        for _name, sel, src_uv in WRAP_WINDOWS:
+            sx0, sy0, sx1, sy1 = src_uv
+            names = sel.get('names')
+            continents = {sel['continent']} if sel.get('continent') else None
+            mimg = land_mask(lands, w, h, names=names, continents=continents)
+            m = np.asarray(mimg.filter(ImageFilter.GaussianBlur(28)), dtype=np.float32) / 255.0
+            if float(m.max()) < 0.05:
+                continue
+            ys, xs = np.where(np.asarray(mimg) > 8)
+            if xs.size < 8:
+                continue
+            dx0, dx1 = float(xs.min()) / w, float(xs.max()) / w
+            dy0, dy1 = float(ys.min()) / h, float(ys.max()) / h
+            pad = 0.012
+            dx0, dy0, dx1, dy1 = dx0 - pad, dy0 - pad, dx1 + pad, dy1 + pad
+            u = (XX - dx0) / max(1e-6, dx1 - dx0)
+            v = (YY - dy0) / max(1e-6, dy1 - dy0)
+            nsx = sx0 + np.clip(u, 0, 1) * (sx1 - sx0)
+            nsy = sy0 + np.clip(v, 0, 1) * (sy1 - sy0)
+            gx = gx * (1.0 - m) + nsx * m
+            gy = gy * (1.0 - m) + nsy * m
+    sampled = bilinear_sample(src, gx, gy)
+    img = Image.fromarray(np.clip(sampled, 0, 255).astype('uint8'), 'RGB')
+    img.info['strategy'] = 'silhouetteFirst'
+    img.info['wrapRemap'] = True
+    return img
+
+
+def _nearest_indices(feature: 'object'):
+    """iy, ix of nearest True pixel. scipy EDT, else chamfer on a 4× downsample."""
+    import numpy as np
+    try:
+        from scipy.ndimage import distance_transform_edt
+        _d, (iy, ix) = distance_transform_edt(~feature, return_indices=True)
+        return iy, ix
+    except ImportError:
+        step = 4
+        small = feature[::step, ::step]
+        sh, sw = small.shape
+        inf = 10**6
+        dist = np.where(small, 0, inf).astype(np.int32)
+        iy = np.zeros((sh, sw), np.int32)
+        ix = np.zeros((sh, sw), np.int32)
+        ys, xs = np.where(small)
+        iy[ys, xs] = ys
+        ix[ys, xs] = xs
+        for _ in range(max(sh, sw)):
+            for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                src = np.pad(dist, ((1, 1), (1, 1)), constant_values=inf)
+                shifted = src[1 + dy:1 + dy + sh, 1 + dx:1 + dx + sw] + 1
+                better = shifted < dist
+                dist = np.where(better, shifted, dist)
+                iy_p = np.pad(iy, ((1, 1), (1, 1)))
+                ix_p = np.pad(ix, ((1, 1), (1, 1)))
+                iy = np.where(better, iy_p[1 + dy:1 + dy + sh, 1 + dx:1 + dx + sw], iy)
+                ix = np.where(better, ix_p[1 + dy:1 + dy + sh, 1 + dx:1 + dx + sw], ix)
+        h, w = feature.shape
+        iy_f = np.clip(iy * step, 0, h - 1)
+        ix_f = np.clip(ix * step, 0, w - 1)
+        iy_full = np.repeat(np.repeat(iy_f, step, axis=0), step, axis=1)[:h, :w]
+        ix_full = np.repeat(np.repeat(ix_f, step, axis=0), step, axis=1)[:h, :w]
+        return iy_full, ix_full
+
+
+def register_plate_to_silhouette(
+    wrapped: Image.Image,
+    land: Image.Image,
+    under: Image.Image | None = None,
+) -> Image.Image:
+    """Warp wrapped-plate coasts onto the live territories.json silhouette.
+
+    Dest land ← nearest plate-land color. Dest sea ← nearest plate-sea.
+    Far holes keep silhouette-conditioned underpainting. Union land only —
+    NEVER a territory mask. Ink rings sit on painted coasts.
+    """
+    import numpy as np
+    arr = np.asarray(wrapped.convert('RGB'), dtype=np.float32)
+    sil = np.asarray(land) > 8
+    plate_land = plate_land_mask_arr(wrapped)
+    out = arr.copy()
+    if plate_land.any() and (~plate_land).any():
+        liy, lix = _nearest_indices(plate_land)
+        siy, six = _nearest_indices(~plate_land)
+        need_land = sil & ~plate_land
+        need_sea = (~sil) & plate_land
+        out[need_land] = arr[liy[need_land], lix[need_land]]
+        out[need_sea] = arr[siy[need_sea], six[need_sea]]
+        # Far silhouette holes: keep construction watercolor (still the guide).
+        if under is not None:
+            uarr = np.asarray(under.convert('RGB').resize(wrapped.size, Image.Resampling.LANCZOS), dtype=np.float32)
+            yy = np.arange(arr.shape[0], dtype=np.int32)[:, None]
+            xx = np.arange(arr.shape[1], dtype=np.int32)[None, :]
+            dland = np.hypot((liy - yy).astype(np.float32), (lix - xx).astype(np.float32))
+            far = need_land & (dland > 90.0)
+            t = np.clip((dland - 90.0) / 70.0, 0, 1)[..., None]
+            out = np.where(far[..., None], out * (1.0 - t) + uarr * t, out)
+    img = Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+    # Soft painted coast on the EXACT silhouette — foam, not a second ink ring.
+    # Territory overlays own the political ink.
+    edge = land.filter(ImageFilter.FIND_EDGES)
+    img = Image.composite(
+        Image.new('RGB', land.size, STYLE_FOAM),
+        img,
+        edge.filter(ImageFilter.GaussianBlur(1.1)).point(lambda v: int(v * 0.22)),
+    )
+    img = Image.composite(
+        Image.new('RGB', land.size, (0x5A, 0x48, 0x34)),
+        img,
+        edge.filter(ImageFilter.GaussianBlur(0.45)).point(lambda v: int(v * 0.16)),
+    )
+    img.info['coastRegistered'] = True
+    img.info['silhouetteFirst'] = True
+    return img
+
+
 def load_p41_plates():
-    """Fail-closed: silhouette + STYLE REF must exist. Gen plates optional."""
+    """Fail-closed: Imagine WORLD hero + Oceania secondary must exist."""
+    imagine = load_rgb(first_existing(
+        GEN41 / 'style-ref-imagine-world.png',
+        ROOT / 'uploads' / 'p41-kick' / '02-grok-imagine-world-hero.jpg',
+        Path('/opt/cursor/artifacts/assets/style-ref-imagine-world.png'),
+    ))
     style = load_rgb(first_existing(
         GEN41 / 'style-ref-oceania-beautiful.png',
         GEN40 / 'style-ref-oceania-beautiful.png',
         GEN39 / 'style-ref-oceania-beautiful.png',
     ))
     world = load_rgb(first_existing(
+        GEN41 / 'style-ref-imagine-world.png',
         GEN41 / 'p41-world-into-silhouette-b.png',
         GEN41 / 'p41-world-into-silhouette.png',
         GEN41 / 'p41-world-hero.png',
@@ -1117,9 +1350,12 @@ def load_p41_plates():
         GEN41 / 'p41-uk-into-silhouette.png',
         GEN41 / 'p41-uk.png',
     ))
+    if not imagine:
+        raise SystemExit('P41 fail-closed: missing Grok Imagine WORLD hero plate')
     if not style:
         raise SystemExit('P41 fail-closed: missing Oceania STYLE REF')
     return {
+        'imagine': imagine,
         'style': style,
         'world': world,
         'oceania': oceania,
@@ -1199,13 +1435,15 @@ def load_p40_plates():
 
 
 def build_basemap(lands) -> Image.Image:
-    """P41: watercolor painted INTO the territories.json silhouette.
+    """P41: Imagine WORLD hero warped into wrap UV, registered to silhouette.
 
     silhouetteFirst — coasts = union land mask from live polygons.
-    basemapUnderInk — rings overlay the same polygons (register by construction).
+    wrap_standard_world_to_game — Americas-left Imagine plate → game wrap.
+    register_plate_to_silhouette — ink rings sit on painted coasts.
+    basemapUnderInk — rings overlay the same polygons.
     maskPaintOff — paste_through_mask is never called here for color.
     NEVER a territory mask. Free world paint without silhouette is killed.
-    never paste_through_mask for color.
+    never paste_through_mask for color. No political borders from the plate.
     """
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(first_existing(BOARD / 'board-parchment-tile.png', GEN37 / 'p37-parchment-grain-tile.png'))
@@ -1217,13 +1455,24 @@ def build_basemap(lands) -> Image.Image:
     style = match_parchment(plates['style'])
     land = land_mask(lands, w, h)
 
-    # Construction hero: paint INTO the exact silhouette. Coasts cannot drift.
-    img = watercolor_into_silhouette(lands, style, w, h)
-    height = img.info.get('imhof_height') or imhof_height(w, h)
+    # Underpaint INTO the exact silhouette so far holes cannot invent coasts.
+    under = watercolor_into_silhouette(lands, style, w, h)
+    height = under.info.get('imhof_height') or imhof_height(w, h)
 
-    # GenerateImage plates enrich beauty. Geographic overlay is FAIL-CLOSED:
-    # only pour when the plate's land-like pixels match the silhouette (IoU).
-    # Real-world redraws (the .40 miss) stay as grain / grade, never coasts.
+    # Hero: THIS Imagine plate, wrap-remapped, then registered to the guide.
+    imagine = plates.get('imagine') or plates.get('world')
+    wrapped = wrap_standard_world_to_game(imagine, w, h, lands=lands)
+    wrapped = kill_isoline_hatch(wrapped)
+    GEN41.mkdir(parents=True, exist_ok=True)
+    wrapped.save(GEN41 / 'p41-imagine-wrap.png', 'PNG', optimize=True)
+    print(f'wrote {GEN41 / "p41-imagine-wrap.png"} wrapRemap')
+    img = register_plate_to_silhouette(wrapped, land, under=under)
+    img = kill_isoline_hatch(img)
+    iou_hero = gen_alignment_iou(img, land)
+    print(f'p41 imagine wrap+register IoU vs silhouette: {iou_hero:.3f}')
+
+    # GenerateImage theater plates enrich beauty. Geographic overlay is
+    # FAIL-CLOSED: only pour when land-like pixels match the silhouette (IoU).
     def maybe_pour(plate, label, amount_hi=0.88, amount_lo=0.0):
         nonlocal img
         if not plate:
@@ -1237,8 +1486,6 @@ def build_basemap(lands) -> Image.Image:
             img = pour_paint_into_silhouette(fitted, img, land, amount=0.28)
         return iou
 
-    # World-B followed the silhouette but is flat sage GIS. Skip as color pour
-    # (it would kill tan interiors). Keep the IoU print as a registration check.
     if plates['world']:
         iou_w = gen_alignment_iou(plates['world'].resize((w, h), Image.Resampling.LANCZOS), land)
         print(f'p41 world gen IoU vs silhouette: {iou_w:.3f}')
@@ -1286,20 +1533,24 @@ def build_basemap(lands) -> Image.Image:
     ))
     if tooth:
         grain = tile_image(tileable_paper(tooth, 768), w, h)
-        img = Image.blend(img, ImageChops.soft_light(img, grain), 0.16)
+        img = Image.blend(img, ImageChops.soft_light(img, grain), 0.08)
     if parchment:
-        img = Image.blend(img, ImageChops.soft_light(img, paper), 0.10)
+        img = Image.blend(img, ImageChops.soft_light(img, paper), 0.06)
+
+    # Oceania beautiful = secondary coastal language only (sage fringe).
+    img = apply_coastal_greens(img, lands, w, h)
 
     # Re-lock: pixels outside the union silhouette fade to parchment sea so a
     # plate cannot invent an alternate shoreline. Dilate 1px to keep the fringe.
     inv = ImageChops.invert(land.filter(ImageFilter.MaxFilter(3)))
-    spilled = Image.blend(img, paper, 0.78)
+    spilled = Image.blend(img, paper, 0.92)
     img = Image.composite(spilled, img, inv)
     edge = land.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.65))
-    img = Image.composite(Image.new('RGB', (w, h), STYLE_FOAM), img, edge.point(lambda v: int(v * 0.28)))
-    img = Image.composite(Image.new('RGB', (w, h), SIL_INK), img, edge.point(lambda v: int(v * 0.50)))
+    img = Image.composite(Image.new('RGB', (w, h), STYLE_FOAM), img, edge.point(lambda v: int(v * 0.22)))
+    # Soft sepia only — political ink is the territories.json overlay, not the plate.
+    img = Image.composite(Image.new('RGB', (w, h), (0x5A, 0x48, 0x34)), img, edge.point(lambda v: int(v * 0.18)))
 
-    img = punch(img, color=1.08, contrast=1.07, sharp=1.05)
+    img = punch(img, color=1.06, contrast=1.08, sharp=1.06)
     # Keep helpers referenced so p37–p40 baker string checks still see names.
     # p39: amount=0.14 UNDER paint · p37-oceania-style-lock · GEN39
     # p37-world-watercolor.png · p37-africa-continent · stain is OFF
@@ -1324,6 +1575,7 @@ def build_basemap(lands) -> Image.Image:
     img.info['maskPaintOff'] = True
     img.info['coastRegistered'] = True
     img.info['silhouetteFirst'] = True
+    img.info['styleRef'] = 'grok-imagine-world'
     return img
 
 

@@ -11,11 +11,12 @@ only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
 Root cause: `.40` free-painted real-world Earth then overlaid
 `territories.json` rings → coast registration miss.
 
-`.41` silhouette-first: live land geometry guide at atlas res; watercolor
-painted *into* that silhouette; ink from the same polygons (register by
-construction). `albedoRev=p41` · `strategy=silhouetteFirst` ·
-`coastRegistered` · `basemapUnderInk` · `maskPaintOff` ·
-`selectOutlineOnly` · `styleRef=oceania-beautiful`.
+`.41` silhouette-first: live land geometry guide at atlas res; Grok Imagine
+WORLD hero wrap-remapped into game UV and registered to that silhouette;
+ink from the same polygons (register by construction). `albedoRev=p41` ·
+`strategy=silhouetteFirst` · `coastRegistered` · `basemapUnderInk` ·
+`maskPaintOff` · `selectOutlineOnly` · `styleRef=grok-imagine-world`.
+Oceania beautiful is secondary coastal language only.
 
 SCHEMA 11. GAME_VERSION V2.81.52-three-polish.41.
 

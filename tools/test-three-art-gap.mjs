@@ -960,12 +960,15 @@ check('p41 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-ar
 check('p41 silhouette guide + STYLE REF on disk',
   pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/silhouette-guide.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p41/silhouette-guide.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/style-ref-imagine-world.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/style-ref-oceania-beautiful.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p41-gen/p41-world-into-silhouette-b.png'));
 check('p41 baker is silhouette-first, mask paint off',
   /GEN41/.test(albedoBaker)
   && /silhouetteFirst/.test(albedoBaker)
   && /watercolor_into_silhouette/.test(albedoBaker)
+  && /wrap_standard_world_to_game/.test(albedoBaker)
+  && /register_plate_to_silhouette/.test(albedoBaker)
   && /build_silhouette_guide/.test(albedoBaker)
   && /coastRegistered/.test(albedoBaker)
   && /maskPaintOff/.test(albedoBaker)
@@ -980,7 +983,7 @@ check('p41 runtime flags + select outline only',
   && /maskPaintOff: true/.test(terrain)
   && /basemapUnderInk: true/.test(terrain)
   && /oceanCoastalRipples: true/.test(terrain)
-  && /styleRef: 'oceania-beautiful'/.test(terrain)
+  && /styleRef: 'grok-imagine-world'/.test(terrain)
   && /selectOutlineOnly: true/.test(spike)
   && /selectWash: false/.test(spike)
   && /selectFill: false/.test(spike)
@@ -1006,7 +1009,7 @@ check('p41 SCORE states silhouette-first + four P0 gates',
   && /basemapUnderInk/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
   && /maskPaintOff/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
   && /selectOutlineOnly/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8'))
-  && /styleRef=oceania-beautiful/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8')));
+  && /styleRef=grok-imagine-world/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p41/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

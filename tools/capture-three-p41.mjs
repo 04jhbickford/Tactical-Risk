@@ -267,7 +267,7 @@ print('SELECT_INTERIOR', max(s['delta'] for s in samples), samples)
   await browser.close();
   if (server) server.close();
 
-  const styleRef = join(root, 'briefs/2026-09-17-three-art-gap/refs/p41-gen/style-ref-oceania-beautiful.png');
+  const styleRef = join(root, 'briefs/2026-09-17-three-art-gap/refs/p41-gen/style-ref-imagine-world.png');
   composePair(
     join(outDir, 'europe-mid-390.png'),
     styleRef,
