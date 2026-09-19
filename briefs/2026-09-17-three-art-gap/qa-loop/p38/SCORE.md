@@ -67,5 +67,5 @@ eastMed:      shipsAboveItaly=true
 - `africa-even.png` / `stack-expand.png` / `stack-collapse.png`
 - `computed.json` / `vercel-live-mid-390.png` / `vercel-live-inspect.json`
 
-**Vercel:** https://tactical-risk20-lwwn3vcr1-james-projects-20d8de40.vercel.app/?three=1  
+**Vercel:** https://tactical-risk20-3suzyn348-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/63 (stacked on PR62 / `.37b`)
