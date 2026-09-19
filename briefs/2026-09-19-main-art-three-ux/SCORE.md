@@ -52,5 +52,6 @@ Default `?three=1` (no demo) stays the thin Karelia–Finland pocket.
 - `combat-move-partial-inf-390.png` — INF 1/3 after +
 - `air-land-planes-390.png` — fighter only + Confirm land
 
-**Vercel:** (preview.8 branch — see PR)
-**PR:** draft on PR76 lineage · do not merge to main
+**Vercel:** https://tactical-risk20-git-cursor-max-c-684b00-james-projects-20d8de40.vercel.app/?three=1&demo=max
+**Deployment:** https://tactical-risk20-ox8npfhxj-james-projects-20d8de40.vercel.app/?three=1&demo=max
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/77 (draft · PR76 lineage · do not merge to main)
