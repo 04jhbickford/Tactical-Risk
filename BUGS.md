@@ -2,6 +2,15 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.11 tiles + split air land
+
+James: air land must pick WHICH planes land WHERE (partial by type
++ dest), not dump all air on one hex. Pickers go horizontal icon
+tiles with in-tile +/− (combat-move, casualty, air-land). Keep .10
+fit / YOU-confirm / zoom hide / ATK-DEF IA. Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.10 battle sheet fit + steppers
 
 James ROUND 2 still: THEY TAKE 2 clipped under Assign casualties.

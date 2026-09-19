@@ -14,6 +14,7 @@ import {
   confirmEnabled,
   battleCard,
   airLandRoster,
+  adjustLanding,
   driveCombatMove,
   driveBattleMid,
   driveAirChoice,
@@ -111,7 +112,10 @@ assert(roster.every((u) => u.type === 'fighter' || u.type === 'bomber'), 'planes
 assert(!roster.some((u) => u.type === 'infantry' || u.type === 'armour'), 'no dest land roster');
 assert(confirmEnabled(air) === false, 'need teal dest');
 tapLand(air, 'Russia');
+assert(confirmLabel(air) === 'Select planes', 'dest then planes');
+adjustLanding(air, 'fighter', 1);
 assert(confirmLabel(air) === 'Confirm: Land in Russia', 'named land');
+assert(confirmEnabled(air) === true, 'partial FTR + dest');
 
 if (failures) {
   console.error(`${failures} ux-preview max-battle checks failed`);

@@ -52,6 +52,7 @@ import {
   dismissGuide,
   pickLoss,
   adjustLoss,
+  adjustLanding,
   LABEL_LANDS,
   driveCombatMove,
   driveBattleMid,
@@ -226,10 +227,15 @@ export async function bootUxPreview() {
           owner: s.owner,
         }))
       : null;
-    const planeStacks = airLand
-      ? Object.entries(play.selectedUnits || {})
+    const planeSteppers = airLand
+      ? Object.entries(play.airLeft || play.selectedUnits || {})
         .filter(([, n]) => Number(n) > 0)
-        .map(([type, quantity]) => ({ type, quantity, owner: 'Russians' }))
+        .map(([type, have]) => ({
+          type,
+          have: Number(have) || 0,
+          picked: Number(play.landingPick?.[type]) || 0,
+          owner: 'Russians',
+        }))
       : null;
     let route = '';
     if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
@@ -241,9 +247,9 @@ export async function bootUxPreview() {
     }
     chrome.paintPlay({
       land: airLand ? (land || { name: 'Land aircraft' }) : land,
-      stacks: airLand ? (planeStacks || []) : (land ? (placements[land.name] || []) : []),
+      stacks: airLand ? [] : (land ? (placements[land.name] || []) : []),
       unitTypes: picked,
-      steppers,
+      steppers: airLand ? planeSteppers : steppers,
       airLand,
       label: confirmLabel(play),
       gold: confirmGold(play),
@@ -268,7 +274,8 @@ export async function bootUxPreview() {
     camera.dirty = true;
   };
   chrome.onUnitStep = (type, delta) => {
-    adjustUnit(play, type, delta);
+    if (play.phase === PHASE.AIR_LAND) adjustLanding(play, type, delta);
+    else adjustUnit(play, type, delta);
     syncSelectionFromPlay();
     paintChrome();
     camera.dirty = true;
@@ -701,6 +708,13 @@ export async function bootUxPreview() {
       paintChrome();
       camera.dirty = true;
       return { ...(play.selectedUnits || {}) };
+    },
+    adjustLanding: (type, delta = 1) => {
+      adjustLanding(play, type, delta);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return { ...(play.landingPick || {}) };
     },
     blocksMapAt: (x, y) => chrome.blocksMapAt(x, y),
     pickLoss: (side, type) => {

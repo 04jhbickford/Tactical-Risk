@@ -3,7 +3,7 @@
   "uxSource": "threePreview",
   "sideProject": true,
   "doNotMerge": true,
-  "version": "V2.81.53-ux-preview.10",
+  "version": "V2.81.53-ux-preview.11",
   "schema": 11,
   "flag": "?three=1 or ?ux=1",
   "maxQuery": "?three=1&max=1",
@@ -30,9 +30,8 @@
   "guideBlocksBoard": false,
   "vercel": "https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1",
   "stills": [
-    "preview8-sheet-no-zoom-390.png",
-    "preview8-you-assign-gold-390.png",
-    "preview8-dense-sheet-390.png",
-    "preview8-battle-ia-split-390.png"
+    "preview11-combat-move-tiles-390.png",
+    "preview11-casualty-tiles-390.png",
+    "preview11-air-land-split-390.png"
   ]
 }

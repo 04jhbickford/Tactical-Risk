@@ -20,6 +20,7 @@ import {
   battleCard,
   inspectPlay,
   airLandRoster,
+  adjustLanding,
   driveCombatMove,
   driveBattleMid,
   driveAirChoice,
@@ -148,7 +149,11 @@ assert(!planes.some((p) => p.type === 'infantry'), 'dest INF not in air sheet');
 tapLand(move, 'Germany');
 assert(move.landingDest == null, 'illegal land ignored');
 tapLand(move, 'Russia');
+assert(confirmLabel(move) === 'Select planes', 'need plane pick');
+assert(confirmEnabled(move) === false, 'dest alone is not enough');
+adjustLanding(move, 'fighter', 1);
 assert(confirmLabel(move) === 'Confirm: Land in Russia', 'named land confirm');
+assert(confirmEnabled(move) === true, 'planes + dest');
 confirm(move);
 assert(move.phase === PHASE.DONE, 'done');
 assert(stackQty(move.placements.Russia, 'fighter', 'Russians') === 1, 'fighter in Russia');

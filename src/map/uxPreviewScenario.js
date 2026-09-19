@@ -70,7 +70,7 @@ export const LAND_TEAL = '#5BA8A0';
 export const GUIDE = {
   [PHASE.COMBAT_MOVE]: 'Tap origin · select units · tap dest · Confirm',
   [PHASE.BATTLE]: 'One Confirm at a time — AA, then dice, then hits.',
-  [PHASE.AIR_LAND]: 'Teal lands can take the aircraft. Tap one, Confirm.',
+  [PHASE.AIR_LAND]: 'Teal land · pick planes · Confirm. Split dests OK.',
   [PHASE.DONE]: 'Aircraft landed. Confirm is idle — Replay if you want.',
 };
 
@@ -168,6 +168,8 @@ export function createScenario(overrides = {}) {
     selectedUnits: {},
     destPicked: null,
     landingDest: null,
+    landingPick: {},
+    airLeft: {},
     landed: false,
     guideOn: true,
     maxBattle: max,
@@ -539,7 +541,9 @@ export function confirmEnabled(state) {
     if (state.battle.step === BATTLE_STEP.COMBAT_RESULT) return lossesReady(state);
     return true;
   }
-  if (state.phase === PHASE.AIR_LAND) return !!state.landingDest && !state.landed;
+  if (state.phase === PHASE.AIR_LAND) {
+    return !!state.landingDest && pickedCount(state.landingPick) > 0 && !state.landed;
+  }
   if (state.phase === PHASE.DONE) return true;
   return false;
 }
@@ -574,6 +578,7 @@ export function confirmLabel(state) {
   }
   if (state.phase === PHASE.AIR_LAND) {
     if (!state.landingDest) return 'Confirm land';
+    if (!pickedCount(state.landingPick)) return 'Select planes';
     return `Confirm: Land in ${state.landingDest}`;
   }
   if (state.phase === PHASE.DONE) {
@@ -586,9 +591,31 @@ export function confirmLabel(state) {
 
 export function airLandRoster(state) {
   if (state?.phase !== PHASE.AIR_LAND) return [];
-  return Object.entries(state.selectedUnits || {})
+  const pool = state.airLeft && Object.keys(state.airLeft).length
+    ? state.airLeft
+    : state.selectedUnits;
+  return Object.entries(pool || {})
     .filter(([, n]) => Number(n) > 0)
     .map(([type, quantity]) => ({ type, quantity: Number(quantity) || 0 }));
+}
+
+export function remainingAirCount(state) {
+  return airLandRoster(state).reduce((n, u) => n + (Number(u.quantity) || 0), 0);
+}
+
+export function adjustLanding(state, type, delta = 1) {
+  if (!state || state.phase !== PHASE.AIR_LAND) return state;
+  if (!UNIT_DEFS[type]?.isAir) return state;
+  const have = Number(state.airLeft?.[type] ?? state.selectedUnits?.[type]) || 0;
+  if (have <= 0) return state;
+  const step = Number(delta);
+  if (!Number.isFinite(step) || step === 0) return state;
+  const cur = Number(state.landingPick?.[type]) || 0;
+  const next = Math.max(0, Math.min(have, cur + step));
+  if (!state.landingPick) state.landingPick = {};
+  if (next <= 0) delete state.landingPick[type];
+  else state.landingPick[type] = next;
+  return state;
 }
 
 export function guideCopy(state) {
@@ -808,32 +835,41 @@ function startAirLand(state) {
   }
   state.phase = PHASE.AIR_LAND;
   state.landingDest = null;
+  state.landingPick = {};
+  state.airLeft = { ...air };
   state.landed = false;
   state.destPicked = null;
-  state.selectedUnits = air;
+  state.selectedUnits = { ...air };
   state.selected = state.dest;
   return state;
 }
 
 function applyLanding(state) {
-  if (!state.landingDest) return state;
+  if (!state.landingDest || !pickedCount(state.landingPick)) return state;
   let from = state.placements[state.dest] || [];
-  const air = airRoster(from, 'Russians');
-  if (!Object.keys(air).length) {
-    state.phase = PHASE.DONE;
-    return state;
-  }
   let destStacks = state.placements[state.landingDest] || [];
-  for (const [type, qty] of Object.entries(air)) {
-    from = removeQty(from, type, 'Russians', qty);
-    destStacks = addQty(destStacks, type, 'Russians', qty);
+  for (const [type, qty] of Object.entries(state.landingPick || {})) {
+    const n = Math.min(Number(qty) || 0, Number(state.airLeft?.[type]) || 0);
+    if (n <= 0) continue;
+    from = removeQty(from, type, 'Russians', n);
+    destStacks = addQty(destStacks, type, 'Russians', n);
+    state.airLeft[type] = Math.max(0, (Number(state.airLeft[type]) || 0) - n);
+    if (state.airLeft[type] <= 0) delete state.airLeft[type];
   }
   state.placements[state.dest] = from;
   state.placements[state.landingDest] = destStacks;
-  state.landed = true;
-  state.phase = PHASE.DONE;
+  state.landingPick = {};
+  state.selectedUnits = { ...(state.airLeft || {}) };
+  const left = remainingAirCount(state);
+  if (left <= 0) {
+    state.landed = true;
+    state.phase = PHASE.DONE;
+    state.selected = state.landingDest;
+    state.selectedUnits = {};
+    return state;
+  }
+  state.landed = false;
   state.selected = state.landingDest;
-  state.selectedUnits = {};
   return state;
 }
 
@@ -852,6 +888,8 @@ export function resetScenario(state) {
   state.selectedUnits = {};
   state.destPicked = null;
   state.landingDest = null;
+  state.landingPick = {};
+  state.airLeft = {};
   state.landed = false;
   state.guideOn = true;
   state.battle = null;
@@ -1016,6 +1054,10 @@ export function driveAirChoice(state) {
 export function driveLanded(state, dest = 'Russia') {
   driveAirChoice(state);
   tapLand(state, dest);
+  const pool = { ...(state.airLeft || state.selectedUnits || {}) };
+  for (const [type, n] of Object.entries(pool)) {
+    adjustLanding(state, type, Number(n) || 0);
+  }
   confirm(state);
   return state;
 }
@@ -1032,6 +1074,8 @@ export function inspectPlay(state) {
     origin: state?.origin || null,
     dest: state?.destPicked || null,
     landingDest: state?.landingDest || null,
+    landingPick: { ...(state?.landingPick || {}) },
+    airLeft: { ...(state?.airLeft || {}) },
     landed: !!state?.landed,
     selectedUnits: { ...(state?.selectedUnits || {}) },
     airLandRoster: airLandRoster(state),
