@@ -477,7 +477,10 @@ export function pickLoss(state, side, type) {
   if (have <= 0) return state;
   const thisN = Number(cur[type]) || 0;
   if (menu.need === 1) {
-    battle[key] = thisN > 0 ? {} : { [type]: 1 };
+    // Sticky: same-type re-tap (or a doubled pointer) must not toggle off
+    // and soft-lock Confirm. A different type replaces the pick.
+    if (thisN > 0) return state;
+    battle[key] = { [type]: 1 };
     return state;
   }
   const used = assignedCount(cur);
@@ -919,9 +922,8 @@ export function battleCard(state) {
         } : null,
         theyNeed > 0 ? {
           side: 'def',
-          label: defMenu.forced
-            ? `They take ${theyNeed} · your ATK hits`
-            : `They take ${theyNeed} · cheapest · tap to change`,
+          readOnly: true,
+          label: `They take ${theyNeed} · ${formatLoss(battle.pendingDef)} · your ATK`,
           need: theyNeed,
           taken: { ...(battle.pendingDef || {}) },
           units: defMenu.units,
@@ -1008,6 +1010,7 @@ export function inspectPlay(state) {
     confirmLabel: confirmLabel(state),
     confirmGold: confirmGold(state),
     confirmEnabled: confirmEnabled(state),
+    youReady: lossesReady(state),
     guideOn: false,
     guide: guideCopy(state),
     legalDests: legalDests(state),

@@ -430,6 +430,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-battle .three-picker[data-loss-side="def"] .three-picker-label { color:#8EB8C8; }
     #three-battle .three-picker-row { display:flex; flex-wrap:wrap; gap:4px; }
+    #three-battle .three-picker[data-loss-side="att"] .three-loss {
+      min-width:52px; min-height:40px;
+    }
     #three-battle .three-loss {
       min-width:44px; min-height:36px; padding:3px 6px; border-radius:10px;
       border:1.5px solid rgba(255,255,255,0.16);
@@ -439,6 +442,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-battle .three-loss.is-on {
       background:#C4A35A; color:#1E2420; border-color:transparent;
+    }
+    #three-battle .three-loss.is-ro {
+      cursor:default; opacity:0.88; pointer-events:none;
     }
     #three-battle .three-picker[data-loss-side="def"] .three-loss.is-on {
       background:#5B8CA8; color:#F4EFE4;
@@ -595,6 +601,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     setConfirmIdle(label = 'Select units') {
       api.confirm.disabled = true;
+      api.confirm.setAttribute('disabled', '');
+      api.confirm.setAttribute('aria-disabled', 'true');
+      api.confirm.dataset.youReady = '0';
       api.confirm.classList.remove('is-ready');
       api.confirm.classList.add('is-idle');
       api.confirm.textContent = label;
@@ -603,6 +612,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     setConfirmReady(label) {
       api.confirm.disabled = false;
+      api.confirm.removeAttribute('disabled');
+      api.confirm.setAttribute('aria-disabled', 'false');
+      api.confirm.dataset.youReady = '1';
       api.confirm.classList.remove('is-idle');
       api.confirm.classList.add('is-ready');
       api.confirm.textContent = label;
@@ -673,9 +685,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           const n = Number(p.taken?.[u.type]) || 0;
           const on = n > 0 ? ' is-on' : '';
           const short = shortType(u.type);
+          if (p.readOnly) {
+            return `<span class="three-loss is-ro${on}">${short}${n ? ` −${n}` : ''}</span>`;
+          }
           return `<button type="button" class="three-loss${on}" data-loss-side="${p.side}" data-loss-type="${u.type}">${short}${n ? ` −${n}` : ''}</button>`;
         }).join('');
-        return `<div class="three-picker" data-loss-side="${p.side}"><div class="three-picker-label">${p.label}</div><div class="three-picker-row">${chips}</div></div>`;
+        return `<div class="three-picker" data-loss-side="${p.side}" data-readonly="${p.readOnly ? '1' : '0'}"><div class="three-picker-label">${p.label}</div><div class="three-picker-row">${chips}</div></div>`;
       }).join('');
       api.battleEl.innerHTML = `
         <p class="three-battle-kicker">${card.kicker || 'Battle'}</p>
@@ -809,7 +824,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         if (!api.isSheetOpen()) api.peek.classList.add('is-on');
       }
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
-      else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
+      else if (enabled || gold) api.setConfirmReady(label || 'Confirm: Take hits');
       else api.setConfirmIdle(label || 'Select units');
       api.wirePeekButtons();
       api.syncLayers();
@@ -875,11 +890,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bindSealedActivate(api.bottom, 'button.three-peek-unit[data-unit-type]', (e, chip) => {
     if (api.peek?.dataset?.airLand === '1') return;
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
-  });
-  bindSealedActivate(api.battleEl, '[data-loss-type]', (e, chip) => {
-    if (typeof api.onLossPick === 'function') {
-      api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType);
-    }
   });
   bindSealedActivate(api.guideEl, '[data-guide="dismiss"]', () => {
     api.setGuide('', false);

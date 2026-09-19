@@ -2,6 +2,16 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.9 P0.2 YOU-confirm
+
+Viz FAIL on tip .8: ART−1 selected but Confirm stayed Assign/disabled.
+Cause: THEY also had an ART chip; a tap registered as THEY and YOU
+never filled. Solo now: only YOU chips are tappable; THEY is a
+read-only cheapest line. Same-type re-tap is sticky (no toggle-off).
+YOU assign → gold Confirm: Take hits. Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.8 max-tip he-correct
 
 James from Karelia combat-move + ROUND 1 stills on PR76 `?three=1&max=1`.

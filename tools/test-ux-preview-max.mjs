@@ -85,8 +85,10 @@ assert(mid.battle.pendingAtt.artillery === 1, 'YOU ART −1');
 assert(lossesReady(mid) === true, 'YOU pick is enough');
 assert(confirmEnabled(mid) === true, 'Confirm gold after YOU only');
 assert(confirmLabel(mid) === 'Confirm: Take hits', 'hits CTA after YOU');
-pickLoss(mid, 'def', 'armour');
-assert(mid.battle.pendingDef.armour === 1, 'THEY tap still registers');
+pickLoss(mid, 'att', 'artillery');
+assert(mid.battle.pendingAtt.artillery === 1, 're-tap ART stays selected');
+assert(confirmEnabled(mid) === true, 're-tap does not soft-lock');
+assert(battleCard(mid).pickers.find((p) => p.side === 'def')?.readOnly === true, 'THEY is read-only in solo');
 
 const air = createScenario({ max: true });
 driveAirChoice(air);
