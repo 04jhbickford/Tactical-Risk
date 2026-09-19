@@ -40,6 +40,7 @@ import {
   addSeaLaneLines,
   addSeaZoneInk,
   makeSeaWaterMeshes,
+  makeBoardSeaMesh,
 } from './threeMapArt.js';
 import { territoryOutlineRings, waterOutlineRings } from './threeMapOutline.js';
 import {
@@ -55,6 +56,7 @@ import {
   regionWashFor,
   plasticColor,
   setWorldLandMap,
+  setWorldSeaMap,
   getPaperImage,
   bonusContinent,
   REGION_WASH,
@@ -65,7 +67,7 @@ import {
   makeOverflowTexture,
   loadUnitAtlases,
 } from './threeMapChits.js';
-import { bakeWorldLandAtlas, getWorldLandTex, getWorldLandNormal } from './threeMapTerrain.js';
+import { bakeWorldLandAtlas, getWorldLandTex, getWorldLandNormal, loadWorldSeaAlbedo, getWorldSeaTex } from './threeMapTerrain.js';
 import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
@@ -260,6 +262,8 @@ export async function bootThreeMapSpike() {
   const lands = territories.filter((t) => !t.isWater);
   const worldLand = await bakeWorldLandAtlas(lands, getPaperImage());
   setWorldLandMap(worldLand, getWorldLandNormal());
+  const worldSea = await loadWorldSeaAlbedo();
+  setWorldSeaMap(worldSea);
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
   const landHeights = new Map();
@@ -303,8 +307,9 @@ export async function bootThreeMapSpike() {
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  // P38 HARD: land ink same weight family as sea-zone closed rings.
-  const landBorderMat = makeLineMat(PALETTE.border, 2.7, 0.87);
+  // P39 HARD: land ink weight/alpha ≥ sea-zone ink. Dissolve before stroke.
+  const landBorderMat = makeLineMat(PALETTE.border, 3.0, 0.92);
+  landBorderMat.depthTest = false;
   const foamMat = makeLineMat(PALETTE.foam, 1.15, 0.62);
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
@@ -367,7 +372,7 @@ export async function bootThreeMapSpike() {
       for (const seal of makeLandSealMeshes(land, landMats.get(land.name)?.seal)) {
         group.add(seal);
       }
-      addTerritoryInk(group, land, landBorderMat, height + 0.05, continentMats.get(bonusContinent(land)));
+      addTerritoryInk(group, land, landBorderMat, height + 0.18, continentMats.get(bonusContinent(land)));
       addFoamCoast(group, land, foamMat, 0.05);
       for (const shelf of makeCoastShelfMeshes(land, coastShelfMat)) {
         group.add(shelf);
@@ -380,6 +385,7 @@ export async function bootThreeMapSpike() {
       }
     }
     const seaWaterMat = makeSeaWaterMaterial();
+    group.add(makeBoardSeaMesh(seaWaterMat));
     for (const water of territories.filter((t) => t.isWater)) {
       for (const sea of makeSeaWaterMeshes(water, seaWaterMat)) {
         group.add(sea);
@@ -1172,7 +1178,7 @@ export async function bootThreeMapSpike() {
   const europeNorthOnScreen = ukXY && germanyXY && ukXY.y < germanyXY.y + 80;
   const ukWestOfGermany = ukXY && germanyXY && ukXY.x < germanyXY.x;
   const westEuropeWestOfGermany = westEuropeXY && germanyXY && westEuropeXY.x < germanyXY.x;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=parchment-wash`, {
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=hand-ripples`, {
     africaSouthOfEurope,
     africaNotUnderNA,
     africaSouthOnScreen,
@@ -1394,6 +1400,10 @@ export async function bootThreeMapSpike() {
         quietLanes: false,
         seaLanes: false,
         oceanNoStipple: true,
+        oceanRipples: true,
+        oceanNoHatch: true,
+        coastalHandRipples: true,
+        worldSeaBound: !!getWorldSeaTex(),
         paintedMountains: true,
         noHatchRidges: false,
         unitNoClip: true,
@@ -1411,7 +1421,7 @@ export async function bootThreeMapSpike() {
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
-        continentPunch: 0.20,
+        continentPunch: 0.14,
         seaDeckClear: true,
         eastMedPinSouth: true,
         noBlotchAtlas: true,
@@ -1433,7 +1443,12 @@ export async function bootThreeMapSpike() {
         opaquePlastic: true,
         coastalGreens: true,
         landSeaBorderFamily: true,
+        landInkGteSea: true,
+        ringsDissolved: true,
+        maskOnlyComposite: !!(albedoBound && albedo?.userData?.maskOnlyComposite),
         playbookFolded: true,
+        seaSrc: getWorldSeaTex()?.userData?.src || null,
+        seaRev: getWorldSeaTex()?.userData?.rev || null,
       };
     },
   };

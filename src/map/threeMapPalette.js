@@ -124,7 +124,8 @@ const PAPER_UV_SHIFT = {
   'South America': [0.08, 0.52],
   Oceania: [0.47, 0.29],
 };
-export const OCEAN_UV = 24;
+// P39b: tiled ocean UVs are dead. World-sea albedo is 1:1 clamp.
+export const OCEAN_UV = 0;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
 export const GRAIN_MULTIPLY = 0.78;
@@ -167,6 +168,7 @@ let paperAO = null;
 let oceanNormal = null;
 let grainCanvas = null;
 let worldLandMap = null;
+let worldSeaMap = null;
 const landSheets = new Map();
 const washMaps = new Map();
 
@@ -175,6 +177,15 @@ let worldLandNormalMap = null;
 export function setWorldLandMap(tex, normalTex = null) {
   worldLandMap = tex || null;
   if (normalTex !== undefined) worldLandNormalMap = normalTex || null;
+}
+
+export function setWorldSeaMap(tex) {
+  worldSeaMap = tex || null;
+  if (tex) oceanMap = tex;
+}
+
+export function getWorldSeaMap() {
+  return worldSeaMap;
 }
 
 export function setWorldLandNormal(tex) {
@@ -337,35 +348,21 @@ function imageToTex(img, fallbackHex, grainImg = null, { srgb = true } = {}) {
 }
 
 function bakeOcean(img) {
-  // P37 STYLE REF: pale washed parchment sea. Never slate-teal candy.
+  // P39b: fallback parchment sea only. Hero is world-sea-albedo (no hatch tile).
   if (!grainCanvas) grainCanvas = bakeGrainField(512);
-  const size = img ? (img.naturalWidth || img.width || 512) : 512;
+  const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = PALETTE.oceanDeep;
+  ctx.fillStyle = '#D8D2C0';
   ctx.fillRect(0, 0, size, size);
-  if (img) ctx.drawImage(img, 0, 0, size, size);
-  const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.06, size * 0.5, size * 0.5, size * 0.92);
-  shelf.addColorStop(0, PALETTE.oceanReef || '#7AADB0');
-  shelf.addColorStop(0.22, PALETTE.oceanShelf);
-  shelf.addColorStop(0.52, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.40));
-  shelf.addColorStop(0.78, PALETTE.oceanDeep);
-  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#B8B4A4', 0.22));
-  ctx.globalCompositeOperation = 'soft-light';
-  ctx.globalAlpha = 0.90;
-  ctx.fillStyle = shelf;
-  ctx.fillRect(0, 0, size, size);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
+  if (img) {
+    ctx.globalAlpha = 0.35;
+    ctx.drawImage(img, 0, 0, size, size);
+    ctx.globalAlpha = 1;
+  }
   overlayPhoto(ctx, grainCanvas, size, OCEAN_GRAIN, 'overlay');
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.globalAlpha = OCEAN_TEAL_PUNCH;
-  ctx.fillStyle = PALETTE.oceanDeep;
-  ctx.fillRect(0, 0, size, size);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
   oceanMap = canvasTex(canvas);
   return oceanMap;
 }
@@ -419,7 +416,9 @@ export async function loadBoardTextures() {
   ]);
   if (!grainCanvas) grainCanvas = bakeGrainField(512);
   paperTex = parchment ? imageToTex(parchment, '#C4B896', grainCanvas) : bakeParchment(null);
-  oceanMap = bakeOcean(ocean);
+  // P39b: do not bind the wave-glyph tile as sea albedo (that was the hatch).
+  oceanMap = bakeOcean(null);
+  void ocean;
   paperNormal = pN ? imageToTex(pN, '#8080ff', null, { srgb: false }) : null;
   paperAO = pAO ? imageToTex(pAO, '#ffffff', null, { srgb: false }) : null;
   oceanNormal = oN ? imageToTex(oN, '#8080ff', null, { srgb: false }) : null;
@@ -437,6 +436,11 @@ export function makePaperTexture() {
   if (paperTex) return paperTex;
   paperTex = bakeParchment(null);
   return paperTex;
+}
+
+export function applyOceanUVs(geometry) {
+  // P39b: tiled hatch is dead. Sea meshes use applyWorldLandUVs (1:1 clamp).
+  void geometry;
 }
 
 export function applyPaperUVs(geometry, territory) {
@@ -530,37 +534,43 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
 }
 
 export function makeOceanMaterial() {
+  // P39b: surround is quiet parchment sea — never a UV-tiled wave hatch.
   makePaperTexture();
-  if (!oceanMap) bakeOcean(null);
   const mat = new THREE.MeshStandardMaterial({
-    map: oceanMap,
-    normalMap: oceanNormal || null,
-    color: 0xd6d0bc,
-    roughness: 0.90,
+    map: paperTex,
+    color: 0xe8e2d4,
+    roughness: 0.96,
     metalness: 0.0,
-    envMapIntensity: 0.03,
-    emissive: 0xd2ccb8,
-    emissiveIntensity: 0.30,
+    envMapIntensity: 0,
+    emissive: 0xe4dcc8,
+    emissiveIntensity: 0.40,
     transparent: false,
-    vertexColors: true,
+    vertexColors: false,
   });
-  // P38: kill stipple-looking ocean normal. Washed parchment-sea only.
-  if (mat.normalMap) mat.normalScale.set(0.10, 0.10);
   return mat;
 }
 
 export function makeSeaWaterMaterial() {
+  makePaperTexture();
+  const map = worldSeaMap || oceanMap;
+  if (!map && !oceanMap) bakeOcean(null);
+  const sea = worldSeaMap || oceanMap;
   return new THREE.MeshStandardMaterial({
-    // PLAYBOOK C: pale washed blue near coasts, fading into parchment.
-    color: 0xb4c6c2,
-    transparent: true,
-    opacity: 0.12,
-    roughness: 0.88,
+    // P39b: world-space coastal hand-ripples. Clamp atlas — no hatch tile.
+    map: sea,
+    color: 0xeef2ee,
+    transparent: false,
+    opacity: 1,
+    roughness: 0.94,
     metalness: 0.0,
-    depthWrite: false,
+    depthWrite: true,
     depthTest: true,
     side: THREE.DoubleSide,
-    envMapIntensity: 0.20,
+    envMapIntensity: 0,
+    emissive: 0xf4f6f2,
+    emissiveIntensity: worldSeaMap ? 0.62 : 0,
+    emissiveMap: worldSeaMap ? sea : null,
+    vertexColors: false,
     polygonOffset: true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2,
@@ -583,30 +593,8 @@ export function makeFoamMaterial() {
 }
 
 export function makeOceanMesh(width, height) {
-  const geo = new THREE.PlaneGeometry(width, height, 32, 24);
+  const geo = new THREE.PlaneGeometry(width, height, 1, 1);
   geo.rotateX(-Math.PI / 2);
-  const pos = geo.attributes.position;
-  const uv = geo.attributes.uv;
-  const colors = new Float32Array(pos.count * 3);
-  // Print-ink shelf: lighter near Europe/N.Africa, darker toward open sea.
-  // Local verts; mesh is later placed at (WORLD_W/2, y, -WORLD_H/2).
-  const shelfX = 62;
-  const shelfZ = 28;
-  for (let i = 0; i < pos.count; i++) {
-    if (uv) uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
-    const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
-    const t = Math.min(1, Math.max(0, (d - 28) / 160));
-    const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // PLAYBOOK C: pale washed blue near coasts (low t) fading to parchment (open).
-    colors[i * 3] = shade * (0.96 + t * 0.08);
-    colors[i * 3 + 1] = shade * (1.00 + t * 0.01);
-    colors[i * 3 + 2] = shade * (1.04 - t * 0.10);
-  }
-  if (uv) {
-    uv.needsUpdate = true;
-    geo.setAttribute('uv2', uv.clone());
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const mat = makeOceanMaterial();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.position.y = -0.12;
