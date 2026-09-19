@@ -1,0 +1,21 @@
+{
+  "artSource": "main",
+  "uxSource": "threePreview",
+  "sideProject": true,
+  "doNotMerge": true,
+  "version": "V2.81.53-ux-preview.1",
+  "schema": 11,
+  "flag": "?three=1 or ?ux=1",
+  "tiles": { "base": 112, "relief": 112, "smallMap": true },
+  "worldPlate": false,
+  "imagineBake": false,
+  "selectOutlineOnly": true,
+  "selectColor": "#C4A35A",
+  "confirmReady": "rgb(196, 163, 90)",
+  "confirmIdle": "Select a territory",
+  "phaseChip": "rgba(30, 36, 32, 0.42)",
+  "lodMid390": "mid",
+  "china": { "polys": 2, "rings": 1 },
+  "vercel": "https://tactical-risk20-4tbh1qis4-james-projects-20d8de40.vercel.app/?three=1",
+  "http": 200
+}
