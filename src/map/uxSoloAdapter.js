@@ -24,6 +24,8 @@ const BUY_TYPES = [
 
 const MOVE_SKIP = new Set(['factory', 'aaGun']);
 
+export const COMBAT_SHELL = ['Combat Move', 'Battle', 'Air land', 'NCM'];
+
 function pickedCount(picked) {
   return Object.values(picked || {}).reduce((n, q) => n + (Number(q) || 0), 0);
 }
@@ -68,17 +70,36 @@ function estimateIncome(gameState, playerId) {
   return income;
 }
 
-function legalMoveDests(gameState, from) {
+function legalMoveDests(gameState, from, { picked = {}, unitDefs = {}, ncm = false } = {}) {
   const player = gameState.currentPlayer;
   if (!player || !from) return [];
   const names = gameState.getConnections?.(from) || [];
-  const ncm = gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE;
+  const types = Object.entries(picked || {})
+    .filter(([, n]) => (Number(n) || 0) > 0)
+    .map(([type]) => type);
+  const landOnly = types.length > 0 && types.every((type) => unitDefs[type]?.isLand);
   return names.filter((name) => {
     const owner = gameState.getOwner(name);
     const enemy = owner && owner !== player.id && !gameState.areAllies(player.id, owner);
     if (ncm && enemy) return false;
+    if (landOnly && gameState.territoryByName?.[name]?.isWater) return false;
     return true;
   });
+}
+
+export function combatShellIndex(mode, turnPhase) {
+  if (mode === 'airLand') return 3;
+  if (mode === 'combat' || mode === 'combatIdle') return 2;
+  if (mode === 'ncm' || turnPhase === TURN_PHASES.NON_COMBAT_MOVE) return 4;
+  if (mode === 'combatMove' || turnPhase === TURN_PHASES.COMBAT_MOVE) return 1;
+  return 0;
+}
+
+function isEnemyLand(gameState, name) {
+  const player = gameState.currentPlayer;
+  if (!player || !name) return false;
+  const owner = gameState.getOwner(name);
+  return !!(owner && owner !== player.id && !gameState.areAllies(player.id, owner));
 }
 
 function phaseWord(gameState, ui) {
@@ -227,7 +248,7 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
       const mine = stacksFor(gameState, name, seatId)
         .filter((s) => !MOVE_SKIP.has(s.type));
       const from = ui.originName;
-      if (pickedCount(ui.picked) && from && legalMoveDests(gameState, from).includes(name)) {
+      if (pickedCount(ui.picked) && from && moveDests(from).includes(name)) {
         ui.dest = name;
         ui.selected = name;
         return;
@@ -282,11 +303,24 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
   }
 
   function findOrigin() {
-    if (ui.dest && pickedCount(ui.picked)) {
-      // Origin is the last owned land we staged from; keep selected as dest.
-      return ui.origin || ui.selected;
-    }
+    if (ui.originName) return ui.originName;
+    if (ui.dest && pickedCount(ui.picked)) return findStagedOrigin();
     return ui.selected;
+  }
+
+  function moveDests(from) {
+    return legalMoveDests(gameState, from, {
+      picked: ui.picked,
+      unitDefs,
+      ncm: ui.mode === 'ncm' || gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+    });
+  }
+
+  function endPhase() {
+    gameState.nextPhase();
+    resetPicks();
+    ui.holdCollect = false;
+    syncMode();
   }
 
   function adjustLoss(side, type, delta) {
@@ -331,23 +365,13 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
         }
         return;
       }
-      const pending = gameState.getPendingPurchases?.()?.reduce((s, p) => s + (p.quantity || 0), 0) || 0;
-      if (ui.mode === 'ncm' && pending <= 0) {
-        ui.holdCollect = true;
-        resetPicks();
-        ui.mode = 'collect';
-        return;
-      }
-      gameState.nextPhase();
-      resetPicks();
-      syncMode();
+      endPhase();
       return;
     }
     if (ui.mode === 'combatIdle') {
       dequeueResolvedHeads(gameState, unitDefs);
-      if (!gameState.combatQueue?.length) gameState.nextPhase();
-      resetPicks();
-      syncMode();
+      if (!gameState.combatQueue?.length) endPhase();
+      else syncMode();
       return;
     }
     if (ui.mode === 'combat' && ui.combat) {
@@ -366,11 +390,11 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
         ui.combat = null;
         if (!failed && beginAirLand(dest)) return;
         dequeueResolvedHeads(gameState, unitDefs);
-        if (!gameState.combatQueue?.length) {
-          gameState.nextPhase();
+        if (!gameState.combatQueue?.length) endPhase();
+        else {
+          resetPicks();
+          syncMode();
         }
-        resetPicks();
-        syncMode();
       }
       return;
     }
@@ -399,10 +423,12 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
       ui.landingPick = {};
       if (pickedCount(ui.airLeft) <= 0) {
         dequeueResolvedHeads(gameState, unitDefs);
-        if (!gameState.combatQueue?.length) gameState.nextPhase();
-        resetPicks();
-        ui.mode = '';
-        syncMode();
+        if (!gameState.combatQueue?.length) endPhase();
+        else {
+          resetPicks();
+          ui.mode = '';
+          syncMode();
+        }
       }
       return;
     }
@@ -449,7 +475,7 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
       if (from && stacksFor(gameState, from, seatId).length) {
         out.origin = from;
         if (pickedCount(ui.picked)) {
-          out.legal = legalMoveDests(gameState, from);
+          out.legal = moveDests(from);
           if (!ui.dest) out.pulse.push(...out.legal);
         } else {
           out.pulse.push(from);
@@ -500,14 +526,15 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
     }
     if (ui.mode === 'combatMove' || ui.mode === 'ncm') {
       if (ui.dest && pickedCount(ui.picked)) {
+        const attack = ui.mode === 'combatMove' && isEnemyLand(gameState, ui.dest);
         return {
-          label: ui.mode === 'ncm' ? `Confirm: Move ${ui.dest}` : `Confirm: Attack ${ui.dest}`,
+          label: attack ? `Confirm: Attack ${ui.dest}` : `Confirm: Move ${ui.dest}`,
           gold: true,
           enabled: true,
         };
       }
       if (pickedCount(ui.picked)) return { label: 'Pick target', gold: false, enabled: false };
-      return { label: ui.mode === 'ncm' ? 'Confirm: End NCM' : 'Confirm: End combat move', gold: true, enabled: true };
+      return { label: 'End Phase', gold: true, enabled: true };
     }
     if (ui.mode === 'combat' && ui.combat) {
       return {
@@ -517,7 +544,7 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
       };
     }
     if (ui.mode === 'combatIdle') {
-      return { label: 'Confirm: End battles', gold: true, enabled: true };
+      return { label: 'End Phase', gold: true, enabled: true };
     }
     if (ui.mode === 'airLand') {
       const ready = !!ui.landingDest && pickedCount(ui.landingPick) > 0;
@@ -619,6 +646,10 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
     if (airLand) route = ui.landingDest ? `Confirm land · ${ui.landingDest}` : 'Pick a teal land';
     if (ui.mode === 'ai') route = ui.notice || `${gameState.currentPlayer?.name || 'AI'} thinking…`;
     if (gameState.gameOver) route = gameState.winCondition || 'Game over';
+    const shellIndex = combatShellIndex(ui.mode, gameState.turnPhase);
+    const shell = (shellIndex > 0 && human())
+      ? { steps: COMBAT_SHELL, current: shellIndex }
+      : { steps: [phaseWord(gameState, ui)], current: 1 };
     const focusName = airLand
       ? (ui.landingDest || 'Land aircraft')
       : ((ui.mode === 'combatMove' || ui.mode === 'ncm') && (pickedCount(ui.picked) || ui.dest)
@@ -646,6 +677,7 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
       phase: phaseWord(gameState, ui),
       ipc: gameState.getIPCs(seatId),
       seat: gameState.getPlayer?.(seatId)?.name || seatId,
+      shell,
     };
   }
 
@@ -663,6 +695,10 @@ export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false
       dest: ui.dest,
       picked: { ...ui.picked },
       combat: ui.combat ? { territory: ui.combat.territory, step: ui.combat.step } : null,
+      origin: ui.originName || null,
+      airLeft: { ...ui.airLeft },
+      landingDest: ui.landingDest || null,
+      shell: combatShellIndex(ui.mode, gameState.turnPhase),
       gameOver: !!gameState.gameOver,
       winner: gameState.winner || null,
       queue: [...(gameState.combatQueue || [])],

@@ -258,12 +258,11 @@ export async function bootUxSolo() {
       replay: model.replay,
       route: model.route,
     });
-    const strip = [];
-    if (!session.ui.started) strip.push('You vs AI');
-    else if (gameState.gameOver) strip.push(gameState.winner || 'Game over');
-    else if (model.phase === 'AI') strip.push(model.route || 'AI');
-    else strip.push(model.phase);
-    chrome.setPhaseStrip(strip, 1);
+    const strip = model.shell?.steps?.length
+      ? model.shell.steps
+      : [model.phase];
+    const stripNow = model.shell?.current || 1;
+    chrome.setPhaseStrip(strip, stripNow);
   }
 
   chrome.onStackToggle = (on) => {

@@ -2,6 +2,15 @@
 
 ---
 
+## 9.19.26 — V2.81.55-ux-preview.12-solo S2–S6 (side only)
+
+Phase shell + End Phase / nextPhase. Combat-move, battle, split air
+land, NCM on real GameState behind Three `.11` tiles / YOU Confirm /
+teal dests. Zoom still hides on sheet/battle. Capitals + AIController
+kept. No second engine. No lobby. Pause before economy/tech/win.
+
+---
+
 ## 9.19.26 — V2.81.55-ux-preview.12-solo S0+S1 (side only)
 
 S0: main V2.81.54 AA-wipe fail-close + V2.81.55 gameEventLog /

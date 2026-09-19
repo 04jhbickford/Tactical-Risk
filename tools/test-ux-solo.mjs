@@ -25,8 +25,9 @@ const {
 } = await import(pathToFileURL(join(root, 'src/map/uxPreviewFlag.js')));
 const { GameState, GAME_PHASES, TURN_PHASES, SETUP_TURN_PHASE, CLASSIC_CAPITALS } =
   await import(pathToFileURL(join(root, 'src/state/gameState.js')));
-const { createSoloSession } = await import(pathToFileURL(join(root, 'src/map/uxSoloAdapter.js')));
-const { territoryCombatAlreadyResolved } =
+const { createSoloSession, COMBAT_SHELL, combatShellIndex } =
+  await import(pathToFileURL(join(root, 'src/map/uxSoloAdapter.js')));
+const { territoryCombatAlreadyResolved, BATTLE_STEP } =
   await import(pathToFileURL(join(root, 'src/map/uxSoloCombat.js')));
 const {
   SOLO_SAVE_KEY,
@@ -151,6 +152,160 @@ const mainSrc = readFileSync(join(root, 'src/main.js'), 'utf8');
 assert(mainSrc.includes('bootUxSolo'), 'main forks solo boot');
 assert(mainSrc.includes('bootUxPreview'), 'main keeps pocket preview');
 assert(mainSrc.includes('gameEventLog') || mainSrc.includes('createGameEventLog'), 'S0 diagnostics wired');
+
+function bootClassic() {
+  const gs = new GameState(setup, territories, continents);
+  gs.isMultiplayer = false;
+  gs.soloLocal = true;
+  gs.unitDefs = unitDefs;
+  gs.initGame('classic', factions, { alliancesEnabled: true });
+  if (gs.turnPhase === SETUP_TURN_PHASE) gs.turnPhase = TURN_PHASES.DEVELOP_TECH;
+  gs._initFriendlyTerritoriesAtTurnStart();
+  return gs;
+}
+
+function skipToCombatMove(sess, gs) {
+  sess.start();
+  if (gs.turnPhase === TURN_PHASES.DEVELOP_TECH) sess.confirm();
+  if (gs.turnPhase === TURN_PHASES.PURCHASE) sess.confirm();
+}
+
+const phaseGame = bootClassic();
+const phaseSess = createSoloSession({ gameState: phaseGame, unitDefs, seatId: 'Russians' });
+skipToCombatMove(phaseSess, phaseGame);
+assert(phaseGame.turnPhase === TURN_PHASES.COMBAT_MOVE, 'S2 skip to combat-move');
+const cmChrome = phaseSess.chromeModel([]);
+assert(cmChrome.label === 'End Phase', `S2 End Phase label ${cmChrome.label}`);
+assert(cmChrome.shell.steps.join('|') === COMBAT_SHELL.join('|'), 'S2 combat shell steps');
+assert(cmChrome.shell.current === 1, `S2 shell on combat-move ${cmChrome.shell.current}`);
+assert(combatShellIndex('combatMove', TURN_PHASES.COMBAT_MOVE) === 1, 'S2 shell index combat-move');
+assert(combatShellIndex('combat', TURN_PHASES.COMBAT) === 2, 'S2 shell index battle');
+assert(combatShellIndex('airLand', TURN_PHASES.COMBAT) === 3, 'S2 shell index air land');
+assert(combatShellIndex('ncm', TURN_PHASES.NON_COMBAT_MOVE) === 4, 'S2 shell index NCM');
+phaseSess.confirm();
+assert(
+  phaseGame.turnPhase === TURN_PHASES.NON_COMBAT_MOVE
+  || phaseGame.turnPhase === TURN_PHASES.MOBILIZE
+  || phaseGame.turnPhase === TURN_PHASES.COLLECT_INCOME
+  || phaseSess.inspect().mode === 'ncm',
+  `S2 End Phase nextPhase → ${phaseGame.turnPhase} ${phaseSess.inspect().mode}`,
+);
+
+const fightGame = bootClassic();
+fightGame._rollDie = (ctx) => (String(ctx).includes('defense') || ctx === 'aa' ? 6 : 1);
+const fight = createSoloSession({ gameState: fightGame, unitDefs, seatId: 'Russians' });
+skipToCombatMove(fight, fightGame);
+const kareliaInf = (fightGame.getUnitsAt('Karelia S.S.R.') || []).find((u) => u.type === 'infantry');
+if (kareliaInf) kareliaInf.quantity = Math.max(8, kareliaInf.quantity || 0);
+fightGame.units['Finland Norway'] = [
+  { type: 'infantry', quantity: 1, owner: 'Germans' },
+];
+fight.tap('Karelia S.S.R.');
+fight.adjustUnit('infantry', 3);
+fight.adjustUnit('fighter', 1);
+fight.tap('Finland Norway');
+assert(fight.inspect().origin === 'Karelia S.S.R.', `S3 origin pinned ${fight.inspect().origin}`);
+assert(fight.inspect().dest === 'Finland Norway', 'S3 dest Finland');
+assert(fight.inspect().picked.infantry === 3, 'S3 tile +/− infantry');
+assert(fight.inspect().picked.fighter === 1, 'S3 tile +/− fighter');
+const attackChrome = fight.chromeModel([]);
+assert(/Attack Finland/.test(attackChrome.label), `S3 attack label ${attackChrome.label}`);
+const marks = fight.highlights();
+assert(marks.origin === 'Karelia S.S.R.', 'S3 highlight origin');
+assert(marks.dest === 'Finland Norway', 'S3 highlight dest');
+fight.confirm();
+assert(
+  (fightGame.getUnitsAt('Finland Norway') || []).some((u) => u.owner === 'Russians' && u.type === 'infantry'),
+  'S3 moveUnits put Russians in Finland',
+);
+assert(
+  (fightGame.getUnitsAt('Finland Norway') || []).some((u) => u.owner === 'Russians' && u.type === 'fighter'),
+  'S3 fighter moved with infantry',
+);
+const afterMove = fight.chromeModel([]);
+assert(afterMove.label === 'End Phase', `S3 End Phase after move ${afterMove.label}`);
+fight.confirm();
+assert(
+  fightGame.turnPhase === TURN_PHASES.COMBAT || fight.inspect().mode === 'combat',
+  `S4 entered combat phase=${fightGame.turnPhase} mode=${fight.inspect().mode}`,
+);
+assert(fight.inspect().shell === 2, `S4 shell battle ${fight.inspect().shell}`);
+assert(fight.inspect().combat?.territory === 'Finland Norway', 'S4 battle is Finland');
+
+let guard = 0;
+while (
+  fight.inspect().mode === 'combat'
+  && fight.inspect().combat
+  && fight.inspect().combat.step !== BATTLE_STEP.WON
+  && guard < 12
+) {
+  const step = fight.inspect().combat.step;
+  if (step === BATTLE_STEP.COMBAT_RESULT) {
+    const you = fight.ui.combat?.pendingYou || {};
+    const need = Object.values(you).reduce((n, q) => n + (Number(q) || 0), 0);
+    if (need === 0 && fight.ui.combat) {
+      fight.adjustLoss('att', 'infantry', 1);
+    }
+  }
+  fight.confirm();
+  guard += 1;
+}
+assert(guard < 12, 'S4 combat resolved without soft-lock');
+if (fight.inspect().mode === 'combat' && fight.inspect().combat?.step === BATTLE_STEP.WON) {
+  fight.confirm();
+}
+assert(
+  fight.inspect().mode === 'airLand' || fight.inspect().mode === 'ncm' || fightGame.turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+  `S5 after battle mode=${fight.inspect().mode} phase=${fightGame.turnPhase}`,
+);
+
+if (fight.inspect().mode === 'airLand') {
+  const airMarks = fight.highlights();
+  assert((airMarks.landable || []).includes('Karelia S.S.R.') || (airMarks.landable || []).includes('Russia'), 'S5 teal landable friendly');
+  const dest = (airMarks.landable || []).includes('Karelia S.S.R.') ? 'Karelia S.S.R.' : airMarks.landable[0];
+  fight.adjustUnit('fighter', 1);
+  fight.tap(dest);
+  assert(fight.inspect().landingDest === dest, `S5 partial air dest ${fight.inspect().landingDest}`);
+  const landChrome = fight.chromeModel([]);
+  assert(landChrome.airLand === true, 'S5 air-land sheet');
+  assert(/Confirm land/.test(landChrome.label), `S5 land confirm ${landChrome.label}`);
+  fight.confirm();
+}
+
+if (fight.inspect().mode !== 'ncm' && fightGame.turnPhase === TURN_PHASES.COMBAT) {
+  fight.confirm();
+}
+if (fightGame.turnPhase === TURN_PHASES.COMBAT && fight.inspect().mode === 'combatIdle') {
+  fight.confirm();
+}
+assert(
+  fight.inspect().mode === 'ncm' || fightGame.turnPhase === TURN_PHASES.NON_COMBAT_MOVE,
+  `S6 NCM phase=${fightGame.turnPhase} mode=${fight.inspect().mode}`,
+);
+if (fight.inspect().mode === 'ncm') {
+  fight.tap('Karelia S.S.R.');
+  fight.adjustUnit('infantry', 1);
+  const beforeDest = fight.inspect().dest;
+  fight.tap('Ukraine S.S.R.');
+  assert(fight.inspect().dest !== 'Ukraine S.S.R.', `S6 NCM rejects enemy dest ${fight.inspect().dest}`);
+  const ncmMarks = fight.highlights();
+  assert(!(ncmMarks.legal || []).includes('Ukraine S.S.R.'), 'S6 NCM legal dests are friendly');
+  if ((ncmMarks.legal || []).includes('Russia')) {
+    fight.tap('Russia');
+    assert(fight.inspect().dest === 'Russia', 'S6 NCM friendly dest');
+    const ncmChrome = fight.chromeModel([]);
+    assert(/Move Russia/.test(ncmChrome.label), `S6 move label ${ncmChrome.label}`);
+  } else {
+    assert(beforeDest !== 'Ukraine S.S.R.', 'S6 kept dest off Ukraine');
+  }
+  const endNcm = fight.chromeModel([]);
+  if (!fight.inspect().dest) {
+    assert(endNcm.label === 'End Phase', `S6 End Phase ${endNcm.label}`);
+  }
+}
+
+assert(!/from ['"].*lobbyManager/.test(soloSrc), 'S2–S6 still no lobby');
+assert(!/createScenario/.test(soloSrc), 'S2–S6 did not expand preview scenario');
 
 if (failed) {
   console.error(`${failed} failed`);

@@ -261,6 +261,15 @@ export async function bootUxPreview() {
       replay: play.phase === PHASE.DONE,
       route,
     });
+    const previewShell = play.phase === PHASE.AIR_LAND
+      ? ['Pick planes', 'Teal dest', 'Confirm land']
+      : play.phase === PHASE.BATTLE
+        ? ['AA', 'Dice', 'Hits']
+        : play.phase === PHASE.DONE
+          ? ['Replay']
+          : ['Tap origin', 'Pick units', 'Tap dest', 'Confirm'];
+    const previewNow = play.phase === PHASE.AIR_LAND ? 1 : play.phase === PHASE.BATTLE ? 2 : 1;
+    chrome.setPhaseStrip(previewShell, previewNow);
   }
 
   chrome.onStackToggle = (on) => {
