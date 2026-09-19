@@ -254,22 +254,39 @@ export async function bootUxPreview() {
       fillFrame: true,
     });
   }
+  function pocketBounds() {
+    const names = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
+      ? [play.origin, play.dest, 'Russia']
+      : [play.origin, play.dest];
+    const pts = names.map((n) => {
+      const t = territories.find((x) => x.name === n);
+      return t && territoryCenter(t);
+    }).filter(Boolean);
+    if (!pts.length) {
+      return play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE ? LAND_FIT : POCKET_FIT;
+    }
+    const pad = 80;
+    return {
+      minX: Math.min(...pts.map((p) => p.x)) - pad,
+      maxX: Math.max(...pts.map((p) => p.x)) + pad,
+      minY: Math.min(...pts.map((p) => p.y)) - pad,
+      maxY: Math.max(...pts.map((p) => p.y)) + pad,
+    };
+  }
+
   function fitPocket() {
-    const bounds = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
-      ? LAND_FIT
-      : POCKET_FIT;
+    const bounds = pocketBounds();
     const dpr = devicePixelRatio || 1;
     const cssW = canvas.width / dpr;
     const cssH = canvas.height / dpr;
     const padTop = 96;
     const padBottom = 150;
-    const availW = Math.max(1, cssW - 24);
+    const availW = Math.max(1, cssW - 28);
     const availH = Math.max(1, cssH - padTop - padBottom);
     const bw = Math.max(1, bounds.maxX - bounds.minX);
     const bh = Math.max(1, bounds.maxY - bounds.minY);
     const fit = Math.min(availW / bw, availH / bh);
-    const readable = play.phase === PHASE.COMBAT_MOVE ? 1.12 : 0.92;
-    camera.zoom = Math.max(camera.minZoom, Math.min(2.2, Math.max(readable, fit)));
+    camera.zoom = Math.max(camera.minZoom, Math.min(1.6, fit));
     const visualCenterY = padTop + availH / 2;
     camera.x = (bounds.minX + bounds.maxX) / 2;
     camera.y = (bounds.minY + bounds.maxY) / 2 - (visualCenterY - cssH / 2) / camera.zoom;

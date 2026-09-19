@@ -40,5 +40,6 @@ Cold open already shows the path. Then:
 - `air-land-choice-390.png` — teal Russia + Karelia
 - `air-landed-390.png` — fighter in Russia, Confirm idle
 
-**Vercel:** (pending this revision)
-**PR:** draft into PR68 lineage (do not merge to main)
+**Vercel:** https://tactical-risk20-git-cursor-comba-cfebfb-james-projects-20d8de40.vercel.app/?three=1
+**Deployment:** https://tactical-risk20-em2czwl5r-james-projects-20d8de40.vercel.app/?three=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/74 (draft · PR68 lineage · do not merge to main)
