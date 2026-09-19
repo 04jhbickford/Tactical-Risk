@@ -22,6 +22,34 @@ export function resolveLandingDestination(unit, index = 0, selectedLandings = {}
   return unit.destination || null;
 }
 
+// Overlay / pending dests can use id, type_index, or type. Merge so a
+// 0-remaining counter and Confirm/Done share the same generous keys.
+export function mergeLandingSelections(selectedLandings = {}, pendingUnits = []) {
+  const merged = { ...(selectedLandings || {}) };
+  for (const unit of pendingUnits || []) {
+    if (!unit?.destination) continue;
+    if (unit.id && !merged[unit.id]) merged[unit.id] = unit.destination;
+    if (unit.type && !merged[unit.type]) merged[unit.type] = unit.destination;
+    const typed = unit.id || landingKeyFor(unit, 0);
+    if (typed && !merged[typed]) merged[typed] = unit.destination;
+  }
+  return merged;
+}
+
+// Aircraft with no landing options crash — they do not block Done.
+// A named dest on id / type_index / type / unit.destination counts.
+export function remainingAirLandingsToAssign(airUnitsToLand = [], selectedLandings = {}) {
+  let remaining = 0;
+  for (let index = 0; index < (airUnitsToLand || []).length; index++) {
+    const unit = airUnitsToLand[index];
+    if (!unit) continue;
+    if (Array.isArray(unit.landingOptions) && unit.landingOptions.length === 0) continue;
+    if (resolveLandingDestination(unit, index, selectedLandings)) continue;
+    remaining++;
+  }
+  return remaining;
+}
+
 export function buildLandingPlan(airUnitsToLand = [], selectedLandings = {}) {
   const plan = [];
   airUnitsToLand.forEach((unit, index) => {
@@ -231,15 +259,31 @@ export function applyAirLandingPlan({
 
 export function shouldOfferEndPhaseDuringMove({
   airLandingActive = false,
+  airLandingsRemaining = null,
   movePendingDest = null,
   selectedMoveCount = 0,
   hideMoveConfirm = false,
 } = {}) {
-  if (airLandingActive) return false;
+  // Hide End Phase only while landings are still unnamed. 0 remaining
+  // (TripleA-class "0 / N UNITS REMAINING") must leave Done clickable.
+  if (airLandingActive) {
+    if (airLandingsRemaining == null || Number(airLandingsRemaining) > 0) {
+      return false;
+    }
+  }
   const readyMoveConfirm = !!movePendingDest
     && Number(selectedMoveCount) > 0
     && !hideMoveConfirm;
   return !readyMoveConfirm;
+}
+
+// Combat queue must not grey Done when named landings are ready — clicking
+// Done commits those landings and finalizes the current battle.
+export function shouldDisableEndPhaseForCombat({
+  hasCombatQueue = false,
+  airLandingReady = false,
+} = {}) {
+  return !!hasCombatQueue && !airLandingReady;
 }
 
 export function selectedMoveCount(selected = {}) {

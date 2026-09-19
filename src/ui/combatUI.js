@@ -4,6 +4,7 @@ import { getUnitIconPath } from '../utils/unitIcons.js';
 import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
 import { syncBottomSurfaces } from './bottomSurface.js';
+import { remainingAirLandingsToAssign } from '../state/airLanding.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -2260,13 +2261,9 @@ export class CombatUI {
       `;
     } else if (phase === 'airLanding') {
       const { airUnitsToLand, selectedLandings } = this.combatState;
-      // Use unit ID for individual tracking (allows same type to land at different locations)
-      const allSelected = airUnitsToLand.every(u => {
-        const unitKey = u.id || u.type;
-        return u.landingOptions.length === 0 || selectedLandings[unitKey];
-      });
+      const remaining = remainingAirLandingsToAssign(airUnitsToLand, selectedLandings);
       html += `
-        <button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>
+        <button class="combat-btn confirm" data-action="confirm-landing" ${remaining > 0 ? 'disabled' : ''}>
           Confirm Landings
         </button>
       `;
@@ -2510,11 +2507,8 @@ export class CombatUI {
     }
     if (phase === 'airLanding') {
       const { airUnitsToLand, selectedLandings } = this.combatState;
-      const allSelected = airUnitsToLand.every((u) => {
-        const unitKey = u.id || u.type;
-        return u.landingOptions.length === 0 || selectedLandings[unitKey];
-      });
-      return `<button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>Confirm Landings</button>`;
+      const remaining = remainingAirLandingsToAssign(airUnitsToLand, selectedLandings);
+      return `<button class="combat-btn confirm" data-action="confirm-landing" ${remaining > 0 ? 'disabled' : ''}>Confirm Landings</button>`;
     }
     if (phase === 'resolved') {
       return `<button class="combat-btn next" data-action="next">${this.gameState.combatQueue.length > 1 ? 'Next Battle' : 'End Combat Phase'}</button>`;

@@ -60,10 +60,19 @@ import {
 import { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } from '../state/undoPolicy.js';
 import {
   shouldOfferEndPhaseDuringMove,
+  shouldDisableEndPhaseForCombat,
   selectedMoveCount,
+  remainingAirLandingsToAssign,
+  mergeLandingSelections,
+  resolveLandingDestination,
 } from '../state/airLanding.js';
 
-export { shouldOfferEndPhaseDuringMove, selectedMoveCount };
+export {
+  shouldOfferEndPhaseDuringMove,
+  shouldDisableEndPhaseForCombat,
+  selectedMoveCount,
+  remainingAirLandingsToAssign,
+};
 import {
   capturePanelPointerLock,
   resolveLockedPanelClick,
@@ -872,6 +881,7 @@ export class PlayerPanel {
         if (this.airLandingIndex < this.airLandingData.airUnitsToLand.length - 1) {
           this.airLandingIndex++;
         }
+        this._maybeApplyReadyAirLandings();
         this._scheduleRender();
       }
     }
@@ -1449,6 +1459,74 @@ export class PlayerPanel {
     return this.airLandingData && this.airLandingData.airUnitsToLand?.length > 0;
   }
 
+  _mergedAirLandingSelections() {
+    if (!this.isAirLandingActive()) return { ...(this.airLandingSelections || {}) };
+    const origin = this.airLandingData.combatTerritory;
+    const pending = this.gameState?.getPendingAirLandings?.()
+      ?.find((entry) => entry.originTerritory === origin);
+    return mergeLandingSelections(this.airLandingSelections || {}, pending?.units || []);
+  }
+
+  _airLandingsRemaining() {
+    if (!this.isAirLandingActive()) return 0;
+    return remainingAirLandingsToAssign(
+      this.airLandingData.airUnitsToLand,
+      this._mergedAirLandingSelections()
+    );
+  }
+
+  _maybeApplyReadyAirLandings() {
+    if (!this.isAirLandingActive()) return;
+    if (this._airLandingsRemaining() !== 0) return;
+    // Mid-combat apply can be overwritten by _finalizeCombat. NCM leftover
+    // overlay must move named aircraft as soon as remaining hits 0.
+    if (this.gameState?.turnPhase === TURN_PHASES.NON_COMBAT_MOVE) {
+      this.gameState.applyPendingAirLandings?.({ unitDefs: this.unitDefs || {} });
+    }
+  }
+
+  commitAirLandingsIfReady() {
+    if (!this.isAirLandingActive()) return false;
+    if (this._airLandingsRemaining() > 0) return false;
+    return this._commitNamedAirLandings();
+  }
+
+  _commitNamedAirLandings() {
+    if (!this.isAirLandingActive()) return false;
+    const landings = {};
+    const crashes = [];
+    const merged = this._mergedAirLandingSelections();
+    this.airLandingData.airUnitsToLand.forEach((unit, idx) => {
+      const unitKey = unit.id || `${unit.type}_${idx}`;
+      const dest = resolveLandingDestination(unit, idx, merged);
+      if (dest) {
+        landings[unitKey] = dest;
+        if (unit.id && unit.id !== unitKey) landings[unit.id] = dest;
+        if (unit.type) landings[unit.type] = dest;
+      } else if (!unit.landingOptions || unit.landingOptions.length === 0) {
+        crashes.push({ id: unit.id, type: unit.type, quantity: unit.quantity });
+      }
+    });
+    const payload = {
+      landings,
+      crashes,
+      isRetreating: this.airLandingData.isRetreating,
+      airUnitsToLand: this.airLandingData.airUnitsToLand,
+      combatTerritory: this.airLandingData.combatTerritory,
+    };
+    if (this.onAirLandingComplete) {
+      this.onAirLandingComplete(payload);
+    } else if (this.gameState?.applyAirLandings) {
+      this.gameState.applyAirLandings(this.airLandingData.combatTerritory, {
+        landings,
+        airUnitsToLand: this.airLandingData.airUnitsToLand,
+        unitDefs: this.unitDefs || {},
+      });
+    }
+    this.clearAirLanding();
+    return true;
+  }
+
   getAirLandingDestinations() {
     if (!this.isAirLandingActive()) return [];
     const allDests = new Set();
@@ -1483,6 +1561,7 @@ export class PlayerPanel {
         this.airLandingIndex++;
       }
 
+      this._maybeApplyReadyAirLandings();
             this._scheduleRender();
       return true;
     }
@@ -1670,20 +1749,19 @@ export class PlayerPanel {
     let buttons = [];
     let warningHtml = '';
 
-    // Air landing confirm button
-    if (this.isAirLandingActive()) {
-      const { airUnitsToLand } = this.airLandingData;
-      const allSelected = airUnitsToLand.every((u, idx) => {
-        const unitKey = u.id || `${u.type}_${idx}`;
-        return u.landingOptions?.length === 0 || this.airLandingSelections[unitKey];
-      });
-
+    // Air landing confirm — stays up while dests are unnamed. At 0 remaining
+    // End Phase / Done is the commit+advance path (Robert 19 Sep NCM stuck).
+    const airLandingsRemaining = this._airLandingsRemaining();
+    const airLandingReady = this.isAirLandingActive() && airLandingsRemaining === 0;
+    if (this.isAirLandingActive() && !airLandingReady) {
       buttons.push({
         action: 'confirm-air-landing',
         label: 'Confirm All Landings',
-        disabled: !allSelected,
+        disabled: true,
         primary: true
       });
+    } else if (airLandingReady) {
+      // Named dests are done — End Phase / Done below commits them.
     }
     // Movement confirm — desktop always. Phone Combat / Fortify use the
     // same named Confirm (Move to X / Attack X). Deploy still icon-commits.
@@ -1806,13 +1884,17 @@ export class PlayerPanel {
     });
     const offerEndPhase = shouldOfferEndPhaseDuringMove({
       airLandingActive: this.isAirLandingActive(),
+      airLandingsRemaining,
       movePendingDest: this.movePendingDest,
       selectedMoveCount: selectedMoveCount(this.moveSelectedUnits),
       hideMoveConfirm: phonePairHidesMoveConfirm,
     });
     if (phase === GAME_PHASES.PLAYING && offerEndPhase) {
-      const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
-        this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
+      const hasUnresolvedCombats = shouldDisableEndPhaseForCombat({
+        hasCombatQueue: turnPhase === TURN_PHASES.COMBAT
+          && !!(this.gameState.combatQueue && this.gameState.combatQueue.length > 0),
+        airLandingReady,
+      });
 
       const pendingPurchases = this.gameState.getPendingPurchases?.() || [];
       const unplacedUnits = pendingPurchases.reduce((sum, p) => sum + p.quantity, 0);
@@ -1827,7 +1909,9 @@ export class PlayerPanel {
 
       buttons.push({
         action: 'next-phase',
-        label: `End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →`,
+        label: airLandingReady
+          ? 'Done →'
+          : `End ${TURN_PHASE_NAMES[turnPhase] || 'Phase'} →`,
         disabled: hasUnresolvedCombats || hasUnplacedUnits,
         primary: true
       });
@@ -4192,23 +4276,16 @@ export class PlayerPanel {
     const { airUnitsToLand, combatTerritory, isRetreating } = this.airLandingData;
     const currentUnit = airUnitsToLand[this.airLandingIndex];
 
-    // Check if all units have landing selections
-    const allSelected = airUnitsToLand.every((u, idx) => {
-      const unitKey = u.id || `${u.type}_${idx}`;
-      return u.landingOptions?.length === 0 || this.airLandingSelections[unitKey];
-    });
-
-    // Count selected vs total
-    const totalUnits = airUnitsToLand.length;
-    const selectedCount = Object.keys(this.airLandingSelections).length;
-    const crashedCount = airUnitsToLand.filter(u => !u.landingOptions || u.landingOptions.length === 0).length;
+    const merged = this._mergedAirLandingSelections();
+    const remaining = remainingAirLandingsToAssign(airUnitsToLand, merged);
+    const needAssign = airUnitsToLand.filter((u) => !Array.isArray(u.landingOptions) || u.landingOptions.length > 0).length;
 
     let html = `
       <div class="pp-inline-air-landing">
         <div class="pp-air-landing-header" style="border-left: 4px solid ${player.color}">
           <span class="pp-air-landing-icon">✈️</span>
-          <span class="pp-air-landing-title">${isRetreating ? 'Retreat - ' : ''}Air Unit Landing</span>
-          <span class="pp-air-landing-counter">${selectedCount}/${totalUnits - crashedCount}</span>
+          <span class="pp-air-landing-title">${isRetreating ? 'Retreat - ' : ''}Move Air Units To Landing Zone</span>
+          <span class="pp-air-landing-counter${remaining === 0 ? ' remaining-done' : ''}">${remaining} / ${needAssign} UNITS REMAINING</span>
         </div>
         <div class="pp-air-landing-from">From: <strong>${combatTerritory}</strong></div>
         <div class="pp-air-landing-hint">Click unit to select, then click map to assign landing</div>
@@ -4219,7 +4296,7 @@ export class PlayerPanel {
     for (let i = 0; i < airUnitsToLand.length; i++) {
       const unit = airUnitsToLand[i];
       const unitKey = unit.id || `${unit.type}_${i}`;
-      const selectedLanding = this.airLandingSelections[unitKey];
+      const selectedLanding = resolveLandingDestination(unit, i, merged);
       const isCurrent = i === this.airLandingIndex && !selectedLanding;
       const hasNoOptions = !unit.landingOptions || unit.landingOptions.length === 0;
       const imageSrc = getUnitIconPath(unit.type, player.id);
@@ -4248,7 +4325,7 @@ export class PlayerPanel {
     html += `</div>`;
 
     // Current unit landing options (dropdown as backup)
-    if (currentUnit && currentUnit.landingOptions?.length > 0 && !this.airLandingSelections[currentUnit.id || `${currentUnit.type}_${this.airLandingIndex}`]) {
+    if (currentUnit && currentUnit.landingOptions?.length > 0 && !resolveLandingDestination(currentUnit, this.airLandingIndex, merged)) {
       html += `
         <div class="pp-air-landing-dest">
           <span class="pp-air-landing-label">Land at:</span>
@@ -4262,7 +4339,7 @@ export class PlayerPanel {
     }
 
     // Check if any selections have been made (for undo button)
-    const hasSelections = Object.keys(this.airLandingSelections).length > 0;
+    const hasSelections = remaining < needAssign || Object.keys(this.airLandingSelections).length > 0;
 
     // Action buttons - Confirm button is in bottom actions bar
     if (hasSelections) {
@@ -5004,42 +5081,21 @@ export class PlayerPanel {
 
         // Handle confirm air landing
         if (action === 'confirm-air-landing') {
-          if (this.isAirLandingActive()) {
-            // Build the landings map
-            const landings = {};
-            const crashes = [];
-            const pendingGroup = this.gameState?.getPendingAirLandings?.()
-              ?.find((entry) => entry.originTerritory === this.airLandingData.combatTerritory);
-            this.airLandingData.airUnitsToLand.forEach((unit, idx) => {
-              const unitKey = unit.id || `${unit.type}_${idx}`;
-              const pendingDest = pendingGroup?.units?.find((u) => (u.id || u.type) === unitKey)?.destination;
-              const dest = this.airLandingSelections[unitKey] || pendingDest;
-              if (dest) {
-                landings[unitKey] = dest;
-              } else if (!unit.landingOptions || unit.landingOptions.length === 0) {
-                // Unit will crash
-                crashes.push({ id: unit.id, type: unit.type, quantity: unit.quantity });
-              }
-            });
-            // Pass result in expected format for combatUI.handleAirLandingComplete
-            const payload = {
-              landings,
-              crashes,
-              isRetreating: this.airLandingData.isRetreating,
-              airUnitsToLand: this.airLandingData.airUnitsToLand,
-              combatTerritory: this.airLandingData.combatTerritory,
-            };
-            if (this.onAirLandingComplete) {
-              this.onAirLandingComplete(payload);
-            } else if (this.gameState?.applyAirLandings) {
-              this.gameState.applyAirLandings(this.airLandingData.combatTerritory, {
-                landings,
-                airUnitsToLand: this.airLandingData.airUnitsToLand,
-                unitDefs: this.unitDefs || {},
-              });
-            }
-            this.clearAirLanding();
+          if (this.isAirLandingActive() && this._airLandingsRemaining() === 0) {
+            this._commitNamedAirLandings();
           }
+          return;
+        }
+
+        if (action === 'next-phase') {
+          this.commitAirLandingsIfReady();
+          const stillCombat = this.gameState?.turnPhase === TURN_PHASES.COMBAT
+            && (this.gameState?.combatQueue?.length || 0) > 0;
+          if (stillCombat) {
+            this._scheduleRender();
+            return;
+          }
+          if (this.onAction) this.onAction('next-phase', {});
           return;
         }
 

@@ -1,5 +1,6 @@
-// V2.81.52: post-combat air landings persist; NCM Done stays clickable
-// after a legal transport move. Run: node tools/test-air-landing-ncm.mjs
+// V2.81.53: post-combat air landings persist; NCM Done stays clickable
+// at 0 remaining (overlay leftover + transport move).
+// Run: node tools/test-air-landing-ncm.mjs
 
 import { pathToFileURL } from 'url';
 import { dirname, join } from 'path';
@@ -22,7 +23,10 @@ const {
   applyAirLandingPlan,
   buildLandingPlan,
   resolveLandingDestination,
+  remainingAirLandingsToAssign,
+  mergeLandingSelections,
   shouldOfferEndPhaseDuringMove,
+  shouldDisableEndPhaseForCombat,
   selectedMoveCount,
   upsertPendingAirLanding,
 } = await import(pathToFileURL(join(root, 'src/state/airLanding.js')));
@@ -75,7 +79,7 @@ function makePlayingState() {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.52', GAME_VERSION === 'V2.81.52');
+check('GAME_VERSION is V2.81.53', GAME_VERSION === 'V2.81.53');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== landing key resolve (id / type_index / type) ===');
@@ -209,6 +213,50 @@ console.log('=== nextPhase COMBAT → NCM applies named landings ===');
     && (gs.units['Eastern United States'] || []).some((u) => u.type === 'fighter' && u.moved));
 }
 
+console.log('=== remaining count + Done at 0 remaining ===');
+{
+  const twoFighters = [
+    { id: 'fighter_0', type: 'fighter', quantity: 1, landingOptions: [{ territory: 'Eastern United States' }] },
+    { id: 'fighter_1', type: 'fighter', quantity: 1, landingOptions: [{ territory: 'Eastern United States' }] },
+  ];
+  check('2 remaining when nothing named',
+    remainingAirLandingsToAssign(twoFighters, {}) === 2);
+  check('type key counts for both aircraft (generous)',
+    remainingAirLandingsToAssign(twoFighters, { fighter: 'Eastern United States' }) === 0);
+  check('pending dests merge into remaining',
+    remainingAirLandingsToAssign(
+      twoFighters,
+      mergeLandingSelections({}, [
+        { id: 'fighter_0', type: 'fighter', destination: 'Eastern United States' },
+        { id: 'fighter_1', type: 'fighter', destination: 'Eastern United States' },
+      ])
+    ) === 0);
+  check('no-option aircraft do not block remaining',
+    remainingAirLandingsToAssign(
+      [{ type: 'fighter', landingOptions: [] }],
+      {}
+    ) === 0);
+  check('overlay + unnamed dests hide End Phase',
+    shouldOfferEndPhaseDuringMove({
+      airLandingActive: true,
+      airLandingsRemaining: 2,
+      selectedMoveCount: 0,
+    }) === false);
+  check('overlay omitted remaining still hides End Phase',
+    shouldOfferEndPhaseDuringMove({ airLandingActive: true, selectedMoveCount: 0 }) === false);
+  check('0 / 2 remaining overlay still offers Done',
+    shouldOfferEndPhaseDuringMove({
+      airLandingActive: true,
+      airLandingsRemaining: 0,
+      movePendingDest: 'Inland Sea',
+      selectedMoveCount: 0,
+    }) === true);
+  check('combat queue does not grey Done when landings are ready',
+    shouldDisableEndPhaseForCombat({ hasCombatQueue: true, airLandingReady: true }) === false);
+  check('combat queue greys Done while landings remain',
+    shouldDisableEndPhaseForCombat({ hasCombatQueue: true, airLandingReady: false }) === true);
+}
+
 console.log('=== NCM Done is not stolen by a ghost destination ===');
 {
   check('no dest → offer End Phase',
@@ -223,14 +271,39 @@ console.log('=== NCM Done is not stolen by a ghost destination ===');
       movePendingDest: 'Inland Sea',
       selectedMoveCount: 1,
     }) === false);
-  check('air landing UI owns the bar',
-    shouldOfferEndPhaseDuringMove({ airLandingActive: true, selectedMoveCount: 0 }) === false);
   check('selectedMoveCount reads ship keys',
     selectedMoveCount({ 'ship:t1': 1, transport: 0 }) === 1);
   check('upsert keeps one row per aircraft',
     upsertPendingAirLanding([], {
       originTerritory: 'West Indies', id: 'fighter_0', type: 'fighter',
     }).length === 1);
+}
+
+console.log('=== nextPhase from NCM applies leftover named landings ===');
+{
+  const gs = makePlayingState();
+  gs.turnPhase = TURN_PHASES.NON_COMBAT_MOVE;
+  gs.combatQueue = [];
+  gs.pendingPurchases = [{ type: 'infantry', quantity: 1, owner: 'usa', cost: 3 }];
+  gs.recordAirLandingSelection({
+    originTerritory: 'West Indies',
+    id: 'fighter_0',
+    type: 'fighter',
+    destination: 'Eastern United States',
+    notify: false,
+  });
+  gs.recordAirLandingSelection({
+    originTerritory: 'West Indies',
+    id: 'fighter_1',
+    type: 'fighter',
+    destination: 'Eastern United States',
+    notify: false,
+  });
+  gs.nextPhase();
+  check('advanced to mobilize', gs.turnPhase === TURN_PHASES.MOBILIZE);
+  check('NCM Done landed leftover aircraft',
+    !(gs.units['West Indies'] || []).some((u) => u.type === 'fighter')
+    && (gs.units['Eastern United States'] || []).some((u) => u.type === 'fighter' && u.moved));
 }
 
 if (failures > 0) {

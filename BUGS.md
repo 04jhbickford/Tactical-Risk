@@ -2,6 +2,39 @@
 
 ---
 
+## 9.19.26 — V2.81.53 NCM Done at 0 air remaining (SCHEMA 11)
+
+Follow-up to V2.81.52 (same Robert Watts + Benson thread, desktop
+screenshot). Sidebar showed TripleA-class "Move Air Units To Landing
+Zone" and green "0 / 2 UNITS REMAINING"; fighters sat on Eastern US;
+transport was in Inland Sea; Done still would not click.
+
+Cause: End Phase hid for the entire air-landing overlay
+(`airLandingActive` → no Done), and Confirm used a single unit-key
+shape so a complete-looking remaining counter could still leave Confirm
+disabled. Combat-queue also greyed End Phase after landings were named.
+`applyPendingAirLandings` ran only on COMBAT→NCM, so a leftover NCM
+overlay never committed on Done.
+
+Fix: remaining count uses id / type_index / type / pending dests.
+End Phase / Done is offered and enabled at 0 remaining (combat queue
+does not grey it). Next Phase commits named landings, then advances
+once the current battle is finalized. Any phase advance applies leftover
+pending dests. SCHEMA 11. GAME_VERSION V2.81.53.
+No Three.js. Do not merge without James.
+
+### Smoke (this PR)
+
+- [ ] After combat, pick Eastern US for each AF. Units land there.
+      Confirm / Done is enabled at 0 / N remaining.
+- [ ] NCM leftover overlay at 0 remaining: Done is clickable (not grey),
+      completes NCM even after a transport moved to Inland Sea / SZ1.
+- [ ] Leftover dest with 0 staged units still does not steal Done.
+- [ ] Combat / Fortify Confirm (dest + units) still hides End Phase
+      until the move commits.
+
+---
+
 ## 9.19.26 — V2.81.52 post-combat air landing + NCM Done (SCHEMA 11)
 
 Robert Watts + Sean Benson (iMessage 19 Sep ~9:44am PT), live main

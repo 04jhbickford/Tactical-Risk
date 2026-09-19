@@ -2243,6 +2243,10 @@ export class GameState {
 
     let currentIndex = TURN_PHASE_ORDER.indexOf(this.turnPhase);
 
+    // Fail-closed: named post-combat landings apply on any advance
+    // (COMBAT→NCM and leftover NCM overlay → mobilize).
+    this.applyPendingAirLandings({ notify: false });
+
     while (currentIndex < TURN_PHASE_ORDER.length - 1) {
       currentIndex++;
       const nextPhase = TURN_PHASE_ORDER[currentIndex];
@@ -2261,8 +2265,6 @@ export class GameState {
           console.warn('Cannot advance to non-combat move: unresolved combats remain');
           return; // Don't advance, stay in current phase
         }
-        // Fail-closed: any post-combat landing the player already named
-        // must be on the board before NCM starts (Robert 19 Sep).
         this.applyPendingAirLandings({ notify: false });
       } else if (nextPhase === TURN_PHASES.MOBILIZE) {
         // Check if there are any pending purchases to place
