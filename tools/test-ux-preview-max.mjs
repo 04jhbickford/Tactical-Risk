@@ -19,6 +19,7 @@ import {
   driveAirChoice,
   lossesReady,
   pickLoss,
+  adjustLoss,
   stackQty,
 } from '../src/map/uxPreviewScenario.js';
 import { isMaxBattleRequested } from '../src/map/uxPreviewFlag.js';
@@ -89,6 +90,17 @@ pickLoss(mid, 'att', 'artillery');
 assert(mid.battle.pendingAtt.artillery === 1, 're-tap ART stays selected');
 assert(confirmEnabled(mid) === true, 're-tap does not soft-lock');
 assert(battleCard(mid).pickers.find((p) => p.side === 'def')?.readOnly === true, 'THEY is read-only in solo');
+
+const stepped = createScenario({ max: true });
+driveBattleMid(stepped);
+adjustLoss(stepped, 'att', 'artillery', 1);
+assert(stepped.battle.pendingAtt.artillery === 1, 'stepper + ART');
+assert(confirmEnabled(stepped) === true, 'stepper + enables Confirm');
+adjustLoss(stepped, 'att', 'artillery', 1);
+assert(stepped.battle.pendingAtt.artillery === 1, 'need 1 stays 1');
+adjustLoss(stepped, 'def', 'infantry', 1);
+assert(stepped.battle.pendingDef.infantry === 2, 'THEY stepper is no-op');
+assert(battleCard(stepped).pickers.find((p) => p.side === 'att')?.units?.length >= 4, 'YOU has type rows');
 
 const air = createScenario({ max: true });
 driveAirChoice(air);

@@ -501,6 +501,34 @@ export function pickLoss(state, side, type) {
   return state;
 }
 
+export function adjustLoss(state, side, type, delta = 1) {
+  const battle = state?.battle;
+  if (!battle || battle.step !== BATTLE_STEP.COMBAT_RESULT) return state;
+  if (side === 'def') return state;
+  const dest = state.placements[state.dest] || [];
+  const menu = lossMenu(dest, 'Russians', battle.defenseHits);
+  if (menu.forced || menu.need <= 0) return state;
+  const have = stackQty(dest, type, 'Russians');
+  if (have <= 0) return state;
+  const step = Number(delta);
+  if (!Number.isFinite(step) || step === 0) return state;
+  const cur = { ...(battle.pendingAtt || {}) };
+  const thisN = Number(cur[type]) || 0;
+  if (menu.need === 1) {
+    if (step > 0) battle.pendingAtt = { [type]: 1 };
+    else if (thisN > 0) battle.pendingAtt = {};
+    return state;
+  }
+  const used = assignedCount(cur);
+  if (step > 0 && thisN < have && used < menu.need) cur[type] = thisN + 1;
+  else if (step < 0 && thisN > 0) {
+    cur[type] = thisN - 1;
+    if (cur[type] <= 0) delete cur[type];
+  }
+  battle.pendingAtt = cur;
+  return state;
+}
+
 export function confirmEnabled(state) {
   if (!state) return false;
   if (state.phase === PHASE.COMBAT_MOVE) {

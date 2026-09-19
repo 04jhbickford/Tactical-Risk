@@ -51,6 +51,7 @@ import {
   inspectPlay,
   dismissGuide,
   pickLoss,
+  adjustLoss,
   LABEL_LANDS,
   driveCombatMove,
   driveBattleMid,
@@ -274,6 +275,11 @@ export async function bootUxPreview() {
   };
   chrome.onLossPick = (side, type) => {
     pickLoss(play, side, type);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onLossStep = (side, type, delta) => {
+    adjustLoss(play, side, type, delta);
     paintChrome();
     camera.dirty = true;
   };

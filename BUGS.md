@@ -2,6 +2,16 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.10 battle sheet fit + steppers
+
+James ROUND 2 still: THEY TAKE 2 clipped under Assign casualties.
+Battle sheet now pins YOU + THEY + Confirm below a scrollable IA
+body (100svh − L0 − safe-area). Casualty rows use the same icon +
++/− steppers as combat-move. THEY stays read-only cheapest but fully
+visible. Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.9 P0.2 YOU-confirm
 
 Viz FAIL on tip .8: ART−1 selected but Confirm stayed Assign/disabled.
