@@ -304,7 +304,7 @@ export async function bootThreeMapSpike() {
   const wrapGroups = createWrapGroups(board);
 
   // P38 HARD: land ink same weight family as sea-zone closed rings.
-  const landBorderMat = makeLineMat(PALETTE.border, 2.6, 0.86);
+  const landBorderMat = makeLineMat(PALETTE.border, 2.7, 0.87);
   const foamMat = makeLineMat(PALETTE.foam, 1.15, 0.62);
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
@@ -1433,6 +1433,7 @@ export async function bootThreeMapSpike() {
         opaquePlastic: true,
         coastalGreens: true,
         landSeaBorderFamily: true,
+        playbookFolded: true,
       };
     },
   };

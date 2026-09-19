@@ -24,10 +24,17 @@ tan interiors, hand-inked coasts + peak hatching, pale washed seas.
 8. Units — opaque solid plastic at near zoom. Tan faction rim/shadow vs parchment.
 
 ## Craft law (PLAYBOOK)
-A) Painterly Imhof — NW light, multi-hue soft shadows, large forms only.
-B) Risk continent multiply ≤~22% feathered; parchment tooth survives.
-C) Land + sea ink same dark weight; closed rings only; no ocean stipple.
-D) Opaque molded plastic + contact shadow + ≥2px dark outline; tan punches off parchment.
+Full text: `briefs/2026-09-18-three-p38-board-polish/PLAYBOOK.md`
+
+1. Painterly Imhof in albedo — NW light, multi-hue shadows by biome
+   (brown / India-red / cool grey), aerial perspective, large forms only.
+2. Root/Oath: ink first, wash second. Residual stain tiny/off.
+3. Civ/Polytopia: steal mid-zoom ridge silhouette only — not candy palette.
+4. Risk multiply ≤~22% feathered 8–20px (AA-RISK-HOMAGE / AA-PALETTE).
+5. Sea = parchment wash + pale coastal blue; no decorative stipple.
+6. Land + sea-zone ink same dark weight/clarity.
+7. Opaque molded plastic + contact shadow + ≥2px outline; tan punches.
+8. Composite A albedo → B multiply → C ink → D minis.
 
 Root/Oath: ink structure first, soft wash second.
 

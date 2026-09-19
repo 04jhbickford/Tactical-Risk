@@ -235,6 +235,21 @@ def grade_chroma(img: Image.Image, mask: Image.Image, rgb, amount=0.18) -> Image
     return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
 
 
+def multiply_continent(img: Image.Image, mask: Image.Image, rgb, amount=0.20, feather=12) -> Image.Image:
+    """PLAYBOOK B: Risk multiply ≤~22%, feathered 8–20px so parchment tooth survives."""
+    try:
+        import numpy as np
+    except ImportError:
+        return print_continent(img, mask, rgb, strength=amount)
+    m = mask.filter(ImageFilter.GaussianBlur(max(8, min(20, feather))))
+    arr = np.asarray(img, dtype=np.float32)
+    a = (np.asarray(m, dtype=np.float32) / 255.0) * amount
+    wash = np.array(rgb, dtype=np.float32)
+    mult = arr * (wash / 255.0)
+    out = arr * (1.0 - a[..., None]) + mult * a[..., None]
+    return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+
+
 def imhof_height(w: int, h: int) -> Image.Image:
     """Dominant ranges only — Alps / Himalayas / Rockies / Andes / Urals."""
     try:
@@ -317,10 +332,18 @@ def apply_imhof(img: Image.Image, land: Image.Image, height: Image.Image, streng
     return Image.composite(lit, img, a)
 
 
-def apply_imhof_painterly(img: Image.Image, land: Image.Image, height: Image.Image, strength=0.26) -> Image.Image:
-    """Craft law A: painterly Imhof. NW light, multi-hue soft shadows, large forms only.
+def apply_imhof_painterly(
+    img: Image.Image,
+    land: Image.Image,
+    height: Image.Image,
+    strength=0.34,
+    cool_map: Image.Image | None = None,
+) -> Image.Image:
+    """PLAYBOOK A: painterly Imhof. NW light, multi-hue shadows, large forms only.
 
-    Warm ochre on lit slopes, cool violet-brown in shade. Not grey GIS hillshade.
+    Warm ochre on lit slopes. Shadows: brown / India-red / cool grey by biome.
+    Aerial perspective: distant (low) ridges softer. Valley contact AO.
+    Not grey GIS hillshade.
     """
     try:
         import numpy as np
@@ -328,24 +351,51 @@ def apply_imhof_painterly(img: Image.Image, land: Image.Image, height: Image.Ima
         return apply_imhof(img, land, height, strength)
     large = height.filter(ImageFilter.GaussianBlur(6))
     shade = imhof_hillshade(large, azimuth=315.0, altitude=38.0)
+    # Aerial perspective — peaks stay crisp; low/distant forms go soft.
+    soft = shade.filter(ImageFilter.GaussianBlur(14))
+    z = np.asarray(height, dtype=np.float32) / 255.0
+    mix = np.clip(z * z * 1.15, 0, 1)
+    s_sharp = np.asarray(shade, dtype=np.float32) / 255.0
+    s_soft = np.asarray(soft, dtype=np.float32) / 255.0
+    s = s_sharp * mix + s_soft * (1.0 - mix)
     arr = np.asarray(img, dtype=np.float32)
-    s = np.asarray(shade, dtype=np.float32) / 255.0
     m = (np.asarray(land) > 8).astype(np.float32)
     hi = np.clip((s - 0.56) / 0.44, 0, 1) * m
     lo = np.clip((0.46 - s) / 0.46, 0, 1) * m
     warm = np.array([252.0, 226.0, 168.0], dtype=np.float32)
-    cool = np.array([86.0, 72.0, 78.0], dtype=np.float32)
+    if cool_map is not None:
+        cool = np.asarray(cool_map, dtype=np.float32)
+    else:
+        cool = np.array([86.0, 72.0, 78.0], dtype=np.float32)
     arr = arr * (1.0 - hi[..., None] * strength * 0.42) + warm * (hi[..., None] * strength * 0.42)
     arr = arr * (1.0 - lo[..., None] * strength * 0.50) + cool * (lo[..., None] * strength * 0.50)
+    # Soft contact AO in valleys (blurred height sits above the floor).
+    blur_z = np.asarray(height.filter(ImageFilter.GaussianBlur(16)), dtype=np.float32) / 255.0
+    valley = np.clip((blur_z - z) * 3.2, 0, 1) * m
+    ao = np.array([72.0, 58.0, 46.0], dtype=np.float32)
+    arr = arr * (1.0 - valley[..., None] * 0.14) + ao * (valley[..., None] * 0.14)
     return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
-def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w: int, h: int) -> Image.Image:
+def biome_cool_map(lands, w: int, h: int) -> Image.Image:
+    """Imhof shadow hues by biome — brown / India-red / cool grey. Not one grey."""
+    cool = Image.new('RGB', (w, h), (86, 72, 78))
+    snow = land_mask(lands, w, h, biomes={'snow'})
+    arid = land_mask(lands, w, h, biomes={'arid'})
+    forest = land_mask(lands, w, h, biomes={'forest', 'jungle', 'lush'})
+    cool.paste((78, 82, 88), (0, 0), snow)       # cool grey
+    cool.paste((118, 62, 48), (0, 0), arid)      # India-red
+    cool.paste((78, 62, 46), (0, 0), forest)     # brown
+    return cool.filter(ImageFilter.GaussianBlur(6))
+
+
+def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w: int, h: int, lands=None) -> Image.Image:
     """Board-game Imhof: inked ridge crests + slope hachures + soft AO.
 
     Not GIS DEM. Not flat brown stamps. NW oblique light; steeper = darker.
     """
-    img = apply_imhof_painterly(img, land, height, strength=0.34)
+    cool = biome_cool_map(lands, w, h) if lands is not None else None
+    img = apply_imhof_painterly(img, land, height, strength=0.34, cool_map=cool)
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     try:
@@ -815,19 +865,18 @@ def build_atlas(lands) -> Image.Image:
         w, h, alpha=0.84, blur=48,
     )
 
-    # P38: Risk-readable continent washes ≤22% multiply. STYLE REF stays hero.
+    # PLAYBOOK Layer A: vegetation + painterly Imhof ink (structure first).
+    img = apply_coastal_greens(img, lands, w, h)
+    height = imhof_height(w, h)
+    img = draw_imhof_peaks(img, mask_all, height, w, h, lands)
+    img = draw_coast(img, mask_all, w, h)
+
+    # PLAYBOOK Layer B: Risk multiply ≤22%, feathered 8–20px. Wash second.
     for key, rgb in CONT_HEX.items():
         cm = land_mask(lands, w, h, continents={key})
-        img = grade_chroma(img, cm, rgb, amount=0.18)
+        img = multiply_continent(img, cm, rgb, amount=0.20, feather=12)
     ussr = land_mask(lands, w, h, names=USSR_LANDS)
-    img = grade_chroma(img, ussr, USSR_HEX, amount=0.16)
-
-    img = apply_coastal_greens(img, lands, w, h)
-
-    height = imhof_height(w, h)
-    # P38: Imhof inked peaks + hatch/soft AO. Not GIS DEM. Not brown stamps.
-    img = draw_imhof_peaks(img, mask_all, height, w, h)
-    img = draw_coast(img, mask_all, w, h)
+    img = multiply_continent(img, ussr, USSR_HEX, amount=0.16, feather=12)
     img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.14)
     img = kill_blotches(img, mask_all, 72)
 

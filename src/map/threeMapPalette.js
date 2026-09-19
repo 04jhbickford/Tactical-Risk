@@ -551,9 +551,10 @@ export function makeOceanMaterial() {
 
 export function makeSeaWaterMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0xc8c4b4,
+    // PLAYBOOK C: pale washed blue near coasts, fading into parchment.
+    color: 0xb4c6c2,
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.12,
     roughness: 0.88,
     metalness: 0.0,
     depthWrite: false,
@@ -596,11 +597,10 @@ export function makeOceanMesh(width, height) {
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // P38 craft C: STYLE REF washed parchment-sea. Pale cream, not grey-teal.
-    // Keep sea lighter than land interiors so Med cannot read as a land plate.
-    colors[i * 3] = shade * 1.04;
-    colors[i * 3 + 1] = shade * 1.01;
-    colors[i * 3 + 2] = shade * 0.94;
+    // PLAYBOOK C: pale washed blue near coasts (low t) fading to parchment (open).
+    colors[i * 3] = shade * (0.96 + t * 0.08);
+    colors[i * 3 + 1] = shade * (1.00 + t * 0.01);
+    colors[i * 3 + 2] = shade * (1.04 - t * 0.10);
   }
   if (uv) {
     uv.needsUpdate = true;

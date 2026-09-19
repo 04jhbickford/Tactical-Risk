@@ -792,7 +792,7 @@ check('p38 sea lanes killed (no decorative stipple)',
   && /addSeaLaneLines[\s\S]*return 0/.test(art));
 check('p38 land borders match sea-zone weight family',
   /land ink same weight family/.test(spike)
-  && /makeLineMat\(PALETTE\.border, 2\.6, 0\.86\)/.test(spike)
+  && /makeLineMat\(PALETTE\.border, 2\.7, 0\.87\)/.test(spike)
   && /landSeaBorderFamily: true/.test(spike));
 check('p38 slivers healed via outer-union + normal offset',
   /healLandRings/.test(outlineSrc)
@@ -809,9 +809,13 @@ check('p38 baker: coastal greens + Imhof hatch + continent ≤22%',
   /apply_coastal_greens/.test(albedoBaker)
   && /draw_imhof_peaks/.test(albedoBaker)
   && /apply_imhof_painterly/.test(albedoBaker)
-  && /amount=0\.18/.test(albedoBaker)
+  && /multiply_continent/.test(albedoBaker)
+  && /amount=0\.20/.test(albedoBaker)
   && /USSR_HEX/.test(albedoBaker)
-  && /COAST_GREEN/.test(albedoBaker));
+  && /COAST_GREEN/.test(albedoBaker)
+  && /biome_cool_map/.test(albedoBaker));
+check('p38 PLAYBOOK on disk',
+  existsSync(join(root, 'briefs/2026-09-18-three-p38-board-polish/PLAYBOOK.md')));
 check('p38 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md')));
 check('p38 required stills',
   pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/mid-vs-style-ref.png')

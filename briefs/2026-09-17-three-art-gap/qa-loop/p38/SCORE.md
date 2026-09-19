@@ -3,7 +3,9 @@
 **Lineage:** PR63 stacked on PR62 `.37b`. Tesla off. Quiet James.
 **STYLE LOCK:** Oceania watercolor parchment (James attached).
 **Albedo rev:** `p38`.
-**Craft law:** A painterly Imhof · B Risk ≤22% · C ink+parchment-sea · D opaque plastic.
+**Craft law:** PLAYBOOK `briefs/2026-09-18-three-p38-board-polish/PLAYBOOK.md` folded.
+A painterly Imhof (biome hues + aerial + valley AO) · B Risk multiply ≤22% feathered · C ink+parchment-sea · D opaque plastic.
+Ink first, wash second. `playbookFolded: true`.
 
 Local 390 stills in this folder. Fail-closed: mid is STYLE REF family
 (watercolor on aged parchment — sage coasts, tan interiors, peak hatching,
@@ -13,11 +15,11 @@ Peek/HUD shows one troop number. Near units opaque plastic.
 
 ## How style was matched
 1. **Hold plates** — `.37b` STYLE REF watercolor plates stay the hero.
-2. **Bake** — `tools/bake-world-land-albedo.py` adds coastal/lowland sage
-   under parchment, Imhof painterly relief (NW light, multi-hue soft
-   shadows, large forms + quiet hatch; Great Dividing Range), Risk
-   continent washes ≤22% multiply (AA-PALETTE / AA-RISK-HOMAGE), destippled
-   parchment-sea tile + faint hand ripples. Mask-only joins held. Cape L-band held.
+2. **Bake** — Layer A: coastal/lowland sage + Imhof painterly relief
+   (NW light, biome multi-hue shadows, aerial perspective, valley AO,
+   large forms + quiet hatch; GDR). Layer B: Risk **multiply** ≤22%
+   feathered 8–20px (AA-PALETTE / AA-RISK-HOMAGE). Destippled parchment-sea
+   + pale coastal blue + hand ripples. Cape L-band held.
 3. **War overlay** — sea-lane dashes killed. Land ink 2.6/0.86 matches sea
    rings 2.8/0.88. `healLandRings` + outward-normal offset (no centroid
    inflate slivers). Peek icons bake no leading `1`. Sculpt holes sealed;
