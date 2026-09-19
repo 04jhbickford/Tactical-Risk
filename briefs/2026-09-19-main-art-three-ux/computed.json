@@ -17,5 +17,6 @@
   "confirmIdle": "Select a territory",
   "phaseChip": "rgba(30, 36, 32, 0.42)",
   "lodMid390": "mid",
-  "japanCrowded": "pip"
+  "japanCrowded": "cluster INF/TNK/+6 at near; pip at mid",
+  "vercel": "https://tactical-risk20-git-cursor-hybri-9ce811-james-projects-20d8de40.vercel.app/?three=1"
 }
