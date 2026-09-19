@@ -20,3 +20,5 @@ Solo/local: only YOU chips are buttons. THEY is a read-only cheapest summary. Re
 https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1
 
 **Version:** V2.81.53-ux-preview.9
+
+Still @390: `../preview9-you-art-confirm-gold-390.png` — YOU ART−1 + gold Confirm: Take hits.
