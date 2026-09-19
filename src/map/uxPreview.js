@@ -376,6 +376,10 @@ export async function bootUxPreview() {
     inspect,
     layoutAt,
     selectLand: (name) => {
+      if (!name) {
+        selectLand(null);
+        return null;
+      }
       const t = territories.find((x) => x.name === name);
       if (t) selectLand(t);
       return t?.name || null;

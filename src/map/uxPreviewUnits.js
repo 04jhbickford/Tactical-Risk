@@ -74,6 +74,11 @@ function polygonCentroid(poly) {
   return { cx: Math.abs(cx * factor), cy: Math.abs(cy * factor), area };
 }
 
+// Preview-only sea pins so water stacks sit in the soup, not on the island.
+const PREVIEW_SEA_CENTERS = {
+  'Japan Sea Zone': { x: 2684, y: 760 },
+};
+
 export function territoryCenter(territory) {
   if (territory?.name === 'Japan' && !territory.isWater) {
     return { x: JAPAN_HOME_CENTER.x, y: JAPAN_HOME_CENTER.y };
@@ -84,6 +89,8 @@ export function territoryCenter(territory) {
     return c ? { x: c[0], y: c[1] } : null;
   }
   if (territory.isWater) {
+    const previewSea = PREVIEW_SEA_CENTERS[territory.name];
+    if (previewSea) return { x: previewSea.x, y: previewSea.y };
     const manual = UnitRenderer.SEA_ZONE_CENTERS?.[territory.name];
     if (manual) return { x: manual.x, y: manual.y };
     let best = null;
