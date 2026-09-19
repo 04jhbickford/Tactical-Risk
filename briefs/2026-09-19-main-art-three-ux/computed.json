@@ -23,9 +23,11 @@
   "vizP1Coach": false,
   "guideOn": true,
   "guideBlocksBoard": false,
+  "vercel": "https://tactical-risk20-git-cursor-hybri-e0b48e-james-projects-20d8de40.vercel.app/?three=1",
   "stills": [
     "combat-move-cold-390.png",
     "combat-move-units-dest-390.png",
-    "casualty-choice-390.png"
+    "casualty-choice-390.png",
+    "ukraine-dest-390.png"
   ]
 }

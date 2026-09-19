@@ -42,3 +42,7 @@ Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** (INF×2 
 - `combat-move-cold-390.png` — labels + origin pulse, no Try
 - `combat-move-units-dest-390.png` — origin → units → dest, Confirm gold
 - `casualty-choice-390.png` — Choose which unit dies sheet
+- `ukraine-dest-390.png` — Karelia staged, Attack Ukraine enabled
+
+**Vercel:** https://tactical-risk20-git-cursor-hybri-e0b48e-james-projects-20d8de40.vercel.app/?three=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/75 (draft · PR68 lineage · do not merge to main)
