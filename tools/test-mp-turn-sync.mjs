@@ -166,7 +166,7 @@ function makePlacementTable({
 
 console.log('=== V2.72 version + leftover-unit pass predicate ===');
 {
-  check('GAME_VERSION is V2.81.53', GAME_VERSION === 'V2.81.53');
+  check('GAME_VERSION is V2.81.54', GAME_VERSION === 'V2.81.54');
   check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
   check('round cap allows Done with leftovers still in the pool',
     canFinishPlacementRound({
@@ -673,6 +673,32 @@ console.log('=== V2.75: seated local human counts as present for AI ===');
       [{ oderId: james, isAI: false, surrendered: true }],
       james,
     ) === false);
+}
+
+console.log('=== V2.81.54 combatTelemetry persists on the game doc ===');
+{
+  const gs = new GameState({ risk: { factions: [] } }, [], []);
+  gs.round = 3;
+  gs.recordCombatTelemetry({
+    kind: 'aa',
+    territory: 'Western Europe',
+    hits: 2,
+    rolls: [1, 1, 5],
+    attackForce: [{ type: 'fighter', quantity: 3 }],
+    defenseForce: [{ type: 'aaGun', quantity: 1 }],
+    survivors: [{ type: 'fighter', quantity: 1 }],
+    wiped: false,
+  });
+  const json = gs.toJSON();
+  check('toJSON includes combatTelemetry (additive SCHEMA 11)',
+    Array.isArray(json.combatTelemetry) && json.combatTelemetry.length === 1
+    && json.combatTelemetry[0].kind === 'aa'
+    && json.combatTelemetry[0].rolls.join(',') === '1,1,5');
+  const loaded = new GameState({ risk: { factions: [] } }, [], []);
+  loaded.loadFromJSON({ ...json, version: 11, players: [], territoryState: {}, units: {}, playerState: {} });
+  check('loadFromJSON restores combatTelemetry for boysenberry-style dumps',
+    loaded.getCombatTelemetry()[0]?.hits === 2
+    && loaded.getCombatTelemetry()[0]?.territory === 'Western Europe');
 }
 
 console.log(failures === 0 ? '\nALL MP TURN-SYNC CHECKS PASS' : `\n${failures} FAILURES`);

@@ -140,6 +140,50 @@ chits / continent washes + the Three preview HUD. Keep off main.
 
 `?three=1` or `?ux=1` boots Canvas `MapRenderer` + Three L0/L1/L2 chrome.
 No Imagine world plate. Live `/` unchanged. Do not merge.
+---
+
+## 9.19.26 — V2.81.54 AA wipe soft-lock (SCHEMA 11)
+
+Sean Benson, game code/name `boysenberry`, ~10:34 PT 19 Sep. After AA
+shot down all of Sean's aircraft: combat continued with 0 attackers,
+stuck on the dice/rolling overlay (no Retreat, no progress). Reload
+did not clear it (queue + board still looked like a live fight). Sean
+resigned. Also reported 94 IPC lost to Rob's 12.
+
+Cause: AA casualties lived only in the overlay (`combatState`). They
+were not written to `gameState.units` until Next → `_finalizeCombat`.
+`combatQueue` stayed populated. Reload / resync called `showNextCombat`,
+which only skipped 0-*defender* leftovers, so a 0-*attacker* leftover
+reopened as `ready` / Roll Dice. Phone `rolling` has no CTA, so a 0-unit
+roll could not exit. Same-type air stacks could under-apply AA hits
+(`selected[type] = take` overwrote). Dice never reached Firestore:
+`actionLog` / `_rollLog` / `combatLog` are in-memory; combat UI rolled
+`Math.random()` directly and skipped `_rollDie`.
+
+Fix: sync AA losses immediately; Continue after an attacker wipe
+finalizes (idempotent). Dequeue 0-attacker queue heads. Never open or
+roll combat with 0 attackers — fail-close to defender holds + End
+Battle. Persist last 40 AA/combat snapshots on the game doc
+(`combatTelemetry`, additive SCHEMA 11). Route combat dice through
+`_rollDie`. GAME_VERSION V2.81.54. Do not merge without James.
+
+Boysenberry dice dump: not recoverable from this environment (Firestore
+reads require auth; no service account; no persisted roll history on
+the live schema). 94-vs-12 luck vs bug cannot be proven from logs. AA
+hits only on 1; wiping a ~94 IPC air force in one volley is not
+plausible luck if N is more than a couple of aircraft.
+
+### Smoke (this PR)
+
+- [ ] Air-only attack into AA: every aircraft dies to AA → Continue
+      shows defender holds / End Combat Phase. No Roll Dice.
+- [ ] Reload on that screen (or after Continue) does not reopen the
+      fight. Combat phase can end.
+- [ ] If the overlay is already on Rolling with 0 attackers, End Battle
+      dismisses it.
+- [ ] After the next live fight, `gameState.getCombatTelemetry()` (or
+      the game doc `state.combatTelemetry`) has AA/combat rolls + unit
+      counts.
 
 ---
 
