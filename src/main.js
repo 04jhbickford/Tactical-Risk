@@ -3189,9 +3189,18 @@ function wantsUxPreview(search = location.search) {
 }
 
 if (wantsUxPreview()) {
-  import('./map/uxPreview.js').then((mod) => mod.bootUxPreview()).catch((err) => {
-    console.error('Failed to start UX preview:', err);
-    reportStartupError('Could not start the UX preview. Canvas 2D is unchanged at /');
+  const soloOn = (() => {
+    const v = String(new URLSearchParams(location.search).get('solo') || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  })();
+  const boot = soloOn
+    ? import('./map/uxSolo.js').then((mod) => mod.bootUxSolo())
+    : import('./map/uxPreview.js').then((mod) => mod.bootUxPreview());
+  boot.catch((err) => {
+    console.error(soloOn ? 'Failed to start solo UX:' : 'Failed to start UX preview:', err);
+    reportStartupError(soloOn
+      ? 'Could not start solo vs AI. Canvas 2D is unchanged at /'
+      : 'Could not start the UX preview. Canvas 2D is unchanged at /');
   });
 } else {
   init().catch((err) => {
