@@ -39,10 +39,14 @@ He drives every tap. Seeded pocket only.
 ## Stills @390
 - `combat-move-cold-390.png` — labels + pulsing origin + Select units, no taps yet
 - `combat-move-origin-chips-390.png` — Karelia peek chips, Confirm still Select units
-- `combat-move-select-390.png` — dest pulse / gold Attack
-- `battle-mid-390.png` — casualty picker
+- `combat-move-pick-target-390.png` — INF+FTR picked, Pick target
+- `combat-move-ukraine-attack-390.png` — gold Attack Ukraine
+- `combat-move-select-390.png` — gold Attack Finland
+- `battle-mid-390.png` — casualty picker, Assign casualties
+- `battle-casualty-picked-390.png` — INF assigned, Take hits gold
 - `air-land-choice-390.png` — teal Russia + Karelia
 - `air-landed-390.png` — fighter in Russia, Confirm idle
 
 **Vercel:** https://tactical-risk20-git-cursor-comba-cfebfb-james-projects-20d8de40.vercel.app/?three=1
+**Deployment:** https://tactical-risk20-hnc32wx45-james-projects-20d8de40.vercel.app/?three=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/74 (draft · PR68 lineage · do not merge to main)
