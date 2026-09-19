@@ -25,33 +25,44 @@ import {
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import {
   PHASE,
+  BATTLE_STEP,
   SELECT_GOLD,
   LAND_TEAL,
+  SCENARIO,
+  GERMANS_SCENARIO,
   createScenario,
+  createGermansMidflow,
   applyScenarioPocket,
+  pocketFromSearch,
   tapLand,
   pickUnit,
+  adjustUnit,
   confirm as confirmPlay,
   confirmLabel,
   confirmGold,
   confirmEnabled,
+  confirmHint,
+  needsChipPulse,
   guideCopy,
   highlights,
   battleCard,
   inspectPlay,
   dismissGuide,
-  tryCombatMove,
   driveCombatMove,
   driveBattleMid,
+  driveCasualtySelect,
+  driveGermansMid,
   driveAirChoice,
   driveLanded,
   resetScenario,
+  attackerOf,
 } from './uxPreviewScenario.js';
 
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
 // Finland Norway (1002,220) + Karelia (1313,250) + Russia (1651,357).
 const POCKET_FIT = { minX: 960, minY: 80, maxX: 1720, maxY: 380 };
 const LAND_FIT = { minX: 980, minY: 70, maxX: 1820, maxY: 460 };
+const GERMANS_FIT = { minX: 1080, minY: 160, maxX: 1680, maxY: 760 };
 
 function applyLiveContinents(list, bonusGroups) {
   const of = new Map();
@@ -139,10 +150,13 @@ export async function bootUxPreview() {
   const territoryMap = new TerritoryMap(territories);
   const classicPlacements = { ...(setup.classic?.unitPlacements || {}) };
   const classicOwners = setup.classic?.territoryOwners || {};
-  const pocket = applyScenarioPocket(classicPlacements, classicOwners);
+  const pocketCfg = pocketFromSearch(location.search);
+  const pocket = applyScenarioPocket(classicPlacements, classicOwners, pocketCfg);
   const placements = pocket.placements;
   const owners = pocket.owners;
-  let play = createScenario({ placements, owners });
+  let play = pocketCfg.id === GERMANS_SCENARIO.id
+    ? createGermansMidflow({ placements, owners })
+    : createScenario({ placements, owners });
   const stressOn = (() => {
     const params = new URLSearchParams(location.search);
     const v = String(params.get('stress') || '').toLowerCase();
@@ -154,14 +168,14 @@ export async function bootUxPreview() {
   }
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
-  const russians = factions.find((f) => f.id === 'Russians');
+  const seat = factions.find((f) => f.id === play.seat) || factions.find((f) => f.id === 'Russians');
 
   const chrome = injectThreeChrome({
-    seat: 'Russians',
-    ipc: russians?.startingPUs || 24,
+    seat: play.seat,
+    ipc: play.ipc || seat?.startingPUs || 24,
     phase: PHASE.COMBAT_MOVE,
   });
-  chrome.setSeat('Russians', russians?.color || '#B22222');
+  chrome.setSeat(play.seat, seat?.color || (play.seat === 'Germans' ? '#4A4A4A' : '#B22222'));
 
   reportStartupStatus('Loading main tiles and unit chits…', 52);
   const { images, ready: imagesReady } = preloadUnitImages(
@@ -214,19 +228,30 @@ export async function bootUxPreview() {
     } else if (play.phase === PHASE.DONE && play.landingDest) {
       route = `Landed · ${play.landingDest}`;
     }
+    const card = battleCard(play);
+    const casualtyOn = play.phase === PHASE.BATTLE
+      && play.battle?.step === BATTLE_STEP.CASUALTIES;
+    const peekLand = casualtyOn ? landByName(play.dest) : land;
+    const peekStacks = casualtyOn
+      ? (placements[play.dest] || []).filter((s) => s.owner === attackerOf(play))
+      : (peekLand ? (placements[peekLand.name] || []) : []);
     chrome.paintPlay({
-      land,
-      stacks: land ? (placements[land.name] || []) : [],
+      land: peekLand,
+      stacks: peekStacks,
       unitTypes: picked,
+      staged: casualtyOn ? (play.battle?.pendingAtt || {}) : (play.selectedUnits || {}),
       label: confirmLabel(play),
       gold: confirmGold(play),
       enabled: confirmEnabled(play),
       guide: guideCopy(play),
       guideOn: play.guideOn,
-      battle: battleCard(play),
+      battle: card,
       replay: play.phase === PHASE.DONE,
       route,
+      hint: confirmHint(play),
+      pulseChips: needsChipPulse(play) || (casualtyOn && !confirmEnabled(play)),
     });
+    paintLandTags(marks);
   }
 
   chrome.onStackToggle = (on) => {
@@ -239,10 +264,27 @@ export async function bootUxPreview() {
     paintChrome();
     camera.dirty = true;
   };
+  chrome.onUnitAdjust = (type, delta) => {
+    adjustUnit(play, type, delta);
+    syncSelectionFromPlay();
+    paintChrome();
+    camera.dirty = true;
+  };
   chrome.onGuideDismiss = () => {
     dismissGuide(play);
     paintChrome();
   };
+
+  function paintLandTags(marks) {
+    const tags = (marks?.labels || []).map((tag) => {
+      const land = landByName(tag.name);
+      const c = land && territoryCenter(land);
+      if (!c) return null;
+      const screen = camera.worldToScreen(c.x, c.y);
+      return { name: tag.name, kind: tag.kind, x: screen.x, y: screen.y };
+    }).filter(Boolean);
+    chrome.setLandTags(tags);
+  }
 
   function fitEurope() {
     camera.fitBounds(EUROPE_FIT, {
@@ -255,7 +297,7 @@ export async function bootUxPreview() {
   function fitPocket() {
     const bounds = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
       ? LAND_FIT
-      : POCKET_FIT;
+      : (play.seat === 'Germans' ? GERMANS_FIT : POCKET_FIT);
     camera.fitBounds(bounds, {
       padding: 12,
       padTop: 56,
@@ -451,6 +493,7 @@ export async function bootUxPreview() {
       });
       ctx.restore();
     }
+    paintLandTags(highlights(play));
   }
 
   function loop() {
@@ -538,7 +581,8 @@ export async function bootUxPreview() {
       owners: Object.keys(owners).length,
       placements: Object.keys(placements).length,
       continents: continents.length,
-      idleConfirm: 'Try combat move',
+      idleConfirm: 'Select your stack',
+      pocket: play.id || SCENARIO.id,
       confirmGold: SELECT_GOLD,
       stress: stressOn,
       play: inspectPlay(play),
@@ -587,12 +631,12 @@ export async function bootUxPreview() {
     layouts: currentLayouts,
     chrome,
     playInspect: () => inspectPlay(play),
-    tryCombatMove: () => {
-      tryCombatMove(play);
+    adjustUnit: (type, delta) => {
+      adjustUnit(play, type, delta);
       syncSelectionFromPlay();
       paintChrome();
       camera.dirty = true;
-      return inspectPlay(play);
+      return { ...(play.selectedUnits || {}) };
     },
     reset: () => {
       resetScenario(play);
@@ -605,6 +649,8 @@ export async function bootUxPreview() {
     drive: (step) => {
       if (step === 'move') driveCombatMove(play);
       else if (step === 'battle') driveBattleMid(play);
+      else if (step === 'hits') driveCasualtySelect(play);
+      else if (step === 'germans') driveGermansMid(play);
       else if (step === 'air') driveAirChoice(play);
       else if (step === 'landed') driveLanded(play, 'Russia');
       syncSelectionFromPlay();

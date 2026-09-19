@@ -13,6 +13,7 @@ export const BATTLE_STEP = {
   AA_RESULT: 'aaResult',
   COMBAT_READY: 'combatReady',
   COMBAT_RESULT: 'combatResult',
+  CASUALTIES: 'casualties',
   WON: 'won',
 };
 
@@ -32,7 +33,35 @@ export const SCENARIO = {
   dest: 'Finland Norway',
   landable: ['Karelia S.S.R.', 'Russia'],
   seed: 1941,
+  attackVerb: 'confirm',
 };
+
+export const GERMANS_SCENARIO = {
+  id: 'ukraine-karelia',
+  seat: 'Germans',
+  ipc: 32,
+  origin: 'Ukraine S.S.R.',
+  dest: 'Karelia S.S.R.',
+  landable: ['Ukraine S.S.R.', 'East Europe'],
+  seed: 1941,
+  attackVerb: 'attack',
+};
+
+export const MOVEABLE = ['infantry', 'armour', 'artillery', 'fighter', 'bomber'];
+export const ATTACK_HINT = 'Tap units above to attack';
+
+const POCKET_ON = new Set(['1', 'true', 'yes', 'germans']);
+
+export function isGermansTip(state) {
+  return state?.seat === 'Germans' || state?.id === GERMANS_SCENARIO.id;
+}
+
+export function pocketFromSearch(search = '') {
+  const params = new URLSearchParams(search);
+  const raw = String(params.get('germans') || params.get('seat') || '').toLowerCase();
+  if (POCKET_ON.has(raw)) return GERMANS_SCENARIO;
+  return SCENARIO;
+}
 
 export const SELECT_GOLD = '#C4A35A';
 export const LEGAL_GOLD = '#C4A35A';
@@ -46,7 +75,6 @@ export const GUIDE = {
 };
 
 export const COMBAT_MOVE_START = 'Tap your stack → units → enemy land → Confirm';
-export const TRY_COMBAT_MOVE_LABEL = 'Try combat move';
 
 const DEMO_ROLLS = {
   aa: [4],
@@ -66,7 +94,21 @@ function clonePlacements(src) {
   return out;
 }
 
-export function seedPlacements() {
+export function seedPlacements(pocket = SCENARIO) {
+  if (pocket?.id === GERMANS_SCENARIO.id || pocket?.seat === 'Germans') {
+    return {
+      [GERMANS_SCENARIO.origin]: [
+        { type: 'armour', quantity: 2, owner: 'Germans' },
+        { type: 'infantry', quantity: 3, owner: 'Germans' },
+        { type: 'fighter', quantity: 1, owner: 'Germans' },
+      ],
+      [GERMANS_SCENARIO.dest]: [
+        { type: 'armour', quantity: 1, owner: 'Russians' },
+        { type: 'infantry', quantity: 3, owner: 'Russians' },
+        { type: 'fighter', quantity: 1, owner: 'Russians' },
+      ],
+    };
+  }
   return {
     [SCENARIO.origin]: [
       { type: 'infantry', quantity: 3, owner: 'Russians' },
@@ -82,7 +124,13 @@ export function seedPlacements() {
   };
 }
 
-export function seedOwners() {
+export function seedOwners(pocket = SCENARIO) {
+  if (pocket?.id === GERMANS_SCENARIO.id || pocket?.seat === 'Germans') {
+    return {
+      [GERMANS_SCENARIO.origin]: 'Germans',
+      [GERMANS_SCENARIO.dest]: 'Russians',
+    };
+  }
   return {
     [SCENARIO.origin]: 'Russians',
     [SCENARIO.dest]: 'Germans',
@@ -90,14 +138,23 @@ export function seedOwners() {
   };
 }
 
+function pocketDefaults(overrides = {}) {
+  if (overrides.id === GERMANS_SCENARIO.id || overrides.seat === 'Germans') {
+    return GERMANS_SCENARIO;
+  }
+  return SCENARIO;
+}
+
 export function createScenario(overrides = {}) {
+  const pocket = pocketDefaults(overrides);
   return {
-    id: SCENARIO.id,
-    seat: SCENARIO.seat,
-    ipc: SCENARIO.ipc,
-    origin: SCENARIO.origin,
-    dest: SCENARIO.dest,
-    landable: [...SCENARIO.landable],
+    id: pocket.id,
+    seat: pocket.seat,
+    ipc: pocket.ipc,
+    origin: pocket.origin,
+    dest: pocket.dest,
+    landable: [...pocket.landable],
+    attackVerb: pocket.attackVerb,
     phase: PHASE.COMBAT_MOVE,
     selected: null,
     selectedUnits: {},
@@ -105,19 +162,19 @@ export function createScenario(overrides = {}) {
     landingDest: null,
     landed: false,
     guideOn: true,
-    placements: seedPlacements(),
-    owners: seedOwners(),
+    placements: seedPlacements(pocket),
+    owners: seedOwners(pocket),
     battle: null,
     rngCursor: 0,
     ...overrides,
   };
 }
 
-export function applyScenarioPocket(basePlacements, baseOwners) {
+export function applyScenarioPocket(basePlacements, baseOwners, pocket = SCENARIO) {
   const placements = clonePlacements(basePlacements);
   const owners = { ...(baseOwners || {}) };
-  const seeded = seedPlacements();
-  const seededOwners = seedOwners();
+  const seeded = seedPlacements(pocket);
+  const seededOwners = seedOwners(pocket);
   for (const [name, stacks] of Object.entries(seeded)) {
     placements[name] = cloneStacks(stacks);
   }
@@ -257,6 +314,29 @@ function formatLoss(taken) {
   return parts.join(' ') || 'none';
 }
 
+export function attackerOf(state) {
+  return state?.seat || 'Russians';
+}
+
+export function defenderOf(state) {
+  const att = attackerOf(state);
+  const marked = state?.owners?.[state.dest];
+  if (marked && marked !== att) return marked;
+  return att === 'Russians' ? 'Germans' : 'Russians';
+}
+
+export function autoStage(state) {
+  if (!state) return state;
+  const stacks = state.placements[state.origin] || [];
+  const next = {};
+  for (const type of MOVEABLE) {
+    const n = stackQty(stacks, type, attackerOf(state));
+    if (n > 0) next[type] = n;
+  }
+  state.selectedUnits = next;
+  return state;
+}
+
 export function tapLand(state, name) {
   if (!state || !name) return state;
   if (state.phase === PHASE.BATTLE) {
@@ -276,14 +356,11 @@ export function tapLand(state, name) {
   }
   if (name === state.origin) {
     state.selected = name;
-    if (!pickedCount(state.selectedUnits)) {
-      state.selectedUnits = {};
-    }
     return state;
   }
-  if (name === state.dest && state.selected === state.origin && hasGround(state.selectedUnits)) {
+  if (name === state.dest) {
     state.destPicked = name;
-    state.selected = name;
+    state.selected = state.origin;
     return state;
   }
   if (name !== state.origin && name !== state.dest) {
@@ -292,16 +369,47 @@ export function tapLand(state, name) {
   return state;
 }
 
+export function pickCasualty(state, type, side = 'att') {
+  const battle = state?.battle;
+  if (!state || state.phase !== PHASE.BATTLE || battle?.step !== BATTLE_STEP.CASUALTIES) {
+    return state;
+  }
+  const dest = state.placements[state.dest] || [];
+  const owner = side === 'def' ? defenderOf(state) : attackerOf(state);
+  const need = side === 'def' ? (battle.needDef || 0) : (battle.needAtt || 0);
+  const pending = side === 'def' ? battle.pendingDef : battle.pendingAtt;
+  if (assignedHits(pending) >= need) return state;
+  const have = stackQty(dest, type, owner);
+  const already = Number(pending[type]) || 0;
+  if (already >= have) return state;
+  pending[type] = already + 1;
+  return state;
+}
+
 export function pickUnit(state, type) {
-  if (!state || state.phase !== PHASE.COMBAT_MOVE) return state;
-  const have = stackQty(state.placements[state.origin], type);
+  if (!state) return state;
+  if (state.phase === PHASE.BATTLE && state.battle?.step === BATTLE_STEP.CASUALTIES) {
+    return pickCasualty(state, type, 'att');
+  }
+  if (state.phase !== PHASE.COMBAT_MOVE) return state;
+  const have = stackQty(state.placements[state.origin], type, attackerOf(state));
   if (have <= 0) return state;
   if ((Number(state.selectedUnits[type]) || 0) > 0) {
     delete state.selectedUnits[type];
   } else {
     state.selectedUnits[type] = have;
   }
-  if (!hasGround(state.selectedUnits)) state.destPicked = null;
+  return state;
+}
+
+export function adjustUnit(state, type, delta) {
+  if (!state || state.phase !== PHASE.COMBAT_MOVE) return state;
+  const have = stackQty(state.placements[state.origin], type, attackerOf(state));
+  if (have <= 0) return state;
+  const cur = Number(state.selectedUnits[type]) || 0;
+  const next = Math.max(0, Math.min(have, cur + Number(delta || 0)));
+  if (next <= 0) delete state.selectedUnits[type];
+  else state.selectedUnits[type] = next;
   return state;
 }
 
@@ -320,13 +428,30 @@ export function destLegal(state) {
     && hasGround(state.selectedUnits);
 }
 
+export function assignedHits(taken) {
+  return Object.values(taken || {}).reduce((n, q) => n + (Number(q) || 0), 0);
+}
+
+export function casualtyChoice(stacks, owner, hits) {
+  const units = combatUnits(stacks, owner);
+  const total = totalQty(units);
+  const need = Math.min(Math.max(0, Number(hits) || 0), total);
+  const types = units.filter((u) => (u.quantity || 0) > 0);
+  const choice = need > 0 && types.length > 1 && need < total;
+  return { need, choice, types };
+}
+
 export function confirmEnabled(state) {
   if (!state) return false;
-  if (state.phase === PHASE.COMBAT_MOVE) {
-    // Gold Confirm as soon as dest is legal. Idle Try is the start affordance.
-    return destLegal(state) || isCombatMoveIdle(state);
+  if (state.phase === PHASE.COMBAT_MOVE) return destLegal(state);
+  if (state.phase === PHASE.BATTLE) {
+    if (!state.battle) return false;
+    if (state.battle.step === BATTLE_STEP.CASUALTIES) {
+      return assignedHits(state.battle.pendingAtt) >= (state.battle.needAtt || 0)
+        && assignedHits(state.battle.pendingDef) >= (state.battle.needDef || 0);
+    }
+    return true;
   }
-  if (state.phase === PHASE.BATTLE) return !!state.battle;
   if (state.phase === PHASE.AIR_LAND) return !!state.landingDest && !state.landed;
   if (state.phase === PHASE.DONE) return true;
   return false;
@@ -338,16 +463,39 @@ export function confirmGold(state) {
   return confirmEnabled(state);
 }
 
+export function attackLabel(state) {
+  if (!state) return 'Attack';
+  return isGermansTip(state)
+    ? `Attack ${state.dest}`
+    : `Confirm: Move to ${state.dest}`;
+}
+
+export function confirmHint(state) {
+  if (!state) return '';
+  if (state.phase === PHASE.BATTLE && state.battle?.step === BATTLE_STEP.CASUALTIES) {
+    if (!confirmEnabled(state)) return 'Tap a unit to take the hit';
+    return '';
+  }
+  if (state.phase !== PHASE.COMBAT_MOVE) return '';
+  if (state.destPicked && !hasGround(state.selectedUnits)) return ATTACK_HINT;
+  return '';
+}
+
+export function needsChipPulse(state) {
+  return !!state
+    && state.phase === PHASE.COMBAT_MOVE
+    && !!state.destPicked
+    && !hasGround(state.selectedUnits);
+}
+
 export function confirmLabel(state) {
-  if (!state) return TRY_COMBAT_MOVE_LABEL;
+  if (!state) return 'Select your stack';
   if (state.phase === PHASE.COMBAT_MOVE) {
-    if (destLegal(state)) {
-      return `Confirm: Move to ${state.dest}`;
-    }
-    if (isCombatMoveIdle(state)) return TRY_COMBAT_MOVE_LABEL;
+    if (destLegal(state) || state.destPicked) return attackLabel(state);
+    if (isGermansTip(state)) return `Attack ${state.dest}`;
     if (state.selected !== state.origin) return 'Select your stack';
     if (!hasGround(state.selectedUnits)) return 'Pick infantry, then a dest';
-    return 'Tap Finland Norway';
+    return `Tap ${state.dest}`;
   }
   if (state.phase === PHASE.BATTLE) {
     const step = state.battle?.step;
@@ -355,6 +503,7 @@ export function confirmLabel(state) {
     if (step === BATTLE_STEP.AA_RESULT) return 'Confirm: Continue';
     if (step === BATTLE_STEP.COMBAT_READY) return 'Confirm: Roll combat';
     if (step === BATTLE_STEP.COMBAT_RESULT) return 'Confirm: Take hits';
+    if (step === BATTLE_STEP.CASUALTIES) return 'Confirm: Take hits';
     if (step === BATTLE_STEP.WON) return `Confirm: Take ${state.dest}`;
     return 'Battle';
   }
@@ -380,6 +529,7 @@ export function highlights(state) {
     dest: null,
     legal: [],
     origins: [],
+    labels: [],
     landable: [],
     selected: state?.selected || null,
   };
@@ -387,14 +537,23 @@ export function highlights(state) {
   if (state.phase === PHASE.COMBAT_MOVE) {
     if (isCombatMoveIdle(state)) {
       out.origins = [state.origin];
+      out.labels = [{ name: state.origin, kind: 'from' }];
     }
-    if (state.selected === state.origin || pickedCount(state.selectedUnits)) {
+    if (
+      state.selected === state.origin
+      || pickedCount(state.selectedUnits)
+      || state.destPicked
+    ) {
       out.origin = state.origin;
     }
-    if (hasGround(state.selectedUnits)) {
-      out.legal = [state.dest];
-    }
+    out.legal = [state.dest];
     if (state.destPicked) out.dest = state.destPicked;
+    if (out.origin || state.destPicked) {
+      out.labels = [
+        { name: state.origin, kind: 'from' },
+        state.destPicked ? { name: state.destPicked, kind: 'to' } : null,
+      ].filter(Boolean);
+    }
   }
   if (state.phase === PHASE.BATTLE) {
     out.origin = state.origin;
@@ -413,7 +572,7 @@ export function highlights(state) {
 
 function startBattle(state) {
   const destStacks = state.placements[state.dest] || [];
-  const guns = aaCount(destStacks, 'Germans');
+  const guns = aaCount(destStacks, defenderOf(state));
   const planes = Number(state.selectedUnits.fighter) || 0;
   state.phase = PHASE.BATTLE;
   state.selected = state.dest;
@@ -441,8 +600,8 @@ function applyCombatMove(state) {
   for (const [type, qty] of Object.entries(state.selectedUnits)) {
     const n = Number(qty) || 0;
     if (n <= 0) continue;
-    state.placements[state.origin] = removeQty(from, type, 'Russians', n);
-    dest = addQty(dest, type, 'Russians', n);
+    state.placements[state.origin] = removeQty(from, type, attackerOf(state), n);
+    dest = addQty(dest, type, attackerOf(state), n);
   }
   state.placements[state.dest] = dest;
   return startBattle(state);
@@ -464,7 +623,7 @@ function rollAA(state) {
   battle.aaHits = hits;
   if (hits > 0) {
     const dest = state.placements[state.dest] || [];
-    state.placements[state.dest] = removeQty(dest, 'fighter', 'Russians', hits);
+    state.placements[state.dest] = removeQty(dest, 'fighter', attackerOf(state), hits);
     if ((Number(state.selectedUnits.fighter) || 0) > 0) {
       state.selectedUnits.fighter = Math.max(0, state.selectedUnits.fighter - hits);
     }
@@ -478,8 +637,8 @@ function rollCombat(state) {
   const battle = state.battle;
   battle.round += 1;
   const dest = state.placements[state.dest] || [];
-  const attackers = combatUnits(dest, 'Russians');
-  const defenders = combatUnits(dest, 'Germans');
+  const attackers = combatUnits(dest, attackerOf(state));
+  const defenders = combatUnits(dest, defenderOf(state));
   const rng = mulberry32(SCENARIO.seed + 17 + state.rngCursor);
   const demo = useDemoRolls(state) && battle.round === 1;
   const attScript = demo ? [...DEMO_ROLLS.attack] : null;
@@ -512,9 +671,17 @@ function rollCombat(state) {
   battle.defenseDice = defenseDice;
   battle.attackHits = attackHits;
   battle.defenseHits = defenseHits;
-  battle.pendingAtt = cheapestLosses(dest, 'Russians', defenseHits);
-  battle.pendingDef = cheapestLosses(dest, 'Germans', attackHits);
-  battle.step = BATTLE_STEP.COMBAT_RESULT;
+  const attOpt = casualtyChoice(dest, attackerOf(state), defenseHits);
+  const defOpt = casualtyChoice(dest, defenderOf(state), attackHits);
+  battle.needAtt = attOpt.need;
+  battle.needDef = defOpt.need;
+  battle.attChoice = attOpt.choice;
+  battle.defChoice = defOpt.choice;
+  battle.pendingAtt = attOpt.choice ? {} : cheapestLosses(dest, attackerOf(state), defenseHits);
+  battle.pendingDef = defOpt.choice ? {} : cheapestLosses(dest, defenderOf(state), attackHits);
+  battle.step = (attOpt.choice || defOpt.choice)
+    ? BATTLE_STEP.CASUALTIES
+    : BATTLE_STEP.COMBAT_RESULT;
   battle.log.push(`R${battle.round} ATK ${attackHits} · DEF ${defenseHits}`);
   return state;
 }
@@ -522,16 +689,16 @@ function rollCombat(state) {
 function applyHits(state) {
   const battle = state.battle;
   let dest = state.placements[state.dest] || [];
-  dest = applyLosses(dest, 'Russians', battle.pendingAtt);
-  dest = applyLosses(dest, 'Germans', battle.pendingDef);
+  dest = applyLosses(dest, attackerOf(state), battle.pendingAtt);
+  dest = applyLosses(dest, defenderOf(state), battle.pendingDef);
   state.placements[state.dest] = dest;
-  const defendersLeft = totalQty(combatUnits(dest, 'Germans'));
-  const attackersLeft = totalQty(combatUnits(dest, 'Russians'));
+  const defendersLeft = totalQty(combatUnits(dest, defenderOf(state)));
+  const attackersLeft = totalQty(combatUnits(dest, attackerOf(state)));
   battle.pendingAtt = {};
   battle.pendingDef = {};
   if (defendersLeft <= 0 && attackersLeft > 0) {
-    state.owners[state.dest] = 'Russians';
-    dest = removeQty(dest, 'aaGun', 'Germans', 99);
+    state.owners[state.dest] = attackerOf(state);
+    dest = removeQty(dest, 'aaGun', defenderOf(state), 99);
     state.placements[state.dest] = dest;
     battle.step = BATTLE_STEP.WON;
     battle.log.push('Attacker takes Finland Norway');
@@ -549,7 +716,7 @@ function applyHits(state) {
 
 function startAirLand(state) {
   const dest = state.placements[state.dest] || [];
-  const planes = airCount(dest, 'Russians');
+  const planes = airCount(dest, attackerOf(state));
   if (planes <= 0 || state.battle?.failed) {
     state.phase = PHASE.DONE;
     state.landingDest = null;
@@ -568,17 +735,17 @@ function startAirLand(state) {
 function applyLanding(state) {
   if (!state.landingDest) return state;
   let from = state.placements[state.dest] || [];
-  const qty = airCount(from, 'Russians');
+  const qty = airCount(from, attackerOf(state));
   if (qty <= 0) {
     state.phase = PHASE.DONE;
     return state;
   }
-  from = removeQty(from, 'fighter', 'Russians', qty);
+  from = removeQty(from, 'fighter', attackerOf(state), qty);
   state.placements[state.dest] = from;
   state.placements[state.landingDest] = addQty(
     state.placements[state.landingDest] || [],
     'fighter',
-    'Russians',
+    attackerOf(state),
     qty,
   );
   state.landed = true;
@@ -589,8 +756,9 @@ function applyLanding(state) {
 }
 
 export function resetScenario(state) {
-  const seeded = seedPlacements();
-  const seededOwners = seedOwners();
+  const pocket = isGermansTip(state) ? GERMANS_SCENARIO : SCENARIO;
+  const seeded = seedPlacements(pocket);
+  const seededOwners = seedOwners(pocket);
   if (state?.placements) {
     for (const [name, stacks] of Object.entries(seeded)) {
       state.placements[name] = cloneStacks(stacks);
@@ -610,16 +778,17 @@ export function resetScenario(state) {
   return state;
 }
 
-export function tryCombatMove(state) {
-  if (!state || state.phase !== PHASE.COMBAT_MOVE) return state;
-  return driveCombatMove(state);
+export function createGermansMidflow(overrides = {}) {
+  const state = createScenario({ ...GERMANS_SCENARIO, ...overrides });
+  tapLand(state, state.origin);
+  tapLand(state, state.dest);
+  return state;
 }
 
 export function confirm(state) {
   if (!state || !confirmEnabled(state)) return state;
   if (state.phase === PHASE.COMBAT_MOVE) {
     if (destLegal(state)) return applyCombatMove(state);
-    if (isCombatMoveIdle(state)) return tryCombatMove(state);
     return state;
   }
   if (state.phase === PHASE.BATTLE) {
@@ -630,7 +799,9 @@ export function confirm(state) {
       return state;
     }
     if (step === BATTLE_STEP.COMBAT_READY) return rollCombat(state);
-    if (step === BATTLE_STEP.COMBAT_RESULT) return applyHits(state);
+    if (step === BATTLE_STEP.COMBAT_RESULT || step === BATTLE_STEP.CASUALTIES) {
+      return applyHits(state);
+    }
     if (step === BATTLE_STEP.WON) return startAirLand(state);
   }
   if (state.phase === PHASE.AIR_LAND) return applyLanding(state);
@@ -667,7 +838,7 @@ export function battleCard(state) {
     return {
       kicker: battle.round ? `Round ${battle.round + 1}` : 'Combat',
       title: state.dest,
-      body: 'Russians attack · Germans defend',
+      body: `${attackerOf(state)} attack · ${defenderOf(state)} defend`,
       dice: [],
     };
   }
@@ -680,6 +851,20 @@ export function battleCard(state) {
         ...battle.attackDice.map((d) => ({ ...d, side: 'atk' })),
         ...battle.defenseDice.map((d) => ({ ...d, side: 'def' })),
       ],
+    };
+  }
+  if (step === BATTLE_STEP.CASUALTIES) {
+    const have = assignedHits(battle.pendingAtt);
+    const need = battle.needAtt || 0;
+    return {
+      kicker: 'Select hits',
+      title: `You ${have}/${need} · they ${formatLoss(battle.pendingDef) || 'none'}`,
+      body: battle.attChoice ? 'Tap your units to assign hits' : 'Hits assigned',
+      dice: [
+        ...battle.attackDice.map((d) => ({ ...d, side: 'atk' })),
+        ...battle.defenseDice.map((d) => ({ ...d, side: 'def' })),
+      ],
+      casualties: true,
     };
   }
   if (step === BATTLE_STEP.WON) {
@@ -710,9 +895,22 @@ export function driveBattleMid(state) {
   return state;
 }
 
+export function driveCasualtySelect(state) {
+  driveBattleMid(state);
+  if (state.battle?.step === BATTLE_STEP.CASUALTIES) {
+    pickCasualty(state, 'infantry', 'att');
+  }
+  return state;
+}
+
 export function driveAirChoice(state) {
   driveBattleMid(state);
-  confirm(state);
+  if (state.battle?.step === BATTLE_STEP.CASUALTIES) {
+    pickCasualty(state, 'infantry', 'att');
+    confirm(state);
+  } else if (state.battle?.step === BATTLE_STEP.COMBAT_RESULT) {
+    confirm(state);
+  }
   confirm(state);
   return state;
 }
@@ -721,6 +919,14 @@ export function driveLanded(state, dest = 'Russia') {
   driveAirChoice(state);
   tapLand(state, dest);
   confirm(state);
+  return state;
+}
+
+export function driveGermansMid(state) {
+  if (!state) return createGermansMidflow();
+  resetScenario(state);
+  tapLand(state, state.origin);
+  tapLand(state, state.dest);
   return state;
 }
 
@@ -740,6 +946,9 @@ export function inspectPlay(state) {
     confirmEnabled: confirmEnabled(state),
     destLegal: destLegal(state),
     idle: isCombatMoveIdle(state),
+    hint: confirmHint(state),
+    pulseChips: needsChipPulse(state),
+    seat: state?.seat || null,
     guideOn: !!state?.guideOn,
     guide: guideCopy(state),
     battleStep: state?.battle?.step || null,

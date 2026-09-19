@@ -1,4 +1,4 @@
-# SCORE — V2.81.53-ux-preview.4
+# SCORE — V2.81.53-ux-preview.5
 **Preview only** `?three=1` or `?ux=1`. Live Canvas / main production untouched. Do not merge.
 
 ```
@@ -8,39 +8,40 @@ sideProject=true
 doNotMerge=true
 iconPack=noOverlap
 vizP1Coach=false
+tryCombatMove=false
+manualOnly=true
 scenario=karelia-finland-air
-startCue=tip+originPulse+try
+germans=?three=1&germans=1
 ```
 
-**Lineage:** follow-up on Hybrid PR73 (`cursor/mobile-combat-ux-a29a`). James: combat-move START was not discoverable @390. Tesla off. Quiet.
+**Lineage:** PR73 tip. James: no Try auto-start; fully manual combat-move; casualty pick when there is a choice. Tesla off. Quiet.
 
-## Playable pocket
-Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** (INF×2 + AA). After the take, land the fighter on teal **Russia** or **Karelia**. Seeded AA miss + ATK 2 / DEF 1.
+## Playable pockets
+- Russians · **Karelia S.S.R.** → **Finland Norway**. Default `?three=1`.
+- Germans · **Ukraine S.S.R.** → **Karelia S.S.R.** · `?three=1&germans=1` (the stuck still, now solvable).
 
-## Layer B — UX (Three preview)
+## Layer B — UX
 | Gate | Verdict | Note |
 |---|---|---|
-| Idle start cue | **PASS** | One-line strip + Karelia pulse + Try combat move. No Got it. |
-| Combat move origin/dest | **PASS** | Gold origin + dest. Confirm gold as soon as dest is legal. |
-| Battle AA / dice / hits | **PASS** | One bottom card. Zoom hidden. Single gold CTA. |
-| Air land + Done | **PASS** | Teal landable. Confirm: Land in Russia. After: idle Replay, not gold. |
-| Phase guide | **BRIEF** | One-line strip, dismiss ×. Does not block the board. |
-| No icon overlap | **PASS** | Same STACK-LOD pack as preview.2. |
-| Mobile ~390 | **PASS** | Thumb Confirm. Peek or battle card, not both. |
+| No Try auto-start | **PASS** | Idle Confirm disabled. Manual FROM → units → TO → Confirm. |
+| Idle start cue | **PASS** | Pulse + FROM label + one-line tip ×. |
+| Chips tappable | **PASS** | Gold fill / n/have steppers. Hint if dest and no units. |
+| Gold Confirm | **PASS** | As soon as dest is legal (units + dest). |
+| Casualty choice | **PASS** | Do not auto-assign when INF+FTR can both take the hit. |
+| Germans mid-flow | **PASS** | Attack lights after unit select. |
+| No icon overlap | **PASS** | Same STACK-LOD pack. |
+| Mobile ~390 | **PASS** | Single thumb CTA. Safe areas. |
 
 ## How-to (390)
-1. **Combat move** — Idle: pulse on Karelia + tip + **Try combat move**. Or tap Karelia → INF + FTR → Finland → gold **Confirm: Move to Finland Norway**.
-2. **Battle** — Confirm Fire AA (miss) → Continue → Roll combat → Take hits → Take Finland Norway.
-3. **Air land** — Tap teal Russia → **Confirm: Land in Russia**. Confirm drops to idle `Landed in Russia · Replay`.
+1. **Combat move** — Tap pulsing stack → tap units (gold chips) → tap enemy land → gold Confirm / Attack.
+2. **Battle** — AA → Continue → Roll. If you have a choice, tap the unit that takes the hit, then **Confirm: Take hits**.
+3. **Air land** — Tap teal Russia → Confirm: Land in Russia.
 
 ## Stills @390
-- `combat-move-idle-390.png` — origin pulse + tip + Try combat move
-- `combat-move-confirm-390.png` — dest legal, Confirm gold
-- `combat-move-select-390.png` — origin/dest gold, Confirm gold (prior)
-- `battle-mid-390.png` — Round 1 dice + hits
-- `air-land-choice-390.png` — teal Russia + Karelia
-- `air-landed-390.png` — fighter in Russia, Confirm idle
+- `combat-move-idle-390.png` — no Try, pulse + FROM label
+- `combat-move-confirm-390.png` — manual mid-flow, Confirm gold
+- `casualty-select-390.png` — choice exists, Confirm after pick
+- `germans-ukraine-karelia-390.png` — previously stuck, now solvable
 
-**Vercel:** https://tactical-risk20-88upzedbz-james-projects-20d8de40.vercel.app/?three=1
-**Git alias:** https://tactical-risk20-git-cursor-mobil-9c9397-james-projects-20d8de40.vercel.app/?three=1
-**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · do not merge to main)
+**Vercel:** (pending this deploy)
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · do not merge)

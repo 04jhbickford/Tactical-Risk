@@ -2,6 +2,16 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.5 manual combat-move + casualty choice
+
+James he-correct on preview.4: no Try auto-start. Fully manual
+FROM → units → TO → Confirm. Casualty pick when there is a choice
+(do not auto-assign). Germans Ukraine→Karelia Attack was gray with
+static chips — chips now gold/steppers; Attack lights after unit tap.
+Preview only. Hold merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.4 combat-move start @390
 
 James: Combat Move phase was already on; the START was not discoverable
