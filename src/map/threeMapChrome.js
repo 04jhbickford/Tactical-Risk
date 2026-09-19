@@ -267,7 +267,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-peek .three-tile,
     #three-battle .three-tile {
-      flex:0 0 auto; width:66px;
+      flex:0 0 auto; width:64px;
       display:inline-flex; flex-direction:column; align-items:center;
       padding:5px 3px 4px; border-radius:14px;
       background:rgba(240,230,210,0.20);
