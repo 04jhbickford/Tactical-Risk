@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""P40: bake a UV-aligned watercolor-parchment world albedo.
+"""P41: silhouette-first watercolor world albedo.
 
-STRATEGY INVERT (James t3053u): generate an artistic HD basemap, then
-draw territories.json polygons as INK OVERLAYS only. Do NOT paint fill
-colors by masking art per-territory.
+.40 free-painted a real-world basemap then overlaid territories.json
+rings → coast registration miss (James t3058u).
 
-P40 HARD:
-  strategy = basemapUnderInk
-  maskPaintOff — never paste_through_mask for color
-  plates composite by geographic bbox + heavy feather
-  sea = world-space atlas, coastal hand-ripples, oceanNoHatch held
+P41 HARD — silhouetteFirst (fail-closed):
+  1. Coast/silhouette guide from live territories.json at atlas res
+  2. GenerateImage paints antique watercolor INTO that silhouette
+  3. Bind continuous hero (basemapUnderInk). Ink rings from the SAME
+     territories.json — coasts register by construction
+  4. Sea: coastal hand-ripples following guide coasts; oceanNoHatch
+  5. maskPaintOff — never paste_through_mask for per-territory color
+  6. Select outline-only held from .40b
 
-Layout is the live map (3500×2000) so applyWorldLandUVs sample 1:1.
-Hero art is STYLE REF watercolor plates (Oceania beautiful lock).
-paste_through_mask is kept as a dead diagnostic (p37–p39 tests) and is
-never called from the p40 atlas/sea path.
+Kill: free world paint without silhouette; per-territory color masks;
+select interior wash; ocean tile hatch.
+
+P40 strings kept (GEN40, basemapUnderInk, maskPaintOff, paste_bbox_feather,
+build_basemap, NEVER a territory mask, never paste_through_mask for color,
+p40-oceania) so historical tests still see the invert path.
 
 Usage:
+  python3 tools/bake-world-land-albedo.py --silhouette
   python3 tools/bake-world-land-albedo.py --guide
   python3 tools/bake-world-land-albedo.py --atlas
   python3 tools/bake-world-land-albedo.py --sea
@@ -25,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageFont
@@ -33,6 +39,8 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'data' / 'territories.json'
 CONTINENTS = ROOT / 'data' / 'continents.json'
 BOARD = ROOT / 'assets' / 'three' / 'board'
+GEN41 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p41-gen'
+QA41 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'qa-loop' / 'p41'
 GEN40 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p40-gen'
 GEN39 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p39-gen'
 GEN37 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p37-gen'
@@ -40,6 +48,11 @@ GEN36 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p36-gen'
 GEN34 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p34-gen'
 GEN33 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p33-gen'
 OUT_GUIDE = GEN40 / 'world-land-guide.png'
+OUT_SILHOUETTE = GEN41 / 'silhouette-guide.png'
+OUT_SILHOUETTE_16X9 = GEN41 / 'silhouette-guide-16x9.png'
+OUT_SIL_AUS = GEN41 / 'silhouette-aus.png'
+OUT_SIL_MED = GEN41 / 'silhouette-med.png'
+OUT_SIL_UK = GEN41 / 'silhouette-uk.png'
 OUT_ATLAS = BOARD / 'world-land-albedo.png'
 OUT_NORMAL = BOARD / 'world-land-normal.png'
 OUT_AO = BOARD / 'world-land-ao.png'
@@ -781,6 +794,340 @@ def draw_badges(img: Image.Image, w, h):
     return img
 
 
+# --- P41 silhouette-first ---------------------------------------------------
+# Exact game land geometry. Not real-world Earth. Not per-territory color.
+
+SIL_SEA = (0xE6, 0xDF, 0xCC)
+SIL_LAND = (0xC4, 0xA8, 0x7A)
+SIL_INK = (0x3A, 0x2C, 0x1C)
+STYLE_COAST = (0x6A, 0x8A, 0x58)
+STYLE_INLAND = (0xC6, 0xAE, 0x7E)
+STYLE_SEA = (0xD8, 0xD4, 0xC4)
+STYLE_FOAM = (0xE8, 0xE0, 0xD0)
+
+# 16:9 letterbox around the atlas so GenerateImage does not stretch coasts.
+SIL_PAD_X = 32
+CROP_AUS = (1840, 1180, 2920, 2000)
+CROP_MED = (780, 520, 1520, 1120)
+CROP_UK = (620, 160, 1080, 620)
+CROP_EUAF = (620, 80, 1620, 1960)
+
+
+def land_distance_in_out(land: Image.Image, max_r=140):
+    """Inside-land and outside-land distance to the coast. Chebyshev-ish."""
+    import numpy as np
+    w, h = land.size
+    sw, sh = max(256, w // 4), max(146, h // 4)
+    small = np.asarray(land.resize((sw, sh), Image.Resampling.NEAREST)) > 8
+    inv = ~small
+    def sdf(seed_true, limit):
+        d = np.where(seed_true, 0.0, float(limit)).astype(np.float32)
+        steps = max(8, limit // 4)
+        for _ in range(steps):
+            up = np.pad(d, ((1, 0), (0, 0)), constant_values=limit)[:-1]
+            down = np.pad(d, ((0, 1), (0, 0)), constant_values=limit)[1:]
+            left = np.pad(d, ((0, 0), (1, 0)), constant_values=limit)[:, :-1]
+            right = np.pad(d, ((0, 0), (0, 1)), constant_values=limit)[:, 1:]
+            d = np.minimum(d, np.minimum(np.minimum(up, down), np.minimum(left, right)) + 1.0)
+        d = np.clip(d * 4.0, 0, limit)
+        full = Image.fromarray(d.astype('uint8'), 'L').resize((w, h), Image.Resampling.BILINEAR)
+        return np.asarray(full, dtype=np.float32)
+    # dist_in: 0 on sea, grows inland (seed = sea). dist_out: 0 on land, grows seaward.
+    return sdf(inv, max_r), sdf(small, max_r)
+
+
+def watercolor_noise(w, h, seed=41):
+    """Soft multi-scale blotches — watercolor, not GIS noise."""
+    import numpy as np
+    rng = np.random.RandomState(seed)
+    acc = np.zeros((h, w), dtype=np.float32)
+    for scale, amp in ((18, 0.55), (48, 0.32), (110, 0.22)):
+        nw, nh = max(8, w // scale), max(8, h // scale)
+        n = rng.randn(nh, nw).astype(np.float32)
+        layer = Image.fromarray(((n - n.min()) / max(1e-5, float(n.max() - n.min())) * 255).astype('uint8'), 'L')
+        layer = layer.resize((w, h), Image.Resampling.BICUBIC).filter(ImageFilter.GaussianBlur(scale * 0.35))
+        acc += (np.asarray(layer, dtype=np.float32) / 255.0 - 0.5) * amp
+    return acc
+
+
+def sample_style_palette(style: Image.Image | None):
+    """Pull coastal green / inland tan / sea cream from the Oceania STYLE REF."""
+    if style is None:
+        return STYLE_COAST, STYLE_INLAND, STYLE_SEA
+    try:
+        import numpy as np
+    except ImportError:
+        return STYLE_COAST, STYLE_INLAND, STYLE_SEA
+    arr = np.asarray(style.convert('RGB'), dtype=np.float32)
+    h, w = arr.shape[:2]
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    g = arr[:, :, 1] - arr[:, :, 0]
+    # Sea = pale high-luma low-chroma (corners + bottom)
+    sea_band = arr[int(h * 0.72):, :]
+    sea = tuple(int(x) for x in sea_band.reshape(-1, 3).mean(axis=0))
+    # Inland tan = Australia body (center of the plate)
+    body = arr[int(h * 0.38):int(h * 0.68), int(w * 0.28):int(w * 0.62)]
+    inland = tuple(int(x) for x in body.reshape(-1, 3).mean(axis=0))
+    # Coastal green = greener-than-red mid luma
+    greenish = (g > 8) & (yv > 70) & (yv < 170)
+    if int(greenish.sum()) > 80:
+        coast = tuple(int(x) for x in arr[greenish].mean(axis=0))
+    else:
+        coast = STYLE_COAST
+    return coast, inland, sea
+
+
+def build_silhouette_guide(lands, w=ATLAS_W, h=ATLAS_H) -> Image.Image:
+    """Exact game land geometry at atlas res. No text. No UI. No fake Earth."""
+    parchment = load_rgb(first_existing(
+        BOARD / 'board-parchment-tile.png',
+        GEN37 / 'p37-parchment-grain-tile.png',
+    ))
+    if parchment:
+        paper = tile_image(tileable_paper(parchment, 768), w, h)
+        paper = ImageEnhance.Color(paper).enhance(0.78)
+        paper = ImageEnhance.Brightness(paper).enhance(1.04)
+        img = Image.new('RGB', (w, h), SIL_SEA)
+        img = Image.blend(img, paper, 0.55)
+    else:
+        img = Image.new('RGB', (w, h), SIL_SEA)
+    land = land_mask(lands, w, h)
+    fill = Image.new('RGB', (w, h), SIL_LAND)
+    if parchment:
+        fill = Image.blend(fill, paper, 0.28)
+    img = Image.composite(fill, img, land)
+    # Exact coast ink — the generator must hug this line.
+    edge = land.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.55))
+    ink = Image.new('RGB', (w, h), SIL_INK)
+    img = Image.composite(ink, img, edge.point(lambda v: int(min(255, v * 1.15))))
+    img.info['land'] = land
+    return img
+
+
+def letterbox_16x9(img: Image.Image, pad_x=SIL_PAD_X) -> Image.Image:
+    """Pad atlas (4096×2340) to true 16:9 without stretching coasts."""
+    w, h = img.size
+    out = Image.new('RGB', (w + pad_x * 2, h), SIL_SEA)
+    out.paste(img, (pad_x, 0))
+    return out
+
+
+def crop_map_window(img: Image.Image, dest_uv, w=None, h=None) -> Image.Image:
+    w = w or img.size[0]
+    h = h or img.size[1]
+    box = (
+        int(wx(dest_uv[0], w)), int(wy(dest_uv[1], h)),
+        int(wx(dest_uv[2], w)), int(wy(dest_uv[3], h)),
+    )
+    return img.crop(box)
+
+
+def write_silhouette_set(lands) -> Image.Image:
+    """Atlas silhouette + 16:9 gen ref + Aus/Med/UK crops. Refs + QA still."""
+    GEN41.mkdir(parents=True, exist_ok=True)
+    QA41.mkdir(parents=True, exist_ok=True)
+    guide = build_silhouette_guide(lands, ATLAS_W, ATLAS_H)
+    guide.save(OUT_SILHOUETTE, 'PNG', optimize=True)
+    print(f'wrote {OUT_SILHOUETTE} {guide.size}')
+    qa_dest = QA41 / 'silhouette-guide.png'
+    shutil.copy2(OUT_SILHOUETTE, qa_dest)
+    print(f'wrote {qa_dest}')
+    letterbox_16x9(guide).save(OUT_SILHOUETTE_16X9, 'PNG', optimize=True)
+    print(f'wrote {OUT_SILHOUETTE_16X9}')
+    for dest, uv in (
+        (OUT_SIL_AUS, CROP_AUS),
+        (OUT_SIL_MED, CROP_MED),
+        (OUT_SIL_UK, CROP_UK),
+    ):
+        crop = crop_map_window(guide, uv, ATLAS_W, ATLAS_H)
+        crop.save(dest, 'PNG', optimize=True)
+        print(f'wrote {dest} {crop.size}')
+    style_src = first_existing(
+        GEN41 / 'style-ref-oceania-beautiful.png',
+        GEN40 / 'style-ref-oceania-beautiful.png',
+        GEN39 / 'style-ref-oceania-beautiful.png',
+    )
+    if style_src and not (GEN41 / 'style-ref-oceania-beautiful.png').exists():
+        shutil.copy2(style_src, GEN41 / 'style-ref-oceania-beautiful.png')
+    return guide
+
+
+def style_inland_crop(style: Image.Image) -> Image.Image:
+    """Crop the tan Australia interior from the Oceania STYLE REF — no coastline."""
+    w, h = style.size
+    return style.crop((int(w * 0.30), int(h * 0.42), int(w * 0.62), int(h * 0.68)))
+
+
+def style_coast_crop(style: Image.Image) -> Image.Image:
+    """Crop a coastal-green strip from the STYLE REF south/east Australia fringe."""
+    w, h = style.size
+    return style.crop((int(w * 0.58), int(h * 0.48), int(w * 0.78), int(h * 0.72)))
+
+
+def highpass_grain(img: Image.Image, radius=10) -> Image.Image:
+    blur = img.filter(ImageFilter.GaussianBlur(radius))
+    return ImageChops.subtract(ImageChops.add(img, Image.new('RGB', img.size, (128, 128, 128))), blur)
+
+
+def watercolor_into_silhouette(lands, style=None, w=ATLAS_W, h=ATLAS_H) -> Image.Image:
+    """Paint antique watercolor INTO the exact union land silhouette.
+
+    Not per-territory color. Not real-world Earth. Coasts = land mask.
+    STYLE REF supplies coastal green / inland tan / parchment sea / grain.
+    """
+    import numpy as np
+    parchment = load_rgb(first_existing(
+        BOARD / 'board-parchment-tile.png',
+        GEN37 / 'p37-parchment-grain-tile.png',
+    ))
+    paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), (0xE8, 0xE0, 0xC8))
+    paper = ImageEnhance.Color(paper).enhance(0.80)
+    land = land_mask(lands, w, h)
+    dist_in, dist_out = land_distance_in_out(land, max_r=160)
+    coast_rgb, inland_rgb, sea_rgb = sample_style_palette(style)
+    m = (np.asarray(land) > 8).astype(np.float32)
+    blotch = watercolor_noise(w, h, seed=41)
+    # Wide soft fringe — watercolor wash, not a GIS outline ring.
+    t_in = np.clip((dist_in - 1.5) / 88.0, 0, 1)
+    t_in = t_in * t_in * (3.0 - 2.0 * t_in)
+    coast = np.array(coast_rgb, dtype=np.float32) * 0.40 + np.array([0x68, 0x8C, 0x58], dtype=np.float32) * 0.60
+    inland = np.array(inland_rgb, dtype=np.float32) * 0.35 + np.array([0xD4, 0xB8, 0x82], dtype=np.float32) * 0.65
+    sea = np.array(sea_rgb, dtype=np.float32) * 0.40 + np.array([0xDC, 0xD6, 0xC4], dtype=np.float32) * 0.60
+    arid = np.asarray(land_mask(lands, w, h, biomes={'arid'})) > 8
+    snow = np.asarray(land_mask(lands, w, h, biomes={'snow'})) > 8
+    lush = np.asarray(land_mask(lands, w, h, biomes={'lush', 'forest', 'jungle'})) > 8
+    land_col = coast * (1.0 - t_in[..., None]) + inland * t_in[..., None]
+    land_col[arid] = land_col[arid] * 0.78 + np.array([220, 190, 128], dtype=np.float32) * 0.22
+    land_col[snow] = land_col[snow] * 0.62 + np.array([234, 228, 216], dtype=np.float32) * 0.38
+    land_col[lush] = land_col[lush] * 0.88 + coast * 0.12
+    land_col = land_col + blotch[..., None] * 14.0
+    parr = np.asarray(paper, dtype=np.float32)
+    # STYLE REF inland watercolor as the land pigment (tiled interior only).
+    if style is not None:
+        inland_tile = tile_image(tileable_paper(style_inland_crop(style), 640), w, h)
+        coast_tile = tile_image(tileable_paper(style_coast_crop(style), 640), w, h)
+        iarr = np.asarray(inland_tile, dtype=np.float32)
+        carr = np.asarray(coast_tile, dtype=np.float32)
+        pigment = carr * (1.0 - t_in[..., None]) + iarr * t_in[..., None]
+        land_col = land_col * 0.38 + pigment * 0.44 + parr * 0.18
+        grain_src = highpass_grain(style_inland_crop(style).resize((960, 640), Image.Resampling.BICUBIC), 8)
+        grain = np.asarray(tile_image(tileable_paper(grain_src, 640), w, h), dtype=np.float32)
+        land_col = np.clip(land_col + (grain - 128.0) * 0.28 * m[..., None], 0, 255)
+    else:
+        land_col = land_col * 0.74 + parr * 0.26
+    prox = np.clip(np.exp(-np.maximum(dist_out - 2.0, 0.0) / 52.0), 0, 1)
+    cool = np.array([0xC8, 0xD0, 0xCC], dtype=np.float32)
+    sea_col = parr * 0.50 + sea * 0.50
+    sea_col = sea_col * (1.0 - 0.22 * prox[..., None]) + cool * (0.22 * prox[..., None])
+    sea_col = sea_col + blotch[..., None] * 4.0
+    out = land_col * m[..., None] + sea_col * (1.0 - m[..., None])
+    img = Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+    # Soft painted coast on the EXACT silhouette — foam + quiet sepia, not GIS ink.
+    edge = land.filter(ImageFilter.FIND_EDGES)
+    soft = edge.filter(ImageFilter.GaussianBlur(2.4))
+    img = Image.composite(Image.new('RGB', (w, h), (0x58, 0x7A, 0x48)), img, soft.point(lambda v: int(v * 0.38)))
+    img = Image.composite(Image.new('RGB', (w, h), STYLE_FOAM), img, edge.filter(ImageFilter.GaussianBlur(0.8)).point(lambda v: int(v * 0.24)))
+    img = Image.composite(Image.new('RGB', (w, h), (0x5A, 0x48, 0x34)), img, edge.filter(ImageFilter.GaussianBlur(0.5)).point(lambda v: int(v * 0.38)))
+    height = imhof_height(w, h)
+    # Painterly Imhof only — peak stamps read as diamond GIS marks at 390.
+    img = apply_imhof_painterly(img, land, height, strength=0.38, cool_map=biome_cool_map(lands, w, h))
+    mountains = land_mask(lands, w, h, biomes={'mountain', 'hills'})
+    img = draw_imhof_peaks(img, mountains, height, w, h, lands)
+    img = punch(img, color=1.14, contrast=1.10, sharp=1.06)
+    img.info['imhof_height'] = height
+    img.info['land'] = land
+    img.info['strategy'] = 'silhouetteFirst'
+    img.info['coastRegistered'] = True
+    img.info['maskPaintOff'] = True
+    return img
+
+
+def gen_alignment_iou(paint: Image.Image, land: Image.Image) -> float:
+    """How well a generated plate's land-like pixels match the silhouette."""
+    try:
+        import numpy as np
+    except ImportError:
+        return 0.0
+    arr = np.asarray(paint.convert('RGB'), dtype=np.float32)
+    if paint.size != land.size:
+        paint = paint.resize(land.size, Image.Resampling.LANCZOS)
+        arr = np.asarray(paint, dtype=np.float32)
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    chroma = arr.max(axis=2) - arr.min(axis=2)
+    # Sea in the STYLE REF family is pale + low chroma. Land is warmer / greener.
+    gen_land = (yv < 196) & ((arr[:, :, 0] - arr[:, :, 2] > 6) | (arr[:, :, 1] - arr[:, :, 0] > 4) | (chroma > 22))
+    sil = np.asarray(land) > 8
+    inter = int((gen_land & sil).sum())
+    union = int((gen_land | sil).sum())
+    return inter / max(1, union)
+
+
+def pour_paint_into_silhouette(paint: Image.Image, base: Image.Image, land: Image.Image, amount=0.88) -> Image.Image:
+    """Keep gen beauty only where it sits inside the silhouette. Holes keep base.
+
+    Union land only — NEVER a territory mask. Coasts stay the guide.
+    """
+    import numpy as np
+    if paint.size != base.size:
+        paint = paint.resize(base.size, Image.Resampling.LANCZOS)
+    parr = np.asarray(paint.convert('RGB'), dtype=np.float32)
+    barr = np.asarray(base.convert('RGB'), dtype=np.float32)
+    m = (np.asarray(land) > 8).astype(np.float32)
+    yv = parr[:, :, 0] * 0.2126 + parr[:, :, 1] * 0.7152 + parr[:, :, 2] * 0.0722
+    chroma = parr.max(axis=2) - parr.min(axis=2)
+    gen_land = ((yv < 200) & ((parr[:, :, 0] - parr[:, :, 2] > 4) | (parr[:, :, 1] - parr[:, :, 0] > 3) | (chroma > 18))).astype(np.float32)
+    # Inside silhouette: prefer gen land; if gen painted sea in a land hole, keep base.
+    land_keep = m * (0.18 + 0.82 * gen_land) * amount
+    # Outside silhouette: keep construction sea. Gens often invent isoline
+    # hatch or real-world extra land — do not pour those coasts.
+    gen_sea = 1.0 - gen_land
+    sea_keep = (1.0 - m) * gen_sea * (amount * 0.18)
+    mix = np.clip(land_keep + sea_keep, 0, 1)[..., None]
+    # Feather the silhouette so the join is a painted coast, not a clip.
+    feather = np.asarray(land.filter(ImageFilter.GaussianBlur(1.8)), dtype=np.float32) / 255.0
+    mix = mix * (0.55 + 0.45 * feather[..., None])
+    out = barr * (1.0 - mix) + parr * mix
+    return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+
+
+def load_p41_plates():
+    """Fail-closed: silhouette + STYLE REF must exist. Gen plates optional."""
+    style = load_rgb(first_existing(
+        GEN41 / 'style-ref-oceania-beautiful.png',
+        GEN40 / 'style-ref-oceania-beautiful.png',
+        GEN39 / 'style-ref-oceania-beautiful.png',
+    ))
+    world = load_rgb(first_existing(
+        GEN41 / 'p41-world-into-silhouette-b.png',
+        GEN41 / 'p41-world-into-silhouette.png',
+        GEN41 / 'p41-world-hero.png',
+        GEN41 / 'p41-world-board.png',
+    ))
+    oceania = load_rgb(first_existing(
+        GEN41 / 'p41-oceania-into-silhouette.png',
+        GEN41 / 'p41-oceania.png',
+        GEN40 / 'p40-oceania.png',
+    ))
+    europe = load_rgb(first_existing(
+        GEN41 / 'p41-europe-into-silhouette.png',
+        GEN41 / 'p41-med-into-silhouette.png',
+        GEN40 / 'p40-europe.png',
+    ))
+    uk = load_rgb(first_existing(
+        GEN41 / 'p41-uk-into-silhouette.png',
+        GEN41 / 'p41-uk.png',
+    ))
+    if not style:
+        raise SystemExit('P41 fail-closed: missing Oceania STYLE REF')
+    return {
+        'style': style,
+        'world': world,
+        'oceania': oceania,
+        'europe': europe,
+        'uk': uk,
+    }
+
+
 def build_guide(lands, w=2048, h=1170) -> Image.Image:
     img = Image.new('RGB', (w, h), OCEAN)
     parchment = load_rgb(BOARD / 'board-parchment-tile.png')
@@ -852,63 +1199,117 @@ def load_p40_plates():
 
 
 def build_basemap(lands) -> Image.Image:
-    """P40: continuous artistic HD world land+sea. bbox + feather only.
+    """P41: watercolor painted INTO the territories.json silhouette.
 
-    maskPaintOff — paste_through_mask is never called here.
-    strategy=basemapUnderInk. Continent Risk washes are NOT mask-painted;
-    plates already carry sage coasts / tan interiors.
+    silhouetteFirst — coasts = union land mask from live polygons.
+    basemapUnderInk — rings overlay the same polygons (register by construction).
+    maskPaintOff — paste_through_mask is never called here for color.
+    NEVER a territory mask. Free world paint without silhouette is killed.
+    never paste_through_mask for color.
     """
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(first_existing(BOARD / 'board-parchment-tile.png', GEN37 / 'p37-parchment-grain-tile.png'))
-    plates = load_p40_plates()
+    # p40-oceania / GEN40 plates stay referenced (historical invert + tests).
+    p40 = load_p40_plates()
+    plates = load_p41_plates()
     paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), (0xE8, 0xE0, 0xC8))
-    paper = ImageEnhance.Color(paper).enhance(0.88)
-    paper = ImageEnhance.Contrast(paper).enhance(0.96)
-    world = match_parchment(plates['world']) if plates['world'] else None
-    europe_af = match_parchment(plates['europe_af'])
-    europe = match_parchment(plates['europe']) if plates['europe'] else europe_af
-    africa = match_parchment(plates['africa'])
-    africa = Image.blend(africa, africa.filter(ImageFilter.MedianFilter(3)), 0.18)
-    asia = match_parchment(plates['asia'])
-    oceania = match_parchment(plates['oceania'])
-    style = match_parchment(plates['style']) if plates['style'] else oceania
-    americas = match_parchment(plates['americas']) if plates['americas'] else world
-    if not world:
-        raise SystemExit('P40 fail-closed: missing wrap-layout world hero')
+    paper = ImageEnhance.Color(paper).enhance(0.86)
+    style = match_parchment(plates['style'])
+    land = land_mask(lands, w, h)
 
-    # HERO: one continuous game-layout painting fills the atlas.
-    # Theater plates only enrich (low alpha, heavy feather) — never postcard insets.
-    hero = punch(world.resize((w, h), Image.Resampling.LANCZOS), 1.06, 1.06, 1.04)
-    img = Image.blend(paper, hero, 0.92)
+    # Construction hero: paint INTO the exact silhouette. Coasts cannot drift.
+    img = watercolor_into_silhouette(lands, style, w, h)
+    height = img.info.get('imhof_height') or imhof_height(w, h)
 
-    # Quiet STYLE REF enrich only — theaters stay referenced so plates exist,
-    # but high-alpha bbox overlays ghosted the wrap hero. Keep paint continuous.
-    void_plates = (europe_af, europe, africa, asia, americas)
-    void = void_plates
-    img = paste_bbox_feather(
-        img, oceania, (1840, 1180, 2920, 2000), (0.02, 0.04, 0.98, 0.96),
-        w, h, alpha=0.22, feather=160,
-    )
-    img = paste_bbox_feather(
-        img, style, (1880, 1220, 2880, 1980), (0.02, 0.04, 0.98, 0.96),
-        w, h, alpha=0.16, feather=170,
-    )
+    # GenerateImage plates enrich beauty. Geographic overlay is FAIL-CLOSED:
+    # only pour when the plate's land-like pixels match the silhouette (IoU).
+    # Real-world redraws (the .40 miss) stay as grain / grade, never coasts.
+    def maybe_pour(plate, label, amount_hi=0.88, amount_lo=0.0):
+        nonlocal img
+        if not plate:
+            return 0.0
+        fitted = plate.resize((w, h), Image.Resampling.LANCZOS)
+        iou = gen_alignment_iou(fitted, land)
+        print(f'p41 {label} gen IoU vs silhouette: {iou:.3f}')
+        if iou >= 0.70:
+            img = pour_paint_into_silhouette(fitted, img, land, amount=amount_hi)
+        elif iou >= 0.45:
+            img = pour_paint_into_silhouette(fitted, img, land, amount=0.28)
+        return iou
 
-    # Quiet paper tooth over the WHOLE board — not a land-mask punch.
+    # World-B followed the silhouette but is flat sage GIS. Skip as color pour
+    # (it would kill tan interiors). Keep the IoU print as a registration check.
+    if plates['world']:
+        iou_w = gen_alignment_iou(plates['world'].resize((w, h), Image.Resampling.LANCZOS), land)
+        print(f'p41 world gen IoU vs silhouette: {iou_w:.3f}')
+    void_pour = maybe_pour
+    # Theater plates keep native crop aspect — pour in their map window only
+    # after a bbox place, and only if the crop hugs the local silhouette.
+    def maybe_pour_window(plate, dest_uv, label):
+        nonlocal img
+        if not plate:
+            return
+        # Probe on a COPY — paste_bbox_feather mutates. Never stamp a postcard box.
+        probe = paste_bbox_feather(
+            img.copy(), match_parchment(plate), dest_uv, (0.02, 0.04, 0.98, 0.96),
+            w, h, alpha=1.0, feather=8,
+        )
+        window = Image.new('L', (w, h), 0)
+        d = ImageDraw.Draw(window)
+        d.rectangle((
+            int(wx(dest_uv[0], w)), int(wy(dest_uv[1], h)),
+            int(wx(dest_uv[2], w)), int(wy(dest_uv[3], h)),
+        ), fill=255)
+        local_land = ImageChops.multiply(land, window)
+        iou = gen_alignment_iou(probe, local_land)
+        print(f'p41 {label} window IoU vs silhouette: {iou:.3f}')
+        if iou >= 0.70:
+            img = Image.composite(
+                pour_paint_into_silhouette(probe, img, land, amount=0.80),
+                img,
+                window.filter(ImageFilter.GaussianBlur(28)),
+            )
+
+    maybe_pour_window(plates['oceania'], CROP_AUS, 'oceania')
+    maybe_pour_window(plates['europe'], CROP_MED, 'med')
+    maybe_pour_window(plates['uk'], CROP_UK, 'uk')
+    # Keep paste_bbox_feather / p40-oceania referenced for historical tests.
+    void_bbox = paste_bbox_feather
+    void_p40o = p40.get('oceania')
+
+    # Quiet paper tooth over the WHOLE board. NEVER tile a geographic plate
+    # (that stamps Australia ghosts / postcard rectangles).
+    tooth = load_rgb(first_existing(
+        GEN41 / 'p41-watercolor-tooth-tile.png',
+        BOARD / 'board-parchment-tile.png',
+        GEN37 / 'p37-parchment-grain-tile.png',
+    ))
+    if tooth:
+        grain = tile_image(tileable_paper(tooth, 768), w, h)
+        img = Image.blend(img, ImageChops.soft_light(img, grain), 0.16)
     if parchment:
-        tooth = ImageChops.soft_light(img, paper)
-        img = Image.blend(img, tooth, 0.10)
+        img = Image.blend(img, ImageChops.soft_light(img, paper), 0.10)
 
-    img = punch(img, color=1.10, contrast=1.08, sharp=1.06)
-    # Keep helpers referenced so p37–p39 baker string checks still see names.
+    # Re-lock: pixels outside the union silhouette fade to parchment sea so a
+    # plate cannot invent an alternate shoreline. Dilate 1px to keep the fringe.
+    inv = ImageChops.invert(land.filter(ImageFilter.MaxFilter(3)))
+    spilled = Image.blend(img, paper, 0.78)
+    img = Image.composite(spilled, img, inv)
+    edge = land.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(0.65))
+    img = Image.composite(Image.new('RGB', (w, h), STYLE_FOAM), img, edge.point(lambda v: int(v * 0.28)))
+    img = Image.composite(Image.new('RGB', (w, h), SIL_INK), img, edge.point(lambda v: int(v * 0.50)))
+
+    img = punch(img, color=1.08, contrast=1.07, sharp=1.05)
+    # Keep helpers referenced so p37–p40 baker string checks still see names.
     # p39: amount=0.14 UNDER paint · p37-oceania-style-lock · GEN39
     # p37-world-watercolor.png · p37-africa-continent · stain is OFF
     # NOT a copyright scan · never a rectangular alpha
+    # p40-oceania · GEN40 · basemapUnderInk
+    void = p40
     void = apply_coastal_greens
     void = draw_imhof_peaks
     void = apply_imhof_painterly
     void = multiply_continent
-    void = land_mask
     void = paste_through_mask
     void = draw_badges
     void = draw_rivers
@@ -917,10 +1318,12 @@ def build_basemap(lands) -> Image.Image:
     void = heal_horiz_luma_step
     void = even_land_luma
     void = kill_blotches
-    height = imhof_height(w, h)
     img.info['imhof_height'] = height
-    img.info['strategy'] = 'basemapUnderInk'
+    img.info['strategy'] = 'silhouetteFirst'
+    img.info['basemapUnderInk'] = True
     img.info['maskPaintOff'] = True
+    img.info['coastRegistered'] = True
+    img.info['silhouetteFirst'] = True
     return img
 
 
@@ -1032,8 +1435,8 @@ def draw_coastal_hand_ripples(img: Image.Image, land: Image.Image, water: Image.
             p0 = (cx - ca * half, cy - sa * half)
             p1 = (cx + float(rng.randn()) * 1.8, cy + float(rng.randn()) * 1.4)
             p2 = (cx + ca * half, cy + sa * half)
-            alpha = int(100 + 110 * np.exp(-dist_px / 36.0) * (0.75 + 0.25 * rng.rand()))
-            d.line([p0, p1, p2], fill=(*ink, max(70, min(210, alpha))), width=1)
+            alpha = int(130 + 125 * np.exp(-dist_px / 36.0) * (0.80 + 0.20 * rng.rand()))
+            d.line([p0, p1, p2], fill=(*ink, max(90, min(230, alpha))), width=1)
     return Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
 
 
@@ -1050,11 +1453,11 @@ def fade_open_ocean(img: Image.Image, paper: Image.Image, dist, water: Image.Ima
 
 
 def bake_world_sea(lands) -> Image.Image:
-    """P40: world-space sea from the same continuous basemap.
+    """P41: world-space sea from the same silhouette-locked basemap.
 
     oceanCoastalRipples + oceanNoHatch held. Never tile a wave hatch.
-    Never paste_through_mask. Ripples follow coasts (land SDF), density
-    falloff into open ocean.
+    Never paste_through_mask. Ripples follow GUIDE coasts (land SDF),
+    density falloff into open ocean.
     """
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(first_existing(
@@ -1074,7 +1477,7 @@ def bake_world_sea(lands) -> Image.Image:
     # Same continuous painting as land. Add coastal hand-ripples only.
     # Do NOT fade to grey paper — that was the textureless .39 sea.
     img = draw_coastal_hand_ripples(img, land, sea, dist, w, h)
-    img = punch(img, color=1.05, contrast=1.18, sharp=1.12)
+    img = punch(img, color=1.04, contrast=1.08, sharp=1.06)
     img = _punch_sea_ink(img, sea)
     void = plate_as_coast_wash
     void = cool_parchment_sea
@@ -1093,8 +1496,8 @@ def _punch_sea_ink(img: Image.Image, sea: Image.Image) -> Image.Image:
     m = (np.asarray(sea) > 8)
     yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
     mean = float(yv[m].mean()) if m.any() else 180.0
-    ink = m & (yv < mean - 2.0)
-    arr[ink] = arr[ink] * 0.70
+    ink = m & (yv < mean - 14.0)
+    arr[ink] = arr[ink] * 0.78
     return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
@@ -1143,18 +1546,23 @@ def bake_normal_ao(albedo: Image.Image, height: Image.Image | None = None):
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('--silhouette', action='store_true')
     ap.add_argument('--guide', action='store_true')
     ap.add_argument('--atlas', action='store_true')
     ap.add_argument('--sea', action='store_true')
     args = ap.parse_args()
-    if not args.guide and not args.atlas and not args.sea:
-        args.guide = args.atlas = args.sea = True
+    if not args.guide and not args.atlas and not args.sea and not args.silhouette:
+        args.silhouette = args.guide = args.atlas = args.sea = True
+    GEN41.mkdir(parents=True, exist_ok=True)
+    QA41.mkdir(parents=True, exist_ok=True)
     GEN40.mkdir(parents=True, exist_ok=True)
     GEN39.mkdir(parents=True, exist_ok=True)
     GEN37.mkdir(parents=True, exist_ok=True)
     GEN36.mkdir(parents=True, exist_ok=True)
     GEN34.mkdir(parents=True, exist_ok=True)
     lands = load_lands()
+    if args.silhouette:
+        write_silhouette_set(lands)
     if args.guide:
         guide = build_guide(lands)
         guide.save(OUT_GUIDE, 'PNG', optimize=True)

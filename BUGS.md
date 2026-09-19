@@ -2,6 +2,25 @@
 
 ---
 
+## 9.19.26 — V2.81.52-three-polish.41 (preview only, SCHEMA 11)
+
+James he-correct t3058u: polygons do not match the background image;
+style still below the grok imagine / Oceania STYLE REF. Preview `?three=1`
+only. Do not merge. Live Canvas untouched. Tesla off. Quiet James.
+
+Root cause: `.40` free-painted real-world Earth then overlaid
+`territories.json` rings → coast registration miss.
+
+`.41` silhouette-first: live land geometry guide at atlas res; watercolor
+painted *into* that silhouette; ink from the same polygons (register by
+construction). `albedoRev=p41` · `strategy=silhouetteFirst` ·
+`coastRegistered` · `basemapUnderInk` · `maskPaintOff` ·
+`selectOutlineOnly` · `styleRef=oceania-beautiful`.
+
+SCHEMA 11. GAME_VERSION V2.81.52-three-polish.41.
+
+---
+
 ## 9.18.26 — V2.81.51-three-polish.36 (preview only, SCHEMA 11)
 
 James YES on Arc plan (t3026u). `.35` fixed readability; mid 390 still read as
