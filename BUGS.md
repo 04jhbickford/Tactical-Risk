@@ -2,6 +2,41 @@
 
 ---
 
+## 9.19.26 — V2.81.55-ux-preview.12-solo S0+S1 (side only)
+
+S0: main V2.81.54 AA-wipe fail-close + V2.81.55 gameEventLog /
+diagnostics on the PR76 hybrid tip. S1: `?three=1&solo=1` + New
+Game vs AI — classic 1942, 1 human + 4 medium AI, historical
+capitals stamped so AI can buy. GameState + AIController + local
+autosave behind Three chrome. No lobby. Hold merge.
+
+---
+
+## 9.19.26 — V2.81.55 cloud game-log + diagnostics (SCHEMA 11)
+
+James want: screenshot → Arc pulls cloud events for that game/moment →
+verify where in play it happened → diagnose/fix.
+
+Delivered: append-only `games/{id}/events` (fail-closed). Kinds
+phase/move/attack/aa/combat/purchase/retreat/error/ui. Dice faces via
+shared `_rollDie` land in aa/combat payloads. Existing
+`combatTelemetry` (last 40 on the game doc) kept; AI `resolveCombat`
+now records it too. Lookup: `tools/query-game-events.mjs` +
+`DIAGNOSTICS.md` + `window.__TR_DIAG__`. Rules: seated/startedBy
+append; admin-only read; no update/delete. SCORE.md. GAME_VERSION
+V2.81.55. Draft only — not production. No admin keys invented.
+
+### Smoke (this PR)
+
+- [ ] Multiplayer fight: `games/{id}/events` grows after phase, move,
+      AA/combat, purchase. A thrown write does not freeze the board.
+- [ ] Admin can list events; a seated non-admin cannot.
+- [ ] `node tools/query-game-events.mjs --print-query --lobby boysenberry --around "10:34 PT 19 Sep"`
+      prints lobby → gameId → client-side window.
+- [ ] `state.combatTelemetry` still present after a fight (SCHEMA 11).
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.12-solo vs AI (side only)
 
 James cold-start: complete real game vs AI on the Three `.11` shell.
@@ -140,6 +175,7 @@ chits / continent washes + the Three preview HUD. Keep off main.
 
 `?three=1` or `?ux=1` boots Canvas `MapRenderer` + Three L0/L1/L2 chrome.
 No Imagine world plate. Live `/` unchanged. Do not merge.
+
 ---
 
 ## 9.19.26 — V2.81.54 AA wipe soft-lock (SCHEMA 11)
