@@ -39,7 +39,7 @@ function iconRowHtml(stacks) {
   if (!stacks?.length) return '';
   return `<div class="three-peek-row">${stacks.map((s) => {
     const color = plasticFor(s.owner);
-    const src = pieceIconDataUrl(s.type, color, 1);
+    const src = pieceIconDataUrl(s.type, color, 0);
     return `<span class="three-peek-unit" title="${formatUnitName(s.type)}">
       <img src="${src}" alt="${shortType(s.type)}" width="36" height="36">
       <b>${s.quantity}</b>

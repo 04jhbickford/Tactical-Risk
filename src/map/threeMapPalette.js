@@ -57,12 +57,12 @@ export const PALETTE = {
 // at mid 390. Quiet print hexes, not candy primaries, not Confirm gold.
 export const REGION_WASH = {
   Europe: '#6B7A4A',
-  Asia: '#8A7355',
+  Asia: '#5F7A5A',
   Africa: '#B08948',
   'Middle East': '#A09058',
   'North America': '#6A8B6E',
-  'South America': '#5A8A72',
-  Oceania: '#7A6B8A',
+  'South America': '#9B7E5A',
+  Oceania: '#6A8B8A',
   // Leftover tile key only — never remap live bonus groups onto this.
   USSR: '#8A7355',
 };
@@ -97,7 +97,7 @@ export const USSR_LANDS = new Set([
 export const PLASTIC = {
   Germans: '#6A6C68',
   Russians: '#2F7A2A',
-  British: '#B89050',
+  British: '#8E6A38',
   Americans: '#4E6828',
   Japanese: '#D24A1C',
 };
@@ -130,7 +130,7 @@ export const OCEAN_UV = 24;
 export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 // P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
-export const OCEAN_GRAIN = 0.14;
+export const OCEAN_GRAIN = 0.06;
 export const OCEAN_OPEN_DARKEN = 0.08;
 export const OCEAN_TEAL_PUNCH = 0.06;
 export const TOOTH_STRENGTH = 0.42;
@@ -544,7 +544,8 @@ export function makeOceanMaterial() {
     transparent: false,
     vertexColors: true,
   });
-  if (mat.normalMap) mat.normalScale.set(0.72, 0.72);
+  // P38: kill stipple-looking ocean normal. Washed parchment-sea only.
+  if (mat.normalMap) mat.normalScale.set(0.10, 0.10);
   return mat;
 }
 

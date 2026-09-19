@@ -140,9 +140,28 @@ function rdp(points, epsilon) {
   return [points[0], points[end]];
 }
 
-export function rasterUnionRings(polygons, { pad = 3, target = 440, epsilon = 1.4 } = {}) {
+function ringArea(poly) {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x1, y1] = poly[i];
+    const [x2, y2] = poly[(i + 1) % poly.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(a) / 2;
+}
+
+export function dropSliverPolygons(polygons, minArea = 220) {
   const polys = (polygons || []).filter((p) => p && p.length >= 3);
   if (polys.length <= 1) return polys;
+  const kept = polys.filter((p) => ringArea(p) >= minArea);
+  if (kept.length) return kept;
+  return [polys.reduce((a, b) => (ringArea(a) >= ringArea(b) ? a : b))];
+}
+
+export function rasterUnionRings(polygons, { pad = 3, target = 440, epsilon = 1.4, force = false } = {}) {
+  const polys = dropSliverPolygons(polygons);
+  if (!polys.length) return [];
+  if (polys.length <= 1 && !force) return polys;
   const bb = bboxOf(polys);
   if (!bb) return polys;
   const minX = bb.minX - pad;
@@ -158,14 +177,33 @@ export function rasterUnionRings(polygons, { pad = 3, target = 440, epsilon = 1.
   const raw = traceContours(grid, w, h, minX, minY, scale);
   const rings = raw
     .map((r) => rdp(r, epsilon))
-    .filter((r) => r.length >= 3);
+    .filter((r) => r.length >= 3 && ringArea(r) >= 80);
   return rings.length ? rings : polys;
 }
 
 export function territoryOutlineRings(territory) {
-  const polys = (territory?.polygons || []).filter((p) => p && p.length >= 3);
+  const polys = dropSliverPolygons(territory?.polygons || []);
+  if (!polys.length) return [];
   if (polys.length <= 1) return polys;
   return rasterUnionRings(polys);
+}
+
+const HEAL_CACHE = new WeakMap();
+
+export function healLandRings(territory) {
+  // P38 HARD: dissolve ears / slivers at multi-border joins (Australia class).
+  // Always raster-union so a concave 900-pt ring cannot keep spike lobes.
+  if (!territory) return [];
+  const hit = HEAL_CACHE.get(territory);
+  if (hit) return hit;
+  const polys = dropSliverPolygons(territory.polygons || []);
+  if (!polys.length) {
+    HEAL_CACHE.set(territory, []);
+    return [];
+  }
+  const rings = rasterUnionRings(polys, { pad: 4, target: 560, epsilon: 1.8, force: true });
+  HEAL_CACHE.set(territory, rings);
+  return rings;
 }
 
 export function outlineRingCount(territory) {

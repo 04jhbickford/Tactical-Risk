@@ -38,16 +38,25 @@ MAP_W, MAP_H = 3500, 2000
 ATLAS_W = 4096
 ATLAS_H = 2340
 
-# Printed A&A / Risk chroma (AA-PALETTE) — the albedo carries this, not an 8% wash.
+# Printed A&A / Risk chroma (AA-PALETTE + AA-RISK-HOMAGE).
+# P38: Asia muted green (not USSR brown). Oceania teal-sage. SA warm tan.
+# Washes stay ≤22% multiply so parchment + STYLE REF still read.
 CONT_HEX = {
     'Europe': (0x6B, 0x7A, 0x4A),
-    'Asia': (0x8A, 0x73, 0x55),
+    'Asia': (0x5F, 0x7A, 0x5A),
     'Africa': (0xB0, 0x89, 0x48),
     'Middle East': (0xA0, 0x90, 0x58),
     'North America': (0x6A, 0x8B, 0x6E),
-    'South America': (0x5A, 0x8A, 0x72),
-    'Oceania': (0x7A, 0x6B, 0x8A),
+    'South America': (0x9B, 0x7E, 0x5A),
+    'Oceania': (0x6A, 0x8B, 0x8A),
 }
+USSR_HEX = (0x8A, 0x73, 0x55)
+USSR_LANDS = {
+    'Russia', 'Karelia S.S.R.', 'Ukraine S.S.R.', 'Novosibirsk',
+    'Evenki National Okrug', 'Soviet Far East', 'Mongolia',
+}
+COAST_GREEN = (0x6E, 0x8C, 0x5E)
+LOWLAND_GREEN = (0x7A, 0x8E, 0x58)
 BIOME_OF = {
     'Finland Norway': 'snow', 'Sweden': 'snow', 'Evenki National Okrug': 'snow',
     'Alaska': 'snow', 'West Canada': 'snow', 'Soviet Far East': 'snow',
@@ -300,6 +309,72 @@ def apply_imhof(img: Image.Image, land: Image.Image, height: Image.Image, streng
     lit = ImageChops.overlay(img, shade_rgb)
     a = land.point(lambda v: int(v * strength * 0.55 + (v > 8) * 20))
     return Image.composite(lit, img, a)
+
+
+def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w: int, h: int) -> Image.Image:
+    """Board-game Imhof: inked ridge crests + slope hachures + soft AO.
+
+    Not GIS DEM. Not flat brown stamps. NW oblique light; steeper = darker.
+    """
+    img = apply_imhof(img, land, height, strength=0.30)
+    layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    try:
+        import numpy as np
+        z = np.asarray(height, dtype=np.float32) / 255.0
+        gy, gx = np.gradient(z)
+    except ImportError:
+        gy = gx = None
+    for ridge in RIDGES:
+        pts = [(wx(x, w), wy(y, h)) for x, y in ridge]
+        # Quiet crest only — never a continent-spanning ink slash.
+        d.line(pts, fill=(88, 70, 48, 42), width=max(1, w // 1600), joint='curve')
+        if len(pts) < 2:
+            continue
+        for i in range(len(pts) - 1):
+            x0, y0 = pts[i]
+            x1, y1 = pts[i + 1]
+            dx, dy = x1 - x0, y1 - y0
+            seg = (dx * dx + dy * dy) ** 0.5 or 1.0
+            steps = max(2, int(seg / max(7.0, w / 380.0)))
+            nx, ny = -dy / seg, dx / seg
+            for s in range(steps):
+                t = (s + 0.5) / steps
+                px, py = x0 + dx * t, y0 + dy * t
+                if gx is not None:
+                    ix = int(max(0, min(w - 1, px)))
+                    iy = int(max(0, min(h - 1, py)))
+                    downhill = gx[iy, ix] * nx + gy[iy, ix] * ny
+                    if downhill < 0:
+                        nx, ny = -nx, -ny
+                    steep = min(1.0, (gx[iy, ix] ** 2 + gy[iy, ix] ** 2) ** 0.5 * 14.0)
+                else:
+                    steep = 0.55
+                ln = max(3.0, (w / 340.0) * (0.55 + steep * 0.7))
+                ink = int(36 + steep * 70)
+                d.line(
+                    [(px, py), (px + nx * ln, py + ny * ln)],
+                    fill=(70, 56, 38, ink),
+                    width=1,
+                )
+    mass = layer.filter(ImageFilter.GaussianBlur(0.6))
+    img.paste(mass.convert('RGB'), (0, 0), ImageChops.multiply(mass.split()[-1], land))
+    return img
+
+
+def apply_coastal_greens(img: Image.Image, lands, w: int, h: int) -> Image.Image:
+    """STYLE REF fringe: richer coastal / lowland greens under parchment.
+
+    Not a khaki-only planet. Arid interiors stay tan; coasts pick up sage.
+    """
+    land = land_mask(lands, w, h)
+    edge = land.filter(ImageFilter.FIND_EDGES).filter(ImageFilter.GaussianBlur(10))
+    fringe = ImageChops.multiply(edge.filter(ImageFilter.MaxFilter(15)), land)
+    fringe = fringe.filter(ImageFilter.GaussianBlur(8))
+    low = land_mask(lands, w, h, biomes={'lush', 'forest', 'jungle'})
+    img = grade_chroma(img, fringe, COAST_GREEN, amount=0.22)
+    img = grade_chroma(img, low, LOWLAND_GREEN, amount=0.14)
+    return img
 
 
 def first_existing(*paths: Path) -> Path | None:
@@ -711,17 +786,21 @@ def build_atlas(lands) -> Image.Image:
         w, h, alpha=0.84, blur=48,
     )
 
-    # Quiet continent hint only — STYLE REF family, not hard tiles.
+    # P38: Risk-readable continent washes ≤22% multiply. STYLE REF stays hero.
     for key, rgb in CONT_HEX.items():
         cm = land_mask(lands, w, h, continents={key})
-        img = grade_chroma(img, cm, rgb, amount=0.06)
+        img = grade_chroma(img, cm, rgb, amount=0.18)
+    ussr = land_mask(lands, w, h, names=USSR_LANDS)
+    img = grade_chroma(img, ussr, USSR_HEX, amount=0.16)
+
+    img = apply_coastal_greens(img, lands, w, h)
 
     height = imhof_height(w, h)
-    # STYLE REF uses peak hatching, not Imhof volume blobs.
+    # P38: Imhof inked peaks + hatch/soft AO. Not GIS DEM. Not brown stamps.
+    img = draw_imhof_peaks(img, mask_all, height, w, h)
     img = draw_coast(img, mask_all, w, h)
     img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.14)
     img = kill_blotches(img, mask_all, 72)
-    img = draw_ridges(img, None, mask_all, w, h)
 
     if parchment:
         tooth = ImageChops.soft_light(img, paper)
@@ -742,15 +821,18 @@ def bake_ocean_wash():
     if not tile:
         return
     tile = tile.resize((768, 768), Image.Resampling.LANCZOS)
-    tile = ImageEnhance.Color(tile).enhance(0.78)
-    tile = ImageEnhance.Contrast(tile).enhance(0.92)
+    # P38: destipple — wash toward STYLE REF parchment-sea. No dotted grain.
+    tile = tile.filter(ImageFilter.GaussianBlur(1.6))
+    tile = ImageEnhance.Color(tile).enhance(0.62)
+    tile = ImageEnhance.Contrast(tile).enhance(0.78)
     try:
         import numpy as np
         arr = np.array(tile, dtype=np.float32)
         lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
-        lum = np.clip((lum - 0.08) / 0.70, 0.42, 1.20)
+        lum = np.clip((lum - 0.08) / 0.70, 0.55, 1.08)
         target = np.array([0xC8, 0xC4, 0xB4], dtype=np.float32)
-        tile = Image.fromarray(np.clip(arr * 0.52 + (target * lum[..., None]) * 0.48, 0, 255).astype('uint8'), 'RGB')
+        tile = Image.fromarray(np.clip(arr * 0.38 + (target * lum[..., None]) * 0.62, 0, 255).astype('uint8'), 'RGB')
+        tile = tile.filter(ImageFilter.GaussianBlur(0.8))
     except ImportError:
         pass
     OUT_OCEAN.parent.mkdir(parents=True, exist_ok=True)

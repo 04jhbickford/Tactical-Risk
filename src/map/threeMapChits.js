@@ -533,6 +533,8 @@ function sampleCell(img, type) {
 function keyBackdrop(pix) {
   // P37 HARD: every mini is bare plastic + contact shadow. Drop black
   // rectangular sheets and leftover paper so infantry/tank/ship match.
+  // P38: do NOT key mid-luma parchment-like sculpt — that punched holes
+  // so tan plastic showed the board through the body.
   const d = pix.data;
   const w = pix.width;
   const h = pix.height;
@@ -558,10 +560,42 @@ function keyBackdrop(pix) {
     const lum = r * 0.299 + g * 0.587 + b * 0.114;
     const sat = Math.max(r, g, b) - Math.min(r, g, b);
     const dist = Math.hypot(r - bg[0], g - bg[1], b - bg[2]);
-    if ((lum < 26 && sat < 18) || (lum > 236 && sat < 24) || dist < 28) {
+    if ((lum < 26 && sat < 18) || (lum > 248 && sat < 16) || dist < 16) {
       d[i + 3] = 0;
     }
   }
+}
+
+function isTanPlastic(hex) {
+  const [r, g, b] = hexRgb(hex);
+  return r > 130 && g > 90 && b < 130 && r - b > 28;
+}
+
+function drawOpaqueUnderbody(ctx, cx, cy, s, ownerColor) {
+  // Solid plastic disc under the sculpt so parchment cannot show through.
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx + s * 0.04, cy + s * 0.22, s * 0.78, s * 0.42, 0, 0, Math.PI * 2);
+  ctx.fillStyle = mixRgb(ownerColor || '#8E8F8C', '#2A2014', 0.28);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + s * 0.02, s * 0.70, s * 0.58, 0, 0, Math.PI * 2);
+  ctx.fillStyle = ownerColor || '#8E8F8C';
+  ctx.fill();
+  ctx.strokeStyle = '#1A140C';
+  ctx.lineWidth = Math.max(5, s * 0.08);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlasticRim(ctx, cx, cy, s, ownerColor) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + s * 0.04, s * 0.72, s * 0.60, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = isTanPlastic(ownerColor) ? '#1A140C' : '#0E0C08';
+  ctx.lineWidth = Math.max(isTanPlastic(ownerColor) ? 8 : 5, s * (isTanPlastic(ownerColor) ? 0.12 : 0.07));
+  ctx.stroke();
+  ctx.restore();
 }
 
 function paintMoldedMini(ctx, {
@@ -571,14 +605,17 @@ function paintMoldedMini(ctx, {
   w = 256,
   h = 256,
   shadow = true,
+  badge = true,
 } = {}) {
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
   const cy = h / 2;
   const s = Math.min(w, h) * 0.42;
   if (shadow) drawContactShadow(ctx, cx, cy + s * 0.12, s);
+  const bodyHex = isTanPlastic(ownerColor) ? mixRgb(ownerColor, '#3A2A14', 0.22) : ownerColor;
+  drawOpaqueUnderbody(ctx, cx, cy, s, bodyHex);
   const src = sampleCell(atlasImage(type), type);
-  const [fr, fg, fb] = hexRgb(ownerColor || '#8E8F8C');
+  const [fr, fg, fb] = hexRgb(bodyHex || '#8E8F8C');
   if (src) {
     const tmp = document.createElement('canvas');
     tmp.width = 256;
@@ -614,6 +651,7 @@ function paintMoldedMini(ctx, {
     const dw = w * 0.96;
     const dh = h * 0.96;
     ctx.drawImage(tmp, (w - dw) / 2, (h - dh) / 2 - 2, dw, dh);
+    drawPlasticRim(ctx, cx, cy, s, bodyHex);
     // Soft toy-plastic specular — keep the sculpt, do not flatten to a disc.
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
@@ -636,11 +674,11 @@ function paintMoldedMini(ctx, {
     ctx.stroke();
     ctx.restore();
   }
-  if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
+  if (badge && quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
 }
 
-export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
-  paintMoldedMini(ctx, { type, ownerColor, quantity, w, h, shadow });
+export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true, badge = true } = {}) {
+  paintMoldedMini(ctx, { type, ownerColor, quantity, w, h, shadow, badge });
 }
 
 export function paintPip(ctx, { ownerColor, total, size = 256 } = {}) {
@@ -697,10 +735,15 @@ export function makeOverflowTexture(plus) {
   return chitTex(canvas);
 }
 
-export function pieceIconDataUrl(type, ownerColor, quantity = 1) {
+export function pieceIconDataUrl(type, ownerColor, quantity = 0) {
+  // P38 HARD: peek/HUD shows ONE number (the <b> count). Never bake a
+  // leading "1" badge into the icon (that was the "1 2" / "1 1" bug).
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 128;
-  paintPiece(canvas.getContext('2d'), { type, ownerColor, quantity, w: 128, h: 128 });
+  paintPiece(canvas.getContext('2d'), {
+    type, ownerColor, quantity: 0, w: 128, h: 128, badge: false,
+  });
+  void quantity;
   return canvas.toDataURL('image/png');
 }

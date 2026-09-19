@@ -15,7 +15,7 @@ import {
   makeCoastShelfMaterial,
   RIVERS,
 } from './threeMapTerrain.js';
-import { territoryOutlineRings, waterOutlineRings } from './threeMapOutline.js';
+import { territoryOutlineRings, waterOutlineRings, healLandRings } from './threeMapOutline.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
@@ -231,21 +231,48 @@ export function landHeightFor(territory, center) {
   return landHeightForTerrain(territory);
 }
 
-function inflateRing(ring, amt) {
-  let cx = 0;
-  let cy = 0;
-  for (const [x, y] of ring) {
-    cx += x;
-    cy += y;
+function signedArea(ring) {
+  let a = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x1, y1] = ring[i];
+    const [x2, y2] = ring[(i + 1) % ring.length];
+    a += x1 * y2 - x2 * y1;
   }
-  cx /= ring.length;
-  cy /= ring.length;
-  return ring.map(([x, y]) => {
-    const dx = x - cx;
-    const dy = y - cy;
-    const len = Math.hypot(dx, dy) || 1;
-    return [x + (dx / len) * amt, y + (dy / len) * amt];
-  });
+  return a / 2;
+}
+
+function inflateRing(ring, amt) {
+  // P38 HARD: outward vertex-normal offset. Centroid inflate on a concave
+  // coast (Australia) spawned sliver lobes at multi-border joins.
+  if (!ring || ring.length < 3 || !amt) return ring;
+  const n = ring.length;
+  const ccw = signedArea(ring) >= 0;
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const a = ring[(i - 1 + n) % n];
+    const b = ring[i];
+    const c = ring[(i + 1) % n];
+    const e1x = b[0] - a[0];
+    const e1y = b[1] - a[1];
+    const e2x = c[0] - b[0];
+    const e2y = c[1] - b[1];
+    const l1 = Math.hypot(e1x, e1y) || 1;
+    const l2 = Math.hypot(e2x, e2y) || 1;
+    // CCW walk: interior is left, outward is right (dy, -dx).
+    const n1x = ccw ? e1y / l1 : -e1y / l1;
+    const n1y = ccw ? -e1x / l1 : e1x / l1;
+    const n2x = ccw ? e2y / l2 : -e2y / l2;
+    const n2y = ccw ? -e2x / l2 : e2x / l2;
+    let nx = n1x + n2x;
+    let ny = n1y + n2y;
+    const len = Math.hypot(nx, ny) || 1;
+    out[i] = [b[0] + (nx / len) * amt, b[1] + (ny / len) * amt];
+  }
+  return out;
+}
+
+function landRingsOf(territory) {
+  return healLandRings(territory);
 }
 
 function shapeFromRing(ring) {
@@ -260,10 +287,10 @@ function shapeFromRing(ring) {
 
 export function makeLandMesh(territory, materials, height) {
   const shapes = [];
-  for (const poly of territory.polygons || []) {
+  for (const poly of landRingsOf(territory)) {
     const ring = smoothRing(simplifyRing(poly, 0.32), 2);
     if (!ring) continue;
-    shapes.push(shapeFromRing(inflateRing(ring, 1.15)));
+    shapes.push(shapeFromRing(inflateRing(ring, 0.55)));
   }
   if (!shapes.length) return null;
 
@@ -313,10 +340,10 @@ export function makeLandSealMeshes(territory, material) {
   material.polygonOffset = true;
   material.polygonOffsetFactor = 4.5;
   material.polygonOffsetUnits = 8;
-  for (const poly of territory.polygons || []) {
+  for (const poly of landRingsOf(territory)) {
     const ring = smoothRing(simplifyRing(poly, 0.28), 2);
     if (!ring) continue;
-    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 1.4)));
+    const geom = new THREE.ShapeGeometry(shapeFromRing(inflateRing(ring, 0.7)));
     geom.rotateX(-Math.PI / 2);
     if (getWorldLandTex()) applyWorldLandUVs(geom);
     else applyPaperUVs(geom, territory);
@@ -422,7 +449,7 @@ export function addTerritoryInk(group, territory, material, y, continentMat) {
 
 export function addFoamCoast(group, territory, material, y = 0.03) {
   if (territory.isWater) return;
-  for (const poly of territory.polygons || []) {
+  for (const poly of landRingsOf(territory)) {
     const ring = simplifyRing(poly);
     if (!ring) continue;
     const line = makeBorderLine(ring, y, material);
@@ -436,7 +463,7 @@ export function addFoamCoast(group, territory, material, y = 0.03) {
 export function makeFoamBandMeshes(territory, material) {
   const meshes = [];
   if (!material || territory?.isWater) return meshes;
-  for (const poly of territory.polygons || []) {
+  for (const poly of landRingsOf(territory)) {
     const ring = simplifyRing(poly, 0.55);
     if (!ring || ring.length < 4) continue;
     const outer = inflateRing(ring, 2.6);
@@ -475,7 +502,7 @@ export { makeCoastShelfMaterial, territoryOutlineRings };
 export function makeCoastShelfMeshes(territory, material) {
   const meshes = [];
   if (!material || territory?.isWater) return meshes;
-  for (const poly of territory.polygons || []) {
+  for (const poly of landRingsOf(territory)) {
     const ring = simplifyRing(poly, 0.6);
     if (!ring || ring.length < 4) continue;
     const outer = inflateRing(ring, 8.2);
@@ -556,26 +583,14 @@ export function addSeaZoneInk(group, territory, material, y = 0.06) {
 export { waterOutlineRings };
 
 export function addSeaLaneLines(group, waters, material, y = 0.05) {
-  // P30 HARD: printed A&A sea-lane ink on ocean — dashed, muted, non-emissive.
-  if (!waters?.length || !material) return 0;
-  const seen = new Set();
-  const byName = new Map(waters.map((t) => [t.name, t]));
-  let n = 0;
-  for (const t of waters) {
-    for (const name of t.connections || []) {
-      const other = byName.get(name);
-      if (!other || !other.isWater) continue;
-      const key = t.name < name ? `${t.name}|${name}` : `${name}|${t.name}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const a = seaCenterOf(t);
-      const b = seaCenterOf(other);
-      if (!a || !b) continue;
-      addLaneSegment(group, a, b, material, y);
-      n += 1;
-    }
-  }
-  return n;
+  // P38 HARD: kill decorative dashed/stipple lanes. Sea ink is closed
+  // water rings from territories.json only. Kept as a no-op so older
+  // callers / tests do not throw.
+  void group;
+  void waters;
+  void material;
+  void y;
+  return 0;
 }
 
 export function makeSeaWaterMeshes(territory, material) {
@@ -599,7 +614,7 @@ export function makeSeaWaterMeshes(territory, material) {
 export function makeCoastAoMeshes(territory, material) {
   const meshes = [];
   if (!material || territory?.isWater) return meshes;
-  for (const poly of territory.polygons || []) {
+  for (const poly of landRingsOf(territory)) {
     const ring = simplifyRing(poly, 0.6);
     if (!ring || ring.length < 4) continue;
     const outer = inflateRing(ring, 6.2);
