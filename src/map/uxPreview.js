@@ -48,8 +48,9 @@ import {
 } from './uxPreviewScenario.js';
 
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
-const POCKET_FIT = { minX: 1080, minY: 70, maxX: 1640, maxY: 560 };
-const LAND_FIT = { minX: 1180, minY: 90, maxX: 1760, maxY: 720 };
+// Finland Norway (1002,220) + Karelia (1313,250) + Russia (1651,357).
+const POCKET_FIT = { minX: 960, minY: 80, maxX: 1720, maxY: 380 };
+const LAND_FIT = { minX: 980, minY: 70, maxX: 1820, maxY: 460 };
 
 function applyLiveContinents(list, bonusGroups) {
   const of = new Map();
@@ -175,7 +176,10 @@ export async function bootUxPreview() {
     camera.onResize();
   }
   resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    fitPocket();
+  });
 
   let selected = null;
   let stacksExpanded = false;
@@ -496,7 +500,7 @@ export async function bootUxPreview() {
       selected: selected?.name || null,
       selectOutlineOnly: true,
       selectColor: SELECT_GOLD,
-      guideOn: false,
+      guideOn: !!play.guideOn,
       vizP1Coach: false,
       iconPack: 'noOverlap',
       overlap,

@@ -190,7 +190,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       display:none;
     }
     html.three-spike.has-l1 #three-stack-toggle,
-    html.three-spike.has-stacks #three-stack-toggle { display:inline-flex; align-items:center; }
+    html.three-spike.has-stacks #three-stack-toggle { display:none; }
     #three-confirm,
     #three-confirm.is-idle,
     #three-confirm:disabled {

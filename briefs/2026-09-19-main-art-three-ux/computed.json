@@ -18,5 +18,12 @@
   "iconPack": "noOverlap",
   "vizP1Coach": false,
   "guideOn": true,
-  "guideBlocksBoard": false
+  "guideBlocksBoard": false,
+  "vercel": "https://tactical-risk20-4vc8ykwag-james-projects-20d8de40.vercel.app/?three=1",
+  "stills": [
+    "combat-move-select-390.png",
+    "battle-mid-390.png",
+    "air-land-choice-390.png",
+    "air-landed-390.png"
+  ]
 }

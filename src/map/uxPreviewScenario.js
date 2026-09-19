@@ -534,6 +534,8 @@ function startAirLand(state) {
   state.phase = PHASE.AIR_LAND;
   state.landingDest = null;
   state.landed = false;
+  state.destPicked = null;
+  state.selectedUnits = { fighter: planes };
   state.selected = state.dest;
   return state;
 }
@@ -557,6 +559,7 @@ function applyLanding(state) {
   state.landed = true;
   state.phase = PHASE.DONE;
   state.selected = state.landingDest;
+  state.selectedUnits = {};
   return state;
 }
 
