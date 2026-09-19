@@ -227,6 +227,10 @@ export class GameState {
     // Combat log for current round
     this.combatLog = [];
 
+    // Persisted combat dice + force snapshots (additive, SCHEMA 11).
+    // Bounded so Firestore docs stay small. Used to audit AA/combat soft-locks.
+    this.combatTelemetry = [];
+
     // Tech research state: { playerId: { techTokens: n, unlockedTechs: [] } }
     this.playerTechs = {};
 
@@ -3602,6 +3606,42 @@ export class GameState {
     return this._rollLog ? this._rollLog.slice() : [];
   }
 
+  // Persist a compact combat-round snapshot (AA or regular dice) on the
+  // game doc so a reload / other client can still see what was rolled.
+  // In-memory _rollLog is not enough — it never survived Firestore.
+  recordCombatTelemetry(entry = {}) {
+    if (!this.combatTelemetry) this.combatTelemetry = [];
+    const capRolls = (rolls) => {
+      const list = Array.isArray(rolls) ? rolls.slice(0, 24) : [];
+      return list.map((n) => Number(n) || 0);
+    };
+    const capForce = (force) => (Array.isArray(force) ? force.slice(0, 16).map((u) => ({
+      type: u?.type || 'unit',
+      quantity: Number(u?.quantity) || 0,
+    })) : []);
+    this.combatTelemetry.push({
+      t: Date.now(),
+      round: this.round,
+      kind: entry.kind || 'combat',
+      territory: entry.territory || null,
+      hits: entry.hits ?? 0,
+      rolls: capRolls(entry.rolls),
+      attackRolls: capRolls(entry.attackRolls),
+      defenseRolls: capRolls(entry.defenseRolls),
+      attackForce: capForce(entry.attackForce),
+      defenseForce: capForce(entry.defenseForce),
+      survivors: capForce(entry.survivors),
+      wiped: !!entry.wiped,
+    });
+    if (this.combatTelemetry.length > 40) {
+      this.combatTelemetry = this.combatTelemetry.slice(-40);
+    }
+  }
+
+  getCombatTelemetry() {
+    return this.combatTelemetry ? this.combatTelemetry.slice() : [];
+  }
+
   _rollCombatWithRolls(units, type, unitDefs) {
     let hits = 0;
     const rolls = [];
@@ -5237,6 +5277,8 @@ export class GameState {
       factoriesAtTurnStart: Array.from(this.factoriesAtTurnStart || []),
       // v11: Turn events for turn summary modal (multiplayer)
       turnEvents: this.turnEvents,
+      // Additive (no schema bump): last ~40 AA/combat dice + force snapshots.
+      combatTelemetry: (this.combatTelemetry || []).map((entry) => ({ ...entry })),
       // Additive config (no schema bump): AI-when-unattended policy (Bug 2).
       // Default false = AI pauses when no human is present. Old clients ignore
       // the extra field; a missing field loads as false. See aiPolicy.js.
@@ -5325,6 +5367,9 @@ export class GameState {
 
     // v11: Restore turn events for turn summary modal
     this.turnEvents = data.turnEvents || [];
+    this.combatTelemetry = Array.isArray(data.combatTelemetry)
+      ? data.combatTelemetry.map((entry) => ({ ...entry }))
+      : [];
 
     // AI-when-unattended policy (Bug 2). Default false: pause AI when no human
     // is present. Older docs without the field load as the safe default.
