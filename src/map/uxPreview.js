@@ -28,6 +28,8 @@ import {
   DEMO,
   FLOW_INSPECT,
   FLOW_COMBAT_MOVE,
+  FLOW_BATTLE,
+  FLOW_AIR,
 } from './uxPreviewFlows.js';
 
 const SELECT_GOLD = '#C4A35A';
