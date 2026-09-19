@@ -1,5 +1,5 @@
 {
-  "version": "V2.81.52-three-polish.40",
+  "version": "V2.81.52-three-polish.40b",
   "inspect": {
     "name": "Alaska",
     "verts": 125028,
@@ -18,7 +18,7 @@
     "landSeal": true,
     "atlas": true,
     "palette": "aa-hecorrect-11",
-    "version": "V2.81.52-three-polish.40",
+    "version": "V2.81.52-three-polish.40b",
     "lod": "mid",
     "regionWash": true,
     "plastic": true,
@@ -75,7 +75,7 @@
     "seaDeckClear": true,
     "eastMedPinSouth": true,
     "noBlotchAtlas": true,
-    "albedoRev": "p40",
+    "albedoRev": "p40b",
     "imhofRelief": true,
     "watercolorParchment": true,
     "styleRef": "oceania-beautiful",
@@ -101,9 +101,20 @@
     "strategy": "basemapUnderInk",
     "oceanCoastalRipples": true,
     "selectOutlineOnly": true,
+    "selectWash": false,
+    "selectFill": false,
+    "selectEmissiveWash": false,
+    "selectLandMat": {
+      "name": "China",
+      "color": 16777215,
+      "emissive": 16777215,
+      "emissiveIntensity": 0.34,
+      "hasEmissiveMap": true,
+      "washMeshes": 0
+    },
     "playbookFolded": true,
     "seaSrc": "assets/three/board/world-sea-albedo.png",
-    "seaRev": "p40"
+    "seaRev": "p40b"
   },
   "confirmReady": {
     "background": "rgb(196, 163, 90)",
@@ -205,6 +216,31 @@
     }
   },
   "australia": "mid",
+  "idleGermany": {
+    "name": "Germany",
+    "color": 16777215,
+    "emissive": 16777215,
+    "emissiveIntensity": 0.34,
+    "hasEmissiveMap": true,
+    "washMeshes": 0
+  },
+  "selectGermany": {
+    "name": "Germany",
+    "color": 16777215,
+    "emissive": 16777215,
+    "emissiveIntensity": 0.34,
+    "hasEmissiveMap": true,
+    "washMeshes": 0
+  },
+  "germanyXY": {
+    "x": 173.53932072269822,
+    "y": 370.7624817563802
+  },
+  "selectOutlineOnly": true,
+  "selectWash": false,
+  "selectFill": false,
+  "selectEmissiveWash": false,
+  "landUnchangedOnSelect": true,
   "idle": {
     "confirm": "rgba(30, 36, 32, 0.88)",
     "copy": "Select a territory",
@@ -233,5 +269,6 @@
     "pip": true,
     "minis": false,
     "selected": true
-  }
+  },
+  "selectInterior": "SELECT_INTERIOR 225 [{'x': 347, 'y': 741, 'ink': (85, 70, 30), 'sel': (187, 151, 62), 'delta': 102}, {'x': 365, 'y': 741, 'ink': (26, 22, 16), 'sel': (251, 205, 110), 'delta': 225}, {'x': 329, 'y': 741, 'ink': (125, 100, 57), 'sel': (156, 124, 70), 'delta': 31}, {'x': 347, 'y': 759, 'ink': (200, 165, 77), 'sel': (200, 165, 77), 'delta': 0}, {'x': 347, 'y': 723, 'ink': (86, 84, 77), 'sel': (26, 22, 16), 'delta': 62}, {'x': 359, 'y': 753, 'ink': (176, 131, 46), 'sel': (176, 131, 46), 'delta': 0}, {'x': 335, 'y': 729, 'ink': (209, 194, 168), 'sel': (159, 130, 50), 'delta': 118}]"
 }
