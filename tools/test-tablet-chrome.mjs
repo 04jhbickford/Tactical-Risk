@@ -200,7 +200,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.54', GAME_VERSION === 'V2.81.54');
+check('GAME_VERSION is V2.81.55', GAME_VERSION === 'V2.81.55');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== resolveMapRightEdge ===');
@@ -2105,6 +2105,9 @@ console.log('=== V2.81.39 all-resign deleteDoc ===');
     /allow delete: if isAdmin\(\)/.test(rules)
     && /resource\.data\.status == 'finished'/.test(rules)
     && /request\.auth\.uid in resource\.data\.playerUserIds/.test(rules));
+  check('events subcollection is append-only',
+    /match \/events\/\{eventId\}/.test(rules)
+    && /allow update: if false/.test(rules));
 }
 
 console.log('=== V2.81.40 phone battle odds hero ===');

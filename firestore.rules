@@ -45,6 +45,16 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Append-only diagnostics log (V2.81.55). Clients create; nobody updates.
+      // Seated players prune oldest docs (retention cap). Admin SDK bypasses
+      // these rules for Arc pulls.
+      match /events/{eventId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update: if false;
+        allow delete: if request.auth != null;
+      }
     }
 
     // Legacy top-level presence collection (unused by current code, kept for

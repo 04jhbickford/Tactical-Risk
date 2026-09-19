@@ -2,6 +2,30 @@
 
 ---
 
+## 9.19.26 — V2.81.55 cloud diagnostics suite (SCHEMA 11, EVENT SCHEMA 1)
+
+James product YES via Arc. Boysenberry-class bugs were undiagnosable:
+dice, IPC swings, and combat-queue exits lived only in memory (or the
+last-40 `combatTelemetry` on the game doc). No Admin pull path.
+
+Fix: append-only `games/{id}/events` (phase, move, AA/combat **faces**,
+losses, IPC deltas, queue/soft-lock exits, client errors). Shared d6
+roller for combat/AA/bombard/sub/tech/rocket. Admin reader
+`tools/pull-game-events.mjs` via `FIREBASE_SERVICE_ACCOUNT_JSON` (fail
+closed, no invented keys). Retention last 5000 events/game. SCHEMA 11
+unchanged (subcollection + additive `lobbyName`). GAME_VERSION V2.81.55.
+Tesla off. Do not merge without James. Hybrid PR68 / Three art untouched.
+
+### Smoke (this PR)
+
+- [ ] MP fight: AA + one combat round. `pull-game-events.mjs --joinCode`
+      (with secret) shows `kind=aa` / `kind=combat` with faces.
+- [ ] Buy a unit / collect income → `kind=ipc` before/after.
+- [ ] Missing secret: script exits 2, prints FAIL CLOSED.
+- [ ] Reload mid-combat still fail-closes AA wipe (V2.81.54 behavior).
+
+---
+
 ## 9.19.26 — V2.81.54 AA wipe soft-lock (SCHEMA 11)
 
 Sean Benson, game code/name `boysenberry`, ~10:34 PT 19 Sep. After AA

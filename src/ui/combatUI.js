@@ -5,6 +5,9 @@ import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
 import { syncBottomSurfaces } from './bottomSurface.js';
 import { remainingAirLandingsToAssign } from '../state/airLanding.js';
+import { rollD6 } from '../diagnostics/diceRoller.js';
+import { EVENT_KINDS } from '../diagnostics/eventSchema.js';
+import { emitGameEvent } from '../diagnostics/eventLog.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -285,6 +288,11 @@ export class CombatUI {
     }
     if (skipped.length > 0) {
       this.gameState._notify?.();
+      emitGameEvent({
+        kind: EVENT_KINDS.QUEUE_EXIT,
+        territory: skipped[0],
+        payload: { skipped, reason: 'resolved_head' },
+      });
     }
     return skipped;
   }
@@ -510,13 +518,20 @@ export class CombatUI {
 
     // Roll for each bombarding ship
     for (const roll of bombardmentRolls) {
-      roll.roll = Math.floor(Math.random() * 6) + 1;
+      roll.roll = this._rollD6('bombard');
       roll.hit = roll.roll <= roll.attackValue;
       if (roll.hit) hits++;
     }
 
     this.combatState.bombardmentHits = hits;
     this.combatState.bombardmentFired = true;
+    this.gameState?.recordCombatTelemetry?.({
+      kind: 'combat',
+      territory: this.currentTerritory,
+      hits,
+      rolls: bombardmentRolls.map((r) => r.roll),
+      attackForce: bombardmentRolls.map((r) => ({ type: r.unit, quantity: 1 })),
+    });
 
     // If there are hits, let the defender choose casualties before combat
     if (hits > 0) {
@@ -570,7 +585,7 @@ export class CombatUI {
     if (typeof this.gameState?._rollDie === 'function') {
       return this.gameState._rollDie(context);
     }
-    return Math.floor(Math.random() * 6) + 1;
+    return rollD6(context);
   }
 
   _rollAAFire() {
@@ -656,6 +671,11 @@ export class CombatUI {
       }
       this.combatState.attackers = attackers.filter(u => (Number(u.quantity) || 0) > 0);
       this.combatState.aaCasualtiesApplied = true;
+      emitGameEvent({
+        kind: EVENT_KINDS.LOSSES,
+        territory: this.currentTerritory,
+        payload: { source: 'aa', attacker: { ...selectedAACasualties } },
+      });
       // Persist the board immediately so a reload cannot resurrect dead air
       // or reopen this fight as Roll Dice with 0 attackers.
       this._syncCombatStateToGame();
@@ -680,6 +700,11 @@ export class CombatUI {
     if (countLivingUnits(this.combatState.attackers) > 0) return false;
     this.combatState.phase = 'resolved';
     this.combatState.winner = 'defender';
+    emitGameEvent({
+      kind: EVENT_KINDS.SOFTLOCK_EXIT,
+      territory: this.currentTerritory,
+      payload: { reason: 'aa_or_combat_wipe', persist: !!persist },
+    });
     if (persist) this._persistResolvedCombat();
     return true;
   }
@@ -765,7 +790,7 @@ export class CombatUI {
       // Roll for active (non-submerged) subs only
       for (let i = 0; i < activeSubs; i++) {
         const def = this.unitDefs['submarine'];
-        const roll = Math.floor(Math.random() * 6) + 1;
+        const roll = this._rollD6('sub:attack');
         const hit = roll <= def.attack;
         subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'attacker' });
         if (hit) attackerSubHits++;
@@ -787,7 +812,7 @@ export class CombatUI {
       // Roll for active (non-submerged) subs only
       for (let i = 0; i < activeSubs; i++) {
         const def = this.unitDefs['submarine'];
-        const roll = Math.floor(Math.random() * 6) + 1;
+        const roll = this._rollD6('sub:defense');
         const hit = roll <= def.defense;
         subFirstStrikeRolls.push({ roll, hit, unitType: 'submarine', side: 'defender' });
         if (hit) defenderSubHits++;
@@ -803,6 +828,13 @@ export class CombatUI {
     this.combatState.pendingSubFirstStrikeAttackerCasualties = defenderSubHits; // Attacker takes hits from defender subs
     this.combatState.pendingSubFirstStrikeDefenderCasualties = attackerSubHits; // Defender takes hits from attacker subs
     this.combatState.submarineFirstStrikeFired = true;
+    this.gameState?.recordCombatTelemetry?.({
+      kind: 'combat',
+      territory: this.currentTerritory,
+      hits: { attack: attackerSubHits, defense: defenderSubHits },
+      attackRolls: subFirstStrikeRolls.filter((r) => r.side === 'attacker').map((r) => r.roll),
+      defenseRolls: subFirstStrikeRolls.filter((r) => r.side === 'defender').map((r) => r.roll),
+    });
 
     // If there are casualties to select, go to casualty selection
     if (attackerSubHits > 0 || defenderSubHits > 0) {
@@ -1527,6 +1559,16 @@ export class CombatUI {
       }
       this.combatState.defenders = [];
     }
+
+    emitGameEvent({
+      kind: EVENT_KINDS.LOSSES,
+      territory: this.currentTerritory,
+      payload: {
+        source: 'combat',
+        attacker: { ...selectedAttackerCasualties },
+        defender: { ...selectedDefenderCasualties },
+      },
+    });
 
     // IMMEDIATE UPDATE: Sync casualties to gameState so map updates in real-time
     this._syncCombatStateToGame();

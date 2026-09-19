@@ -17,6 +17,9 @@ import {
   unappliedLandingPlan,
   upsertPendingAirLanding,
 } from './airLanding.js';
+import { rollD6 } from '../diagnostics/diceRoller.js';
+import { EVENT_KINDS } from '../diagnostics/eventSchema.js';
+import { emitGameEvent } from '../diagnostics/eventLog.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -1605,7 +1608,9 @@ export class GameState {
 
     // If it was a purchased unit, refund IPCs
     if (lastPlacement.purchased && lastPlacement.cost) {
-      this.playerState[player.id].ipcs += lastPlacement.cost;
+      this._changeIPCs(player.id, lastPlacement.cost, 'undo_placement', {
+        unitType: lastPlacement.unitType,
+      });
     } else {
       // If it was from starting units, restore to pool
       const unitsToPlace = this.getUnitsToPlace(player.id);
@@ -1735,8 +1740,7 @@ export class GameState {
       return { success: false, error: 'Not enough IPCs' };
     }
 
-    // Deduct IPCs
-    this.playerState[player.id].ipcs -= cost;
+    this._changeIPCs(player.id, -cost, 'purchase', { unitType });
 
     // Add to pending purchases - track territory if specified (store actual cost paid)
     const existing = this.pendingPurchases.find(p =>
@@ -1766,7 +1770,9 @@ export class GameState {
     }
 
     // Refund IPCs (use stored cost which includes any tech discounts)
-    this.playerState[player.id].ipcs += existing.cost || unitDef.cost;
+    this._changeIPCs(player.id, existing.cost || unitDef.cost, 'undo_purchase', {
+      unitType,
+    });
 
     // Remove from pending
     existing.quantity--;
@@ -1808,7 +1814,9 @@ export class GameState {
       if (purchase.owner === player.id) {
         const unitDef = unitDefs[purchase.type];
         if (unitDef) {
-          this.playerState[player.id].ipcs += unitDef.cost * purchase.quantity;
+          this._changeIPCs(player.id, unitDef.cost * purchase.quantity, 'clear_purchases', {
+            unitType: purchase.type,
+          });
         }
       }
     }
@@ -2075,7 +2083,7 @@ export class GameState {
       if (territoryName !== capital) return false;
     }
 
-    this.playerState[player.id].ipcs -= cost;
+    this._changeIPCs(player.id, -cost, 'place_purchase', { unitType, territory: territoryName });
 
     const units = this.units[territoryName] || [];
     const existing = units.find(u => u.type === unitType && u.owner === player.id);
@@ -2166,6 +2174,15 @@ export class GameState {
     }
     // Reset turn state - start with tech development phase
     this.turnPhase = TURN_PHASES.DEVELOP_TECH;
+    this._emitDiag(EVENT_KINDS.PHASE, {
+      payload: {
+        from: TURN_PHASES.COLLECT_INCOME,
+        to: TURN_PHASES.DEVELOP_TECH,
+        via: 'nextTurn',
+        playerId: this.currentPlayer?.id,
+        round: this.round,
+      },
+    });
     this.unitsPlacedThisRound = 0;
     this.unitsPlacedThisRoundOwnerId = null;
     this.pendingPurchases = [];
@@ -2302,7 +2319,11 @@ export class GameState {
       }
 
       // Set the phase and break
+      const fromPhase = this.turnPhase;
       this.turnPhase = nextPhase;
+      this._emitDiag(EVENT_KINDS.PHASE, {
+        payload: { from: fromPhase, to: nextPhase, via: 'nextPhase' },
+      });
       break;
     }
 
@@ -2328,7 +2349,7 @@ export class GameState {
     const totalCost = unitDef.cost * quantity;
     if (this.playerState[player.id].ipcs < totalCost) return false;
 
-    this.playerState[player.id].ipcs -= totalCost;
+    this._changeIPCs(player.id, -totalCost, 'purchase_mobilize', { unitType, quantity });
 
     // Add to pending purchases
     const existing = this.pendingPurchases.find(p => p.type === unitType);
@@ -2921,6 +2942,20 @@ export class GameState {
     }
 
     this._notify();
+    this._emitDiag(EVENT_KINDS.MOVE, {
+      territory: toTerritory,
+      payload: {
+        from: fromTerritory,
+        to: toTerritory,
+        units: (unitsToMove || []).map((u) => ({
+          type: u.type,
+          quantity: u.quantity,
+        })),
+        captured: !!captured,
+        isCombatMove,
+        isNonCombatMove,
+      },
+    });
     return {
       success: true,
       from: fromTerritory,
@@ -3586,15 +3621,44 @@ export class GameState {
     return result;
   }
 
-  // Central d6 roller (Bug 4). Every die in the game funnels through here so
-  // rolls can be logged for empirical fairness auditing. Gameplay is UNCHANGED:
-  // still an unseeded Math.random() d6 — there is no seeding anywhere. The
-  // "predetermined rolls" report was a byproduct of Bug 1 (the same combat
-  // re-resolved across refreshes on un-persisted state → similar outcomes).
-  // The log is in-memory only (never serialized into toJSON / Firestore) and
-  // bounded to the last 500 rolls; inspect via getRollLog() from the console.
+  _emitDiag(kind, fields = {}) {
+    return emitGameEvent({
+      kind,
+      turn: fields.turn ?? this.round,
+      turnPhase: fields.turnPhase ?? this.turnPhase,
+      playerId: fields.playerId ?? this.currentPlayer?.id ?? null,
+      territory: fields.territory ?? null,
+      faces: fields.faces,
+      hits: fields.hits,
+      payload: fields.payload,
+    });
+  }
+
+  _changeIPCs(playerId, delta, reason, extra = {}) {
+    const state = this.playerState[playerId];
+    if (!state) return 0;
+    const before = Number(state.ipcs) || 0;
+    const next = before + Number(delta || 0);
+    state.ipcs = next < 0 ? 0 : next;
+    this._emitDiag(EVENT_KINDS.IPC, {
+      playerId,
+      payload: {
+        reason,
+        delta: Number(delta) || 0,
+        before,
+        after: state.ipcs,
+        ...extra,
+      },
+    });
+    return state.ipcs;
+  }
+
+  // Central d6 roller (Bug 4 / V2.81.55). Every scored die funnels through
+  // src/diagnostics/diceRoller.js — still an unseeded Math.random() d6.
+  // Faces also land on games/{id}/events for Arc. In-memory _rollLog is
+  // kept for console dumps (getRollLog).
   _rollDie(context = 'combat') {
-    const roll = Math.floor(Math.random() * 6) + 1;
+    const roll = rollD6(context, { playerId: this.currentPlayer?.id });
     if (!this._rollLog) this._rollLog = [];
     this._rollLog.push({ t: Date.now(), context, roll });
     if (this._rollLog.length > 500) this._rollLog.shift();
@@ -3636,6 +3700,21 @@ export class GameState {
     if (this.combatTelemetry.length > 40) {
       this.combatTelemetry = this.combatTelemetry.slice(-40);
     }
+    const kind = entry.kind === 'aa' ? EVENT_KINDS.AA : EVENT_KINDS.COMBAT;
+    const faces = capRolls(entry.rolls).concat(capRolls(entry.attackRolls), capRolls(entry.defenseRolls));
+    this._emitDiag(kind, {
+      territory: entry.territory || null,
+      faces,
+      hits: entry.hits ?? 0,
+      payload: {
+        wiped: !!entry.wiped,
+        attackRolls: capRolls(entry.attackRolls),
+        defenseRolls: capRolls(entry.defenseRolls),
+        attackForce: capForce(entry.attackForce),
+        defenseForce: capForce(entry.defenseForce),
+        survivors: capForce(entry.survivors),
+      },
+    });
   }
 
   getCombatTelemetry() {
@@ -3908,7 +3987,7 @@ export class GameState {
       }
     }
 
-    this.playerState[player.id].ipcs += income;
+    this._changeIPCs(player.id, income, 'income');
   }
 
   _clearMovedFlags() {
@@ -3969,8 +4048,15 @@ export class GameState {
     const loserState = this.playerState[loser.id];
 
     if (captorState && loserState) {
-      captorState.ipcs += loserState.ipcs;
-      loserState.ipcs = 0;
+      const transferred = Number(loserState.ipcs) || 0;
+      this._changeIPCs(newOwner, transferred, 'capital_capture', {
+        from: loser.id,
+        territory,
+      });
+      this._changeIPCs(loser.id, -transferred, 'capital_lost', {
+        to: newOwner,
+        territory,
+      });
       loserState.capitalCaptured = true;
     }
 
@@ -4263,7 +4349,7 @@ export class GameState {
     const cost = count * 5;
     if (pState.ipcs < cost) return false;
 
-    pState.ipcs -= cost;
+    this._changeIPCs(playerId, -cost, 'tech_dice', { count });
 
     if (!this.playerTechs[playerId]) {
       this.playerTechs[playerId] = { techTokens: 0, unlockedTechs: [] };
@@ -4289,6 +4375,13 @@ export class GameState {
       rolls.push(roll);
       if (roll === 6) breakthrough = true;
     }
+
+    this._emitDiag(EVENT_KINDS.TECH, {
+      playerId,
+      faces: rolls.slice(),
+      hits: breakthrough ? 1 : 0,
+      payload: { breakthrough, tokens: rolls.length },
+    });
 
     // Reset tokens after rolling (they're consumed)
     techState.techTokens = 0;
@@ -4441,7 +4534,7 @@ export class GameState {
 
     // Increment trade count and award IPCs
     this.cardTradeCount[playerId] = tradeNum + 1;
-    this.playerState[playerId].ipcs += value;
+    this._changeIPCs(playerId, value, 'risk_cards');
 
     this._notify();
     return { success: true, ipcs: value };
@@ -4484,7 +4577,7 @@ export class GameState {
 
     // Increment trade count and award IPCs
     this.cardTradeCount[playerId] = tradeNum + 1;
-    this.playerState[playerId].ipcs += value;
+    this._changeIPCs(playerId, value, 'risk_cards');
 
     this._notify();
     return { success: true, ipcs: value };
@@ -5078,13 +5171,23 @@ export class GameState {
       return { success: false, error: 'Target must have a factory' };
     }
 
-    // Roll for damage (1d6)
-    const damage = Math.floor(Math.random() * 6) + 1;
+    // Roll for damage (1d6) via the shared roller
+    const damage = this._rollDie('rocket');
     const targetIPCs = this.getIPCs(targetOwner);
     const actualDamage = Math.min(damage, targetIPCs);
 
-    // Apply damage
-    this.playerState[targetOwner].ipcs -= actualDamage;
+    this._changeIPCs(targetOwner, -actualDamage, 'rocket', {
+      from: fromTerritory,
+      territory: targetTerritory,
+      face: damage,
+    });
+    this._emitDiag(EVENT_KINDS.ROCKET, {
+      territory: targetTerritory,
+      playerId: player.id,
+      faces: [damage],
+      hits: actualDamage,
+      payload: { from: fromTerritory, targetOwner, targetIPCs },
+    });
 
     // Mark AA gun as used
     this.rocketsUsedThisTurn[fromTerritory] = usedCount + 1;

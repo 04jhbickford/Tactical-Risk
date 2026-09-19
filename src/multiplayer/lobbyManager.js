@@ -910,6 +910,7 @@ export class LobbyManager {
           lobbyId: live.id,
           lobbyCode: live.code,
           code: live.code,
+          lobbyName: live.name || null,
           status: 'starting',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
@@ -921,6 +922,8 @@ export class LobbyManager {
           lobbyData: {
             players: roster.players,
             settings: live.settings,
+            name: live.name || null,
+            code: live.code,
           },
         });
 

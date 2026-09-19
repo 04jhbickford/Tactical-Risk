@@ -3,11 +3,13 @@
 // multiplayer core (syncManager) can both import it without coupling UI code
 // into the sync path. Bump GAME_VERSION for every deployed change.
 
-export const GAME_VERSION = 'V2.81.54';
+export const GAME_VERSION = 'V2.81.55';
 
 // Schema version of the serialized game state (mirrors gameState.toJSON().version).
 // Bump only when the persisted state shape changes; a mismatch here is a harder
 // compatibility signal than the display version.
+// V2.81.55 cloud events live in games/{id}/events (EVENT_SCHEMA_VERSION = 1)
+// and do not bump this number.
 export const SCHEMA_VERSION = 11;
 
 // Compare two 'V<major>.<minor>' version strings.

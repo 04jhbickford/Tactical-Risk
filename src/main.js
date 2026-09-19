@@ -105,12 +105,19 @@ import {
 } from './ui/territoryTooltip.js';
 
 initMobileShell();
+installClientErrorCapture();
 
 // Multiplayer imports
 import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
 import { getAuthManager } from './multiplayer/auth.js';
 import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
+import { bindBrowserGameLog } from './diagnostics/bindBrowserSink.js';
+import {
+  emitClientError,
+  emitSoftlockExit,
+  installClientErrorCapture,
+} from './diagnostics/installClientErrorCapture.js';
 import { leaveGame, isAllResignDeleteFailure, retryDeleteFinishedGame } from './multiplayer/surrender.js';
 import {
   applySurrenderToState,
@@ -1057,6 +1064,12 @@ async function init() {
 
     // Create sync manager
     syncManager = createSyncManager(gameId, gameState);
+    bindBrowserGameLog({
+      gameId,
+      joinCode: currentGameCode || resolveLobbyCodeFromGameDoc(lobbyData),
+      lobbyName: lobbyData?.lobbyData?.name || lobbyData?.name || lobbyData?.lobbyName || null,
+      gameState,
+    });
 
     const user = authManager.getUser();
 
@@ -1353,11 +1366,19 @@ async function init() {
         // (not one per attempt) — auto-battle used to spam "connecting error".
         if (data?.attempt === 1) {
           showNotification('Connection hiccup — retrying to save your last action…');
+          emitClientError('push_failed', data?.error, {
+            phase: data?.phase || gameState?.turnPhase,
+            attemptedVersion: data?.attemptedVersion,
+          });
         }
       }
       // Retries exhausted: local state has been snapped back to the server's
       // last confirmed truth, so the client can't proceed on un-persisted state.
       if (event === 'push_exhausted') {
+        emitSoftlockExit('push_exhausted', {
+          error: data?.error || null,
+          attemptedVersion: data?.attemptedVersion,
+        });
         playerPanel.setWaitingForSync(resolveWaitingLockAfterExhaust());
         const now = Date.now();
         if (shouldShowPushExhaustedNotice({ lastShownAt: lastPushExhaustedToastAt, now })) {
