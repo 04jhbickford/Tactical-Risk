@@ -15,6 +15,8 @@ import {
   confirmEnabled,
   highlights,
   guideCopy,
+  guideSteps,
+  combatMoveStep,
   battleCard,
   inspectPlay,
   driveCombatMove,
@@ -35,13 +37,22 @@ function assert(cond, msg) {
 
 const move = createScenario();
 assert(move.phase === PHASE.COMBAT_MOVE, 'starts combat move');
-assert(confirmLabel(move) === 'Select your stack', 'idle label');
+assert(confirmLabel(move) === 'Tap the glowing red stack', 'idle label');
 assert(confirmGold(move) === false, 'idle not gold');
 assert(confirmEnabled(move) === false, 'idle disabled');
+assert(highlights(move).origin === SCENARIO.origin, 'origin marked on load');
+assert(highlights(move).pulse.includes(SCENARIO.origin), 'origin pulses on load');
+assert(combatMoveStep(move) === 1, 'step 1 on load');
+assert(guideCopy(move).includes('1 Tap your red stack'), 'numbered strip');
+assert(guideSteps(move).persistent === true, 'strip persists');
+assert(guideSteps(move).current === 1, 'strip on step 1');
+assert(guideSteps(move).steps[0] === 'Tap your red stack', 'step copy');
 
 tapLand(move, SCENARIO.origin);
 assert(move.selected === SCENARIO.origin, 'origin selected');
-assert(confirmLabel(move) === 'Pick infantry, then a dest', 'need units');
+assert(confirmLabel(move) === 'Pick INF + FTR', 'need units');
+assert(!highlights(move).pulse.includes(SCENARIO.origin), 'origin pulse stops after tap');
+assert(combatMoveStep(move) === 2, 'step 2 after origin tap');
 
 pickUnit(move, 'fighter');
 assert(move.selectedUnits.fighter === 1, 'fighter staged');
@@ -52,12 +63,18 @@ assert(move.destPicked == null, 'no dest without ground');
 pickUnit(move, 'infantry');
 assert(move.selectedUnits.infantry === 3, 'inf staged');
 assert(highlights(move).legal.includes(SCENARIO.dest), 'finland legal');
-assert(guideCopy(move).includes('Karelia'), 'brief guide');
+assert(highlights(move).pulse.includes(SCENARIO.dest), 'dest pulses after units');
+assert(combatMoveStep(move) === 3, 'step 3 after INF+FTR');
+assert(confirmLabel(move) === 'Tap glowing Finland', 'dest hint');
+assert(guideCopy(move).includes('4 Confirm'), 'confirm in strip');
 
 tapLand(move, SCENARIO.dest);
 assert(move.destPicked === SCENARIO.dest, 'dest picked');
 assert(confirmGold(move) === true, 'confirm gold on staged move');
+assert(confirmEnabled(move) === true, 'confirm enabled when legal');
 assert(confirmLabel(move) === `Confirm: Move to ${SCENARIO.dest}`, 'named dest confirm');
+assert(combatMoveStep(move) === 4, 'step 4 confirm');
+assert(!highlights(move).pulse.includes(SCENARIO.dest), 'dest pulse stops after pick');
 
 confirm(move);
 assert(move.phase === PHASE.BATTLE, 'entered battle');
@@ -114,6 +131,12 @@ assert(stackQty(move.placements[SCENARIO.dest], 'fighter', 'Russians') === 0, 'f
 assert(confirmGold(move) === false, 'done confirm not gold — does not stick');
 assert(confirmEnabled(move) === true, 'replay enabled');
 assert(confirmLabel(move).includes('Landed in Russia'), 'landed label');
+
+const infOnly = createScenario();
+tapLand(infOnly, SCENARIO.origin);
+pickUnit(infOnly, 'infantry');
+assert(highlights(infOnly).pulse.includes(SCENARIO.dest), 'dest pulses after ground pick');
+assert(confirmGold(infOnly) === false, 'not legal until dest tap');
 
 const mid = createScenario();
 driveBattleMid(mid);

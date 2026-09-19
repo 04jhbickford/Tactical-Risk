@@ -2,6 +2,20 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.4 combat-move start affordances
+
+James could not figure out how to *initiate* a combat move on `?three=1`
+even with the seeded Karelia pocket. Discoverability fail.
+
+Preview-only fix: persistent numbered phase strip on load
+(`1 Tap your red stack · 2 Pick INF+FTR · 3 Tap Finland · 4 Confirm`),
+pulse the Karelia stack until tapped, pulse Finland after unit pick,
+gold Confirm as soon as the move is legal, 64px thumb target.
+No Got it modal. Coach stays off. No-overlap stacks + seeded battle /
+air-land kept. Do not merge to main.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.3 mobile combat / battle / air-land
 
 James: keep playing Three UX. Give him a combat move, a battle, and an

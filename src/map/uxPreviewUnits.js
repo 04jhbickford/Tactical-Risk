@@ -446,6 +446,37 @@ function drawOverflowChip(ctx, x, y, size, text) {
   ctx.restore();
 }
 
+function drawPulseHalo(ctx, tokens, wave, color = '#C4A35A') {
+  if (!tokens?.length) return;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let maxSize = 0;
+  for (const tok of tokens) {
+    minX = Math.min(minX, tok.x);
+    minY = Math.min(minY, tok.y);
+    maxX = Math.max(maxX, tok.x);
+    maxY = Math.max(maxY, tok.y);
+    maxSize = Math.max(maxSize, tok.size || 0);
+  }
+  const pad = maxSize * (0.72 + 0.22 * wave);
+  const x = (minX + maxX) / 2;
+  const y = (minY + maxY) / 2;
+  const w = (maxX - minX) + pad * 2;
+  const h = (maxY - minY) + pad * 2;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2.2, maxSize * 0.12);
+  ctx.globalAlpha = 0.35 + 0.55 * wave;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14 + 10 * wave;
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, Math.max(8, maxSize * 0.28));
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function renderPreviewStacks(ctx, {
   territories,
   placements,
@@ -454,6 +485,8 @@ export function renderPreviewStacks(ctx, {
   selectedName,
   stacksExpanded,
   factionColors,
+  pulseNames = [],
+  pulseWave = 1,
 }) {
   const layouts = layoutAllPreviewStacks({
     territories,
@@ -462,7 +495,11 @@ export function renderPreviewStacks(ctx, {
     selectedName,
     stacksExpanded,
   });
+  const pulse = new Set(pulseNames || []);
   for (const layout of layouts) {
+    if (pulse.has(layout.name)) {
+      drawPulseHalo(ctx, layout.tokens, pulseWave);
+    }
     const color = factionColors?.get(layout.owner) || FACTION_FALLBACK[layout.owner] || '#4A4A4A';
     for (const tok of layout.tokens) {
       if (tok.kind === 'overflow') {

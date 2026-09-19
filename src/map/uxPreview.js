@@ -36,6 +36,7 @@ import {
   confirmGold,
   confirmEnabled,
   guideCopy,
+  guideSteps,
   highlights,
   battleCard,
   inspectPlay,
@@ -221,7 +222,8 @@ export async function bootUxPreview() {
       gold: confirmGold(play),
       enabled: confirmEnabled(play),
       guide: guideCopy(play),
-      guideOn: play.guideOn,
+      guideOn: true,
+      guideSteps: guideSteps(play),
       battle: battleCard(play),
       replay: play.phase === PHASE.DONE,
       route,
@@ -257,8 +259,8 @@ export async function bootUxPreview() {
       : POCKET_FIT;
     camera.fitBounds(bounds, {
       padding: 12,
-      padTop: 56,
-      padBottom: 132,
+      padTop: 92,
+      padBottom: 144,
       fillFrame: false,
     });
   }
@@ -396,12 +398,17 @@ export async function bootUxPreview() {
       territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
       const marks = highlights(play);
       const byName = (name) => territories.find((t) => t.name === name);
+      const wave = 0.5 + 0.5 * Math.sin(performance.now() / 280);
+      const pulsing = new Set(marks.pulse || []);
       for (const name of marks.legal || []) {
+        ctx.save();
+        if (pulsing.has(name)) ctx.globalAlpha = 0.42 + 0.58 * wave;
         strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
           color: SELECT_GOLD,
           dashed: true,
-          width: 2.6,
+          width: pulsing.has(name) ? 3.4 + 1.2 * wave : 2.6,
         });
+        ctx.restore();
       }
       for (const name of marks.landable || []) {
         strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
@@ -411,10 +418,13 @@ export async function bootUxPreview() {
         });
       }
       if (marks.origin) {
+        ctx.save();
+        if (pulsing.has(marks.origin)) ctx.globalAlpha = 0.46 + 0.54 * wave;
         strokeSelectOutline(ctx, byName(marks.origin), territoryRenderer, camera.zoom, {
           color: SELECT_GOLD,
-          width: 3.2,
+          width: pulsing.has(marks.origin) ? 3.8 + 1.4 * wave : 3.2,
         });
+        ctx.restore();
       }
       if (marks.dest) {
         strokeSelectOutline(ctx, byName(marks.dest), territoryRenderer, camera.zoom, {
@@ -437,13 +447,40 @@ export async function bootUxPreview() {
         selectedName: selected?.name || null,
         stacksExpanded,
         factionColors,
+        pulseNames: marks.pulse || [],
+        pulseWave: wave,
       });
+      if (pulsing.has(play.origin) && play.phase === PHASE.COMBAT_MOVE) {
+        const originLand = byName(play.origin);
+        const center = originLand && territoryCenter(originLand);
+        if (center) {
+          const z = Math.max(0.22, camera.zoom);
+          const w = 54 / z;
+          const h = 22 / z;
+          const x = center.x;
+          const y = center.y - 40 / z;
+          ctx.save();
+          ctx.globalAlpha = 0.78 + 0.22 * wave;
+          ctx.fillStyle = SELECT_GOLD;
+          ctx.beginPath();
+          ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+          ctx.fill();
+          ctx.fillStyle = '#1E2420';
+          ctx.font = `700 ${14 / z}px -apple-system, "SF Pro Text", sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.globalAlpha = 1;
+          ctx.fillText('TAP', x, y);
+          ctx.restore();
+        }
+      }
       ctx.restore();
     }
   }
 
   function loop() {
-    if (camera.dirty || camera._targetX !== null) {
+    const pulsing = highlights(play).pulse?.length > 0;
+    if (camera.dirty || camera._targetX !== null || pulsing) {
       camera.dirty = false;
       paint();
     }
@@ -525,7 +562,9 @@ export async function bootUxPreview() {
       owners: Object.keys(owners).length,
       placements: Object.keys(placements).length,
       continents: continents.length,
-      idleConfirm: 'Select your stack',
+      idleConfirm: 'Tap the glowing red stack',
+      phaseStrip: guideSteps(play),
+      pulse: highlights(play).pulse,
       confirmGold: SELECT_GOLD,
       stress: stressOn,
       play: inspectPlay(play),

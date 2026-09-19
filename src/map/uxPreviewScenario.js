@@ -38,8 +38,15 @@ export const SELECT_GOLD = '#C4A35A';
 export const LEGAL_GOLD = '#C4A35A';
 export const LAND_TEAL = '#5BA8A0';
 
+export const MOVE_STEPS = [
+  'Tap your red stack',
+  'Pick INF+FTR',
+  'Tap Finland',
+  'Confirm',
+];
+
 export const GUIDE = {
-  [PHASE.COMBAT_MOVE]: 'Tap Karelia, pick INF + FTR, tap Finland, Confirm.',
+  [PHASE.COMBAT_MOVE]: '1 Tap your red stack · 2 Pick INF+FTR · 3 Tap Finland · 4 Confirm',
   [PHASE.BATTLE]: 'One Confirm at a time — AA, then dice, then hits.',
   [PHASE.AIR_LAND]: 'Teal lands can take the fighter. Tap one, Confirm.',
   [PHASE.DONE]: 'Fighter landed. Confirm is idle — Replay if you want.',
@@ -318,15 +325,30 @@ export function confirmGold(state) {
   return confirmEnabled(state);
 }
 
+export function hasDemoAttackForce(selectedUnits) {
+  return hasGround(selectedUnits) && hasAir(selectedUnits);
+}
+
+export function combatMoveStep(state) {
+  if (!state || state.phase !== PHASE.COMBAT_MOVE) return 0;
+  if (state.destPicked && hasGround(state.selectedUnits)) return 4;
+  if (hasDemoAttackForce(state.selectedUnits)) return 3;
+  if (state.selected === state.origin || pickedCount(state.selectedUnits)) return 2;
+  return 1;
+}
+
 export function confirmLabel(state) {
-  if (!state) return 'Select your stack';
+  if (!state) return 'Tap the glowing red stack';
   if (state.phase === PHASE.COMBAT_MOVE) {
     if (state.destPicked && hasGround(state.selectedUnits)) {
       return `Confirm: Move to ${state.dest}`;
     }
-    if (state.selected !== state.origin) return 'Select your stack';
-    if (!hasGround(state.selectedUnits)) return 'Pick infantry, then a dest';
-    return 'Tap Finland Norway';
+    if (state.selected !== state.origin && !pickedCount(state.selectedUnits)) {
+      return 'Tap the glowing red stack';
+    }
+    if (!hasGround(state.selectedUnits)) return 'Pick INF + FTR';
+    if (!hasAir(state.selectedUnits)) return 'Pick the fighter too';
+    return 'Tap glowing Finland';
   }
   if (state.phase === PHASE.BATTLE) {
     const step = state.battle?.step;
@@ -346,11 +368,26 @@ export function confirmLabel(state) {
       ? `Landed in ${state.landingDest} · Replay`
       : 'Replay scenario';
   }
-  return 'Select your stack';
+  return 'Tap the glowing red stack';
 }
 
 export function guideCopy(state) {
   return GUIDE[state?.phase] || GUIDE[PHASE.COMBAT_MOVE];
+}
+
+export function guideSteps(state) {
+  if (state?.phase === PHASE.COMBAT_MOVE) {
+    return {
+      persistent: true,
+      current: combatMoveStep(state),
+      steps: [...MOVE_STEPS],
+    };
+  }
+  return {
+    persistent: true,
+    current: 0,
+    steps: [guideCopy(state)],
+  };
 }
 
 export function highlights(state) {
@@ -360,14 +397,16 @@ export function highlights(state) {
     legal: [],
     landable: [],
     selected: state?.selected || null,
+    pulse: [],
   };
   if (!state) return out;
   if (state.phase === PHASE.COMBAT_MOVE) {
-    if (state.selected === state.origin || pickedCount(state.selectedUnits)) {
-      out.origin = state.origin;
-    }
+    out.origin = state.origin;
+    const originTapped = state.selected === state.origin || pickedCount(state.selectedUnits);
+    if (!originTapped) out.pulse.push(state.origin);
     if (hasGround(state.selectedUnits)) {
       out.legal = [state.dest];
+      if (!state.destPicked) out.pulse.push(state.dest);
     }
     if (state.destPicked) out.dest = state.destPicked;
   }
@@ -706,6 +745,8 @@ export function inspectPlay(state) {
     confirmEnabled: confirmEnabled(state),
     guideOn: !!state?.guideOn,
     guide: guideCopy(state),
+    guideSteps: guideSteps(state),
+    combatMoveStep: combatMoveStep(state),
     battleStep: state?.battle?.step || null,
     aaHits: state?.battle?.aaHits ?? null,
     attackHits: state?.battle?.attackHits ?? null,

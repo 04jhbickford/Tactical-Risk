@@ -1,4 +1,4 @@
-# SCORE — V2.81.53-ux-preview.3
+# SCORE — V2.81.53-ux-preview.4
 **Preview only** `?three=1` or `?ux=1`. Live Canvas / main production untouched. Do not merge.
 
 ```
@@ -11,7 +11,7 @@ vizP1Coach=false
 scenario=karelia-finland-air
 ```
 
-**Lineage:** follow-up on Hybrid PR68 (`cursor/main-art-three-ux-9380`). James: play combat move, battle, airplane landing on ~390 phone chrome. Tesla off.
+**Lineage:** follow-up on Hybrid PR68 (`cursor/main-art-three-ux-9380`) / PR73. James: combat-move start was not discoverable. Tesla off. Do not merge to main.
 
 ## Playable pocket
 Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** (INF×2 + AA). After the take, land the fighter on teal **Russia** or **Karelia**. Seeded AA miss + ATK 2 / DEF 1.
@@ -19,24 +19,26 @@ Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** (INF×2 
 ## Layer B — UX (Three preview)
 | Gate | Verdict | Note |
 |---|---|---|
-| Combat move origin/dest | **PASS** | Gold origin + dest. Confirm: Move to Finland Norway. |
+| Cold-open start | **PASS** | Numbered strip + pulsing Karelia + TAP chip before any tap. |
+| Combat move origin/dest | **PASS** | Origin pulses until tap. Dest pulses after INF+FTR. Confirm gold when legal. |
 | Battle AA / dice / hits | **PASS** | One bottom card. Zoom hidden. Single gold CTA. |
 | Air land + Done | **PASS** | Teal landable. Confirm: Land in Russia. After: idle Replay, not gold. |
-| Phase guide | **BRIEF** | One-line strip, dismiss ×. Does not block the board. |
+| Phase guide | **STRIP** | Persistent numbered steps. Not a Got it modal. No ×. |
 | No icon overlap | **PASS** | Same STACK-LOD pack as preview.2. |
-| Mobile ~390 | **PASS** | Thumb Confirm. Peek or battle card, not both. |
+| Mobile ~390 | **PASS** | 64px thumb Confirm. Peek or battle card, not both. |
 
 ## How-to (390)
-1. **Combat move** — Tap Karelia → tap INF + FTR chips → tap Finland (gold dest) → gold **Confirm: Move to Finland Norway**.
+Cold open already shows the path. Then:
+1. **Combat move** — Tap glowing Karelia → tap INF + FTR chips → tap glowing Finland → gold **Confirm: Move to Finland Norway**.
 2. **Battle** — Confirm Fire AA (miss) → Continue → Roll combat → Take hits → Take Finland Norway.
 3. **Air land** — Tap teal Russia → **Confirm: Land in Russia**. Confirm drops to idle `Landed in Russia · Replay`.
 
 ## Stills @390
+- `combat-move-cold-390.png` — strip + pulsing origin + TAP, no taps yet
 - `combat-move-select-390.png` — origin/dest gold, Confirm gold
 - `battle-mid-390.png` — Round 1 dice + hits
 - `air-land-choice-390.png` — teal Russia + Karelia
 - `air-landed-390.png` — fighter in Russia, Confirm idle
 
-**Vercel:** https://tactical-risk20-jj7jpthqb-james-projects-20d8de40.vercel.app/?three=1
-**Git alias:** https://tactical-risk20-git-cursor-mobil-9c9397-james-projects-20d8de40.vercel.app/?three=1
-**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · do not merge to main)
+**Vercel:** (pending this revision)
+**PR:** draft into PR68 lineage (do not merge to main)
