@@ -1,0 +1,439 @@
+// Classic 1942 solo vs AI under Three chrome.
+// S1: cold start + seats + IPC/capitals + inspect board. Phases still thin.
+// Preview only. Do not merge to main. Do not grow uxPreviewScenario.js.
+
+import { Camera, MAP_WIDTH } from './camera.js';
+import { MapRenderer } from './mapRenderer.js';
+import { TerritoryRenderer } from './territoryRenderer.js';
+import { TerritoryMap } from './territoryMap.js';
+import { injectThreeChrome } from './threeMapChrome.js';
+import {
+  preloadUnitImages,
+  renderPreviewStacks,
+  hitTestPreviewStack,
+  territoryCenter,
+} from './uxPreviewUnits.js';
+import {
+  dismissStartupLoader,
+  reportStartupError,
+  reportStartupStatus,
+} from '../ui/startupLoader.js';
+import { GAME_VERSION } from '../version.js';
+import {
+  bindSealedActivate,
+  clientPointOf,
+  eventElement,
+  shouldIgnoreMapHit,
+} from './threeChromeEvents.js';
+import { AIController } from '../ai/aiController.js';
+import { TURN_PHASE_NAMES } from '../state/gameState.js';
+import {
+  startClassicSolo,
+  placementsFromState,
+  inspectSolo,
+  DEFAULT_HUMAN_SEAT,
+} from './threeSoloMatch.js';
+
+const SELECT_GOLD = '#C4A35A';
+const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
+
+function applyLiveContinents(list, bonusGroups) {
+  const of = new Map();
+  for (const c of bonusGroups || []) {
+    for (const n of c.territories || []) of.set(n, c.name);
+  }
+  for (const t of list || []) {
+    if (of.has(t.name)) t.continent = of.get(t.name);
+  }
+}
+
+function strokeSelectOutline(ctx, territory, territoryRenderer, zoom, {
+  color = SELECT_GOLD,
+  dashed = false,
+  width = 3.4,
+} = {}) {
+  if (!territory) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = Math.max(2.2, width / Math.max(0.18, zoom));
+  ctx.shadowColor = 'rgba(30, 36, 32, 0.72)';
+  ctx.shadowBlur = dashed ? 0 : 10 / Math.max(0.18, zoom);
+  if (dashed) ctx.setLineDash([10 / Math.max(0.18, zoom), 7 / Math.max(0.18, zoom)]);
+  if (territory.polygons.length === 1) {
+    territoryRenderer._strokePoly(ctx, territory.polygons[0]);
+  } else {
+    const edges = territoryRenderer._getExternalEdgesWithTolerance(
+      territory.polygons,
+      territory.name,
+    );
+    territoryRenderer._strokeEdges(ctx, edges);
+  }
+  ctx.restore();
+}
+
+export async function bootThreeSolo() {
+  reportStartupStatus('Solo vs AI — loading 1942 board…', 28);
+
+  let territories;
+  let continents;
+  let setup;
+  let unitDefs;
+  try {
+    const [tRes, cRes, sRes, uRes] = await Promise.all([
+      fetch('data/territories.json'),
+      fetch('data/continents.json'),
+      fetch('data/setup.json'),
+      fetch('data/units.json'),
+    ]);
+    if (!tRes.ok || !cRes.ok || !sRes.ok || !uRes.ok) throw new Error('map data fetch failed');
+    territories = await tRes.json();
+    continents = await cRes.json();
+    setup = await sRes.json();
+    unitDefs = await uRes.json();
+    applyLiveContinents(territories, continents);
+  } catch (err) {
+    console.error(err);
+    reportStartupError('Solo vs AI could not load territory data.');
+    return;
+  }
+
+  const canvas = document.getElementById('mapCanvas');
+  if (!canvas) {
+    reportStartupError('Solo vs AI missing #mapCanvas.');
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const camera = new Camera(canvas);
+  camera.usePhoneMinZoom = true;
+
+  const mapRenderer = new MapRenderer();
+  const territoryRenderer = new TerritoryRenderer(territories, continents);
+  const territoryMap = new TerritoryMap(territories);
+  const factions = setup.classic?.factions || setup.factions || [];
+  const factionColors = new Map(factions.map((f) => [f.id, f.color]));
+
+  let gameState = startClassicSolo(setup, territories, continents);
+  gameState.unitDefs = unitDefs;
+  territoryRenderer.setGameState(gameState);
+
+  const openingHuman = gameState.players.find((p) => !p.isAI) || gameState.players[0];
+  const human = openingHuman;
+  const chrome = injectThreeChrome({
+    seat: human?.name || DEFAULT_HUMAN_SEAT,
+    ipc: gameState.getIPCs(human?.id) || 0,
+    phase: TURN_PHASE_NAMES[gameState.turnPhase] || 'Develop Tech',
+  });
+  chrome.setSeat(human?.name || DEFAULT_HUMAN_SEAT, human?.color || '#B22222');
+
+  let aiController = null;
+  function wireAI() {
+    if (aiController) return aiController;
+    aiController = new AIController();
+    aiController.setUnitDefs(unitDefs);
+    aiController.setCanAct(() => true);
+    aiController.setGameState(gameState);
+    return aiController;
+  }
+  wireAI();
+
+  reportStartupStatus('Loading main tiles and unit chits…', 52);
+  const { images, ready: imagesReady } = preloadUnitImages(
+    unitDefs,
+    factions.map((f) => f.id),
+  );
+  await Promise.all([mapRenderer.load(), imagesReady]);
+
+  function resizeCanvas() {
+    const dpr = devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    camera.onResize();
+  }
+  resizeCanvas();
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+    fitEurope();
+  });
+
+  let selected = null;
+  let stacksExpanded = false;
+  let hover = null;
+  let unsubscribe = null;
+
+  function bindState(next) {
+    if (unsubscribe) unsubscribe();
+    gameState = next;
+    gameState.unitDefs = unitDefs;
+    territoryRenderer.setGameState(gameState);
+    unsubscribe = gameState.subscribe(() => {
+      paintChrome();
+      camera.dirty = true;
+    });
+  }
+
+  function landByName(name) {
+    return territories.find((t) => t.name === name) || null;
+  }
+
+  function currentPlacements() {
+    return placementsFromState(gameState);
+  }
+
+  function paintChrome() {
+    const current = gameState.currentPlayer;
+    const you = gameState.players.find((p) => !p.isAI) || current;
+    chrome.setPhase(TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY');
+    chrome.setSeat(current?.name || you?.name || '—', current?.color || you?.color);
+    chrome.setIpc(gameState.getIPCs(you?.id) || 0);
+    const land = selected;
+    const stacks = land ? (gameState.units[land.name] || []) : [];
+    chrome.paintPlay({
+      land,
+      stacks,
+      label: current?.isAI
+        ? `${current.name} thinking…`
+        : `${TURN_PHASE_NAMES[gameState.turnPhase] || 'Phase'} · S2 next`,
+      gold: false,
+      enabled: false,
+      guide: '',
+      guideOn: false,
+      battle: null,
+      replay: false,
+      route: 'Classic 1942 · inspect',
+    });
+  }
+
+  chrome.onStackToggle = (on) => {
+    stacksExpanded = on;
+    camera.dirty = true;
+  };
+  chrome.onNewGameVsAI = () => {
+    startMatch();
+  };
+
+  function startMatch() {
+    bindState(startClassicSolo(setup, territories, continents));
+    if (aiController) aiController.setGameState(gameState);
+    else wireAI();
+    selected = null;
+    gameState.autoSave();
+    paintChrome();
+    fitEurope();
+    camera.dirty = true;
+  }
+
+  bindState(gameState);
+
+  function fitEurope() {
+    camera.fitBounds(EUROPE_FIT, {
+      padding: 12,
+      padTop: 56,
+      padBottom: 96,
+      fillFrame: true,
+    });
+  }
+
+  function eventFromChrome(e) {
+    const node = eventElement(e);
+    if (!node || typeof node.closest !== 'function') return false;
+    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-phase-strip');
+  }
+
+  function ignoreMapHit(e) {
+    const pt = clientPointOf(e);
+    return shouldIgnoreMapHit({
+      sheetOpen: chrome.isSheetOpen(),
+      targetInChrome: eventFromChrome(e),
+      clientX: pt?.x,
+      clientY: pt?.y,
+      rects: chrome.hitRects(),
+    });
+  }
+
+  function pickAt(sx, sy) {
+    const world = camera.screenToWorld(sx, sy);
+    world.x = ((world.x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
+    const fromStack = hitTestPreviewStack(world.x, world.y, {
+      territories,
+      placements: currentPlacements(),
+      zoom: camera.zoom,
+      selectedName: selected?.name,
+      stacksExpanded,
+    });
+    return fromStack || territoryMap.hitTest(world.x, world.y);
+  }
+
+  function selectLand(next) {
+    selected = next || null;
+    paintChrome();
+    camera.dirty = true;
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (ignoreMapHit(e)) return;
+    camera.onMouseDown(e);
+  });
+  canvas.addEventListener('mousemove', (e) => {
+    if (camera.onMouseMove(e)) {
+      canvas.classList.add('is-panning');
+      return;
+    }
+    if (ignoreMapHit(e)) {
+      hover = null;
+      canvas.classList.remove('is-hovering');
+      return;
+    }
+    const hit = pickAt(e.clientX, e.clientY);
+    hover = hit;
+    canvas.classList.toggle('is-hovering', !!hit);
+    camera.dirty = true;
+  });
+  window.addEventListener('mouseup', (e) => {
+    const wasDrag = camera.onMouseUp();
+    canvas.classList.remove('is-panning');
+    if (wasDrag) return;
+    if (ignoreMapHit(e)) return;
+    selectLand(pickAt(e.clientX, e.clientY));
+  });
+  canvas.addEventListener('wheel', (e) => camera.onWheel(e), { passive: false });
+
+  let pinch = null;
+  canvas.addEventListener('touchstart', (e) => {
+    if (ignoreMapHit(e)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      pinch = {
+        dist: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+        zoom: camera.zoom,
+      };
+      camera._dragging = false;
+      return;
+    }
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      camera.onMouseDown({
+        button: 0,
+        clientX: t.clientX,
+        clientY: t.clientY,
+        preventDefault() { e.preventDefault(); },
+      });
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => {
+    if (pinch && e.touches.length === 2) {
+      e.preventDefault();
+      const [a, b] = e.touches;
+      const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      const factor = dist / Math.max(1, pinch.dist);
+      camera.zoom = Math.max(camera.minZoom, Math.min(3, pinch.zoom * factor));
+      camera.onResize();
+      return;
+    }
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      camera.onMouseMove({ clientX: t.clientX, clientY: t.clientY });
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) pinch = null;
+    if (e.touches.length === 0) {
+      const wasDrag = camera.onMouseUp();
+      canvas.classList.remove('is-panning');
+      if (wasDrag || ignoreMapHit(e)) return;
+      const t = e.changedTouches[0];
+      if (t) selectLand(pickAt(t.clientX, t.clientY));
+    }
+  });
+
+  bindSealedActivate(chrome.zoom, '[data-zoom]', (e, btn) => {
+    if (btn.dataset.zoom === 'fit') fitEurope();
+    else camera.zoomBy(btn.dataset.zoom);
+  });
+
+  function paint() {
+    camera.update();
+    const dpr = devicePixelRatio || 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#3CC0BF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    camera.applyTransform(ctx);
+
+    const viewport = camera.getViewport();
+    const startCopy = Math.floor(viewport.x / MAP_WIDTH);
+    const endCopy = Math.floor((viewport.x + viewport.width) / MAP_WIDTH);
+    const placements = currentPlacements();
+    for (let copy = startCopy; copy <= endCopy; copy++) {
+      const offsetX = copy * MAP_WIDTH;
+      ctx.save();
+      ctx.translate(offsetX, 0);
+      const localViewport = {
+        x: viewport.x - offsetX,
+        y: viewport.y,
+        width: viewport.width,
+        height: viewport.height,
+      };
+      mapRenderer.render(ctx, localViewport, { flatOcean: false });
+      territoryRenderer.renderWaterMask(ctx);
+      territoryRenderer.renderOwnershipOverlays(ctx, camera.zoom);
+      territoryRenderer.renderTerrainTexture(ctx, camera.zoom);
+      territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
+      if (selected) {
+        strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          width: 3.2,
+        });
+      }
+      renderPreviewStacks(ctx, {
+        territories,
+        placements,
+        images,
+        zoom: camera.zoom,
+        selectedName: selected?.name || null,
+        stacksExpanded,
+        factionColors,
+      });
+      ctx.restore();
+    }
+  }
+
+  function loop() {
+    if (camera.dirty || camera._targetX !== null) {
+      camera.dirty = false;
+      paint();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  fitEurope();
+  paintChrome();
+  gameState.autoSave();
+  paint();
+  requestAnimationFrame(loop);
+  dismissStartupLoader();
+
+  window.__threeSolo = {
+    version: GAME_VERSION,
+    inspect: () => inspectSolo(gameState),
+    selectLand: (name) => {
+      const t = landByName(name);
+      if (t) selectLand(t);
+      return t?.name || null;
+    },
+    newGame: () => {
+      startMatch();
+      return inspectSolo(gameState);
+    },
+    chrome,
+    gameState,
+  };
+
+  return window.__threeSolo;
+}

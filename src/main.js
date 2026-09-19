@@ -3202,17 +3202,25 @@ async function init() {
   dismissStartupLoader();
 }
 
+function queryFlagOn(value) {
+  const v = String(value || '').toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes';
+}
+
 function wantsUxPreview(search = location.search) {
   const params = new URLSearchParams(search);
-  const on = (value) => {
-    const v = String(value || '').toLowerCase();
-    return v === '1' || v === 'true' || v === 'yes';
-  };
-  return on(params.get('three')) || on(params.get('ux'));
+  return queryFlagOn(params.get('three')) || queryFlagOn(params.get('ux'));
+}
+
+function wantsSolo(search = location.search) {
+  return wantsUxPreview(search) && queryFlagOn(new URLSearchParams(search).get('solo'));
 }
 
 if (wantsUxPreview()) {
-  import('./map/uxPreview.js').then((mod) => mod.bootUxPreview()).catch((err) => {
+  const boot = wantsSolo()
+    ? import('./map/threeSoloBoot.js').then((mod) => mod.bootThreeSolo())
+    : import('./map/uxPreview.js').then((mod) => mod.bootUxPreview());
+  boot.catch((err) => {
     console.error('Failed to start UX preview:', err);
     reportStartupError('Could not start the UX preview. Canvas 2D is unchanged at /');
   });

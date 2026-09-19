@@ -11,6 +11,24 @@ export function isUxPreviewRequested(search = typeof location !== 'undefined' ? 
   return ON.has(three) || ON.has(ux);
 }
 
+// Full classic solo vs AI under Three chrome. Pocket demo stays ?three=1 / ?max=1.
+export function isSoloRequested(search = typeof location !== 'undefined' ? location.search : '') {
+  if (!isUxPreviewRequested(search)) return false;
+  const params = new URLSearchParams(search);
+  return ON.has(String(params.get('solo') || '').toLowerCase());
+}
+
+export function soloHref(href = typeof location !== 'undefined' ? location.href : 'http://localhost/') {
+  const url = new URL(href, 'http://localhost/');
+  url.searchParams.set('three', '1');
+  url.searchParams.delete('ux');
+  url.searchParams.delete('max');
+  url.searchParams.delete('stress');
+  url.searchParams.delete('demo');
+  url.searchParams.set('solo', '1');
+  return url.toString();
+}
+
 // Fat Karelia → Ukraine battle. ?max=1, ?stress=1, or ?demo=max
 export function isMaxBattleRequested(search = typeof location !== 'undefined' ? location.search : '') {
   const params = new URLSearchParams(search);
@@ -24,5 +42,9 @@ export function stripPreviewParams(href = typeof location !== 'undefined' ? loca
   const url = new URL(href, 'http://localhost/');
   url.searchParams.delete('three');
   url.searchParams.delete('ux');
+  url.searchParams.delete('solo');
+  url.searchParams.delete('max');
+  url.searchParams.delete('stress');
+  url.searchParams.delete('demo');
   return url.toString();
 }

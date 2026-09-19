@@ -1,11 +1,20 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** PLAN ONLY. Do not implement Phase 2 in this commit.  
+**Status:** S0 + S1 landed. **STOP before S2.** Hold merge.  
 **Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.53-ux-preview.11` · SCHEMA 11  
-**Tip URL:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
+**Tip:** `V2.81.55-ux-solo.1` · SCHEMA 11  
+**Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
+**Solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
 **Live main:** https://tactical-risk20.vercel.app/ · `V2.81.55` · SCHEMA 11  
 **Tesla / Viz:** off. Side / hybrid only. **Keep off `main` until a separate yes.**
+
+## S0 / S1 landed (2026-09-19)
+
+**S0** — Cherry-picked main `b98a4df` (V2.81.54 AA-wipe fail-close) and `e99f629` (V2.81.55 game-log / diagnostics) onto this side branch. Tip UX kept. `GAME_VERSION` is `V2.81.55-ux-solo.1`.
+
+**S1** — `?three=1&solo=1` and menu **New Game vs AI** boot real `GameState` classic 1942: 1 human (Russians) + 4 medium AI, historical capitals stamped, live IPC, Develop Tech chrome, inspect-only board. Pocket `?three=1&max=1` unchanged (`uxPreviewScenario.js` not grown).
+
+**Still stubbed (S2+):** End Phase / purchase / combat-move / combat / NCM / mobilize / win. Confirm is idle. AI is wired but waits on the human seat.
 
 This brief tells Arc how to port a **real solo match vs AI** onto the tip `.11` Three UX without rewriting the rules engine and without touching lobby / multiplayer / `main`.
 
@@ -265,8 +274,6 @@ A playtester on a **390-wide** viewport, **no lobby**, can:
 
 ## Kickoff note for Phase 2
 
-**READY FOR PHASE 2 GO.**
+**S0 + S1 DONE. STOP — ready for Arc pause before S2.**
 
-Not blocked on product questions. First Phase 2 commit should be **S0 + S1 only** (bring 54/55 onto the side branch, add `?three=1&solo=1` boot). Do not start S4 combat-adapter until S0 is on the branch.
-
-Hold PR76 merge. This file is the SoT for the solo-AI port.
+Do not start S2 (phase shell / End Phase) until the next yes. Hold PR76 merge.

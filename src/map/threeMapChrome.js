@@ -4,7 +4,7 @@
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
-import { stripPreviewParams } from './uxPreviewFlag.js';
+import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
 import {
   bindSealedActivate,
   chromeHitRectsFrom,
@@ -567,6 +567,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   sheet.innerHTML = `
     <h2>Match</h2>
     <button type="button" class="three-sheet-row" data-sheet="close">Back to board</button>
+    <button type="button" class="three-sheet-row" data-sheet="solo">New Game vs AI</button>
     <button type="button" class="three-sheet-row" data-sheet="canvas">Open live Canvas (no preview)</button>
     <p class="three-sheet-note">Preview only · main art · Three UX · SCHEMA ${SCHEMA_VERSION} · do not merge.</p>
   `;
@@ -599,6 +600,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     onLossPick: null,
     onLossStep: null,
     onGuideDismiss: null,
+    onNewGameVsAI: null,
     hitRects() {
       return chromeHitRectsFrom(api);
     },
@@ -908,6 +910,15 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bindSealedActivate(sheet, '[data-sheet]', (e, row) => {
     if (row.dataset.sheet === 'canvas') {
       location.href = stripPreviewParams(location.href);
+      return;
+    }
+    if (row.dataset.sheet === 'solo') {
+      if (typeof api.onNewGameVsAI === 'function') {
+        api.setSheetOpen(false);
+        api.onNewGameVsAI();
+        return;
+      }
+      location.href = soloHref(location.href);
       return;
     }
     api.setSheetOpen(false);

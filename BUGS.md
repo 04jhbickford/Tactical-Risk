@@ -2,6 +2,15 @@
 
 ---
 
+## 9.19.26 — V2.81.55-ux-solo.1 S0+S1 (preview only)
+
+S0: main V2.81.54 AA-wipe + V2.81.55 game-log brought onto PR76.  
+S1: `?three=1&solo=1` / New Game vs AI boots classic GameState (1 human +
+4 medium AI, historical capitals stamped). Phases still thin. Pocket
+`?three=1&max=1` kept. Do not merge. STOP before S2.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.11 tiles + split air land
 
 James: air land must pick WHICH planes land WHERE (partial by type
