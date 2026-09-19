@@ -84,6 +84,7 @@ function legalMoveDests(gameState, from) {
 function phaseWord(gameState, ui) {
   if (gameState.gameOver) return 'VICTORY';
   if (!ui.started) return 'SOLO';
+  if (ui.mode === 'collect' || ui.holdCollect) return 'COLLECT';
   if (ui.mode === 'airLand') return 'AIR LAND';
   if (ui.combat) return 'BATTLE';
   if (!isHumanTurn(gameState, ui.seatId)) return 'AI';
@@ -153,6 +154,10 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
     }
     const phase = gameState.turnPhase;
     if (phase === TURN_PHASES.COMBAT) {
+      if (ui.combat) {
+        ui.mode = 'combat';
+        return;
+      }
       dequeueResolvedHeads(gameState, unitDefs);
       if (gameState.combatQueue?.length) {
         const name = gameState.combatQueue[0];
@@ -338,16 +343,28 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
       syncMode();
       return;
     }
+    if (ui.mode === 'combatIdle') {
+      dequeueResolvedHeads(gameState, unitDefs);
+      if (!gameState.combatQueue?.length) gameState.nextPhase();
+      resetPicks();
+      syncMode();
+      return;
+    }
     if (ui.mode === 'combat' && ui.combat) {
       const before = ui.combat.step;
       confirmCombat(ui.combat, gameState, unitDefs);
+      if (!ui.combat) {
+        syncMode();
+        return;
+      }
       if (ui.combat.step === BATTLE_STEP.WON && before !== BATTLE_STEP.WON) {
         return;
       }
       if (ui.combat.step === BATTLE_STEP.WON) {
         const dest = ui.combat.territory;
-        if (!ui.combat.failed && beginAirLand(dest)) return;
+        const failed = !!ui.combat.failed;
         ui.combat = null;
+        if (!failed && beginAirLand(dest)) return;
         dequeueResolvedHeads(gameState, unitDefs);
         if (!gameState.combatQueue?.length) {
           gameState.nextPhase();
@@ -495,6 +512,9 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
         enabled: combatConfirmEnabled(ui.combat, gameState),
       };
     }
+    if (ui.mode === 'combatIdle') {
+      return { label: 'Confirm: End battles', gold: true, enabled: true };
+    }
     if (ui.mode === 'airLand') {
       const ready = !!ui.landingDest && pickedCount(ui.landingPick) > 0;
       return {
@@ -582,16 +602,31 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
       : null;
     const confirm = confirmModel();
     const airLand = ui.mode === 'airLand';
+    const moveFrom = (ui.mode === 'combatMove' || ui.mode === 'ncm') ? findStagedOrigin() : null;
     let route = ui.notice || '';
     if (ui.mode === 'splash') route = 'Russians vs 4 AI · classic board';
-    if (ui.mode === 'combatMove' && ui.dest) route = `${findStagedOrigin() || ''} → ${ui.dest}`;
-    if (ui.mode === 'ncm' && ui.dest) route = `${findStagedOrigin() || ''} → ${ui.dest}`;
+    if ((ui.mode === 'combatMove' || ui.mode === 'ncm') && ui.dest) {
+      route = `${moveFrom || ''} → ${ui.dest}`;
+    }
     if (airLand) route = ui.landingDest ? `Confirm land · ${ui.landingDest}` : 'Pick a teal land';
     if (ui.mode === 'ai') route = ui.notice || `${gameState.currentPlayer?.name || 'AI'} thinking…`;
     if (gameState.gameOver) route = gameState.winCondition || 'Game over';
+    const focusName = airLand
+      ? (ui.landingDest || 'Land aircraft')
+      : ((ui.mode === 'combatMove' || ui.mode === 'ncm') && (pickedCount(ui.picked) || ui.dest)
+        ? (moveFrom || ui.selected)
+        : ui.selected);
+    const focusLand = focusName && territories
+      ? (territories.find((t) => t.name === focusName) || { name: focusName })
+      : land;
+    const sheetLand = airLand
+      ? (focusLand || { name: 'Land aircraft' })
+      : (focusLand || ((ui.mode === 'purchase' || ui.mode === 'place' || ui.mode === 'collect' || ui.mode === 'tech')
+        ? { name: ui.mode === 'purchase' ? 'Purchase units' : ui.mode === 'place' ? 'Place units' : ui.mode === 'collect' ? 'Collect income' : 'Develop tech' }
+        : null));
     return {
-      land: airLand ? (land || { name: 'Land aircraft' }) : land,
-      stacks: airLand ? [] : (ui.selected ? stacksFor(gameState, ui.selected) : []),
+      land: sheetLand,
+      stacks: airLand ? [] : (focusName ? stacksFor(gameState, focusName) : []),
       steppers: steppers(),
       airLand,
       label: confirm.label,
