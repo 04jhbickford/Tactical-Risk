@@ -499,8 +499,11 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     transparent: false,
     side: THREE.DoubleSide,
     // P34: painted albedo is the hero — idle parchment emissive washed it to GIS.
-    emissive: 0x000000,
-    emissiveIntensity: 0,
+    // P37: paper floor so MeshStandard cannot crush STYLE REF watercolor.
+    // Select gold temporarily replaces this; setLandEmissive restores it.
+    emissive: world ? 0xffffff : 0x000000,
+    emissiveIntensity: world ? 0.34 : 0,
+    emissiveMap: world ? sheet : null,
   });
   if (top.normalMap) {
     const n = world && worldLandNormalMap ? IMHOF_NORMAL_SCALE : TOOTH_NORMAL_MID;
@@ -536,6 +539,8 @@ export function makeOceanMaterial() {
     roughness: 0.86,
     metalness: 0.0,
     envMapIntensity: 0.04,
+    emissive: 0xc8c4b4,
+    emissiveIntensity: 0.22,
     transparent: false,
     vertexColors: true,
   });

@@ -180,10 +180,12 @@ check('key/fill drama: warm key + cool fill/hemi',
   /warm-key-cool-fill/.test(spike)
   && /HemisphereLight\(0xD8D2C4, 0x5A5040/.test(spike)
   && /DirectionalLight\(0x7E9AAB/.test(spike)
-  && /0\.72/.test(spike));
+  && /0\.24/.test(spike));
 check('p37 paper-preserving lights keep STYLE REF watercolor',
-  /HemisphereLight\(0xD8D2C4, 0x5A5040, 0\.56\)/.test(spike)
-  && /toneMappingExposure = 0\.96/.test(spike));
+  /HemisphereLight\(0xD8D2C4, 0x5A5040, 1\.08\)/.test(spike)
+  && /toneMappingExposure = 2\.08/.test(spike)
+  && /LinearToneMapping/.test(spike)
+  && /ACESFilmicToneMapping/.test(spike));
 check('parchment tooth punches at 390 mid',
   /TOOTH_STRENGTH = 0\.42/.test(palette)
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
@@ -566,7 +568,7 @@ check('p34 land samples painted albedo, stain is OFF',
   && /stain is OFF/.test(terrain)
   && /WORLD_LAND_ALBEDO_REV/.test(terrain)
   && /painted albedo is the hero/.test(palette)
-  && /emissive: 0x000000/.test(palette));
+  && /paper floor so MeshStandard cannot crush/.test(palette));
 check('p33 no permanent name sprites',
   /permanent name sprites are gone/.test(spike)
   && !/labelTexture\(t\.name\)/.test(spike)
@@ -749,6 +751,16 @@ check('p37 Confirm gold + China hold stay',
   /#three-confirm\.is-ready:not\(:disabled\):not\(\.is-idle\) \{[\s\S]*?background:#C4A35A/.test(chrome)
   && /outer union only/.test(art)
   && /noMapLabels: true/.test(spike));
+check('p37 required stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/mid-vs-style-ref.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/australia-no-seam.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/africa-even.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/sea-zones-ink.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/med-no-clip.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/unit-bg-unified.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/china-hold.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/japan-near.png'));
+check('p37 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p37/SCORE.md')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

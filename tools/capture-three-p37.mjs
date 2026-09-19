@@ -74,7 +74,7 @@ print('wrote', ${JSON.stringify(dest)})
 
 async function main() {
   const puppeteer = await import('puppeteer-core');
-  const given = process.argv[2];
+  const given = process.argv.slice(2).find((a) => !a.startsWith('--'));
   let server = null;
   const url = given || (await (async () => {
     const local = await serveLocal();
@@ -113,6 +113,7 @@ async function main() {
     console.log('wrote', dest);
   };
 
+  const quick = process.argv.includes('--quick');
   await page.evaluate(() => window.__threeSpike.frameEuropeAfrica());
   await shot('europe-mid-390.png');
   await shot('mid-painted-relief.png');
@@ -120,6 +121,37 @@ async function main() {
   await shot('mid-continents.png');
   await shot('europe-mid-hud-390.png');
   await shot('sea-zones-ink.png');
+  if (quick) {
+    await page.evaluate(() => window.__threeSpike.frameAfrica({ lift: 210, south: 30 }));
+    await shot('africa-even.png');
+    await page.evaluate(() => {
+      window.__threeSpike.frameAustralia({ lift: 168, south: 22 });
+      window.__threeSpike.selectLand(null);
+    });
+    await shot('australia-no-seam.png');
+    const eastMed = await page.evaluate(() => window.__threeSpike.frameEastMed({ lift: 78, south: 11 }));
+    await shot('east-med-select-no-clip.png');
+    const centralMed = await page.evaluate(() => window.__threeSpike.frameCentralMed({ lift: 78, south: 9 }));
+    await shot('med-no-clip.png');
+    await shot('unit-bg-unified.png');
+    await page.evaluate(() => window.__threeSpike.frameChina({ lift: 118 }));
+    await shot('china-hold.png');
+    await shot('china-select-hold.png');
+    await page.evaluate(() => window.__threeSpike.frameNearJapan());
+    await shot('japan-near.png');
+    await shot('japan-near-hold.png');
+    const computed = await page.evaluate(() => ({
+      version: window.__threeSpike.inspect().version,
+      inspect: window.__threeSpike.inspect(),
+    }));
+    writeFileSync(join(outDir, 'computed.json'), JSON.stringify({ ...computed, eastMed, centralMed }, null, 2));
+    await browser.close();
+    if (server) server.close();
+    const styleRef = join(root, 'briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-oceania-style-lock.png');
+    composePair(join(outDir, 'europe-mid-390.png'), styleRef, join(outDir, 'mid-vs-style-ref.png'), 'p37 mid', 'STYLE REF');
+    composePair(join(outDir, 'australia-no-seam.png'), styleRef, join(outDir, 'australia-vs-style-ref.png'), 'p37 AU', 'STYLE REF');
+    return;
+  }
 
   await page.evaluate(() => window.__threeSpike.frameAfrica({ lift: 210, south: 30 }));
   await shot('africa-even.png');

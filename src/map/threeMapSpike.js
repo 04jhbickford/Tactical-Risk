@@ -322,7 +322,8 @@ export async function bootThreeMapSpike() {
     dashSize: 5.4,
     gapSize: 7.2,
   });
-  const seaInkMat = makeLineMat('#4A3C2C', 2.15, 0.78);
+  const seaInkMat = makeLineMat('#3A2E22', 2.8, 0.88);
+  seaInkMat.depthTest = false;
   lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, seaInkMat, ...continentMats.values());
 
   for (const land of lands) {
@@ -479,30 +480,33 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  // P37: paper-preserving key. ACES 1.22 + hemi 0.78 + key 1.18 blew
-  // STYLE REF watercolor to pale cream. Keep warm-key-cool-fill sculpt.
-  // MeshStandard only. No neon.
-  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 0.56);
+  // P37: scanned-paper light. ACESFilmicToneMapping + RoomEnvironment +
+  // hemi 0.78 / key 1.18 blew STYLE REF watercolor to pale cream.
+  // Keep warm-key-cool-fill sculpt. MeshStandard only. No neon.
+  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 1.08);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFE2B0, 0.72);
+  const key = new THREE.DirectionalLight(0xFFE2B0, 0.24);
   key.position.set(-96, 58, -28);
   key.target.position.set(WORLD_W * 0.42, 0, -WORLD_H * 0.38);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.26);
+  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.14);
   fill.position.set(72, 24, 44);
   scene.add(fill);
-  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.12);
+  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.08);
   bounce.position.set(12, -14, 22);
   scene.add(bounce);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.96;
+  renderer.toneMapping = THREE.LinearToneMapping; // paper; ACESFilmicToneMapping washed chroma
+  renderer.toneMappingExposure = 2.08;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
+  // Paper albedo is the hero — IBL washed sage/tan to cream.
+  scene.environment = null;
+  void pmrem;
+  void RoomEnvironment;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -699,9 +703,15 @@ export async function bootThreeMapSpike() {
     if (mats?.top?.emissive) {
       if (hex) {
         mats.top.emissive.setHex(hex);
+        mats.top.emissiveMap = null;
         mats.top.emissiveIntensity = 0.30;
+      } else if (getWorldLandTex()) {
+        mats.top.emissive.setHex(0xffffff);
+        mats.top.emissiveMap = getWorldLandTex();
+        mats.top.emissiveIntensity = 0.34;
       } else {
         mats.top.emissive.setHex(0x000000);
+        mats.top.emissiveMap = null;
         mats.top.emissiveIntensity = 0;
       }
     }
@@ -1103,7 +1113,7 @@ export async function bootThreeMapSpike() {
   const europeNorthOnScreen = ukXY && germanyXY && ukXY.y < germanyXY.y + 80;
   const ukWestOfGermany = ukXY && germanyXY && ukXY.x < germanyXY.x;
   const westEuropeWestOfGermany = westEuropeXY && germanyXY && westEuropeXY.x < germanyXY.x;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=slate-teal`, {
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=parchment-wash`, {
     africaSouthOfEurope,
     africaNotUnderNA,
     africaSouthOnScreen,
