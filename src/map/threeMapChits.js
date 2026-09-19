@@ -571,31 +571,54 @@ function isTanPlastic(hex) {
   return r > 130 && g > 90 && b < 130 && r - b > 28;
 }
 
-function drawOpaqueUnderbody(ctx, cx, cy, s, ownerColor) {
-  // Solid plastic disc under the sculpt so parchment cannot show through.
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx + s * 0.04, cy + s * 0.22, s * 0.78, s * 0.42, 0, 0, Math.PI * 2);
-  ctx.fillStyle = mixRgb(ownerColor || '#8E8F8C', '#2A2014', 0.28);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + s * 0.02, s * 0.70, s * 0.58, 0, 0, Math.PI * 2);
-  ctx.fillStyle = ownerColor || '#8E8F8C';
-  ctx.fill();
-  ctx.strokeStyle = '#1A140C';
-  ctx.lineWidth = Math.max(5, s * 0.08);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawPlasticRim(ctx, cx, cy, s, ownerColor) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + s * 0.04, s * 0.72, s * 0.60, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = isTanPlastic(ownerColor) ? '#1A140C' : '#0E0C08';
-  ctx.lineWidth = Math.max(isTanPlastic(ownerColor) ? 8 : 5, s * (isTanPlastic(ownerColor) ? 0.12 : 0.07));
-  ctx.stroke();
-  ctx.restore();
+function sealSculptHoles(pix, fillRgb, tan) {
+  // P38: close interior alpha holes so parchment cannot show through.
+  // Do NOT stamp a disc — keep the molded silhouette.
+  const d = pix.data;
+  const w = pix.width;
+  const h = pix.height;
+  const a0 = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) a0[i] = d[i * 4 + 3];
+  let cur = a0;
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Uint8Array(cur);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (cur[i] > 40) continue;
+        let n = 0;
+        if (cur[i - 1] > 80) n += 1;
+        if (cur[i + 1] > 80) n += 1;
+        if (cur[i - w] > 80) n += 1;
+        if (cur[i + w] > 80) n += 1;
+        if (n >= 2) next[i] = 255;
+      }
+    }
+    cur = next;
+  }
+  const rim = new Uint8Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      if (cur[i] > 40) continue;
+      if (cur[i - 1] > 80 || cur[i + 1] > 80 || cur[i - w] > 80 || cur[i + w] > 80) {
+        rim[i] = tan ? 230 : 190;
+      }
+    }
+  }
+  for (let i = 0; i < w * h; i++) {
+    if (a0[i] < 16 && cur[i] > 80) {
+      d[i * 4] = fillRgb[0];
+      d[i * 4 + 1] = fillRgb[1];
+      d[i * 4 + 2] = fillRgb[2];
+      d[i * 4 + 3] = 255;
+    } else if (a0[i] < 16 && rim[i] > 0) {
+      d[i * 4] = tan ? 22 : 14;
+      d[i * 4 + 1] = tan ? 16 : 12;
+      d[i * 4 + 2] = tan ? 10 : 8;
+      d[i * 4 + 3] = rim[i];
+    }
+  }
 }
 
 function paintMoldedMini(ctx, {
@@ -613,7 +636,6 @@ function paintMoldedMini(ctx, {
   const s = Math.min(w, h) * 0.42;
   if (shadow) drawContactShadow(ctx, cx, cy + s * 0.12, s);
   const bodyHex = isTanPlastic(ownerColor) ? mixRgb(ownerColor, '#3A2A14', 0.22) : ownerColor;
-  drawOpaqueUnderbody(ctx, cx, cy, s, bodyHex);
   const src = sampleCell(atlasImage(type), type);
   const [fr, fg, fb] = hexRgb(bodyHex || '#8E8F8C');
   if (src) {
@@ -647,11 +669,11 @@ function paintMoldedMini(ctx, {
       d[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
       d[i + 3] = a;
     }
+    sealSculptHoles(pix, [fr, fg, fb], isTanPlastic(bodyHex));
     tx.putImageData(pix, 0, 0);
     const dw = w * 0.96;
     const dh = h * 0.96;
     ctx.drawImage(tmp, (w - dw) / 2, (h - dh) / 2 - 2, dw, dh);
-    drawPlasticRim(ctx, cx, cy, s, bodyHex);
     // Soft toy-plastic specular — keep the sculpt, do not flatten to a disc.
     ctx.save();
     ctx.globalCompositeOperation = 'screen';

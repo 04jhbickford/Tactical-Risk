@@ -800,8 +800,8 @@ check('p38 slivers healed via outer-union + normal offset',
   && /outward vertex-normal offset/.test(art)
   && /landSliversHealed: true/.test(spike));
 check('p38 units opaque plastic + tan rim',
-  /drawOpaqueUnderbody/.test(chits)
-  && /drawPlasticRim/.test(chits)
+  /sealSculptHoles/.test(chits)
+  && /P38: close interior alpha holes/.test(chits)
   && /alphaTest: 0\.42/.test(spike)
   && /opaquePlastic: true/.test(spike)
   && /#8E6A38/.test(palette));
@@ -811,6 +811,26 @@ check('p38 baker: coastal greens + Imhof hatch + continent ≤22%',
   && /amount=0\.18/.test(albedoBaker)
   && /USSR_HEX/.test(albedoBaker)
   && /COAST_GREEN/.test(albedoBaker));
+check('p38 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md')));
+check('p38 required stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/mid-vs-style-ref.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/vegetation-coast.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/ocean-clean.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/land-borders.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/mountains-relief.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/continents-wash.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/unit-count-one.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/aus-no-slivers.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/tan-units-contrast.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/near-opaque-plastic.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/africa-even.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/stack-expand.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/stack-collapse.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p38/vercel-live-mid-390.png'));
+check('p38 SCORE states eight gates',
+  /Vegetation/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md'), 'utf8'))
+  && /albedoRev=p38/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md'), 'utf8'))
+  && /unitCountOne/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

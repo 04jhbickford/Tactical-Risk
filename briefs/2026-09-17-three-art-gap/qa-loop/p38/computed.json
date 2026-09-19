@@ -1,0 +1,346 @@
+{
+  "version": "V2.81.52-three-polish.38",
+  "inspect": {
+    "name": "Alaska",
+    "verts": 28548,
+    "materialCount": 2,
+    "hasTileMap": false,
+    "wrap": "1",
+    "africaSouthOfEurope": true,
+    "africaNotUnderNA": true,
+    "africaSouthOnScreen": true,
+    "europeNorthOnScreen": true,
+    "ukWestOfGermany": true,
+    "westEuropeWestOfGermany": true,
+    "waterInk": true,
+    "foam": true,
+    "bevel": true,
+    "landSeal": true,
+    "atlas": true,
+    "palette": "aa-hecorrect-11",
+    "version": "V2.81.52-three-polish.38",
+    "lod": "near",
+    "regionWash": true,
+    "plastic": true,
+    "stackLod": true,
+    "idleCta": false,
+    "confirmCopy": "Confirm: Japan",
+    "selectLiftMs": 150,
+    "moldedOutline": "≥2.5px",
+    "keyFill": "warm-key-cool-fill",
+    "parchmentTooth": true,
+    "lodTooth": "clean",
+    "quietZoom": true,
+    "plasticSpec": "tight-lobe",
+    "geography": true,
+    "biomeWashes": true,
+    "mountainRelief": true,
+    "forestClumps": true,
+    "coastShelf": true,
+    "rivers": true,
+    "landUndulation": true,
+    "nearMinis": true,
+    "selectMinis": true,
+    "geoUnmirror": true,
+    "evenParchment": true,
+    "parchmentFloor": 0.48,
+    "quietLanes": false,
+    "seaLanes": false,
+    "oceanNoStipple": true,
+    "paintedMountains": true,
+    "noHatchRidges": false,
+    "unitNoClip": true,
+    "japanLod": true,
+    "japanHome": true,
+    "quietContinentWash": true,
+    "selectClear": true,
+    "liveContinents": true,
+    "continentCount": 7,
+    "paintedAlbedo": true,
+    "albedoBound": true,
+    "albedoSrc": "assets/three/board/world-land-albedo.png",
+    "albedoSize": [
+      4096,
+      2340
+    ],
+    "stainFallback": false,
+    "dissolveSelect": true,
+    "noMapLabels": true,
+    "noBakedIpc": true,
+    "continentPunch": 0.2,
+    "seaDeckClear": true,
+    "eastMedPinSouth": true,
+    "noBlotchAtlas": true,
+    "albedoRev": "p38",
+    "imhofRelief": true,
+    "watercolorParchment": true,
+    "styleRef": "oceania-watercolor",
+    "featheredJoins": true,
+    "evenLighting": true,
+    "landcoverBound": true,
+    "canvasTooth": true,
+    "paintedRelief": true,
+    "normalBound": true,
+    "unitBgUnified": true,
+    "seaInkClosedRings": true,
+    "stackToggle": true,
+    "unitCountOne": true,
+    "landSliversHealed": true,
+    "opaquePlastic": true,
+    "coastalGreens": true,
+    "landSeaBorderFamily": true
+  },
+  "confirmReady": {
+    "background": "rgb(196, 163, 90)",
+    "copy": "Confirm: Japan",
+    "class": "is-ready"
+  },
+  "zoom": "rgba(30, 36, 32, 0.62)",
+  "place": "rgba(30, 36, 32, 0.42)",
+  "lod": "near",
+  "peekBadges": 6,
+  "peekIconCount": 6,
+  "roster": {
+    "germany": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 2,
+          "owner": "Germans"
+        },
+        {
+          "type": "infantry",
+          "quantity": 4,
+          "owner": "Germans"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Germans"
+        }
+      ],
+      "total": 10,
+      "peekTotal": 8
+    },
+    "japan": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "infantry",
+          "quantity": 3,
+          "owner": "Japanese"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Japanese"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Japanese"
+        }
+      ],
+      "total": 8,
+      "peekTotal": 8
+    },
+    "unitedKingdom": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 1,
+          "owner": "British"
+        },
+        {
+          "type": "infantry",
+          "quantity": 2,
+          "owner": "British"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "British"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "British"
+        },
+        {
+          "type": "fighter",
+          "quantity": 2,
+          "owner": "British"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "British"
+        }
+      ],
+      "total": 8,
+      "peekTotal": 8
+    },
+    "eastUs": {
+      "stacks": [
+        {
+          "type": "infantry",
+          "quantity": 2,
+          "owner": "Americans"
+        },
+        {
+          "type": "armour",
+          "quantity": 1,
+          "owner": "Americans"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Americans"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Americans"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Americans"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Americans"
+        }
+      ],
+      "total": 7,
+      "peekTotal": 8
+    }
+  },
+  "continents": [
+    {
+      "name": "North America",
+      "bonus": 24
+    },
+    {
+      "name": "South America",
+      "bonus": 12
+    },
+    {
+      "name": "Europe",
+      "bonus": 30
+    },
+    {
+      "name": "Middle East",
+      "bonus": 18
+    },
+    {
+      "name": "Africa",
+      "bonus": 27
+    },
+    {
+      "name": "Asia",
+      "bonus": 33
+    },
+    {
+      "name": "Oceania",
+      "bonus": 39
+    }
+  ],
+  "china": {
+    "band": "mid",
+    "rings": 1,
+    "polys": 2
+  },
+  "eastMed": {
+    "band": "near",
+    "deck": 3.5999999999999996,
+    "italyHeight": 1.82,
+    "shipsAboveItaly": true,
+    "pin": {
+      "x": 1262,
+      "y": 878
+    }
+  },
+  "centralMed": {
+    "band": "near",
+    "deck": 3.5999999999999996,
+    "italyHeight": 1.82,
+    "shipsAboveItaly": true,
+    "pin": {
+      "x": 1132,
+      "y": 834
+    },
+    "rings": 1
+  },
+  "australia": "mid",
+  "idle": {
+    "confirm": "rgba(30, 36, 32, 0.88)",
+    "copy": "Select a territory",
+    "class": "is-idle"
+  },
+  "eastMedCapture": {
+    "band": "near",
+    "deck": 3.5999999999999996,
+    "italyHeight": 1.82,
+    "shipsAboveItaly": true,
+    "pin": {
+      "x": 1262,
+      "y": 878
+    }
+  },
+  "centralMedCapture": {
+    "band": "near",
+    "deck": 3.5999999999999996,
+    "italyHeight": 1.82,
+    "shipsAboveItaly": true,
+    "pin": {
+      "x": 1132,
+      "y": 834
+    },
+    "rings": 1
+  },
+  "stackExpand": {
+    "name": "Germany",
+    "expanded": true,
+    "pip": false,
+    "minis": true,
+    "selected": true
+  },
+  "stackCollapse": {
+    "name": "Germany",
+    "expanded": false,
+    "pip": true,
+    "minis": false,
+    "selected": true
+  }
+}
