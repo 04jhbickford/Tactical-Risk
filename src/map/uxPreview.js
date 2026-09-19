@@ -26,6 +26,7 @@ import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import {
   bindSealedActivate,
   clientPointOf,
+  eventElement,
   shouldIgnoreMapHit,
 } from './threeChromeEvents.js';
 import {
@@ -352,7 +353,7 @@ export async function bootUxPreview() {
   }
 
   function eventFromChrome(e) {
-    const node = e?.target;
+    const node = eventElement(e);
     if (!node || typeof node.closest !== 'function') return false;
     return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-phase-strip');
   }

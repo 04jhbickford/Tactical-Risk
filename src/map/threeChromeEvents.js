@@ -21,6 +21,18 @@ export function isPointInAnyRect(clientX, clientY, rects = []) {
   );
 }
 
+export function eventElement(e) {
+  if (!e) return null;
+  const path = typeof e.composedPath === 'function' ? e.composedPath() : null;
+  if (path?.length) {
+    const fromPath = path.find((n) => n && typeof n.closest === 'function');
+    if (fromPath) return fromPath;
+  }
+  const t = e.target;
+  if (t && typeof t.closest === 'function') return t;
+  return t?.parentElement || null;
+}
+
 export function clientPointOf(e) {
   if (!e) return null;
   if (Number.isFinite(e.clientX) && Number.isFinite(e.clientY)) {
@@ -100,13 +112,15 @@ export function bindSealedActivate(root, selector, handler) {
   sealChromeControl(root);
   let lastAt = 0;
   const fire = (e) => {
-    const hit = selector ? e.target?.closest?.(selector) : root;
+    const node = eventElement(e);
+    const hit = selector ? node?.closest?.(selector) : root;
     if (!hit || hit.disabled) return;
     const now = Date.now();
     if (now - lastAt < 280) return;
     lastAt = now;
     handler(e, hit);
   };
+  root.addEventListener('pointerdown', fire, { capture: true });
   root.addEventListener('pointerup', fire, { capture: true });
   root.addEventListener('click', fire, { capture: true });
 }

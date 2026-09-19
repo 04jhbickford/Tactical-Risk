@@ -6,6 +6,7 @@ import {
   shouldIgnoreMapHit,
   sealChromeEvent,
   clientPointOf,
+  eventElement,
 } from '../src/map/threeChromeEvents.js';
 
 let failures = 0;
@@ -65,6 +66,9 @@ const ev = {
 };
 sealChromeEvent(ev);
 assert(ev.n === 1 && ev.prevented === 1, 'seal stops and prevents');
+
+const textTarget = { parentElement: { closest: (sel) => (sel === '[data-step]' ? { dataset: { step: '1' } } : null) } };
+assert(eventElement({ target: textTarget }) === textTarget.parentElement, 'text-node tap walks to parent');
 
 const touch = clientPointOf({
   changedTouches: [{ clientX: plus.left + 4, clientY: plus.top + 4 }],
