@@ -2,6 +2,16 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.1 main art + Three UX (preview only)
+
+James t3069u: side-project art wasn’t working. Use **main** tiles /
+chits / continent washes + the Three preview HUD. Keep off main.
+
+`?three=1` or `?ux=1` boots Canvas `MapRenderer` + Three L0/L1/L2 chrome.
+No Imagine world plate. Live `/` unchanged. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53 NCM Done at 0 air remaining (SCHEMA 11)
 
 Follow-up to V2.81.52 (same Robert Watts + Benson thread, desktop

@@ -3179,7 +3179,23 @@ async function init() {
   dismissStartupLoader();
 }
 
-init().catch((err) => {
-  console.error('Failed to initialize:', err);
-  reportStartupError('Could not start Tactical Risk. Local saves and in-progress games stay on this device.');
-});
+function wantsUxPreview(search = location.search) {
+  const params = new URLSearchParams(search);
+  const on = (value) => {
+    const v = String(value || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  };
+  return on(params.get('three')) || on(params.get('ux'));
+}
+
+if (wantsUxPreview()) {
+  import('./map/uxPreview.js').then((mod) => mod.bootUxPreview()).catch((err) => {
+    console.error('Failed to start UX preview:', err);
+    reportStartupError('Could not start the UX preview. Canvas 2D is unchanged at /');
+  });
+} else {
+  init().catch((err) => {
+    console.error('Failed to initialize:', err);
+    reportStartupError('Could not start Tactical Risk. Local saves and in-progress games stay on this device.');
+  });
+}
