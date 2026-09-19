@@ -1,6 +1,8 @@
 // STACK-LOD SoT — preview only. No Three import.
-// Used by the Canvas UX preview (main art + Three HUD). Far/mid = ONE pip+N.
-// Near = ≤3–4 silhouettes + +K. Never dual systems.
+// Used by the Canvas UX preview (main art + Three HUD).
+// Idle at every zoom = ONE pip+N. Expand (toggle or selected) only when the
+// cluster fits inside the land footprint and a neighbor budget. Dense /
+// small lands (Japan, UK, islands) and max-type rosters collapse first.
 
 export const LOD_FAR = 215;
 export const LOD_NEAR = 92;
@@ -14,9 +16,9 @@ export const PIP_MAX_PX = 72;
 export const PIECE_MIN_PX = 84;
 export const PIECE_MAX_PX = 118;
 
-/** Near camera OR a selected land — molded minis. Mid/far idle stays pip+N. */
+/** Selected land may request minis. Idle (including near) stays pip+N. */
 export function showMinis(band, selected) {
-  return band === 'near' || !!selected;
+  return !!selected && band !== 'far';
 }
 
 const TYPE_PRIORITY = [
@@ -182,31 +184,182 @@ export function pieceWorldCap(baseWorld, footprint, n, name = '') {
   return Math.max(japan ? 3.05 : 3.6, Math.min(baseWorld, cap));
 }
 
-export function clusterPack(n, pitch) {
+/** Center-to-center pack. Pitch is the minimum gap between piece centers. */
+export function spreadClusterPack(n, pitch) {
   if (n <= 0) return [];
   if (n === 1) return [{ x: 0, z: 0 }];
   if (n === 2) {
     return [
-      { x: -pitch * 0.34, z: 0 },
-      { x: pitch * 0.34, z: 0 },
+      { x: -pitch * 0.5, z: 0 },
+      { x: pitch * 0.5, z: 0 },
     ];
   }
   if (n === 3) {
+    const r = pitch / Math.sqrt(3);
     return [
-      { x: 0, z: -pitch * 0.30 },
-      { x: -pitch * 0.33, z: pitch * 0.24 },
-      { x: pitch * 0.33, z: pitch * 0.24 },
+      { x: 0, z: -r },
+      { x: -pitch * 0.5, z: r * 0.5 },
+      { x: pitch * 0.5, z: r * 0.5 },
     ];
   }
   if (n === 4) {
+    const h = pitch * 0.5;
     return [
-      { x: -pitch * 0.30, z: -pitch * 0.24 },
-      { x: pitch * 0.30, z: -pitch * 0.24 },
-      { x: -pitch * 0.30, z: pitch * 0.24 },
-      { x: pitch * 0.30, z: pitch * 0.24 },
+      { x: -h, z: -h },
+      { x: h, z: -h },
+      { x: -h, z: h },
+      { x: h, z: h },
     ];
   }
-  return spiralPack(n, pitch * 0.78);
+  return spiralPack(n, pitch);
+}
+
+export function clusterPack(n, pitch) {
+  return spreadClusterPack(n, pitch);
+}
+
+export function clusterRadius(pts, pieceWorld) {
+  let r = 0;
+  const pad = pieceWorld * 0.72;
+  for (const p of pts || []) {
+    r = Math.max(r, Math.hypot(p.x, p.z) + pad);
+  }
+  return r;
+}
+
+export function neighborDistanceMap(centers) {
+  const map = new Map();
+  for (let i = 0; i < centers.length; i++) {
+    let best = Infinity;
+    for (let j = 0; j < centers.length; j++) {
+      if (i === j) continue;
+      const d = Math.hypot(centers[j].x - centers[i].x, centers[j].y - centers[i].y);
+      if (d > 0 && d < best) best = d;
+    }
+    map.set(centers[i].name, Number.isFinite(best) ? best : 400);
+  }
+  return map;
+}
+
+export const MAX_LAYOUT_TYPES = [
+  'infantry', 'armour', 'artillery', 'fighter', 'bomber',
+  'aaGun', 'factory', 'tacticalBomber',
+];
+
+export function crowdMaxTypeStacks(owner = 'Japanese') {
+  return MAX_LAYOUT_TYPES.map((type, i) => ({
+    type,
+    quantity: type === 'infantry' ? 4 : 1,
+    owner,
+  }));
+}
+
+/**
+ * Canvas hybrid stack plan. Caps pip/piece size to the land's screen
+ * footprint and a neighbor budget so chits do not overlap at 390 CSS,
+ * at far/mid/near, or on Japan-sized lands with a max-type roster.
+ */
+export function planBoardStack({
+  stacks,
+  footprint,
+  name = '',
+  zoom = 0.42,
+  band = 'mid',
+  stacksExpanded = false,
+  selected = false,
+  neighborDist = 240,
+  cssWidth = 390,
+} = {}) {
+  const z = Math.max(0.12, Number(zoom) || 0.4);
+  const fp = denseFootprint(name, footprint);
+  const min = fp?.min || footprint?.min || 200;
+  const dense = isDenseLand(name, footprint);
+  const sorted = sortStacks(stacks);
+  const typeCount = sorted.length;
+  const phone = cssWidth > 0 && cssWidth <= 480;
+  const landScreen = min * z;
+  const neighborScreen = Math.max(8, neighborDist * z);
+
+  const pipDesired = footprintPiecePx(footprint, band, false, 1, name);
+  const pipCap = Math.min(
+    pipDesired,
+    phone ? 30 : 36,
+    landScreen * (dense ? 0.40 : 0.46),
+    neighborScreen * 0.32,
+  );
+  const pipPx = Math.max(4, pipCap);
+
+  const idle = {
+    mode: 'pip',
+    piecePx: pipPx,
+    pieceWorld: pipPx / z,
+    pts: [{ x: 0, z: 0 }],
+    shown: sorted[0] ? [sorted[0]] : [],
+    overflowQty: 0,
+    collapse: true,
+    radius: (pipPx / z) * 0.50,
+    reason: 'idle',
+  };
+
+  const tryExpand = stacksExpanded || showMinis(band, selected);
+  if (!tryExpand) return idle;
+
+  if (stacksExpanded && !selected && dense && (typeCount >= 3 || landScreen < 64)) {
+    return { ...idle, reason: 'dense-toggle' };
+  }
+  if (landScreen < 28) return { ...idle, reason: 'too-small' };
+
+  const layout = nearLayout(sorted);
+  let shown = layout.shown;
+  let overflowQty = layout.overflowQty;
+  const maxTyped = (phone || dense) ? 2 : NEAR_TYPED;
+  if (shown.length > maxTyped) {
+    const hidden = shown.slice(maxTyped);
+    shown = shown.slice(0, maxTyped);
+    overflowQty += hidden.reduce((n, s) => n + (s.quantity || 0), 0);
+  }
+  const n = shown.length + (overflowQty > 0 ? 1 : 0);
+  if (n <= 1) return { ...idle, reason: 'single' };
+
+  const maxRadius = Math.min(
+    min * (selected ? 0.38 : (dense ? 0.26 : 0.32)),
+    neighborDist * (selected ? 0.40 : 0.32),
+  );
+
+  const pieceDesired = footprintPiecePx(footprint, band, true, shown.length, name);
+  let piecePx = Math.max(
+    16,
+    Math.min(pieceDesired, phone ? 34 : 42, landScreen * 0.30),
+  );
+  let pieceWorld = piecePx / z;
+  const pitch = pieceWorld * 1.08;
+  let pts = spreadClusterPack(n, pitch);
+  let radius = clusterRadius(pts, pieceWorld);
+
+  if (radius > maxRadius && radius > 0) {
+    const scale = maxRadius / radius;
+    pieceWorld *= scale;
+    piecePx = pieceWorld * z;
+    pts = pts.map((p) => ({ x: p.x * scale, z: p.z * scale }));
+    radius = maxRadius;
+  }
+
+  const minPiece = selected ? (phone ? 18 : 16) : (phone ? 20 : 18);
+  const clusterScreen = radius * z;
+  if (piecePx < minPiece) return { ...idle, reason: 'wont-fit' };
+  if (n >= 3 && clusterScreen < (phone ? 36 : 28)) return { ...idle, reason: 'tight-cluster' };
+
+  return {
+    mode: 'cluster',
+    piecePx,
+    pieceWorld,
+    pts,
+    shown,
+    overflowQty,
+    collapse: false,
+    radius,
+    reason: 'fit',
+  };
 }
 
 export function packPitchFor(n, pieceWorld, footprint, name = '') {

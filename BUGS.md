@@ -2,6 +2,28 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.2 hybrid stack layout (preview only)
+
+James he-correct on PR68 `?three=1`: icons messy / overlapping on mobile,
+small lands (Japan), max unit-type layouts, and zoom. Coach "Got it"
+card sat on the board (Viz P1).
+
+Fix (preview only, do not merge): idle is pip+N at every zoom. Piece
+size is capped to the land screen footprint and a neighbor budget.
+Expand (toggle or selected) only when the cluster still fits; Japan /
+UK / islands and 8-type crowds stay pip+N at 390 mid. Coach overlay
+removed from hybrid entry. GAME_VERSION V2.81.53-ux-preview.2.
+
+### Smoke (this PR)
+
+- [ ] 390 CSS + phone chrome: Europe mid pips do not overlap neighbors.
+- [ ] Zoom out / mid / in: stacks stay readable; no icon pile-ups.
+- [ ] Japan (classic 6-type and max-type crowd) stays pip+N at mid.
+- [ ] Expand stacks at near: Germany cluster stays inside the land.
+- [ ] No "Got it" coach card on hybrid boot.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.1 main art + Three UX (preview only)
 
 James t3069u: side-project art wasn’t working. Use **main** tiles /

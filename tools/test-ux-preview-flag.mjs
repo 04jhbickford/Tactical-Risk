@@ -19,6 +19,8 @@ assert(lodBandFromZoom(0.55) === 'mid', 'mid');
 assert(lodBandFromZoom(1.2) === 'near', 'near');
 assert(showMinis('mid', false) === false, 'mid idle collapse');
 assert(showMinis('mid', true) === true, 'mid select expand');
-assert(showMinis('near', false) === true, 'near expand');
+assert(showMinis('near', false) === false, 'near idle stays pip');
+assert(showMinis('near', true) === true, 'near select may expand');
+assert(showMinis('far', true) === false, 'far select stays pip');
 
 console.log('ux-preview flag + STACK-LOD checks passed');

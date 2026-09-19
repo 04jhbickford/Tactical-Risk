@@ -6,7 +6,8 @@ import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
 import { injectThreeChrome } from './threeMapChrome.js';
-import { lodBandFromZoom, preloadUnitImages, renderPreviewStacks, hitTestPreviewStack, territoryCenter } from './uxPreviewUnits.js';
+import { lodBandFromZoom, preloadUnitImages, renderPreviewStacks, hitTestPreviewStack, territoryCenter, collectStackCenters, planForTerritory } from './uxPreviewUnits.js';
+import { crowdMaxTypeStacks, neighborDistanceMap, territoryFootprint } from './threeMapDensity.js';
 import {
   dismissStartupLoader,
   reportStartupError,
@@ -16,6 +17,7 @@ import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
+const JAPAN_FIT = { minX: 2460, minY: 600, maxX: 2740, maxY: 900 };
 
 function applyLiveContinents(list, bonusGroups) {
   const of = new Map();
@@ -170,6 +172,7 @@ export async function bootUxPreview() {
       zoom: camera.zoom,
       selectedName: selected?.name,
       stacksExpanded,
+      cssWidth: canvas.width / (devicePixelRatio || 1),
     });
     return fromStack || territoryMap.hitTest(world.x, world.y);
   }
@@ -295,6 +298,7 @@ export async function bootUxPreview() {
         selectedName: selected?.name || null,
         stacksExpanded,
         factionColors,
+        cssWidth: canvas.width / (devicePixelRatio || 1),
       });
       ctx.restore();
     }
@@ -339,17 +343,45 @@ export async function bootUxPreview() {
       continents: continents.length,
       idleConfirm: 'Select a territory',
       confirmGold: SELECT_GOLD,
+      coachGuide: false,
+      cssWidth: canvas.width / (devicePixelRatio || 1),
     };
   };
 
+  function layoutAt(name) {
+    const entries = collectStackCenters(territories, placements);
+    const neighbors = neighborDistanceMap(entries);
+    const entry = entries.find((e) => e.name === name);
+    if (!entry) return null;
+    return planForTerritory(entry, {
+      zoom: camera.zoom,
+      selectedName: selected?.name || null,
+      stacksExpanded,
+      neighbors,
+      cssWidth: canvas.width / (devicePixelRatio || 1),
+      footprint: territoryFootprint(entry.t),
+    });
+  }
+
+  function fitJapan() {
+    camera.fitBounds(JAPAN_FIT, {
+      padding: 12,
+      padTop: 56,
+      padBottom: 96,
+      fillFrame: true,
+    });
+  }
+
   window.__uxPreview = {
     inspect,
+    layoutAt,
     selectLand: (name) => {
       const t = territories.find((x) => x.name === name);
       if (t) selectLand(t);
       return t?.name || null;
     },
     frameEurope: fitEurope,
+    frameJapan: fitJapan,
     frameNear: () => {
       camera.zoom = 1.15;
       const g = territories.find((t) => t.name === 'Germany');
@@ -359,6 +391,13 @@ export async function bootUxPreview() {
         camera.y = c.y;
       }
       camera.dirty = true;
+    },
+    crowdMaxTypes: (name = 'Japan') => {
+      const t = territories.find((x) => x.name === name);
+      const owner = placements[name]?.[0]?.owner || t?.originalOwner || 'Japanese';
+      placements[name] = crowdMaxTypeStacks(owner);
+      camera.dirty = true;
+      return placements[name].map((s) => s.type);
     },
     setStacksExpanded: (on) => {
       stacksExpanded = !!on;

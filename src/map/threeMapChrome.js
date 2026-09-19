@@ -183,10 +183,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       backdrop-filter:saturate(1.35) blur(16px);
       font:600 13px/1 -apple-system,"SF Pro Text",sans-serif;
       cursor:pointer;
-      display:none;
+      display:inline-flex; align-items:center;
     }
-    html.three-spike.has-l1 #three-stack-toggle,
-    html.three-spike.has-stacks #three-stack-toggle { display:inline-flex; align-items:center; }
     #three-confirm,
     #three-confirm.is-idle,
     #three-confirm:disabled {
@@ -231,23 +229,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       -webkit-tap-highlight-color:transparent;
     }
     #three-zoom button[data-zoom="fit"] { font-size:12px; letter-spacing:0.02em; }
-    #three-phase-guide {
-      display:none; pointer-events:auto;
-      padding:10px 12px; border-radius:12px;
-      background:rgba(30,36,32,0.42);
-      -webkit-backdrop-filter:saturate(1.35) blur(18px);
-      backdrop-filter:saturate(1.35) blur(18px);
-      border:1px solid rgba(255,255,255,0.12);
-      color:#E8E2D4;
-    }
-    #three-phase-guide.is-on { display:block; }
-    #three-phase-guide p { margin:0 0 8px; font:400 13px/1.35 -apple-system,"SF Pro Text",sans-serif; }
-    #three-phase-guide button {
-      min-height:44px; padding:0 14px; border-radius:10px;
-      border:1px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.06); color:#E8E2D4;
-      font:600 14px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
-    }
     #three-sheet {
       display:none; position:absolute; left:0; right:0; bottom:0; z-index:40;
       max-height:min(52dvh, 420px);
@@ -301,10 +282,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   const bottom = document.createElement('div');
   bottom.id = 'three-bottom';
   bottom.innerHTML = `
-    <div id="three-phase-guide">
-      <p>Tap a land to inspect. Confirm stays gold only when a territory is staged. Stacks collapse to pip+N at mid zoom.</p>
-      <button type="button" id="three-guide-dismiss">Got it</button>
-    </div>
     <button type="button" id="three-stack-toggle" aria-pressed="false">Expand stacks</button>
     <div id="three-peek"></div>
     <button type="button" id="three-confirm" class="is-idle" disabled>Select a territory</button>
@@ -317,11 +294,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     <h2>Match</h2>
     <button type="button" class="three-sheet-row" data-sheet="close">Back to board</button>
     <button type="button" class="three-sheet-row" data-sheet="canvas">Open live Canvas (no preview)</button>
-    <p class="three-sheet-note">Preview only · main art · Three UX · SCHEMA ${SCHEMA_VERSION} · do not merge.</p>
+    <p class="three-sheet-note">Tap a land to inspect. Stacks stay pip+N when the land is small or zoomed out. Preview only · main art · Three UX · SCHEMA ${SCHEMA_VERSION} · do not merge.</p>
   `;
   document.body.appendChild(sheet);
 
-  const guide = bottom.querySelector('#three-phase-guide');
   const stackToggle = bottom.querySelector('#three-stack-toggle');
 
   const api = {
@@ -336,7 +312,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     ipcEl: l0.querySelector('#three-ipc'),
     pipEl: l0.querySelector('#three-seat-pip'),
     menuBtn: l0.querySelector('#three-menu-btn'),
-    guide,
+    guide: null,
     stackToggle,
     stacksExpanded: false,
     onStackToggle: null,
@@ -387,8 +363,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       stackToggle.textContent = api.stacksExpanded ? 'Collapse stacks' : 'Expand stacks';
       api.syncLayers();
     },
-    showGuide(on = true) {
-      guide.classList.toggle('is-on', !!on);
+    showGuide(_on = false) {
+      return false;
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
       if (api.isSheetOpen()) {
@@ -453,11 +429,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     api.setStacksExpanded(!api.stacksExpanded);
     if (typeof api.onStackToggle === 'function') api.onStackToggle(api.stacksExpanded);
   });
-  guide.addEventListener('pointerdown', (e) => e.stopPropagation());
-  guide.querySelector('#three-guide-dismiss').addEventListener('click', (e) => {
-    e.stopPropagation();
-    api.showGuide(false);
-  });
   api.peek.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-unit-type]');
     if (!chip) return;
@@ -465,6 +436,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
   });
   api.setStacksExpanded(false);
-  api.showGuide(true);
+  api.showGuide(false);
   return api;
 }

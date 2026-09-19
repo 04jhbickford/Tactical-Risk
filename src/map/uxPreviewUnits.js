@@ -3,12 +3,9 @@
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { UnitRenderer } from './unitRenderer.js';
 import {
-  showMinis,
-  nearLayout,
-  clusterPack,
-  sortStacks,
+  planBoardStack,
+  neighborDistanceMap,
   territoryFootprint,
-  footprintPiecePx,
   JAPAN_HOME_CENTER,
 } from './threeMapDensity.js';
 
@@ -124,13 +121,14 @@ function screenPx(zoom, px) {
   return Math.max(0.5, px / Math.max(0.12, zoom));
 }
 
-function drawCountBadge(ctx, x, y, text, zoom) {
-  const fontSize = screenPx(zoom, 12);
+function drawCountBadge(ctx, x, y, text, zoom, piecePx = 24) {
+  const fontPx = Math.max(8, Math.min(11, piecePx * 0.40));
+  const fontSize = screenPx(zoom, fontPx);
   ctx.font = `700 ${fontSize}px -apple-system, "SF Pro Text", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const padX = screenPx(zoom, 5);
-  const h = fontSize + screenPx(zoom, 4);
+  const padX = screenPx(zoom, Math.max(3, fontPx * 0.35));
+  const h = fontSize + screenPx(zoom, 3);
   const w = Math.max(h, ctx.measureText(text).width + padX * 2);
   ctx.fillStyle = '#1A1610';
   ctx.beginPath();
@@ -156,6 +154,40 @@ function drawChit(ctx, img, x, y, size, ownerColor) {
   ctx.restore();
 }
 
+export function collectStackCenters(territories, placements) {
+  const centers = [];
+  for (const t of territories) {
+    const stacks = placements[t.name];
+    if (!stacks?.length) continue;
+    const center = territoryCenter(t);
+    if (!center) continue;
+    centers.push({ name: t.name, x: center.x, y: center.y, t, stacks, center });
+  }
+  return centers;
+}
+
+export function planForTerritory(entry, {
+  zoom,
+  selectedName,
+  stacksExpanded,
+  neighbors,
+  cssWidth = 390,
+  footprint,
+}) {
+  const band = lodBandFromZoom(zoom);
+  return planBoardStack({
+    stacks: entry.stacks,
+    footprint,
+    name: entry.name,
+    zoom,
+    band,
+    stacksExpanded,
+    selected: entry.name === selectedName,
+    neighborDist: neighbors.get(entry.name) || 240,
+    cssWidth,
+  });
+}
+
 export function renderPreviewStacks(ctx, {
   territories,
   placements,
@@ -164,62 +196,81 @@ export function renderPreviewStacks(ctx, {
   selectedName,
   stacksExpanded,
   factionColors,
+  cssWidth = 390,
+  footprints,
 }) {
-  const band = lodBandFromZoom(zoom);
-  for (const t of territories) {
-    const stacks = placements[t.name];
-    if (!stacks?.length) continue;
-    const center = territoryCenter(t);
-    if (!center) continue;
-    const selected = t.name === selectedName;
-    const expand = stacksExpanded || showMinis(band, selected);
+  const entries = collectStackCenters(territories, placements);
+  const neighbors = neighborDistanceMap(entries);
+  for (const entry of entries) {
+    const { t, stacks, center } = entry;
+    const footprint = footprints?.get(t.name) || territoryFootprint(t);
+    const plan = planForTerritory(entry, {
+      zoom, selectedName, stacksExpanded, neighbors, cssWidth, footprint,
+    });
     const owner = stackOwner(stacks, t);
     const color = factionColors?.get(owner) || FACTION_FALLBACK[owner] || '#4A4A4A';
-    const total = stackTotal(stacks);
-    const footprint = territoryFootprint(t);
-    if (!expand) {
-      const pip = screenPx(zoom, footprintPiecePx(footprint, band, false, 1, t.name));
-      const img = images?.[owner]?.[sortStacks(stacks)[0]?.type];
-      drawChit(ctx, img, center.x, center.y, pip, color);
-      drawCountBadge(ctx, center.x + pip * 0.42, center.y + pip * 0.42, String(total), zoom);
+    const piece = plan.pieceWorld;
+    if (plan.mode !== 'cluster') {
+      const img = images?.[owner]?.[plan.shown[0]?.type];
+      drawChit(ctx, img, center.x, center.y, piece, color);
+      drawCountBadge(
+        ctx,
+        center.x + piece * 0.36,
+        center.y + piece * 0.36,
+        String(stackTotal(stacks)),
+        zoom,
+        plan.piecePx,
+      );
       continue;
     }
-    const layout = nearLayout(stacks);
-    const n = layout.shown.length + (layout.overflowQty > 0 ? 1 : 0);
-    const piece = screenPx(zoom, footprintPiecePx(footprint, band, true, layout.shown.length, t.name));
-    const pitch = piece * 0.72;
-    const pts = clusterPack(n, pitch);
-    layout.shown.forEach((stack, i) => {
-      const pt = pts[i] || { x: 0, z: 0 };
+    plan.shown.forEach((stack, i) => {
+      const pt = plan.pts[i] || { x: 0, z: 0 };
       const img = images?.[stack.owner || owner]?.[stack.type];
       const px = center.x + pt.x;
       const py = center.y + pt.z;
       drawChit(ctx, img, px, py, piece, factionColors?.get(stack.owner || owner) || color);
-      drawCountBadge(ctx, px + piece * 0.38, py + piece * 0.38, String(stack.quantity), zoom);
+      drawCountBadge(
+        ctx,
+        px + piece * 0.34,
+        py + piece * 0.34,
+        String(stack.quantity),
+        zoom,
+        plan.piecePx,
+      );
     });
-    if (layout.overflowQty > 0) {
-      const pt = pts[layout.shown.length] || { x: piece * 0.7, z: 0 };
-      drawCountBadge(ctx, center.x + pt.x, center.y + pt.z, `+${layout.overflowQty}`, zoom);
+    if (plan.overflowQty > 0) {
+      const pt = plan.pts[plan.shown.length] || { x: piece * 0.7, z: 0 };
+      drawCountBadge(ctx, center.x + pt.x, center.y + pt.z, `+${plan.overflowQty}`, zoom, plan.piecePx);
     }
   }
 }
 
-export function hitTestPreviewStack(worldX, worldY, { territories, placements, zoom, selectedName, stacksExpanded }) {
-  const band = lodBandFromZoom(zoom);
-  const radius = screenPx(zoom, 36);
+export function hitTestPreviewStack(worldX, worldY, {
+  territories,
+  placements,
+  zoom,
+  selectedName,
+  stacksExpanded,
+  cssWidth = 390,
+}) {
+  const entries = collectStackCenters(territories, placements);
+  const neighbors = neighborDistanceMap(entries);
   let best = null;
-  let bestD = radius;
-  for (const t of territories) {
-    const stacks = placements[t.name];
-    if (!stacks?.length) continue;
-    const center = territoryCenter(t);
-    if (!center) continue;
-    const expand = stacksExpanded || showMinis(band, t.name === selectedName);
-    const d = Math.hypot(worldX - center.x, worldY - center.y);
-    const reach = expand ? radius * 1.8 : radius;
+  let bestD = Infinity;
+  for (const entry of entries) {
+    const plan = planForTerritory(entry, {
+      zoom,
+      selectedName,
+      stacksExpanded,
+      neighbors,
+      cssWidth,
+      footprint: territoryFootprint(entry.t),
+    });
+    const d = Math.hypot(worldX - entry.center.x, worldY - entry.center.y);
+    const reach = plan.radius || plan.pieceWorld * 0.7;
     if (d <= reach && d <= bestD) {
       bestD = d;
-      best = t;
+      best = entry.t;
     }
   }
   return best;
