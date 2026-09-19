@@ -54,7 +54,8 @@ function iconRowHtml(stacks) {
 
 function stepperRowHtml(steppers) {
   if (!steppers?.length) return '';
-  return `<div class="three-steppers">${steppers.map((s) => {
+  const fat = steppers.length >= 5 ? ' is-fat' : '';
+  return `<div class="three-steppers${fat}">${steppers.map((s) => {
     const src = getUnitIconPath(s.type, s.owner) || '';
     const short = shortType(s.type);
     const have = Number(s.have ?? s.quantity) || 0;
@@ -218,6 +219,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek .three-steppers {
       display:flex; flex-direction:column; gap:8px; margin-top:10px;
     }
+    #three-peek .three-steppers.is-fat .three-stepper { min-height:44px; padding:2px 6px; }
+    #three-peek .three-steppers.is-fat .three-step { width:40px; height:40px; }
     #three-peek .three-stepper {
       display:flex; align-items:center; gap:10px;
       min-height:52px; padding:4px 8px;

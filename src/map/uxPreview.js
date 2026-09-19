@@ -23,6 +23,7 @@ import {
   reportStartupStatus,
 } from '../ui/startupLoader.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
+import { isMaxBattleRequested } from './uxPreviewFlag.js';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -33,6 +34,8 @@ import {
   PHASE,
   SELECT_GOLD,
   LAND_TEAL,
+  MAX_ATTACK,
+  MAX_DEFEND,
   createScenario,
   applyScenarioPocket,
   tapLand,
@@ -148,26 +151,19 @@ export async function bootUxPreview() {
   const territoryMap = new TerritoryMap(territories);
   const classicPlacements = { ...(setup.classic?.unitPlacements || {}) };
   const classicOwners = setup.classic?.territoryOwners || {};
-  const pocket = applyScenarioPocket(classicPlacements, classicOwners);
+  const maxBattle = isMaxBattleRequested();
+  const pocket = applyScenarioPocket(classicPlacements, classicOwners, { max: maxBattle });
   const placements = pocket.placements;
   const owners = pocket.owners;
-  let play = createScenario({ placements, owners });
-  const stressOn = (() => {
-    const params = new URLSearchParams(location.search);
-    const v = String(params.get('stress') || '').toLowerCase();
-    return v === '1' || v === 'true' || v === 'yes';
-  })();
-  if (stressOn) {
-    placements.Japan = stressStacks('Japanese', STRESS_LAND_TYPES);
-    placements.Germany = stressStacks('Germans', STRESS_LAND_TYPES);
-  }
+  let play = createScenario({ placements, owners, maxBattle });
+  const stressOn = maxBattle;
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
   const russians = factions.find((f) => f.id === 'Russians');
 
   const chrome = injectThreeChrome({
     seat: 'Russians',
-    ipc: russians?.startingPUs || 24,
+    ipc: play.ipc || russians?.startingPUs || 24,
     phase: PHASE.COMBAT_MOVE,
   });
   chrome.setSeat('Russians', russians?.color || '#B22222');
@@ -658,6 +654,11 @@ export async function bootUxPreview() {
       continents: continents.length,
       idleConfirm: 'Select units',
       tryCombatMove: false,
+      maxBattle,
+      maxQuery: '?three=1&max=1',
+      maxAliases: ['?three=1&max=1', '?three=1&stress=1', '?three=1&demo=max'],
+      maxAttack: maxBattle ? { ...MAX_ATTACK } : null,
+      maxDefend: maxBattle ? { ...MAX_DEFEND } : null,
       mapLabels: LABEL_LANDS,
       pulse: highlights(play).pulse,
       pocket: {

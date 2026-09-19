@@ -1,4 +1,4 @@
-import { isUxPreviewRequested, stripPreviewParams } from '../src/map/uxPreviewFlag.js';
+import { isUxPreviewRequested, isMaxBattleRequested, stripPreviewParams } from '../src/map/uxPreviewFlag.js';
 import { lodBandFromZoom, shouldExpandPreview } from '../src/map/uxPreviewUnits.js';
 import { showMinis } from '../src/map/threeMapDensity.js';
 
@@ -12,6 +12,10 @@ assert(isUxPreviewRequested('?ux=1') === true, 'ux=1');
 assert(isUxPreviewRequested('?ux=yes') === true, 'ux=yes');
 assert(isUxPreviewRequested('') === false, 'empty');
 assert(isUxPreviewRequested('?foo=1') === false, 'unrelated');
+assert(isMaxBattleRequested('?max=1') === true, 'max=1');
+assert(isMaxBattleRequested('?demo=max') === true, 'demo=max');
+assert(isMaxBattleRequested('?stress=1') === true, 'stress=1');
+assert(isMaxBattleRequested('?three=1') === false, 'three alone is not max');
 assert(stripPreviewParams('https://example.com/?three=1&ux=1').includes('three') === false, 'strip three');
 assert(stripPreviewParams('https://example.com/?three=1&ux=1').includes('ux') === false, 'strip ux');
 assert(lodBandFromZoom(0.2) === 'far', 'far');

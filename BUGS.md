@@ -2,6 +2,21 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.7-max fat Karelia→Ukraine
+
+James wanted a bigger battle sim on the preview.7 / PR76 tip.
+`?three=1&max=1` (aliases `?stress=1`, `?demo=max`) seeds MAX stacks
+on **Karelia S.S.R.** (RUS) vs **Ukraine S.S.R.** (GER). Default
+`?three=1` stays the small Finland pocket. Preview only. Do not merge.
+
+Attacker (Karelia): INF×10 ART×6 TNK×6 FTR×4 BMB×3 — steppers, not
+auto-all. Defender (Ukraine): INF×8 ART×4 TNK×4 FTR×3 AA×3 — mixed
+casualty picks. First (and later demo) rounds script 2 ATK / 1 DEF
+hits + AA miss so planes land. Keep preview.7: steppers, Congo eat,
+planes-only Confirm land, no Try, casualty pick.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.7 unit sheet click-through
 
 James he-correct on preview.6, folded here. Three bars:
