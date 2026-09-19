@@ -1,8 +1,8 @@
-# SCORE — V2.81.53-ux-preview.10
+# SCORE — V2.81.53-ux-preview.11
 **Preview only** `?three=1&max=1`. Do not merge. Tesla off.
 
 ```
-version=V2.81.53-ux-preview.10
+version=V2.81.53-ux-preview.11
 maxQuery=?three=1&max=1
 doNotMerge=true
 tesla=off
@@ -10,11 +10,12 @@ tesla=off
 
 | Bar | Verdict |
 |---|---|
-| Cutoff | **PASS** — YOU + THEY + Confirm pinned; IA scrolls. Confirm below selectors. |
-| Selector UX | **PASS** — casualty rows are icon + +/− steppers, same as combat-move. |
-| P0.1–P0.4 | **KEEP** — zoom hidden, YOU-confirm, dense sheet, ATK/DEF IA. |
+| Air land | **PASS** — dest tap does not dump-all; per-type counts + dest choice; planes-only sheet; Confirm land. |
+| Selector UX | **PASS** — combat-move / casualty / air-land are horizontal icon tiles + badge + +/−. |
+| Cutoff | **KEEP** — YOU + THEY + Confirm pinned; IA scrolls. Horizontal tiles shrink the picker. |
+| P0.1–P0.4 | **KEEP** — zoom hidden, YOU-confirm, dense sheet, ATK/DEF IA, max seed. |
 
-THEY is read-only cheapest (INF×2) and fully visible.
+THEY is read-only cheapest (badge only) and fully visible.
 
-**URL:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1
-**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/76 (draft · hold merge)
+**URL:** (Vercel preview after push)
+**PR:** draft · hold merge · hybrid lineage (not main)

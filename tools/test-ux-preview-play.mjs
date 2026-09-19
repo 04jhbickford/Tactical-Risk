@@ -11,6 +11,7 @@ import {
   tapLand,
   pickUnit,
   adjustUnit,
+  adjustLanding,
   pickLoss,
   confirm,
   confirmLabel,
@@ -148,6 +149,13 @@ assert(!planes.some((p) => p.type === 'infantry'), 'dest INF not in air sheet');
 tapLand(move, 'Germany');
 assert(move.landingDest == null, 'illegal land ignored');
 tapLand(move, 'Russia');
+assert(confirmEnabled(move) === false, 'dest tap does not dump-all');
+assert(confirmLabel(move) === 'Assign planes', 'need per-type counts');
+confirm(move);
+assert(move.phase === PHASE.AIR_LAND, 'confirm without counts stays air land');
+assert(stackQty(move.placements.Russia, 'fighter', 'Russians') === 0, 'no dump-all to Russia');
+adjustLanding(move, 'fighter', 1);
+assert(move.landingPlan.Russia.fighter === 1, 'FTR assigned to Russia');
 assert(confirmLabel(move) === 'Confirm: Land in Russia', 'named land confirm');
 confirm(move);
 assert(move.phase === PHASE.DONE, 'done');

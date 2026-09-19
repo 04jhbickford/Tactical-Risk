@@ -8,6 +8,7 @@ import {
   createScenario,
   tapLand,
   adjustUnit,
+  adjustLanding,
   pickUnit,
   confirm,
   confirmLabel,
@@ -111,7 +112,23 @@ assert(roster.every((u) => u.type === 'fighter' || u.type === 'bomber'), 'planes
 assert(!roster.some((u) => u.type === 'infantry' || u.type === 'armour'), 'no dest land roster');
 assert(confirmEnabled(air) === false, 'need teal dest');
 tapLand(air, 'Russia');
-assert(confirmLabel(air) === 'Confirm: Land in Russia', 'named land');
+assert(confirmEnabled(air) === false, 'dest tap does not dump-all');
+assert(confirmLabel(air) === 'Assign planes', 'need per-type counts');
+adjustLanding(air, 'fighter', 2);
+assert(air.landingPlan.Russia.fighter === 2, '2 FTR to Russia');
+assert(confirmEnabled(air) === false, 'leftover planes block Confirm');
+tapLand(air, 'Karelia S.S.R.');
+adjustLanding(air, 'fighter', 2);
+adjustLanding(air, 'bomber', 3);
+assert(confirmEnabled(air) === true, 'all planes assigned');
+assert(confirmLabel(air) === 'Confirm: Land aircraft', 'split dest confirm');
+confirm(air);
+assert(air.phase === PHASE.DONE, 'split land done');
+assert(stackQty(air.placements.Russia, 'fighter', 'Russians') === 2, 'Russia took 2 FTR');
+assert(stackQty(air.placements['Karelia S.S.R.'], 'fighter', 'Russians') === 2, 'Karelia took leftover FTR');
+assert(stackQty(air.placements['Karelia S.S.R.'], 'bomber', 'Russians') === 3, 'Karelia took BMB');
+assert(stackQty(air.placements[MAX_SCENARIO.dest], 'fighter', 'Russians') === 0, 'no leftover FTR on dest');
+assert(stackQty(air.placements[MAX_SCENARIO.dest], 'bomber', 'Russians') === 0, 'no leftover BMB on dest');
 
 if (failures) {
   console.error(`${failures} ux-preview max-battle checks failed`);

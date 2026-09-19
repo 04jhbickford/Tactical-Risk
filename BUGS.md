@@ -2,6 +2,25 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.11 air-land counts + tile selectors
+
+James he-correct on preview.10 + Russia strip still (horizontal
+INF/FTR/BMB tiles with count badges).
+
+1. Air land: dest tap no longer dumps every plane. Per-type +/−
+   assigns counts to the current teal dest; leftover can go to
+   another land. Sheet stays planes-only. Confirm land when the
+   plan is complete.
+2. Selectors: combat-move, casualty, and air-land use the same
+   horizontal icon tiles (icon + label + badge + small +/−).
+   Tall vertical stepper lists are gone.
+
+Keep preview.10: no sheet clip, YOU→Confirm gold, THEY read-only,
+zoom hidden while sheet open, ATK/DEF IA, max seed. Preview only.
+Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.10 battle sheet fit + steppers
 
 James ROUND 2 still: THEY TAKE 2 clipped under Assign casualties.

@@ -70,7 +70,7 @@ export const LAND_TEAL = '#5BA8A0';
 export const GUIDE = {
   [PHASE.COMBAT_MOVE]: 'Tap origin · select units · tap dest · Confirm',
   [PHASE.BATTLE]: 'One Confirm at a time — AA, then dice, then hits.',
-  [PHASE.AIR_LAND]: 'Teal lands can take the aircraft. Tap one, Confirm.',
+  [PHASE.AIR_LAND]: 'Teal lands can take the aircraft. Pick dest, set counts, Confirm.',
   [PHASE.DONE]: 'Aircraft landed. Confirm is idle — Replay if you want.',
 };
 
@@ -168,6 +168,7 @@ export function createScenario(overrides = {}) {
     selectedUnits: {},
     destPicked: null,
     landingDest: null,
+    landingPlan: {},
     landed: false,
     guideOn: true,
     maxBattle: max,
@@ -225,6 +226,47 @@ export function selectedAirCount(selectedUnits) {
   return Object.entries(selectedUnits || {}).reduce((n, [type, qty]) => (
     UNIT_DEFS[type]?.isAir ? n + (Number(qty) || 0) : n
   ), 0);
+}
+
+export function landingAssignedByType(state, dest = null) {
+  const plan = state?.landingPlan || {};
+  const dests = dest ? [dest] : Object.keys(plan);
+  const out = {};
+  for (const name of dests) {
+    for (const [type, n] of Object.entries(plan[name] || {})) {
+      const qty = Number(n) || 0;
+      if (qty <= 0) continue;
+      out[type] = (out[type] || 0) + qty;
+    }
+  }
+  return out;
+}
+
+export function landingCountAt(state, dest, type) {
+  if (!dest || !type) return 0;
+  return Number(state?.landingPlan?.[dest]?.[type]) || 0;
+}
+
+export function airLeftByType(state) {
+  const have = state?.selectedUnits || {};
+  const used = landingAssignedByType(state);
+  const out = {};
+  for (const [type, n] of Object.entries(have)) {
+    if (!UNIT_DEFS[type]?.isAir) continue;
+    const left = Math.max(0, (Number(n) || 0) - (Number(used[type]) || 0));
+    if (left > 0) out[type] = left;
+  }
+  return out;
+}
+
+export function airLeftCount(state) {
+  return Object.values(airLeftByType(state)).reduce((n, q) => n + q, 0);
+}
+
+function landingDestsUsed(state) {
+  return Object.entries(state?.landingPlan || {})
+    .filter(([, counts]) => assignedCount(counts) > 0)
+    .map(([name]) => name);
 }
 
 function combatUnits(stacks, owner) {
@@ -424,6 +466,43 @@ export function adjustUnit(state, type, delta = 1) {
   return state;
 }
 
+// Air-land sheet steppers: FTR [-] n [+] for the current teal dest.
+// Dest tap alone assigns nothing — no dump-all.
+export function adjustLanding(state, type, delta = 1) {
+  if (!state || state.phase !== PHASE.AIR_LAND) return state;
+  const dest = state.landingDest;
+  if (!dest || !state.landable?.includes(dest)) return state;
+  if (!UNIT_DEFS[type]?.isAir) return state;
+  const have = Number(state.selectedUnits?.[type]) || 0;
+  if (have <= 0) return state;
+  const step = Number(delta);
+  if (!Number.isFinite(step) || step === 0) return state;
+  const used = Number(landingAssignedByType(state)[type]) || 0;
+  const here = landingCountAt(state, dest, type);
+  const left = Math.max(0, have - used);
+  let next = here;
+  if (step > 0) next = Math.min(have, here + Math.min(step, left));
+  else next = Math.max(0, here + step);
+  if (!state.landingPlan) state.landingPlan = {};
+  if (!state.landingPlan[dest]) state.landingPlan[dest] = {};
+  if (next <= 0) delete state.landingPlan[dest][type];
+  else state.landingPlan[dest][type] = next;
+  if (!Object.keys(state.landingPlan[dest]).length) delete state.landingPlan[dest];
+  return state;
+}
+
+export function fillLanding(state, dest) {
+  if (!state || state.phase !== PHASE.AIR_LAND) return state;
+  tapLand(state, dest);
+  if (state.landingDest !== dest) return state;
+  for (const [type, qty] of Object.entries(state.selectedUnits || {})) {
+    if (!UNIT_DEFS[type]?.isAir) continue;
+    const left = Number(airLeftByType(state)[type]) || 0;
+    if (left > 0) adjustLanding(state, type, left);
+  }
+  return state;
+}
+
 export function assignedCount(taken) {
   return Object.values(taken || {}).reduce((n, q) => n + (Number(q) || 0), 0);
 }
@@ -539,7 +618,11 @@ export function confirmEnabled(state) {
     if (state.battle.step === BATTLE_STEP.COMBAT_RESULT) return lossesReady(state);
     return true;
   }
-  if (state.phase === PHASE.AIR_LAND) return !!state.landingDest && !state.landed;
+  if (state.phase === PHASE.AIR_LAND) {
+    return !state.landed
+      && airLeftCount(state) === 0
+      && assignedCount(landingAssignedByType(state)) > 0;
+  }
   if (state.phase === PHASE.DONE) return true;
   return false;
 }
@@ -573,8 +656,16 @@ export function confirmLabel(state) {
     return 'Battle';
   }
   if (state.phase === PHASE.AIR_LAND) {
-    if (!state.landingDest) return 'Confirm land';
-    return `Confirm: Land in ${state.landingDest}`;
+    const left = airLeftCount(state);
+    if (left > 0) {
+      if (!state.landingDest) return 'Confirm land';
+      const here = assignedCount(state.landingPlan?.[state.landingDest]);
+      return here > 0 ? 'Assign remaining' : 'Assign planes';
+    }
+    const dests = landingDestsUsed(state);
+    if (dests.length === 1) return `Confirm: Land in ${dests[0]}`;
+    if (dests.length > 1) return 'Confirm: Land aircraft';
+    return 'Confirm land';
   }
   if (state.phase === PHASE.DONE) {
     return state.landingDest
@@ -587,7 +678,7 @@ export function confirmLabel(state) {
 export function airLandRoster(state) {
   if (state?.phase !== PHASE.AIR_LAND) return [];
   return Object.entries(state.selectedUnits || {})
-    .filter(([, n]) => Number(n) > 0)
+    .filter(([type, n]) => UNIT_DEFS[type]?.isAir && Number(n) > 0)
     .map(([type, quantity]) => ({ type, quantity: Number(quantity) || 0 }));
 }
 
@@ -808,6 +899,7 @@ function startAirLand(state) {
   }
   state.phase = PHASE.AIR_LAND;
   state.landingDest = null;
+  state.landingPlan = {};
   state.landed = false;
   state.destPicked = null;
   state.selectedUnits = air;
@@ -816,24 +908,32 @@ function startAirLand(state) {
 }
 
 function applyLanding(state) {
-  if (!state.landingDest) return state;
+  const dests = landingDestsUsed(state);
+  if (!dests.length) return state;
   let from = state.placements[state.dest] || [];
   const air = airRoster(from, 'Russians');
   if (!Object.keys(air).length) {
     state.phase = PHASE.DONE;
     return state;
   }
-  let destStacks = state.placements[state.landingDest] || [];
-  for (const [type, qty] of Object.entries(air)) {
-    from = removeQty(from, type, 'Russians', qty);
-    destStacks = addQty(destStacks, type, 'Russians', qty);
+  for (const destName of dests) {
+    let destStacks = state.placements[destName] || [];
+    for (const [type, qty] of Object.entries(state.landingPlan[destName] || {})) {
+      const n = Math.min(Number(qty) || 0, Number(air[type]) || 0);
+      if (n <= 0) continue;
+      from = removeQty(from, type, 'Russians', n);
+      destStacks = addQty(destStacks, type, 'Russians', n);
+      air[type] = Math.max(0, (Number(air[type]) || 0) - n);
+    }
+    state.placements[destName] = destStacks;
   }
   state.placements[state.dest] = from;
-  state.placements[state.landingDest] = destStacks;
   state.landed = true;
   state.phase = PHASE.DONE;
+  state.landingDest = dests.length === 1 ? dests[0] : (state.landingDest || dests[0]);
   state.selected = state.landingDest;
   state.selectedUnits = {};
+  state.landingPlan = {};
   return state;
 }
 
@@ -852,6 +952,7 @@ export function resetScenario(state) {
   state.selectedUnits = {};
   state.destPicked = null;
   state.landingDest = null;
+  state.landingPlan = {};
   state.landed = false;
   state.guideOn = true;
   state.battle = null;
@@ -1015,7 +1116,7 @@ export function driveAirChoice(state) {
 
 export function driveLanded(state, dest = 'Russia') {
   driveAirChoice(state);
-  tapLand(state, dest);
+  fillLanding(state, dest);
   confirm(state);
   return state;
 }
@@ -1032,6 +1133,8 @@ export function inspectPlay(state) {
     origin: state?.origin || null,
     dest: state?.destPicked || null,
     landingDest: state?.landingDest || null,
+    landingPlan: JSON.parse(JSON.stringify(state?.landingPlan || {})),
+    airLeft: airLeftCount(state),
     landed: !!state?.landed,
     selectedUnits: { ...(state?.selectedUnits || {}) },
     airLandRoster: airLandRoster(state),

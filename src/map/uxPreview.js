@@ -41,6 +41,10 @@ import {
   tapLand,
   pickUnit,
   adjustUnit,
+  adjustLanding,
+  landingCountAt,
+  airLeftByType,
+  airLeftCount,
   pickedCount,
   confirm as confirmPlay,
   confirmLabel,
@@ -216,26 +220,41 @@ export async function bootUxPreview() {
       && land
       && land.name === play.origin
       && (play.selected === play.origin || pickedCount(play.selectedUnits) || play.destPicked);
-    const steppers = showSteppers
-      ? (placements[land.name] || [])
-        .filter((s) => s.type !== 'factory' && s.type !== 'aaGun' && (s.quantity || 0) > 0)
-        .map((s) => ({
-          type: s.type,
-          have: s.quantity,
-          picked: Number(play.selectedUnits?.[s.type]) || 0,
-          owner: s.owner,
-        }))
-      : null;
     const planeStacks = airLand
       ? Object.entries(play.selectedUnits || {})
         .filter(([, n]) => Number(n) > 0)
         .map(([type, quantity]) => ({ type, quantity, owner: 'Russians' }))
       : null;
+    const steppers = airLand
+      ? (planeStacks || []).map((s) => ({
+        type: s.type,
+        have: s.quantity,
+        picked: landingCountAt(play, play.landingDest, s.type),
+        owner: s.owner,
+        plusOff: !play.landingDest || (Number(airLeftByType(play)[s.type]) || 0) <= 0,
+      }))
+      : (showSteppers
+        ? (placements[land.name] || [])
+          .filter((s) => s.type !== 'factory' && s.type !== 'aaGun' && (s.quantity || 0) > 0)
+          .map((s) => ({
+            type: s.type,
+            have: s.quantity,
+            picked: Number(play.selectedUnits?.[s.type]) || 0,
+            owner: s.owner,
+          }))
+        : null);
     let route = '';
     if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
       route = `${play.origin} → ${play.destPicked}`;
     } else if (airLand) {
-      route = play.landingDest ? `Confirm land · ${play.landingDest}` : 'Pick a teal land';
+      const left = airLeftCount(play);
+      if (!play.landingDest) {
+        route = left ? `${left} plane${left === 1 ? '' : 's'} · pick dest` : 'Pick a teal land';
+      } else {
+        route = left
+          ? `${play.landingDest} · ${left} left`
+          : `Confirm land · ${play.landingDest}`;
+      }
     } else if (play.phase === PHASE.DONE && play.landingDest) {
       route = `Landed · ${play.landingDest}`;
     }
@@ -268,7 +287,8 @@ export async function bootUxPreview() {
     camera.dirty = true;
   };
   chrome.onUnitStep = (type, delta) => {
-    adjustUnit(play, type, delta);
+    if (play.phase === PHASE.AIR_LAND) adjustLanding(play, type, delta);
+    else adjustUnit(play, type, delta);
     syncSelectionFromPlay();
     paintChrome();
     camera.dirty = true;
@@ -701,6 +721,13 @@ export async function bootUxPreview() {
       paintChrome();
       camera.dirty = true;
       return { ...(play.selectedUnits || {}) };
+    },
+    adjustLanding: (type, delta = 1) => {
+      adjustLanding(play, type, delta);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
     },
     blocksMapAt: (x, y) => chrome.blocksMapAt(x, y),
     pickLoss: (side, type) => {

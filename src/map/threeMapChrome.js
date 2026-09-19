@@ -52,24 +52,53 @@ function iconRowHtml(stacks) {
   }).join('')}</div>`;
 }
 
+function unitTileHtml({
+  type,
+  owner,
+  have = 0,
+  picked = 0,
+  readOnly = false,
+  plusOff = false,
+  minusOff = false,
+  lossSide = '',
+} = {}) {
+  const src = getUnitIconPath(type, owner) || '';
+  const short = shortType(type);
+  const name = formatUnitName(type);
+  const pickedOn = picked > 0 ? ' is-picked' : '';
+  const ro = readOnly ? ' is-ro' : '';
+  const minusAttrs = lossSide
+    ? `data-loss-step="-1" data-loss-side="${lossSide}" data-loss-type="${type}"`
+    : `data-step="-1" data-unit-type="${type}"`;
+  const plusAttrs = lossSide
+    ? `data-loss-step="1" data-loss-side="${lossSide}" data-loss-type="${type}"`
+    : `data-step="1" data-unit-type="${type}"`;
+  const ctrls = readOnly ? '' : `<div class="three-tile-ctrls">
+      <button type="button" class="three-step" ${minusAttrs} ${minusOff ? 'disabled' : ''} aria-label="Fewer ${name}">−</button>
+      <button type="button" class="three-step" ${plusAttrs} ${plusOff ? 'disabled' : ''} aria-label="More ${name}">+</button>
+    </div>`;
+  return `<div class="three-tile${pickedOn}${ro}" data-unit-type="${type}"${lossSide ? ` data-loss-side="${lossSide}"` : ''}>
+      <img src="${src}" alt="${short}" width="36" height="36">
+      <em>${short}</em>
+      <b>${picked}</b>
+      ${ctrls}
+    </div>`;
+}
+
 function stepperRowHtml(steppers) {
   if (!steppers?.length) return '';
   const fat = steppers.length >= 5 ? ' is-fat' : '';
-  return `<div class="three-steppers${fat}">${steppers.map((s) => {
-    const src = getUnitIconPath(s.type, s.owner) || '';
-    const short = shortType(s.type);
+  return `<div class="three-tiles${fat}">${steppers.map((s) => {
     const have = Number(s.have ?? s.quantity) || 0;
     const picked = Number(s.picked) || 0;
-    const name = formatUnitName(s.type);
-    return `<div class="three-stepper" data-unit-type="${s.type}">
-      <img src="${src}" alt="${short}" width="28" height="28">
-      <em>${short}</em>
-      <div class="three-stepper-ctrls">
-        <button type="button" class="three-step" data-step="-1" data-unit-type="${s.type}" ${picked <= 0 ? 'disabled' : ''} aria-label="Fewer ${name}">−</button>
-        <span class="three-step-count" data-step-count="${s.type}">${picked}/${have}</span>
-        <button type="button" class="three-step" data-step="1" data-unit-type="${s.type}" ${picked >= have ? 'disabled' : ''} aria-label="More ${name}">+</button>
-      </div>
-    </div>`;
+    return unitTileHtml({
+      type: s.type,
+      owner: s.owner,
+      have,
+      picked,
+      plusOff: !!s.plusOff || picked >= have,
+      minusOff: !!s.minusOff || picked <= 0,
+    });
   }).join('')}</div>`;
 }
 
@@ -92,23 +121,19 @@ function lossStepperHtml(picker) {
   if (!units.length) return '';
   const fat = units.length >= 5 ? ' is-fat' : '';
   const ro = picker.readOnly ? ' is-ro' : '';
-  return `<div class="three-steppers is-loss${fat}${ro}" data-loss-side="${picker.side}">${units.map((u) => {
-    const src = getUnitIconPath(u.type, owner) || '';
-    const short = shortType(u.type);
+  return `<div class="three-tiles is-loss${fat}${ro}" data-loss-side="${picker.side}">${units.map((u) => {
     const have = Number(u.quantity) || 0;
     const picked = Number(picker.taken?.[u.type]) || 0;
-    const name = formatUnitName(u.type);
-    const plusOff = picker.readOnly || picked >= have || used >= need;
-    const minusOff = picker.readOnly || picked <= 0;
-    return `<div class="three-stepper" data-unit-type="${u.type}" data-loss-side="${picker.side}">
-      <img src="${src}" alt="${short}" width="28" height="28">
-      <em>${short}</em>
-      <div class="three-stepper-ctrls">
-        <button type="button" class="three-step" data-loss-step="-1" data-loss-side="${picker.side}" data-loss-type="${u.type}" ${minusOff ? 'disabled' : ''} aria-label="Fewer ${name}">−</button>
-        <span class="three-step-count">${picked}/${have}</span>
-        <button type="button" class="three-step" data-loss-step="1" data-loss-side="${picker.side}" data-loss-type="${u.type}" ${plusOff ? 'disabled' : ''} aria-label="More ${name}">+</button>
-      </div>
-    </div>`;
+    return unitTileHtml({
+      type: u.type,
+      owner,
+      have,
+      picked,
+      readOnly: !!picker.readOnly,
+      lossSide: picker.side,
+      plusOff: picker.readOnly || picked >= have || used >= need,
+      minusOff: picker.readOnly || picked <= 0,
+    });
   }).join('')}</div>`;
 }
 
@@ -261,52 +286,64 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:700 11px/16px -apple-system,"SF Pro Text",sans-serif;
       font-variant-numeric:tabular-nums; text-align:center;
     }
-    #three-peek .three-steppers,
-    #three-battle .three-steppers {
-      display:flex; flex-direction:column; gap:3px; margin-top:6px;
+    #three-peek .three-tiles,
+    #three-battle .three-tiles {
+      display:flex; flex-wrap:nowrap; gap:6px; margin-top:8px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
     }
-    #three-peek .three-steppers.is-fat .three-stepper,
-    #three-battle .three-steppers.is-fat .three-stepper { min-height:36px; padding:1px 4px; }
-    #three-peek .three-steppers.is-fat .three-step,
-    #three-battle .three-steppers.is-fat .three-step { width:36px; height:36px; font-size:18px; }
-    #three-peek .three-stepper,
-    #three-battle .three-stepper {
-      display:flex; align-items:center; gap:6px;
-      min-height:36px; padding:1px 6px;
-      background:rgba(240,230,210,0.12);
-      border:1px solid rgba(255,255,255,0.14);
-      border-radius:10px;
+    #three-peek .three-tiles::-webkit-scrollbar,
+    #three-battle .three-tiles::-webkit-scrollbar { display:none; }
+    #three-peek .three-tile,
+    #three-battle .three-tile {
+      position:relative; flex:1 1 0; min-width:56px; max-width:80px;
+      display:inline-flex; flex-direction:column; align-items:center;
+      padding:4px 2px 6px;
+      background:rgba(240,230,210,0.20);
+      border:1.5px solid rgba(255,255,255,0.22);
+      border-radius:14px;
     }
-    #three-peek .three-stepper img,
-    #three-battle .three-stepper img { width:28px; height:28px; display:block; }
-    #three-peek .three-stepper em,
-    #three-battle .three-stepper em {
-      flex:0 0 28px;
-      font:700 11px/1 -apple-system,"SF Pro Text",sans-serif;
+    #three-peek .three-tiles.is-fat .three-tile,
+    #three-battle .three-tiles.is-fat .three-tile { min-width:52px; max-width:72px; padding:3px 1px 5px; }
+    #three-peek .three-tile.is-picked,
+    #three-battle .three-tile.is-picked {
+      box-shadow:0 0 0 2px #C4A35A;
+      border-color:#C4A35A;
+    }
+    #three-peek .three-tile img,
+    #three-battle .three-tile img { width:36px; height:36px; display:block; }
+    #three-peek .three-tiles.is-fat .three-tile img,
+    #three-battle .three-tiles.is-fat .three-tile img { width:32px; height:32px; }
+    #three-peek .three-tile em,
+    #three-battle .three-tile em {
+      display:block; margin-top:2px;
+      font:700 10px/1 -apple-system,"SF Pro Text",sans-serif;
       letter-spacing:0.04em; color:#F4E8C4; font-style:normal;
     }
-    #three-peek .three-stepper-ctrls,
-    #three-battle .three-stepper-ctrls {
-      margin-left:auto; display:flex; align-items:center; gap:4px;
+    #three-peek .three-tile b,
+    #three-battle .three-tile b {
+      position:absolute; right:-2px; top:-2px;
+      min-width:16px; height:16px; padding:0 4px;
+      border-radius:999px; background:#1A1610; color:#F4EFE4;
+      font:700 11px/16px -apple-system,"SF Pro Text",sans-serif;
+      font-variant-numeric:tabular-nums; text-align:center;
+    }
+    #three-peek .three-tile-ctrls,
+    #three-battle .three-tile-ctrls {
+      display:flex; align-items:center; justify-content:center; gap:4px;
+      margin-top:5px;
     }
     #three-peek .three-step,
     #three-battle .three-step {
-      width:36px; height:36px; border-radius:10px;
+      width:26px; height:24px; border-radius:8px;
       border:1px solid rgba(255,255,255,0.16);
       background:rgba(30,36,32,0.55); color:#F4E8C4;
-      font:700 18px/1 -apple-system,"SF Pro Text",sans-serif;
+      font:700 16px/1 -apple-system,"SF Pro Text",sans-serif;
       cursor:pointer; -webkit-tap-highlight-color:transparent;
       touch-action:manipulation;
     }
     #three-peek .three-step:disabled,
     #three-battle .three-step:disabled { opacity:0.35; cursor:default; }
-    #three-peek .three-step-count,
-    #three-battle .three-step-count {
-      min-width:44px; text-align:center;
-      font:700 13px/1 -apple-system,"SF Pro Text",sans-serif;
-      font-variant-numeric:tabular-nums lining-nums;
-      color:#F4EFE4;
-    }
     #three-stack-toggle {
       pointer-events:auto;
       align-self:flex-end;
@@ -485,10 +522,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       text-transform:uppercase; color:#C4A35A; margin-bottom:3px;
     }
     #three-battle .three-picker[data-loss-side="def"] .three-picker-label { color:#8EB8C8; }
-    #three-battle .three-steppers.is-loss { margin-top:0; gap:3px; }
-    #three-battle .three-steppers.is-loss .three-stepper { min-height:32px; padding:1px 4px; }
-    #three-battle .three-steppers.is-loss .three-step { width:36px; height:32px; }
-    #three-battle .three-steppers.is-loss.is-ro .three-step { opacity:0.35; }
+    #three-battle .three-tiles.is-loss { margin-top:0; }
+    #three-battle .three-tiles.is-loss.is-ro .three-tile { padding-bottom:8px; }
     #three-confirm { flex:0 0 auto; position:relative; z-index:2; }
     html.three-spike.has-battle #three-stack-toggle { display:none; }
     #three-sheet {
@@ -834,7 +869,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
         api.peek.innerHTML = `<div class="three-peek-head"><strong>${title}</strong>
           <div class="three-peek-meta">${route || 'Selected aircraft'}</div></div>
-          ${iconRowHtml(stacks)}`;
+          ${steppers?.length ? stepperRowHtml(steppers) : iconRowHtml(stacks)}`;
         api.peek.dataset.rosterTotal = String(rosterTotal);
         api.peek.dataset.airLand = '1';
         if (!api.isSheetOpen()) api.peek.classList.add('is-on');
