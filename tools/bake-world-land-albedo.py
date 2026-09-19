@@ -351,6 +351,96 @@ def even_land_luma(img: Image.Image, land: Image.Image, target=LAND_LUMA_TARGET,
     return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
+def flatten_region_luma(img: Image.Image, land: Image.Image, amount=0.62) -> Image.Image:
+    """Kill low-frequency brightness steps (plate / L-band joins) inside a land mask.
+
+    Subtract a heavily blurred luma residual toward the land median.
+    Watercolor grain and peak hatching stay; a hard Cape rectangle cannot.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return img
+    arr = np.asarray(img, dtype=np.float32)
+    m = np.asarray(land) > 8
+    if int(m.sum()) < 80:
+        return img
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    yimg = Image.fromarray(np.clip(yv, 0, 255).astype('uint8'), 'L')
+    low = np.asarray(yimg.filter(ImageFilter.GaussianBlur(120)), dtype=np.float32)
+    target = float(np.median(yv[m]))
+    residual = (low - target) * amount
+    new_y = yv - residual
+    scale = np.ones_like(yv)
+    scale[m] = np.clip(new_y[m] / np.maximum(yv[m], 1.0), 0.88, 1.14)
+    arr = arr * scale[..., None]
+    return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
+
+
+def heal_horiz_luma_step(img: Image.Image, land: Image.Image, w: int, h: int,
+                         min_map_y=1480, max_map_y=1920) -> Image.Image:
+    """Erase a remaining hard horizontal brightness step inside a land mask.
+
+    Walks land-row mean luma, finds the worst south-of-Sahel jump, and
+    crossfades a wide window through the mask only — never a rectangle.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return img
+    arr = np.asarray(img, dtype=np.float32)
+    m = np.asarray(land) > 8
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    y0 = max(0, int(wy(min_map_y, h)))
+    y1 = min(h - 1, int(wy(max_map_y, h)))
+    means = []
+    for y in range(y0, y1):
+        row = m[y]
+        means.append(float(yv[y, row].mean()) if row.any() else np.nan)
+    means = np.array(means, dtype=np.float32)
+    valid = ~np.isnan(means)
+    if int(valid.sum()) < 12:
+        return img
+    sm = means.copy()
+    # 6px running mean, skip NaN
+    for i in range(len(sm)):
+        lo, hi = max(0, i - 3), min(len(sm), i + 4)
+        sl = means[lo:hi]
+        sl = sl[~np.isnan(sl)]
+        if sl.size:
+            sm[i] = sl.mean()
+    d = np.diff(sm)
+    d[np.isnan(d)] = 0
+    k = int(np.argmax(np.abs(d)))
+    if abs(float(d[k])) < 2.4:
+        return img
+    seam = y0 + k
+    # Crossfade ±70 atlas px through the land mask.
+    half = 70
+    yy = np.arange(h)[:, None]
+    t = np.clip((yy - (seam - half)) / (2 * half), 0, 1)
+    # Sample a north and south land mean color
+    def mean_rgb(ya, yb):
+        band = m[ya:yb]
+        if not band.any():
+            return None
+        return arr[ya:yb][band].mean(axis=0)
+    north = mean_rgb(max(0, seam - 90), seam - 8)
+    south = mean_rgb(seam + 8, min(h, seam + 90))
+    if north is None or south is None:
+        return img
+    # Lift the darker side toward the lighter so the step dies, keep chroma.
+    target = (north + south) * 0.5
+    lift = np.zeros_like(arr)
+    lift[:] = target
+    # Blend amount peaks at the seam, only on land
+    amt = (1.0 - np.abs(t * 2 - 1.0)) * 0.55
+    amt = amt * m[..., None]
+    arr = arr * (1.0 - amt) + lift * amt
+    print(f'heal_horiz_luma_step: map y≈{seam * MAP_H / h:.0f} delta={d[k]:.2f}')
+    return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
+
+
 def tileable_paper(src: Image.Image, size=768) -> Image.Image:
     """Crop vignette edges, then blend seams. A worn-edge tile becomes a plate grid."""
     w, h = src.size
@@ -408,10 +498,16 @@ def paste_through_mask(img, plate, mask, dest_uv, src_frac, w, h, alpha=0.78, bl
     rx1, ry1 = int(wx(dest_uv[2], w)), int(wy(dest_uv[3], h))
     if rx1 <= rx0 or ry1 <= ry0:
         return img
+    # Dest is positioning. If the live mask extends past the box (Cape /
+    # Australia class), grow dest so land is never cut by a rectangle.
+    mb = mask.getbbox()
+    if mb and (mb[0] < rx0 - 2 or mb[1] < ry0 - 2 or mb[2] > rx1 + 2 or mb[3] > ry1 + 2):
+        rx0, ry0 = min(rx0, mb[0]), min(ry0, mb[1])
+        rx1, ry1 = max(rx1, mb[2]), max(ry1, mb[3])
     fitted = crop.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS)
-    box_mask = Image.new('L', (w, h), 0)
-    box_mask.paste(Image.new('L', (rx1 - rx0, ry1 - ry0), 255), (rx0, ry0))
-    local = ImageChops.multiply(mask, box_mask)
+    # Alpha is the land mask. Dest box is only used to place the crop;
+    # a 1px box edge in open ocean is fine, a box edge on land is not.
+    local = mask
     fitted = match_to_region(fitted, img.crop((rx0, ry0, rx1, ry1)), local.crop((rx0, ry0, rx1, ry1)))
     layer = img.copy()
     layer.paste(fitted, (rx0, ry0))
@@ -522,9 +618,10 @@ def build_atlas(lands) -> Image.Image:
     parchment = load_rgb(first_existing(BOARD / 'board-parchment-tile.png', GEN37 / 'p37-parchment-grain-tile.png'))
     world = load_rgb(first_existing(GEN37 / 'p37-world-watercolor.png'))
     europe = load_rgb(first_existing(GEN37 / 'p37-europe-africa-theater.png'))
+    africa = load_rgb(first_existing(GEN37 / 'p37-africa-continent.png', GEN37 / 'p37-world-watercolor.png'))
     asia = load_rgb(first_existing(GEN37 / 'p37-asia-continent.png', GEN37 / 'p37-world-watercolor.png'))
     oceania = load_rgb(first_existing(GEN37 / 'p37-oceania-style-lock.png'))
-    if not world or not europe or not oceania:
+    if not world or not europe or not oceania or not africa:
         raise SystemExit('P37 fail-closed: missing STYLE REF watercolor plates')
 
     paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
@@ -537,6 +634,9 @@ def build_atlas(lands) -> Image.Image:
 
     world = match_parchment(world)
     europe = match_parchment(europe)
+    africa = match_parchment(africa)
+    # Quiet faint political hairlines on the generated continent plate.
+    africa = Image.blend(africa, africa.filter(ImageFilter.MedianFilter(3)), 0.40)
     asia = match_parchment(asia) if asia else world
     oceania = match_parchment(oceania)
 
@@ -548,12 +648,31 @@ def build_atlas(lands) -> Image.Image:
     )
 
     # Theater detail through continent masks only (feathered). Australia last.
-    em = land_mask(lands, w, h, continents={'Europe', 'Africa', 'Middle East'})
+    # P37b HARD: the Europe/Africa plate is Med + Sahara only. Pasting it
+    # through all of Africa with dest y=1680 cut a rectangular L-band across
+    # the Cape (South Africa map y=1586–1923). Northern names only; dest
+    # stays north of Congo. Full AF is one continuous continent plate.
+    north_af = {
+        'Algeria', 'Anglo Sudan Egypt', 'French West Africa',
+        'Italian East Africa', 'French Equatorial Africa',
+    }
+    em = land_mask(lands, w, h, continents={'Europe', 'Middle East'})
+    em = ImageChops.lighter(em, land_mask(lands, w, h, names=north_af))
     img = paste_through_mask(
         img, europe, em,
-        (560, 40, 1860, 1680), (0.02, 0.02, 0.98, 0.98),
-        w, h, alpha=0.88, blur=52,
+        (560, 40, 1860, 1420), (0.02, 0.02, 0.98, 0.86),
+        w, h, alpha=0.88, blur=80,
     )
+    # One continuous Africa wash — dest covers the Cape. Mask-only alpha.
+    # Plate inset keeps the worn paper edge off the southern tip.
+    af_all = land_mask(lands, w, h, continents={'Africa'})
+    img = paste_through_mask(
+        img, africa, af_all,
+        (640, 790, 1560, 1960), (0.10, 0.07, 0.90, 0.86),
+        w, h, alpha=0.96, blur=56,
+    )
+    img = flatten_region_luma(img, af_all, 0.72)
+    img = heal_horiz_luma_step(img, af_all, w, h)
     am = land_mask(lands, w, h, continents={'Asia'})
     img = paste_through_mask(
         img, asia, am,

@@ -15,7 +15,7 @@ export const BAKE_H = 1170;
 export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
 export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
 export const WORLD_LAND_NORMAL = 'assets/three/board/world-land-normal.png';
-export const WORLD_LAND_ALBEDO_REV = 'p37';
+export const WORLD_LAND_ALBEDO_REV = 'p37b';
 
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',

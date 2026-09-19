@@ -1,4 +1,4 @@
-// V2.81.51-three-polish.37 STYLE REF watercolor + .36 war overlay holds.
+// V2.81.52-three-polish.37 STYLE REF watercolor + .36 war overlay holds.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.51-three-polish.37', GAME_VERSION === 'V2.81.51-three-polish.37');
+check('GAME_VERSION is V2.81.52-three-polish.37', GAME_VERSION === 'V2.81.52-three-polish.37');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -656,7 +656,13 @@ check('p35 required stills held',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/east-med-select-no-clip.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/china-select-hold.png'));
 check('p36 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P36.md')));
-check('p37 albedo rev is p37', /WORLD_LAND_ALBEDO_REV = 'p37'/.test(terrain));
+check('p37 albedo rev is p37b', /WORLD_LAND_ALBEDO_REV = 'p37b'/.test(terrain));
+check('p37b Cape is mask-only (no dest y=1680 L-band)',
+  /flatten_region_luma/.test(albedoBaker)
+  && /heal_horiz_luma_step/.test(albedoBaker)
+  && /p37-africa-continent/.test(albedoBaker)
+  && /1960/.test(albedoBaker)
+  && !/\(560, 40, 1860, 1680\)/.test(albedoBaker));
 check('p37 painted albedo stays bound (not stain fallback)',
   /WORLD_LAND_ALBEDO/.test(terrain)
   && /loadWorldLandAlbedo/.test(terrain)
@@ -729,7 +735,8 @@ check('p37 STYLE REF plates on disk',
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-world-watercolor.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-europe-africa-theater.png')
   && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-asia-continent.png')
-  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-ocean-wash-tile.png'));
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-ocean-wash-tile.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-africa-continent.png'));
 check('p37 sea-zone ink is closed water rings',
   /waterOutlineRings/.test(outlineSrc)
   && /addSeaZoneInk/.test(art)
