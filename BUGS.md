@@ -2,6 +2,18 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.5 manual combat-move (no Try)
+
+James he-correct: do not auto-play the combat move. Remove Try combat
+move / TAP-to-drive. He taps origin → tappable chips → dest → gold
+Confirm. Discoverability is map labels + pulse origin + pulse dest
+after units + disabled hints “Select units” / “Pick target”.
+Ukraine is a legal dest (dead chips / gray Attack fixed). Optional
+casualties use a picker, not cheapest auto-pick. Seeded pocket stays.
+Preview only. Do not merge to main.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.4 combat-move start affordances
 
 James could not figure out how to *initiate* a combat move on `?three=1`

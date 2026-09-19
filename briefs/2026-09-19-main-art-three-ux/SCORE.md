@@ -1,4 +1,4 @@
-# SCORE — V2.81.53-ux-preview.4
+# SCORE — V2.81.53-ux-preview.5
 **Preview only** `?three=1` or `?ux=1`. Live Canvas / main production untouched. Do not merge.
 
 ```
@@ -11,7 +11,7 @@ vizP1Coach=false
 scenario=karelia-finland-air
 ```
 
-**Lineage:** follow-up on Hybrid PR68 (`cursor/main-art-three-ux-9380`) / PR73. James: combat-move start was not discoverable. Tesla off. Do not merge to main.
+**Lineage:** follow-up on Hybrid PR68 / PR73 / PR74. James he-correct: no Try, no auto-start. Tesla off. Do not merge to main.
 
 ## Playable pocket
 Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** (INF×2 + AA). After the take, land the fighter on teal **Russia** or **Karelia**. Seeded AA miss + ATK 2 / DEF 1.

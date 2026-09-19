@@ -40,6 +40,7 @@ function iconRowHtml(stacks) {
     const src = getUnitIconPath(s.type, s.owner) || '';
     return `<button type="button" class="three-peek-unit" data-unit-type="${s.type}" title="${formatUnitName(s.type)}">
       <img src="${src}" alt="${shortType(s.type)}" width="36" height="36">
+      <em>${shortType(s.type)}</em>
       <b>${s.quantity}</b>
     </button>`;
   }).join('')}</div>`;
@@ -158,18 +159,24 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-peek .three-peek-row::-webkit-scrollbar { display:none; }
     #three-peek .three-peek-unit { flex:0 0 auto; }
     #three-peek .three-peek-unit {
-      position:relative; width:56px; height:56px;
-      display:inline-flex; align-items:center; justify-content:center;
-      background:rgba(240,230,210,0.16);
-      border:1px solid rgba(255,255,255,0.10);
-      border-radius:12px;
+      position:relative; width:64px; height:72px;
+      display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+      background:rgba(240,230,210,0.20);
+      border:1.5px solid rgba(255,255,255,0.22);
+      border-radius:14px;
       color:inherit; padding:0; cursor:pointer;
       -webkit-tap-highlight-color:transparent;
     }
     #three-peek .three-peek-unit.is-picked {
       box-shadow:0 0 0 2px #C4A35A;
+      border-color:#C4A35A;
     }
-    #three-peek .three-peek-unit img { width:48px; height:48px; display:block; }
+    #three-peek .three-peek-unit img { width:44px; height:44px; display:block; }
+    #three-peek .three-peek-unit em {
+      display:block; margin-top:1px;
+      font:700 10px/1 -apple-system,"SF Pro Text",sans-serif;
+      letter-spacing:0.04em; color:#F4E8C4; font-style:normal;
+    }
     #three-peek .three-peek-unit b {
       position:absolute; right:-2px; bottom:-2px;
       min-width:16px; height:16px; padding:0 4px;
@@ -237,14 +244,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-zoom button[data-zoom="fit"] { font-size:12px; letter-spacing:0.02em; }
     #three-phase-guide { display:none !important; }
-    #three-phase-strip {
-      position:absolute; left:0; right:0; z-index:31;
-      top:calc(48px + env(safe-area-inset-top, 0px));
-      padding:6px 10px 0;
-      padding-left:max(10px, env(safe-area-inset-left));
-      padding-right:max(10px, env(safe-area-inset-right));
-      pointer-events:none;
-    }
+    #three-phase-strip { display:none !important; }
     #three-phase-strip .three-steps {
       display:flex; align-items:center; flex-wrap:nowrap; gap:0;
       min-height:36px; padding:7px 10px; border-radius:12px;
@@ -315,6 +315,22 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       background:#C4A35A; color:#1E2420; border-color:transparent;
     }
     #three-battle .three-die.is-def { opacity:0.88; }
+    #three-battle .three-pickers { margin-top:8px; display:flex; flex-direction:column; gap:8px; }
+    #three-battle .three-picker-label {
+      font:600 11px/1 -apple-system,sans-serif; letter-spacing:0.04em;
+      text-transform:uppercase; color:#C4A35A; margin-bottom:4px;
+    }
+    #three-battle .three-picker-row { display:flex; flex-wrap:wrap; gap:6px; }
+    #three-battle .three-loss {
+      min-width:56px; min-height:48px; padding:4px 8px; border-radius:12px;
+      border:1.5px solid rgba(255,255,255,0.16);
+      background:rgba(240,230,210,0.12); color:#E8E2D4;
+      font:700 12px/1.2 -apple-system,"SF Pro Text",sans-serif;
+      cursor:pointer; -webkit-tap-highlight-color:transparent;
+    }
+    #three-battle .three-loss.is-on {
+      background:#C4A35A; color:#1E2420; border-color:transparent;
+    }
     html.three-spike.has-battle #three-zoom,
     html.three-spike.has-l2 #three-zoom { display:none; }
     html.three-spike.has-battle #three-stack-toggle { display:none; }
@@ -341,7 +357,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
     @media (max-width:430px) {
       #three-l0 .three-l0-ver { display:none; }
-      #three-peek .three-peek-unit { width:48px; height:48px; }
+      #three-peek .three-peek-unit { width:60px; height:70px; }
       #three-peek .three-peek-unit img { width:40px; height:40px; }
       #three-phase-strip .three-step { font-size:11px; }
       #three-confirm, #three-confirm.is-idle, #three-confirm:disabled {
@@ -388,7 +404,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     <div id="three-guide" aria-live="polite"></div>
     <div id="three-battle"></div>
     <div id="three-peek"></div>
-    <button type="button" id="three-confirm" class="is-idle" disabled>Tap the glowing red stack</button>
+    <button type="button" id="three-confirm" class="is-idle" disabled>Select units</button>
   `;
   document.body.appendChild(bottom);
 
@@ -425,6 +441,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     stacksExpanded: false,
     onStackToggle: null,
     onUnitPick: null,
+    onLossPick: null,
     onGuideDismiss: null,
     setSeat(name, color) {
       api.seatEl.textContent = name;
@@ -454,7 +471,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     isSheetOpen() {
       return sheet.classList.contains('is-open');
     },
-    setConfirmIdle(label = 'Tap the glowing red stack') {
+    setConfirmIdle(label = 'Select units') {
       api.confirm.disabled = true;
       api.confirm.classList.remove('is-ready');
       api.confirm.classList.add('is-idle');
@@ -510,11 +527,21 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const side = d.side === 'def' ? ' is-def' : '';
         return `<span class="three-die${hit}${side}" title="${d.type || ''}">${d.face}</span>`;
       }).join('');
+      const pickers = (card.pickers || []).map((p) => {
+        const chips = (p.units || []).map((u) => {
+          const n = Number(p.taken?.[u.type]) || 0;
+          const on = n > 0 ? ' is-on' : '';
+          const short = shortType(u.type);
+          return `<button type="button" class="three-loss${on}" data-loss-side="${p.side}" data-loss-type="${u.type}">${short}${n ? ` −${n}` : ''}</button>`;
+        }).join('');
+        return `<div><div class="three-picker-label">${p.label}</div><div class="three-picker-row">${chips}</div></div>`;
+      }).join('');
       api.battleEl.innerHTML = `
         <p class="three-battle-kicker">${card.kicker || 'Battle'}</p>
         <strong>${card.title || ''}</strong>
         <div class="three-battle-body">${card.body || ''}</div>
-        ${dice ? `<div class="three-dice">${dice}</div>` : ''}`;
+        ${dice ? `<div class="three-dice">${dice}</div>` : ''}
+        ${pickers ? `<div class="three-pickers">${pickers}</div>` : ''}`;
       api.battleEl.classList.add('is-on');
       api.syncLayers();
     },
@@ -542,12 +569,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       replay = false,
       route = '',
     } = {}) {
-      api.setGuide(guide, true);
-      if (guideSteps?.steps?.length) {
-        api.setPhaseStrip(guideSteps.steps, guideSteps.current || 1);
-      } else {
-        api.setPhaseStrip(guide ? [guide] : [], 1);
-      }
+      api.setGuide('', false);
+      api.setPhaseStrip([], 0);
       api.setBattle(battle);
       if (battle) {
         api.peek.classList.remove('is-on');
@@ -575,7 +598,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       }
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
       else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
-      else api.setConfirmIdle(label || 'Tap the glowing red stack');
+      else api.setConfirmIdle(label || 'Select units');
       api.syncLayers();
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
@@ -646,6 +669,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (!chip) return;
     e.stopPropagation();
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
+  });
+  api.battleEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-loss-type]');
+    if (!chip) return;
+    e.stopPropagation();
+    if (typeof api.onLossPick === 'function') {
+      api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType);
+    }
   });
   api.guideEl.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-guide="dismiss"]');

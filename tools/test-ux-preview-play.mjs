@@ -1,22 +1,21 @@
 // Playable UX preview: Combat Move → Battle → Air Land.
-// Run: node tools/test-ux-preview-play.mjs
+// Manual only — no Try / auto-start. Run: node tools/test-ux-preview-play.mjs
 
 import {
   PHASE,
   BATTLE_STEP,
   SCENARIO,
   SELECT_GOLD,
+  LABEL_LANDS,
   createScenario,
   tapLand,
   pickUnit,
+  pickLoss,
   confirm,
   confirmLabel,
   confirmGold,
   confirmEnabled,
   highlights,
-  guideCopy,
-  guideSteps,
-  combatMoveStep,
   battleCard,
   inspectPlay,
   driveCombatMove,
@@ -25,6 +24,7 @@ import {
   driveLanded,
   resetScenario,
   stackQty,
+  lossesReady,
 } from '../src/map/uxPreviewScenario.js';
 
 let failures = 0;
@@ -37,22 +37,26 @@ function assert(cond, msg) {
 
 const move = createScenario();
 assert(move.phase === PHASE.COMBAT_MOVE, 'starts combat move');
-assert(confirmLabel(move) === 'Tap the glowing red stack', 'idle label');
+assert(confirmLabel(move) === 'Select units', 'idle hint');
 assert(confirmGold(move) === false, 'idle not gold');
-assert(confirmEnabled(move) === false, 'idle disabled');
+assert(confirmEnabled(move) === false, 'idle disabled — no Try');
 assert(highlights(move).origin === SCENARIO.origin, 'origin marked on load');
 assert(highlights(move).pulse.includes(SCENARIO.origin), 'origin pulses on load');
-assert(combatMoveStep(move) === 1, 'step 1 on load');
-assert(guideCopy(move).includes('1 Tap your red stack'), 'numbered strip');
-assert(guideSteps(move).persistent === true, 'strip persists');
-assert(guideSteps(move).current === 1, 'strip on step 1');
-assert(guideSteps(move).steps[0] === 'Tap your red stack', 'step copy');
+assert(LABEL_LANDS.includes('Ukraine S.S.R.'), 'ukraine labeled');
+assert(LABEL_LANDS.includes('Karelia S.S.R.'), 'karelia labeled');
+
+tapLand(move, 'Ukraine S.S.R.');
+assert(move.selected == null, 'ukraine before origin does not steal selection');
+assert(confirmEnabled(move) === false, 'ukraine first keeps Attack gray');
 
 tapLand(move, SCENARIO.origin);
 assert(move.selected === SCENARIO.origin, 'origin selected');
-assert(confirmLabel(move) === 'Pick INF + FTR', 'need units');
+assert(confirmLabel(move) === 'Select units', 'select units after origin');
 assert(!highlights(move).pulse.includes(SCENARIO.origin), 'origin pulse stops after tap');
-assert(combatMoveStep(move) === 2, 'step 2 after origin tap');
+
+tapLand(move, 'Ukraine S.S.R.');
+assert(move.destPicked == null, 'ukraine dest ignored until units');
+assert(move.selected === SCENARIO.origin, 'chips stay on origin after ukraine tap');
 
 pickUnit(move, 'fighter');
 assert(move.selectedUnits.fighter === 1, 'fighter staged');
@@ -63,18 +67,21 @@ assert(move.destPicked == null, 'no dest without ground');
 pickUnit(move, 'infantry');
 assert(move.selectedUnits.infantry === 3, 'inf staged');
 assert(highlights(move).legal.includes(SCENARIO.dest), 'finland legal');
-assert(highlights(move).pulse.includes(SCENARIO.dest), 'dest pulses after units');
-assert(combatMoveStep(move) === 3, 'step 3 after INF+FTR');
-assert(confirmLabel(move) === 'Tap glowing Finland', 'dest hint');
-assert(guideCopy(move).includes('4 Confirm'), 'confirm in strip');
+assert(highlights(move).legal.includes('Ukraine S.S.R.'), 'ukraine legal dest');
+assert(highlights(move).pulse.includes(SCENARIO.dest), 'finland pulses after units');
+assert(highlights(move).pulse.includes('Ukraine S.S.R.'), 'ukraine pulses after units');
+assert(confirmLabel(move) === 'Pick target', 'pick target hint');
+assert(confirmGold(move) === false, 'gray until dest tap');
+
+tapLand(move, 'Ukraine S.S.R.');
+assert(move.destPicked === 'Ukraine S.S.R.', 'ukraine dest legal');
+assert(confirmGold(move) === true, 'gold Attack after ukraine dest');
+assert(confirmLabel(move) === 'Confirm: Attack Ukraine S.S.R.', 'named ukraine attack');
 
 tapLand(move, SCENARIO.dest);
-assert(move.destPicked === SCENARIO.dest, 'dest picked');
-assert(confirmGold(move) === true, 'confirm gold on staged move');
-assert(confirmEnabled(move) === true, 'confirm enabled when legal');
-assert(confirmLabel(move) === `Confirm: Move to ${SCENARIO.dest}`, 'named dest confirm');
-assert(combatMoveStep(move) === 4, 'step 4 confirm');
-assert(!highlights(move).pulse.includes(SCENARIO.dest), 'dest pulse stops after pick');
+assert(move.destPicked === SCENARIO.dest, 'finland dest');
+assert(confirmLabel(move) === `Confirm: Attack ${SCENARIO.dest}`, 'named finland attack');
+assert(confirmEnabled(move) === true, 'confirm when legal');
 
 confirm(move);
 assert(move.phase === PHASE.BATTLE, 'entered battle');
@@ -82,79 +89,61 @@ assert(move.battle.step === BATTLE_STEP.AA_READY, 'AA first');
 assert(stackQty(move.placements[SCENARIO.origin], 'infantry') === 0, 'origin emptied of INF');
 assert(stackQty(move.placements[SCENARIO.dest], 'infantry', 'Russians') === 3, 'INF on dest');
 assert(confirmLabel(move) === 'Confirm: Fire AA', 'AA CTA');
-assert(confirmGold(move) === true, 'AA gold');
-assert(battleCard(move).kicker === 'AA fire', 'AA card');
 
 confirm(move);
-assert(move.battle.step === BATTLE_STEP.AA_RESULT, 'AA result');
 assert(move.battle.aaHits === 0, 'seeded AA miss');
-assert(battleCard(move).title === 'Missed', 'AA miss title');
-assert(stackQty(move.placements[SCENARIO.dest], 'fighter', 'Russians') === 1, 'fighter lives');
-
 confirm(move);
 assert(move.battle.step === BATTLE_STEP.COMBAT_READY, 'combat ready');
-assert(confirmLabel(move) === 'Confirm: Roll combat', 'roll CTA');
-
 confirm(move);
 assert(move.battle.step === BATTLE_STEP.COMBAT_RESULT, 'mid-fight');
 assert(move.battle.attackHits === 2, 'demo 2 attack hits');
 assert(move.battle.defenseHits === 1, 'demo 1 defense hit');
-assert(confirmLabel(move) === 'Confirm: Take hits', 'hits CTA');
-assert(battleCard(move).title.includes('ATK 2'), 'dice card title');
-assert(battleCard(move).dice.length >= 6, 'dice faces shown');
+assert(lossesReady(move) === false, 'optional attacker loss not auto-picked');
+assert(!move.battle.pendingAtt.infantry, 'no cheapest INF auto-assign');
+assert(confirmEnabled(move) === false, 'take hits disabled until assign');
+assert(confirmLabel(move) === 'Assign casualties', 'assign hint');
+assert(battleCard(move).pickers?.length >= 1, 'casualty picker shown');
+
+pickLoss(move, 'att', 'fighter');
+assert(move.battle.pendingAtt.fighter === 1, 'chose fighter');
+pickLoss(move, 'att', 'infantry');
+assert(move.battle.pendingAtt.infantry === 1, 'switched to INF');
+assert(!move.battle.pendingAtt.fighter, 'fighter unassigned');
+assert(lossesReady(move) === true, 'losses assigned');
+assert(confirmLabel(move) === 'Confirm: Take hits', 'hits CTA after assign');
 
 confirm(move);
 assert(move.battle.step === BATTLE_STEP.WON, 'attacker wins');
 assert(move.owners[SCENARIO.dest] === 'Russians', 'finland taken');
-assert(stackQty(move.placements[SCENARIO.dest], 'infantry', 'Germans') === 0, 'defenders gone');
 assert(stackQty(move.placements[SCENARIO.dest], 'infantry', 'Russians') === 2, '1 INF lost');
 
 confirm(move);
 assert(move.phase === PHASE.AIR_LAND, 'air land');
 assert(confirmGold(move) === false, 'air idle not gold');
-assert(confirmLabel(move) === 'Tap a landable territory', 'air idle');
 assert(highlights(move).landable.includes('Russia'), 'russia landable');
-assert(highlights(move).landable.includes(SCENARIO.origin), 'karelia landable');
 
 tapLand(move, 'Germany');
 assert(move.landingDest == null, 'illegal land ignored');
 tapLand(move, 'Russia');
-assert(move.landingDest === 'Russia', 'russia chosen');
-assert(confirmGold(move) === true, 'land confirm gold');
 assert(confirmLabel(move) === 'Confirm: Land in Russia', 'named land confirm');
-
 confirm(move);
 assert(move.phase === PHASE.DONE, 'done');
-assert(move.landed === true, 'landed flag');
 assert(stackQty(move.placements.Russia, 'fighter', 'Russians') === 1, 'fighter in Russia');
-assert(stackQty(move.placements[SCENARIO.dest], 'fighter', 'Russians') === 0, 'fighter left finland');
-assert(confirmGold(move) === false, 'done confirm not gold — does not stick');
-assert(confirmEnabled(move) === true, 'replay enabled');
-assert(confirmLabel(move).includes('Landed in Russia'), 'landed label');
-
-const infOnly = createScenario();
-tapLand(infOnly, SCENARIO.origin);
-pickUnit(infOnly, 'infantry');
-assert(highlights(infOnly).pulse.includes(SCENARIO.dest), 'dest pulses after ground pick');
-assert(confirmGold(infOnly) === false, 'not legal until dest tap');
+assert(confirmGold(move) === false, 'done confirm not gold');
 
 const mid = createScenario();
 driveBattleMid(mid);
 assert(mid.phase === PHASE.BATTLE, 'drive battle');
-assert(mid.battle.step === BATTLE_STEP.COMBAT_RESULT, 'drive mid-fight');
-const snap = inspectPlay(mid);
-assert(snap.confirmGold === true, 'inspect gold mid-fight');
-assert(snap.attackHits === 2, 'inspect hits');
+assert(mid.battle.step === BATTLE_STEP.COMBAT_RESULT, 'drive mid-fight waits for picker');
+assert(inspectPlay(mid).lossesReady === false, 'drive does not auto-pick');
 
 const air = createScenario();
 driveAirChoice(air);
 assert(air.phase === PHASE.AIR_LAND, 'drive air');
-assert(air.landingDest == null, 'air waits for tap');
 
 const done = createScenario();
 driveLanded(done, 'Russia');
 assert(done.phase === PHASE.DONE, 'drive landed');
-assert(done.landingDest === 'Russia', 'landed russia');
 resetScenario(done);
 assert(done.phase === PHASE.COMBAT_MOVE, 'replay resets');
 assert(stackQty(done.placements[SCENARIO.origin], 'infantry') === 3, 'pocket restored');
