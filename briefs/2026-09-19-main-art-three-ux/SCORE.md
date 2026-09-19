@@ -37,6 +37,6 @@ Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** (INF×2 
 - `air-land-choice-390.png` — teal Russia + Karelia
 - `air-landed-390.png` — fighter in Russia, Confirm idle
 
-**Vercel:** https://tactical-risk20-4vc8ykwag-james-projects-20d8de40.vercel.app/?three=1
+**Vercel:** https://tactical-risk20-jj7jpthqb-james-projects-20d8de40.vercel.app/?three=1
 **Git alias:** https://tactical-risk20-git-cursor-mobil-9c9397-james-projects-20d8de40.vercel.app/?three=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · do not merge to main)
