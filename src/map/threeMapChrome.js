@@ -213,7 +213,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       z-index:28; display:flex; flex-direction:column; gap:8px;
     }
     html.three-spike.has-l1 #three-zoom {
-      bottom:calc(208px + env(safe-area-inset-bottom, 0px));
+      bottom:calc(300px + env(safe-area-inset-bottom, 0px));
     }
     html.three-spike.has-l2 #three-zoom { display:none; }
     #three-zoom button {

@@ -43,9 +43,10 @@ overlap:      none at out/mid/in
 ```
 
 ## Stills
-- `japan-crowded.png` — Japan max-type, pip+N, no spill
-- `europe-mid.png` — Europe mid zoom
-- `mobile-390-chrome.png` — 390 CSS + phone chrome
+- `japan-crowded.png` — Japan 8-type crowd, INF/TNK/+6 inside the island
+- `europe-mid.png` — Europe mid zoom, one pip+N per land
+- `mobile-390-chrome.png` — 390×700 (phone browser chrome height)
 - `stack-collapsed.png` / `stack-expanded.png` — toggle
 
-**PR:** follow-up draft on the PR68 side branch. Do not merge to main.
+**Vercel:** https://tactical-risk20-git-cursor-hybri-9ce811-james-projects-20d8de40.vercel.app/?three=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/72 (draft follow-up on PR68 branch · do not merge to main)
