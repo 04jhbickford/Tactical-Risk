@@ -315,9 +315,11 @@ export async function bootThreeMapSpike() {
   const coastAoMat = makeCoastAoMaterial();
   const coastShelfMat = makeCoastShelfMaterial();
   const riverMat = makeLineMat('#3A4E52', 2.2, 0.46);
-  const selectHaloMat = makeLineMat('#3A3428', 8.8, 0.52);
-  const selectMat = makeLineMat(PALETTE.select, 6.4, 0.94);
+  // P40b HARD: hairline gold/ink ring. Fat 6.4+8.8 read as interior wash.
+  const selectHaloMat = makeLineMat('#3A3428', 4.2, 0.48);
+  const selectMat = makeLineMat(PALETTE.select, 2.8, 0.96);
   const selectWashMat = makeSelectWashMaterial();
+  selectWashMat.visible = false;
   const continentMats = new Map();
   for (const [name, hex] of Object.entries(REGION_WASH)) {
     if (name === 'USSR') continue;
@@ -710,24 +712,35 @@ export async function bootThreeMapSpike() {
   }
 
   function setLandEmissive(name, hex) {
-    const mats = landMats.get(name);
+    // P40b HARD: select never touches land materials.
     // P40 HARD: never re-tint continuous art per polygon. Select is outline.
+    // Zero interior multiply / brighten / tint / emissive wash.
     // Soft gold ring/ink — never a candy yellow flood. never a blue glow ring.
+    void name;
     void hex;
     void makeSelectWashMeshes;
     const heldP31 = 'emissiveIntensity = 0.30';
+    const heldGold = 0xC4A35A;
     void heldP31;
-    if (mats?.top?.emissive) {
-      if (getWorldLandTex()) {
-        mats.top.emissive.setHex(0xffffff);
-        mats.top.emissiveMap = getWorldLandTex();
-        mats.top.emissiveIntensity = 0.34;
-      } else {
-        mats.top.emissive.setHex(0x000000);
-        mats.top.emissiveMap = null;
-        mats.top.emissiveIntensity = 0;
-      }
+    void heldGold;
+  }
+
+  function landMatState(name) {
+    const top = landMats.get(name)?.top;
+    let washCount = 0;
+    for (const group of wrapGroups) {
+      group.traverse((obj) => {
+        if (obj?.userData?.kind === 'select-wash') washCount += 1;
+      });
     }
+    return {
+      name,
+      color: top?.color?.getHex?.() ?? null,
+      emissive: top?.emissive?.getHex?.() ?? null,
+      emissiveIntensity: top?.emissiveIntensity ?? null,
+      hasEmissiveMap: !!top?.emissiveMap,
+      washMeshes: washCount,
+    };
   }
 
   function screenScale(kind, footprint, typeCount = 1, name = '') {
@@ -778,8 +791,10 @@ export async function bootThreeMapSpike() {
     for (const group of wrapGroups) {
       if (!group.visible) continue;
       if (!water) {
-        // P40 HARD: select = gold/ink outline on continuous art.
+        // P40b HARD: select = gold/ink outline on continuous art.
         // Never a per-polygon wash that re-tints the basemap.
+        void selectWashMat;
+        void makeSelectWashMeshes;
       }
       const rings = water
         ? waterOutlineRings(territory)
@@ -951,7 +966,7 @@ export async function bootThreeMapSpike() {
     const next = picked?.territory || null;
     const unitType = picked?.unitType || null;
     if (hover) {
-      if (hoveredName && hoveredName !== selectedName) setLandEmissive(hoveredName, 0x000000);
+      void setLandEmissive;
       hoveredName = next && !next.isWater ? next.name : null;
       renderer.domElement.classList.toggle('is-hovering', !!next);
       return;
@@ -980,9 +995,9 @@ export async function bootThreeMapSpike() {
       forceCollapsed.clear();
       forceExpanded.clear();
     }
-    if (selectedName) setLandEmissive(selectedName, 0x000000);
+    // P40b HARD: never tint / emissive / multiply the land on select.
+    void setLandEmissive;
     selectedName = next ? next.name : null;
-    if (next && !next.isWater) setLandEmissive(next.name, 0xC4A35A);
     selectedUnitType = unitType && next ? unitType : (next && selectedUnitType && selectedName === next.name ? selectedUnitType : unitType);
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
@@ -1195,6 +1210,7 @@ export async function bootThreeMapSpike() {
     screenYOf,
     screenXYOf,
     lodBand: currentBand,
+    landMatState,
     selectLand(name, unitType = null) {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
@@ -1450,6 +1466,10 @@ export async function bootThreeMapSpike() {
         strategy: albedo?.userData?.strategy || null,
         oceanCoastalRipples: !!(albedoBound && albedo?.userData?.oceanCoastalRipples),
         selectOutlineOnly: true,
+        selectWash: false,
+        selectFill: false,
+        selectEmissiveWash: false,
+        selectLandMat: selectedName ? landMatState(selectedName) : null,
         playbookFolded: true,
         seaSrc: getWorldSeaTex()?.userData?.src || null,
         seaRev: getWorldSeaTex()?.userData?.rev || null,

@@ -119,12 +119,15 @@ async function main() {
   await shot('europe-mid-390.png');
   await shot('continents-subtle.png');
   await shot('land-borders-ink.png');
+  const idleGermany = await page.evaluate(() => window.__threeSpike.landMatState('Germany'));
 
   await page.evaluate(() => {
     window.__threeSpike.frameEuropeAfrica();
     window.__threeSpike.selectLand('Germany');
   });
   await shot('select-on-art.png');
+  const selectGermany = await page.evaluate(() => window.__threeSpike.landMatState('Germany'));
+  const germanyXY = await page.evaluate(() => window.__threeSpike.screenXYOf('Germany'));
 
   await page.evaluate(() => {
     window.__threeSpike.frameAustralia({ lift: 168, south: 22 });
@@ -194,6 +197,20 @@ async function main() {
       australia: window.__threeSpike.frameAustralia({ lift: 168, south: 22 }),
     };
   });
+  computed.idleGermany = idleGermany;
+  computed.selectGermany = selectGermany;
+  computed.germanyXY = germanyXY;
+  computed.selectOutlineOnly = !!(computed.inspect?.selectOutlineOnly);
+  computed.selectWash = computed.inspect?.selectWash;
+  computed.selectFill = computed.inspect?.selectFill;
+  computed.selectEmissiveWash = computed.inspect?.selectEmissiveWash;
+  computed.landUnchangedOnSelect = idleGermany
+    && selectGermany
+    && idleGermany.color === selectGermany.color
+    && idleGermany.emissive === selectGermany.emissive
+    && idleGermany.emissiveIntensity === selectGermany.emissiveIntensity
+    && idleGermany.hasEmissiveMap === selectGermany.hasEmissiveMap
+    && selectGermany.washMeshes === 0;
 
   await page.evaluate(() => window.__threeSpike.selectLand(null));
   await new Promise((r) => setTimeout(r, 400));
@@ -208,6 +225,31 @@ async function main() {
   computed.eastMedCapture = eastMed;
   computed.stackExpand = stackExpand;
   computed.stackCollapse = stackCollapse;
+  const ink = join(outDir, 'land-borders-ink.png');
+  const sel = join(outDir, 'select-on-art.png');
+  if (existsSync(ink) && existsSync(sel) && germanyXY?.x && germanyXY?.y) {
+    const py = `
+from PIL import Image
+ink = Image.open(${JSON.stringify(ink)}).convert('RGB')
+sel = Image.open(${JSON.stringify(sel)}).convert('RGB')
+# Capture is 390 CSS × dpr 2.
+sx = int(${germanyXY.x} * 2)
+sy = int(${germanyXY.y} * 2)
+samples = []
+for dx, dy in ((0,0),(18,0),(-18,0),(0,18),(0,-18),(12,12),(-12,-12)):
+    x = max(2, min(ink.width-3, sx+dx))
+    y = max(2, min(ink.height-3, sy+dy))
+    a = ink.getpixel((x,y))
+    b = sel.getpixel((x,y))
+    d = max(abs(a[0]-b[0]), abs(a[1]-b[1]), abs(a[2]-b[2]))
+    samples.append({'x':x,'y':y,'ink':a,'sel':b,'delta':d})
+print('SELECT_INTERIOR', max(s['delta'] for s in samples), samples)
+`;
+    const r = spawnSync('python3', ['-c', py], { encoding: 'utf8' });
+    computed.selectInterior = (r.stdout || r.stderr || '').trim();
+    console.log(computed.selectInterior);
+  }
+
   writeFileSync(join(outDir, 'computed.json'), JSON.stringify(computed, null, 2));
   console.log(JSON.stringify(computed.inspect, null, 2));
 

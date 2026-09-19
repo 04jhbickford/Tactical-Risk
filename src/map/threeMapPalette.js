@@ -504,7 +504,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     side: THREE.DoubleSide,
     // P34: painted albedo is the hero — idle parchment emissive washed it to GIS.
     // P37: paper floor so MeshStandard cannot crush STYLE REF watercolor.
-    // Select gold temporarily replaces this; setLandEmissive restores it.
+    // P40b: select never replaces this. Outline stroke only.
     emissive: world ? 0xffffff : 0x000000,
     emissiveIntensity: world ? 0.34 : 0,
     emissiveMap: world ? sheet : null,

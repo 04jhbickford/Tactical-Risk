@@ -1,9 +1,9 @@
-# p40 SCORE — V2.81.52-three-polish.40
+# p40b SCORE — V2.81.52-three-polish.40b
 **Preview only** `?three=1`. Live Canvas untouched. Do not merge.
 **Lineage:** stacked on PR64 / `.39b`. Tesla off. Quiet James.
 **STYLE LOCK:** Oceania beautiful parchment (James attached).
-**Albedo rev:** `p40`.
-**Inspect:** `strategy=basemapUnderInk` · `maskPaintOff` · `oceanCoastalRipples` · `styleRef=oceania-beautiful` · `oceanNoHatch` · `selectOutlineOnly`
+**Albedo rev:** `p40b`.
+**Inspect:** `strategy=basemapUnderInk` · `maskPaintOff` · `oceanCoastalRipples` · `styleRef=oceania-beautiful` · `oceanNoHatch` · `selectOutlineOnly` · `selectWash=false` · `selectFill=false` · `selectEmissiveWash=false`
 
 Local 390 stills in this folder. Fail-closed: mid is STYLE REF family
 and beats `.39`. Continuous hero basemap under ink overlays. No
@@ -22,16 +22,17 @@ Select = gold/ink outline on continuous art.
 4. **Ocean** — same world-space painting + coastal hand-ripples. Hatch tile
    / `OCEAN_UV` stay dead (`oceanNoHatch`).
 5. **Select** — gold/ink outline only. No wash fill. No per-poly re-tint.
-6. **Bind** — `world-land-albedo.png?v=p40` + `world-sea-albedo.png?v=p40`.
+   No interior multiply / brighten / tint / emissive wash. Hairline ring.
+6. **Bind** — `world-land-albedo.png?v=p40b` + `world-sea-albedo.png?v=p40b`.
    Stain OFF.
 
 ## P0 HARD
 | Gate | Verdict | Note |
 |---|---|---|
-| 1 Mid beauty ≥ STYLE REF and beats .39 | **PASS** | `mid-vs-style-ref.png` / `mid-vs-p39.png`: parchment tooth, sage coasts, tan interiors. Same family as Oceania beautiful. Warmer and less GIS than `.39b`. |
-| 2 Territory borders FIT | **PASS** | `land-borders-ink.png` / `aus-fit.png`: ink overlays on continuous art. No paint-mask slivers. |
-| 3 Ocean coastal hand-ripples | **PASS** | `ocean-ripples.png`: organic cool coastal strokes, density falloff. `oceanCoastalRipples` · `oceanNoHatch`. |
-| 4 Select = outline on art | **PASS** | `select-on-art.png`: gold/ink ring only. Art does not re-tint per poly. `selectOutlineOnly`. |
+| 1 Mid beauty ≥ STYLE REF and beats .39 | **PASS** | held from `.40`. `mid-vs-style-ref.png` / `mid-vs-p39.png`. No albedo rebake. |
+| 2 Territory borders FIT | **PASS** | held. `land-borders-ink.png` / `aus-fit.png`. No paint-mask slivers. |
+| 3 Ocean coastal hand-ripples | **PASS** | held. `ocean-ripples.png`. `oceanCoastalRipples` · `oceanNoHatch`. |
+| 4 Select = outline on art | **PASS** | `select-on-art.png`: gold/ink ring only. Basemap paint unchanged inside. `selectOutlineOnly`. Zero wash/fill/emissive. |
 
 ## Held .38 / .39
 | Gate | Verdict | Note |
@@ -44,10 +45,11 @@ Select = gold/ink outline on continuous art.
 
 ## Computed proof (390, local)
 ```
-albedoBound:  true  4096×2340  albedoRev=p40  stainFallback=false
+albedoBound:  true  4096×2340  albedoRev=p40b  stainFallback=false
 strategy=basemapUnderInk  maskPaintOff  styleRef=oceania-beautiful
 oceanCoastalRipples  oceanNoHatch  coastalHandRipples  worldSeaBound
-selectOutlineOnly  landInkGteSea  ringsDissolved  continentPunch=0.14
+selectOutlineOnly  selectWash=false  selectFill=false  selectEmissiveWash=false
+landInkGteSea  ringsDissolved  continentPunch=0.14
 unitCountOne  opaquePlastic  stackToggle  seaInkClosedRings
 ```
 
@@ -58,7 +60,7 @@ unitCountOne  opaquePlastic  stackToggle  seaInkClosedRings
 - `africa-even.png` / `stack-expand.png` / `stack-collapse.png`
 - `computed.json`
 
-**One line:** mask paint off → basemap under ink.
+**One line:** select outline-only, no interior wash
 
-**Vercel:** https://tactical-risk20-l2v69lmur-james-projects-20d8de40.vercel.app/?three=1  
+**Vercel:** (pending p40b preview)  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/65 (stacked on PR64 / `.39b`)

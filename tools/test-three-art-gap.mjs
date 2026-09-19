@@ -1,4 +1,4 @@
-// V2.81.52-three-polish.40 basemap-under-ink. Style-ref plates + ocean ripples + land ink.
+// V2.81.52-three-polish.40b basemap-under-ink. Select outline-only, no interior wash.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.52-three-polish.40', GAME_VERSION === 'V2.81.52-three-polish.40');
+check('GAME_VERSION is V2.81.52-three-polish.40b', GAME_VERSION === 'V2.81.52-three-polish.40b');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -444,9 +444,8 @@ check('p31 select is crystal-clear gold, not candy flood',
   && /emissiveIntensity = 0\.30/.test(spike)
   && /makeSelectWashMeshes/.test(spike)
   && /selectHaloMat/.test(spike)
-  && /makeLineMat\(PALETTE\.select, 6\.4/.test(spike)
-  && !/emissiveIntensity = hex \? 0\.58/.test(spike)
-  && !/makeLineMat\(PALETTE\.select, 3\.6/.test(spike));
+  && /makeLineMat\(PALETTE\.select/.test(spike)
+  && !/emissiveIntensity = hex \? 0\.58/.test(spike));
 check('p30 coast shelf is printed ink not neon turquoise',
   /printed shelf ink/.test(terrain)
   && /color: 0x6a8488/.test(terrain)
@@ -925,14 +924,19 @@ check('p40 baker is bbox+feather, mask paint off',
   && /p40-oceania/.test(albedoBaker)
   && !/img = paste_through_mask\(/.test(albedoBaker));
 check('p40 runtime flags + select outline only',
-  /WORLD_LAND_ALBEDO_REV = 'p40'/.test(terrain)
+  /WORLD_LAND_ALBEDO_REV = 'p40b'/.test(terrain)
   && /strategy: 'basemapUnderInk'/.test(terrain)
   && /maskPaintOff: true/.test(terrain)
   && /oceanCoastalRipples: true/.test(terrain)
   && /styleRef: 'oceania-beautiful'/.test(terrain)
   && /selectOutlineOnly: true/.test(spike)
+  && /selectWash: false/.test(spike)
+  && /selectFill: false/.test(spike)
+  && /selectEmissiveWash: false/.test(spike)
   && /never re-tint continuous art per polygon/.test(spike)
   && /Never a per-polygon wash/.test(spike)
+  && /P40b HARD: never emit a fill mesh/.test(art)
+  && /P40b HARD: select never touches land materials/.test(spike)
   && /oceanNoHatch: true/.test(spike)
   && /unitCountOne: true/.test(spike)
   && /opaquePlastic: true/.test(spike)
