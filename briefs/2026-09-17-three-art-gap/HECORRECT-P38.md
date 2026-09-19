@@ -23,6 +23,14 @@ tan interiors, hand-inked coasts + peak hatching, pale washed seas.
 7. Polygon slivers — heal ears at multi-border joins (Australia). Clean rings.
 8. Units — opaque solid plastic at near zoom. Tan faction rim/shadow vs parchment.
 
+## Craft law (PLAYBOOK)
+A) Painterly Imhof — NW light, multi-hue soft shadows, large forms only.
+B) Risk continent multiply ≤~22% feathered; parchment tooth survives.
+C) Land + sea ink same dark weight; closed rings only; no ocean stipple.
+D) Opaque molded plastic + contact shadow + ≥2px dark outline; tan punches off parchment.
+
+Root/Oath: ink structure first, soft wash second.
+
 ## Fail closed if
 - Any of the 8 regress
 - STYLE LOCK breaks (tiles, blotches, labels, Confirm gold, stack sticky)

@@ -580,7 +580,7 @@ function sealSculptHoles(pix, fillRgb, tan) {
   const a0 = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) a0[i] = d[i * 4 + 3];
   let cur = a0;
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 3; pass++) {
     const next = new Uint8Array(cur);
     for (let y = 1; y < h - 1; y++) {
       for (let x = 1; x < w - 1; x++) {
@@ -596,15 +596,23 @@ function sealSculptHoles(pix, fillRgb, tan) {
     }
     cur = next;
   }
-  const rim = new Uint8Array(w * h);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = y * w + x;
-      if (cur[i] > 40) continue;
-      if (cur[i - 1] > 80 || cur[i + 1] > 80 || cur[i - w] > 80 || cur[i + w] > 80) {
-        rim[i] = tan ? 230 : 190;
+  // ≥2px dark outline (256 tex → ~8px ≈ 2px+ on a 64px sprite).
+  let rim = new Uint8Array(w * h);
+  const outlinePasses = tan ? 3 : 2;
+  let edge = cur;
+  for (let pass = 0; pass < outlinePasses; pass++) {
+    const next = new Uint8Array(edge);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (edge[i] > 40) continue;
+        if (edge[i - 1] > 80 || edge[i + 1] > 80 || edge[i - w] > 80 || edge[i + w] > 80) {
+          next[i] = 255;
+          rim[i] = tan ? 235 : 210;
+        }
       }
     }
+    edge = next;
   }
   for (let i = 0; i < w * h; i++) {
     if (a0[i] < 16 && cur[i] > 80) {

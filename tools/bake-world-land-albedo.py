@@ -311,12 +311,35 @@ def apply_imhof(img: Image.Image, land: Image.Image, height: Image.Image, streng
     return Image.composite(lit, img, a)
 
 
+def apply_imhof_painterly(img: Image.Image, land: Image.Image, height: Image.Image, strength=0.26) -> Image.Image:
+    """Craft law A: painterly Imhof. NW light, multi-hue soft shadows, large forms only.
+
+    Warm ochre on lit slopes, cool violet-brown in shade. Not grey GIS hillshade.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        return apply_imhof(img, land, height, strength)
+    large = height.filter(ImageFilter.GaussianBlur(9))
+    shade = imhof_hillshade(large, azimuth=315.0, altitude=40.0)
+    arr = np.asarray(img, dtype=np.float32)
+    s = np.asarray(shade, dtype=np.float32) / 255.0
+    m = (np.asarray(land) > 8).astype(np.float32)
+    hi = np.clip((s - 0.56) / 0.44, 0, 1) * m
+    lo = np.clip((0.46 - s) / 0.46, 0, 1) * m
+    warm = np.array([252.0, 226.0, 168.0], dtype=np.float32)
+    cool = np.array([86.0, 72.0, 78.0], dtype=np.float32)
+    arr = arr * (1.0 - hi[..., None] * strength * 0.42) + warm * (hi[..., None] * strength * 0.42)
+    arr = arr * (1.0 - lo[..., None] * strength * 0.50) + cool * (lo[..., None] * strength * 0.50)
+    return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
+
+
 def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w: int, h: int) -> Image.Image:
     """Board-game Imhof: inked ridge crests + slope hachures + soft AO.
 
     Not GIS DEM. Not flat brown stamps. NW oblique light; steeper = darker.
     """
-    img = apply_imhof(img, land, height, strength=0.30)
+    img = apply_imhof_painterly(img, land, height, strength=0.26)
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     try:

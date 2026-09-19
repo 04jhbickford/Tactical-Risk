@@ -808,6 +808,7 @@ check('p38 units opaque plastic + tan rim',
 check('p38 baker: coastal greens + Imhof hatch + continent ≤22%',
   /apply_coastal_greens/.test(albedoBaker)
   && /draw_imhof_peaks/.test(albedoBaker)
+  && /apply_imhof_painterly/.test(albedoBaker)
   && /amount=0\.18/.test(albedoBaker)
   && /USSR_HEX/.test(albedoBaker)
   && /COAST_GREEN/.test(albedoBaker));

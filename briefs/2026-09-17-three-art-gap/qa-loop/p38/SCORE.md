@@ -28,7 +28,7 @@ Peek/HUD shows one troop number. Near units opaque plastic.
 | 1 Vegetation | **PASS** | `vegetation-coast.png` / `aus-no-slivers.png`: sage coastal fringe, not khaki-only. Europe/Italy/Greece + Australia ring. |
 | 2 Ocean | **PASS** | `ocean-clean.png`: no dotted sea-lane stipple. Washed parchment-sea. `seaLanes: false` · `oceanNoStipple: true`. Sea ink = closed rings. |
 | 3 Land borders | **PASS** | `land-borders.png`: land ink same weight family as sea-zone rings. Readable mid-zoom. |
-| 4 Mountains | **PASS** | `mountains-relief.png` / albedo: Imhof AO + quiet hatch on Alps/Himalayas/Andes. Not flat stamps, not DEM. `imhofRelief: true`. |
+| 4 Mountains | **PASS** | `mountains-relief.png` / albedo: painterly Imhof (NW light, multi-hue soft shadows, large forms) + quiet hatch. Not flat stamps, not DEM. `imhofRelief: true`. |
 | 5 Continent washes | **PASS** | `continents-wash.png` / `africa-even.png`: Europe olive, Africa ochre, Asia muted green, USSR brown-tan, NA sage, SA warm tan, Oceania teal-sage. ≤22% (`continentPunch: 0.20`). |
 | 6 Unit count | **PASS** | `unit-count-one.png` / `east-us-peek-one.png`: peek `<b>` is the only number. No baked leading `1`. `unitCountOne: true`. |
 | 7 Polygon slivers | **PASS** | `aus-no-slivers.png` / `aus-select-clean.png`: clean Australia ring. No extra lobes at joins. `landSliversHealed: true`. |
