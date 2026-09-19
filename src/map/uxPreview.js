@@ -23,6 +23,7 @@ import {
   reportStartupStatus,
 } from '../ui/startupLoader.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
+import { parseUxDemo } from './uxPreviewFlag.js';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -54,6 +55,9 @@ import {
   driveAirChoice,
   driveLanded,
   resetScenario,
+  scenarioById,
+  MAX_ATTACKER,
+  MAX_DEFENDER,
 } from './uxPreviewScenario.js';
 
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -148,10 +152,12 @@ export async function bootUxPreview() {
   const territoryMap = new TerritoryMap(territories);
   const classicPlacements = { ...(setup.classic?.unitPlacements || {}) };
   const classicOwners = setup.classic?.territoryOwners || {};
-  const pocket = applyScenarioPocket(classicPlacements, classicOwners);
+  const demoId = parseUxDemo(location.search);
+  const demoSpec = scenarioById(demoId);
+  const pocket = applyScenarioPocket(classicPlacements, classicOwners, demoSpec);
   const placements = pocket.placements;
   const owners = pocket.owners;
-  let play = createScenario({ placements, owners });
+  let play = createScenario({ id: demoSpec.id, placements, owners });
   const stressOn = (() => {
     const params = new URLSearchParams(location.search);
     const v = String(params.get('stress') || '').toLowerCase();
@@ -296,8 +302,8 @@ export async function bootUxPreview() {
   }
   function pocketBounds() {
     const names = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
-      ? [play.origin, play.dest, 'Russia']
-      : [play.origin, ...((play.legalDests || LABEL_LANDS).filter((n) => n !== 'Russia'))];
+      ? [...new Set([play.origin, play.dest, ...((play.landable || []).filter((n) => n !== play.origin))])]
+      : [play.origin, ...((play.legalDests || play.labels || LABEL_LANDS).filter((n) => n !== 'Russia'))];
     const pts = names.map((n) => {
       const t = territories.find((x) => x.name === n);
       return t && territoryCenter(t);
@@ -305,7 +311,7 @@ export async function bootUxPreview() {
     if (!pts.length) {
       return play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE ? LAND_FIT : POCKET_FIT;
     }
-    const pad = 80;
+    const pad = play.id === 'max-both-sides' ? 110 : 80;
     return {
       minX: Math.min(...pts.map((p) => p.x)) - pad,
       maxX: Math.max(...pts.map((p) => p.x)) + pad,
@@ -547,7 +553,7 @@ export async function bootUxPreview() {
         pulseNames: marks.pulse || [],
         pulseWave: wave,
       });
-      for (const name of marks.labels || LABEL_LANDS) {
+      for (const name of marks.labels || play.labels || LABEL_LANDS) {
         const land = byName(name);
         const center = land && territoryCenter(land);
         if (!center) continue;
@@ -555,6 +561,7 @@ export async function bootUxPreview() {
         const short = name === 'Karelia S.S.R.' ? 'Karelia'
           : name === 'Finland Norway' ? 'Finland Norway'
           : name === 'Ukraine S.S.R.' ? 'Ukraine'
+          : name === 'East Europe' ? 'East Europe'
           : name;
         ctx.save();
         ctx.font = `700 ${Math.max(11, 13 / z)}px -apple-system, "SF Pro Text", sans-serif`;
@@ -658,7 +665,11 @@ export async function bootUxPreview() {
       continents: continents.length,
       idleConfirm: 'Select units',
       tryCombatMove: false,
-      mapLabels: LABEL_LANDS,
+      demo: play.id,
+      attacker: { ...(play.id === 'max-both-sides' ? MAX_ATTACKER : { infantry: 3, fighter: 1 }) },
+      defender: { ...(play.id === 'max-both-sides' ? MAX_DEFENDER : { infantry: 2, aaGun: 1 }) },
+      pair: { origin: play.origin, dest: play.dest, legalDests: [...(play.legalDests || [])] },
+      mapLabels: play.labels || LABEL_LANDS,
       pulse: highlights(play).pulse,
       pocket: {
         camera: { x: Number(camera.x.toFixed(1)), y: Number(camera.y.toFixed(1)) },

@@ -18,22 +18,86 @@ export const BATTLE_STEP = {
 
 export const UNIT_DEFS = {
   infantry: { attack: 1, defense: 2, cost: 3, isAir: false, isAA: false },
+  artillery: { attack: 2, defense: 2, cost: 4, isAir: false, isAA: false },
+  armour: { attack: 3, defense: 3, cost: 5, isAir: false, isAA: false },
   fighter: { attack: 3, defense: 4, cost: 10, isAir: true, isAA: false },
+  bomber: { attack: 4, defense: 1, cost: 12, isAir: true, isAA: false },
+  tacticalBomber: { attack: 3, defense: 3, cost: 11, isAir: true, isAA: false },
   aaGun: { attack: 0, defense: 0, cost: 5, isAir: false, isAA: true },
-  armour: { attack: 3, defense: 2, cost: 5, isAir: false, isAA: false },
   factory: { attack: 0, defense: 0, cost: 15, isAir: false, isAA: false },
 };
 
-export const SCENARIO = {
-  id: 'karelia-finland-air',
-  seat: 'Russians',
-  ipc: 24,
-  origin: 'Karelia S.S.R.',
-  dest: 'Finland Norway',
-  legalDests: ['Finland Norway', 'Ukraine S.S.R.'],
-  landable: ['Karelia S.S.R.', 'Russia'],
-  seed: 1941,
+export const COMBAT_TYPES = [
+  'infantry', 'artillery', 'armour', 'fighter', 'bomber', 'tacticalBomber',
+];
+export const AIR_TYPES = ['fighter', 'bomber', 'tacticalBomber'];
+export const GROUND_TYPES = ['infantry', 'artillery', 'armour'];
+
+export const MAX_ATTACKER = {
+  infantry: 10,
+  armour: 6,
+  artillery: 6,
+  fighter: 4,
+  bomber: 3,
 };
+
+export const MAX_DEFENDER = {
+  infantry: 8,
+  armour: 5,
+  artillery: 5,
+  fighter: 3,
+  bomber: 2,
+  aaGun: 2,
+};
+
+export const MAX_ALT_DEFENDER = {
+  infantry: 4,
+  armour: 2,
+  artillery: 2,
+  fighter: 1,
+  aaGun: 1,
+};
+
+export const SCENARIOS = {
+  'karelia-finland-air': {
+    id: 'karelia-finland-air',
+    seat: 'Russians',
+    ipc: 24,
+    origin: 'Karelia S.S.R.',
+    dest: 'Finland Norway',
+    legalDests: ['Finland Norway', 'Ukraine S.S.R.'],
+    landable: ['Karelia S.S.R.', 'Russia'],
+    labels: ['Karelia S.S.R.', 'Finland Norway', 'Ukraine S.S.R.', 'Russia'],
+    seed: 1941,
+  },
+  'max-both-sides': {
+    id: 'max-both-sides',
+    seat: 'Russians',
+    ipc: 24,
+    origin: 'Karelia S.S.R.',
+    dest: 'Ukraine S.S.R.',
+    legalDests: ['Ukraine S.S.R.', 'East Europe'],
+    landable: ['Karelia S.S.R.', 'Russia'],
+    labels: ['Karelia S.S.R.', 'Ukraine S.S.R.', 'East Europe', 'Russia'],
+    seed: 1942,
+  },
+};
+
+export const SCENARIO = SCENARIOS['karelia-finland-air'];
+
+export function scenarioById(id) {
+  const key = String(id || '').toLowerCase().trim();
+  if (key === 'max' || key === 'maxed' || key === 'max-both-sides' || key === 'stress-combat') {
+    return SCENARIOS['max-both-sides'];
+  }
+  return SCENARIOS['karelia-finland-air'];
+}
+
+function stacksFromCounts(counts, owner) {
+  return Object.entries(counts || {})
+    .filter(([, n]) => (Number(n) || 0) > 0)
+    .map(([type, quantity]) => ({ type, quantity: Number(quantity) || 0, owner }));
+}
 
 export const SELECT_GOLD = '#C4A35A';
 export const LEGAL_GOLD = '#C4A35A';
@@ -42,16 +106,11 @@ export const LAND_TEAL = '#5BA8A0';
 export const GUIDE = {
   [PHASE.COMBAT_MOVE]: 'Tap origin · select units · tap dest · Confirm',
   [PHASE.BATTLE]: 'One Confirm at a time — AA, then dice, then hits.',
-  [PHASE.AIR_LAND]: 'Teal lands can take the fighter. Tap one, Confirm.',
-  [PHASE.DONE]: 'Fighter landed. Confirm is idle — Replay if you want.',
+  [PHASE.AIR_LAND]: 'Teal lands can take the aircraft. Tap one, Confirm.',
+  [PHASE.DONE]: 'Aircraft landed. Confirm is idle — Replay if you want.',
 };
 
-export const LABEL_LANDS = [
-  'Karelia S.S.R.',
-  'Finland Norway',
-  'Ukraine S.S.R.',
-  'Russia',
-];
+export const LABEL_LANDS = SCENARIO.labels;
 
 const DEMO_ROLLS = {
   aa: [4],
@@ -71,7 +130,18 @@ function clonePlacements(src) {
   return out;
 }
 
-export function seedPlacements() {
+export function seedPlacements(spec = SCENARIO) {
+  const scenario = typeof spec === 'string' ? scenarioById(spec) : (spec || SCENARIO);
+  if (scenario.id === 'max-both-sides') {
+    return {
+      [scenario.origin]: stacksFromCounts(MAX_ATTACKER, 'Russians'),
+      [scenario.dest]: stacksFromCounts(MAX_DEFENDER, 'Germans'),
+      'East Europe': stacksFromCounts(MAX_ALT_DEFENDER, 'Germans'),
+      Russia: [
+        { type: 'infantry', quantity: 2, owner: 'Russians' },
+      ],
+    };
+  }
   return {
     [SCENARIO.origin]: [
       { type: 'infantry', quantity: 3, owner: 'Russians' },
@@ -90,7 +160,16 @@ export function seedPlacements() {
   };
 }
 
-export function seedOwners() {
+export function seedOwners(spec = SCENARIO) {
+  const scenario = typeof spec === 'string' ? scenarioById(spec) : (spec || SCENARIO);
+  if (scenario.id === 'max-both-sides') {
+    return {
+      [scenario.origin]: 'Russians',
+      [scenario.dest]: 'Germans',
+      'East Europe': 'Germans',
+      Russia: 'Russians',
+    };
+  }
   return {
     [SCENARIO.origin]: 'Russians',
     [SCENARIO.dest]: 'Germans',
@@ -100,14 +179,18 @@ export function seedOwners() {
 }
 
 export function createScenario(overrides = {}) {
+  const spec = scenarioById(overrides.id || overrides.demo);
+  const { id: _id, demo: _demo, ...rest } = overrides;
   return {
-    id: SCENARIO.id,
-    seat: SCENARIO.seat,
-    ipc: SCENARIO.ipc,
-    origin: SCENARIO.origin,
-    dest: SCENARIO.dest,
-    legalDests: [...SCENARIO.legalDests],
-    landable: [...SCENARIO.landable],
+    id: spec.id,
+    seat: spec.seat,
+    ipc: spec.ipc,
+    origin: spec.origin,
+    dest: spec.dest,
+    legalDests: [...spec.legalDests],
+    landable: [...spec.landable],
+    labels: [...(spec.labels || LABEL_LANDS)],
+    seed: spec.seed,
     phase: PHASE.COMBAT_MOVE,
     selected: null,
     selectedUnits: {},
@@ -115,19 +198,21 @@ export function createScenario(overrides = {}) {
     landingDest: null,
     landed: false,
     guideOn: true,
-    placements: seedPlacements(),
-    owners: seedOwners(),
+    placements: seedPlacements(spec),
+    owners: seedOwners(spec),
     battle: null,
     rngCursor: 0,
-    ...overrides,
+    ...rest,
+    id: spec.id,
   };
 }
 
-export function applyScenarioPocket(basePlacements, baseOwners) {
+export function applyScenarioPocket(basePlacements, baseOwners, spec = SCENARIO) {
+  const scenario = typeof spec === 'string' ? scenarioById(spec) : (spec || SCENARIO);
   const placements = clonePlacements(basePlacements);
   const owners = { ...(baseOwners || {}) };
-  const seeded = seedPlacements();
-  const seededOwners = seedOwners();
+  const seeded = seedPlacements(scenario);
+  const seededOwners = seedOwners(scenario);
   for (const [name, stacks] of Object.entries(seeded)) {
     placements[name] = cloneStacks(stacks);
   }
@@ -150,17 +235,14 @@ export function pickedCount(selectedUnits) {
 }
 
 export function hasGround(selectedUnits) {
-  return (Number(selectedUnits?.infantry) || 0) > 0
-    || (Number(selectedUnits?.armour) || 0) > 0;
+  return GROUND_TYPES.some((type) => (Number(selectedUnits?.[type]) || 0) > 0);
 }
 
 export function hasAir(selectedUnits) {
-  return (Number(selectedUnits?.fighter) || 0) > 0
-    || (Number(selectedUnits?.bomber) || 0) > 0;
+  return AIR_TYPES.some((type) => (Number(selectedUnits?.[type]) || 0) > 0);
 }
 
 function combatUnits(stacks, owner) {
-  const order = ['infantry', 'armour', 'fighter', 'bomber'];
   return (stacks || [])
     .filter((s) => (
       s.owner === owner
@@ -169,8 +251,8 @@ function combatUnits(stacks, owner) {
       && s.type !== 'aaGun'
     ))
     .sort((a, b) => {
-      const ia = order.indexOf(a.type);
-      const ib = order.indexOf(b.type);
+      const ia = COMBAT_TYPES.indexOf(a.type);
+      const ib = COMBAT_TYPES.indexOf(b.type);
       return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
     });
 }
@@ -222,11 +304,23 @@ export function d6(rng) {
   return 1 + Math.floor(rng() * 6);
 }
 
-function useDemoRolls(state) {
+function usePocketDemoRolls(state) {
+  if (state?.id === 'max-both-sides') return false;
   const attInf = Number(state.selectedUnits.infantry) || 0;
   const attFtr = Number(state.selectedUnits.fighter) || 0;
   const defInf = stackQty(state.placements[state.dest], 'infantry', 'Germans');
   return attInf === 3 && attFtr === 1 && defInf === 2;
+}
+
+function useMaxDemoRolls(state) {
+  if (state?.id !== 'max-both-sides') return false;
+  const land = GROUND_TYPES.filter((t) => (Number(state.selectedUnits?.[t]) || 0) > 0).length;
+  const air = AIR_TYPES.filter((t) => (Number(state.selectedUnits?.[t]) || 0) > 0).length;
+  return pickedCount(state.selectedUnits) >= 12 && land >= 2 && air >= 1;
+}
+
+function scenarioSeed(state) {
+  return Number(state?.seed) || SCENARIO.seed;
 }
 
 function takeDie(state, scripted, rng) {
@@ -235,10 +329,9 @@ function takeDie(state, scripted, rng) {
 }
 
 function cheapestLosses(stacks, owner, hits) {
-  const order = ['infantry', 'armour', 'fighter', 'bomber'];
   const taken = {};
   let left = hits;
-  for (const type of order) {
+  for (const type of COMBAT_TYPES) {
     if (left <= 0) break;
     const have = (stacks || [])
       .filter((s) => s.owner === owner && s.type === type)
@@ -261,9 +354,17 @@ function applyLosses(stacks, owner, taken) {
 }
 
 function formatLoss(taken) {
+  const short = {
+    infantry: 'INF',
+    artillery: 'ART',
+    armour: 'TNK',
+    fighter: 'FTR',
+    bomber: 'BMB',
+    tacticalBomber: 'TAC',
+  };
   const parts = Object.entries(taken || {})
     .filter(([, n]) => n > 0)
-    .map(([type, n]) => `${type === 'infantry' ? 'INF' : type === 'fighter' ? 'FTR' : type}×${n}`);
+    .map(([type, n]) => `${short[type] || type}×${n}`);
   return parts.join(' ') || 'none';
 }
 
@@ -383,11 +484,11 @@ export function pickLoss(state, side, type) {
     return state;
   }
   const used = assignedCount(cur);
-  if (thisN > 0) {
+  if (thisN > 0 && (used >= menu.need || thisN >= have)) {
     cur[type] = thisN - 1;
     if (cur[type] <= 0) delete cur[type];
-  } else if (used < menu.need) {
-    cur[type] = 1;
+  } else if (used < menu.need && thisN < have) {
+    cur[type] = thisN + 1;
   }
   battle[key] = cur;
   return state;
@@ -471,7 +572,7 @@ export function highlights(state) {
     landable: [],
     selected: state?.selected || null,
     pulse: [],
-    labels: [...LABEL_LANDS],
+    labels: [...(state?.labels || LABEL_LANDS)],
   };
   if (!state) return out;
   if (state.phase === PHASE.COMBAT_MOVE) {
@@ -499,10 +600,14 @@ export function highlights(state) {
   return out;
 }
 
+function selectedAirCount(selectedUnits) {
+  return AIR_TYPES.reduce((n, type) => n + (Number(selectedUnits?.[type]) || 0), 0);
+}
+
 function startBattle(state) {
   const destStacks = state.placements[state.dest] || [];
   const guns = aaCount(destStacks, 'Germans');
-  const planes = Number(state.selectedUnits.fighter) || 0;
+  const planes = selectedAirCount(state.selectedUnits);
   state.phase = PHASE.BATTLE;
   state.selected = state.dest;
   state.battle = {
@@ -537,10 +642,32 @@ function applyCombatMove(state) {
   return startBattle(state);
 }
 
+function removeCheapestAir(state, hits) {
+  let left = hits;
+  let dest = state.placements[state.dest] || [];
+  for (const type of AIR_TYPES) {
+    if (left <= 0) break;
+    const have = stackQty(dest, type, 'Russians');
+    const take = Math.min(have, left);
+    if (take <= 0) continue;
+    dest = removeQty(dest, type, 'Russians', take);
+    if ((Number(state.selectedUnits[type]) || 0) > 0) {
+      state.selectedUnits[type] = Math.max(0, (Number(state.selectedUnits[type]) || 0) - take);
+      if (state.selectedUnits[type] <= 0) delete state.selectedUnits[type];
+    }
+    left -= take;
+  }
+  state.placements[state.dest] = dest;
+}
+
 function rollAA(state) {
   const battle = state.battle;
-  const rng = mulberry32(SCENARIO.seed + state.rngCursor);
-  const scripted = useDemoRolls(state) ? [...DEMO_ROLLS.aa] : null;
+  const rng = mulberry32(scenarioSeed(state) + state.rngCursor);
+  const pocket = usePocketDemoRolls(state);
+  const maxed = useMaxDemoRolls(state);
+  const scripted = pocket
+    ? [...DEMO_ROLLS.aa]
+    : (maxed ? Array.from({ length: battle.aaPlanes }, () => 4) : null);
   const dice = [];
   let hits = 0;
   for (let i = 0; i < battle.aaPlanes; i++) {
@@ -551,16 +678,27 @@ function rollAA(state) {
   state.rngCursor += 1;
   battle.aaDice = dice;
   battle.aaHits = hits;
-  if (hits > 0) {
-    const dest = state.placements[state.dest] || [];
-    state.placements[state.dest] = removeQty(dest, 'fighter', 'Russians', hits);
-    if ((Number(state.selectedUnits.fighter) || 0) > 0) {
-      state.selectedUnits.fighter = Math.max(0, state.selectedUnits.fighter - hits);
-    }
-  }
+  if (hits > 0) removeCheapestAir(state, hits);
   battle.step = BATTLE_STEP.AA_RESULT;
   battle.log.push(hits ? `AA hit ×${hits}` : 'AA missed');
   return state;
+}
+
+function scriptedFacesFor(units, attr, hitsWanted) {
+  const faces = [];
+  let left = Math.max(0, Number(hitsWanted) || 0);
+  for (const unit of units || []) {
+    const val = Number(UNIT_DEFS[unit.type]?.[attr]) || 0;
+    for (let i = 0; i < (unit.quantity || 0); i++) {
+      if (left > 0 && val > 0) {
+        faces.push(Math.min(6, val));
+        left -= 1;
+      } else {
+        faces.push(6);
+      }
+    }
+  }
+  return faces;
 }
 
 function rollCombat(state) {
@@ -569,10 +707,23 @@ function rollCombat(state) {
   const dest = state.placements[state.dest] || [];
   const attackers = combatUnits(dest, 'Russians');
   const defenders = combatUnits(dest, 'Germans');
-  const rng = mulberry32(SCENARIO.seed + 17 + state.rngCursor);
-  const demo = useDemoRolls(state) && battle.round === 1;
-  const attScript = demo ? [...DEMO_ROLLS.attack] : null;
-  const defScript = demo ? [...DEMO_ROLLS.defense] : null;
+  const rng = mulberry32(scenarioSeed(state) + 17 + state.rngCursor);
+  const pocket = usePocketDemoRolls(state) && battle.round === 1;
+  const maxed = useMaxDemoRolls(state);
+  const attTotal = totalQty(attackers);
+  const defTotal = totalQty(defenders);
+  let attScript = pocket ? [...DEMO_ROLLS.attack] : null;
+  let defScript = pocket ? [...DEMO_ROLLS.defense] : null;
+  if (maxed && !pocket) {
+    const attHits = battle.round === 1
+      ? Math.min(6, Math.max(1, defTotal - 2))
+      : defTotal;
+    const defHits = battle.round === 1
+      ? Math.min(3, Math.max(1, attTotal - 2))
+      : Math.min(2, Math.max(0, attTotal - 1));
+    attScript = scriptedFacesFor(attackers, 'attack', attHits);
+    defScript = scriptedFacesFor(defenders, 'defense', defHits);
+  }
 
   const attackDice = [];
   let attackHits = 0;
@@ -640,9 +791,19 @@ function applyHits(state) {
   return state;
 }
 
-function startAirLand(state) {
+function survivingAir(state) {
   const dest = state.placements[state.dest] || [];
-  const planes = airCount(dest, 'Russians');
+  const roster = {};
+  for (const type of AIR_TYPES) {
+    const n = stackQty(dest, type, 'Russians');
+    if (n > 0) roster[type] = n;
+  }
+  return roster;
+}
+
+function startAirLand(state) {
+  const roster = survivingAir(state);
+  const planes = Object.values(roster).reduce((n, q) => n + q, 0);
   if (planes <= 0 || state.battle?.failed) {
     state.phase = PHASE.DONE;
     state.landingDest = null;
@@ -653,7 +814,7 @@ function startAirLand(state) {
   state.landingDest = null;
   state.landed = false;
   state.destPicked = null;
-  state.selectedUnits = { fighter: planes };
+  state.selectedUnits = roster;
   state.selected = state.dest;
   return state;
 }
@@ -661,19 +822,19 @@ function startAirLand(state) {
 function applyLanding(state) {
   if (!state.landingDest) return state;
   let from = state.placements[state.dest] || [];
-  const qty = airCount(from, 'Russians');
+  const roster = survivingAir(state);
+  const qty = Object.values(roster).reduce((n, q) => n + q, 0);
   if (qty <= 0) {
     state.phase = PHASE.DONE;
     return state;
   }
-  from = removeQty(from, 'fighter', 'Russians', qty);
+  let dest = state.placements[state.landingDest] || [];
+  for (const [type, n] of Object.entries(roster)) {
+    from = removeQty(from, type, 'Russians', n);
+    dest = addQty(dest, type, 'Russians', n);
+  }
   state.placements[state.dest] = from;
-  state.placements[state.landingDest] = addQty(
-    state.placements[state.landingDest] || [],
-    'fighter',
-    'Russians',
-    qty,
-  );
+  state.placements[state.landingDest] = dest;
   state.landed = true;
   state.phase = PHASE.DONE;
   state.selected = state.landingDest;
@@ -682,8 +843,9 @@ function applyLanding(state) {
 }
 
 export function resetScenario(state) {
-  const seeded = seedPlacements();
-  const seededOwners = seedOwners();
+  const spec = scenarioById(state?.id);
+  const seeded = seedPlacements(spec);
+  const seededOwners = seedOwners(spec);
   if (state?.placements) {
     for (const [name, stacks] of Object.entries(seeded)) {
       state.placements[name] = cloneStacks(stacks);
@@ -691,6 +853,13 @@ export function resetScenario(state) {
   }
   if (state?.owners) Object.assign(state.owners, seededOwners);
   if (!state) return createScenario();
+  state.id = spec.id;
+  state.origin = spec.origin;
+  state.dest = spec.dest;
+  state.legalDests = [...spec.legalDests];
+  state.landable = [...spec.landable];
+  state.labels = [...(spec.labels || LABEL_LANDS)];
+  state.seed = spec.seed;
   state.phase = PHASE.COMBAT_MOVE;
   state.selected = null;
   state.selectedUnits = {};
@@ -735,7 +904,7 @@ export function battleCard(state) {
     return {
       kicker: 'AA fire',
       title: state.dest,
-      body: `${battle.aaGuns} gun vs ${battle.aaPlanes} fighter · hit on 1`,
+      body: `${battle.aaGuns} gun vs ${battle.aaPlanes} aircraft · hit on 1`,
       dice: [],
     };
   }
@@ -743,7 +912,7 @@ export function battleCard(state) {
     return {
       kicker: 'AA results',
       title: battle.aaHits ? `Hit ×${battle.aaHits}` : 'Missed',
-      body: battle.aaHits ? 'Cheapest aircraft removed' : 'Fighter is safe · next is combat',
+      body: battle.aaHits ? 'Cheapest aircraft removed' : 'Aircraft safe · next is combat',
       dice: battle.aaDice.map((face) => ({ face, hit: face === 1 })),
     };
   }
@@ -791,17 +960,44 @@ export function battleCard(state) {
     return {
       kicker: battle.failed ? 'Held' : 'Taken',
       title: battle.failed ? 'Defender holds' : state.dest,
-      body: battle.failed ? 'No landing — replay from Confirm' : 'Land the fighter next',
+      body: battle.failed ? 'No landing — replay from Confirm' : 'Land the aircraft next',
       dice: [],
     };
   }
   return null;
 }
 
+function fillOptionalLosses(state) {
+  const battle = state?.battle;
+  if (!battle || battle.step !== BATTLE_STEP.COMBAT_RESULT) return state;
+  const dest = state.placements[state.dest] || [];
+  const sides = [
+    { key: 'att', owner: 'Russians', hits: battle.defenseHits },
+    { key: 'def', owner: 'Germans', hits: battle.attackHits },
+  ];
+  for (const side of sides) {
+    const menu = lossMenu(dest, side.owner, side.hits);
+    if (menu.forced || menu.need <= 0) continue;
+    const pendingKey = side.key === 'att' ? 'pendingAtt' : 'pendingDef';
+    for (const unit of menu.units) {
+      let guard = 0;
+      while (assignedCount(battle[pendingKey]) < menu.need && guard++ < 24) {
+        const before = assignedCount(battle[pendingKey]);
+        pickLoss(state, side.key, unit.type);
+        if (assignedCount(battle[pendingKey]) <= before) break;
+      }
+    }
+  }
+  return state;
+}
+
 export function driveCombatMove(state) {
   tapLand(state, state.origin);
-  pickUnit(state, 'infantry');
-  pickUnit(state, 'fighter');
+  const origin = state.placements[state.origin] || [];
+  for (const type of COMBAT_TYPES) {
+    const have = stackQty(origin, type);
+    if (have > 0) state.selectedUnits[type] = have;
+  }
   tapLand(state, state.dest);
   return state;
 }
@@ -809,17 +1005,29 @@ export function driveCombatMove(state) {
 export function driveBattleMid(state) {
   driveCombatMove(state);
   confirm(state);
-  confirm(state);
-  confirm(state);
-  confirm(state);
+  if (state.battle?.step === BATTLE_STEP.AA_READY) confirm(state);
+  if (state.battle?.step === BATTLE_STEP.AA_RESULT) confirm(state);
+  if (state.battle?.step === BATTLE_STEP.COMBAT_READY) confirm(state);
   return state;
 }
 
 export function driveAirChoice(state) {
   driveBattleMid(state);
-  pickLoss(state, 'att', 'infantry');
-  confirm(state);
-  confirm(state);
+  let guard = 0;
+  while (state.phase === PHASE.BATTLE && guard++ < 16) {
+    const step = state.battle?.step;
+    if (step === BATTLE_STEP.COMBAT_RESULT) {
+      fillOptionalLosses(state);
+      if (!lossesReady(state)) pickLoss(state, 'att', 'infantry');
+      confirm(state);
+      continue;
+    }
+    if (step === BATTLE_STEP.WON) {
+      confirm(state);
+      break;
+    }
+    confirm(state);
+  }
   return state;
 }
 
@@ -830,14 +1038,25 @@ export function driveLanded(state, dest = 'Russia') {
   return state;
 }
 
+function countMap(stacks, owner = null) {
+  const out = {};
+  for (const s of stacks || []) {
+    if (owner && s.owner !== owner) continue;
+    out[s.type] = (out[s.type] || 0) + (Number(s.quantity) || 0);
+  }
+  return out;
+}
+
 export function inspectPlay(state) {
   const marks = highlights(state);
+  const originName = state?.origin || SCENARIO.origin;
+  const destName = state?.dest || SCENARIO.dest;
   return {
     scenario: state?.id || SCENARIO.id,
     phase: state?.phase || null,
     selected: state?.selected || null,
-    origin: state?.origin || null,
-    dest: state?.destPicked || null,
+    origin: originName,
+    dest: state?.destPicked || destName,
     landingDest: state?.landingDest || null,
     landed: !!state?.landed,
     selectedUnits: { ...(state?.selectedUnits || {}) },
@@ -848,6 +1067,7 @@ export function inspectPlay(state) {
     guideOn: false,
     guide: guideCopy(state),
     legalDests: legalDests(state),
+    labels: [...(state?.labels || LABEL_LANDS)],
     lossesReady: lossesReady(state),
     pendingAtt: { ...(state?.battle?.pendingAtt || {}) },
     pendingDef: { ...(state?.battle?.pendingDef || {}) },
@@ -856,9 +1076,12 @@ export function inspectPlay(state) {
     attackHits: state?.battle?.attackHits ?? null,
     defenseHits: state?.battle?.defenseHits ?? null,
     highlights: marks,
-    karelia: cloneStacks(state?.placements?.[SCENARIO.origin]),
-    finland: cloneStacks(state?.placements?.[SCENARIO.dest]),
+    attacker: countMap(state?.placements?.[originName], 'Russians'),
+    defender: countMap(state?.placements?.[destName], 'Germans'),
+    karelia: cloneStacks(state?.placements?.['Karelia S.S.R.']),
+    finland: cloneStacks(state?.placements?.['Finland Norway']),
     ukraine: cloneStacks(state?.placements?.['Ukraine S.S.R.']),
+    eastEurope: cloneStacks(state?.placements?.['East Europe']),
     russia: cloneStacks(state?.placements?.Russia),
     owners: { ...(state?.owners || {}) },
   };

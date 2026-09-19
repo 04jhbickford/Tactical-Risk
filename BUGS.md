@@ -2,6 +2,18 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.8 max both-sides combat stress
+
+James asked for a MAXED attacker+defender combat demo on the PR76
+hybrid tip. `?three=1&demo=max` seeds Karelia (not Japan) → Ukraine
+with high counts of every land type plus FTR/BMB, defender full stack
++ AA. East Europe is the spacious alternate dest. Manual FROM →
+steppers → TO → Confirm. Air land stays planes-only + Confirm.
+Casualty chips increment when more than one hit must be assigned.
+Preview only. Do not merge to main.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.7 unit sheet click-through
 
 James he-correct on preview.6, folded here. Three bars:
