@@ -105,9 +105,10 @@ import {
 } from './ui/territoryTooltip.js';
 
 initMobileShell();
+installClientErrorHooks();
 
 // Multiplayer imports
-import { initializeFirebase, isFirebaseConfigured } from './multiplayer/firebase.js';
+import { initializeFirebase, isFirebaseConfigured, getFirebaseDb } from './multiplayer/firebase.js';
 import { getAuthManager } from './multiplayer/auth.js';
 import { getLobbyManager } from './multiplayer/lobbyManager.js';
 import { createSyncManager } from './multiplayer/syncManager.js';
@@ -156,6 +157,14 @@ import {
 import { AuthScreen } from './ui/authScreen.js';
 import { MultiplayerLobby } from './ui/multiplayerLobby.js';
 import { GameList } from './ui/gameList.js';
+import {
+  attachDiagnosticsConsole,
+  bindGameEventLog,
+  createFirestoreEventWriter,
+  createGameEventLog,
+  installClientErrorHooks,
+  unbindGameEventLog,
+} from './multiplayer/gameEventLog.js';
 
 // DEBUG: Set to true to log sea zone click coordinates for positioning
 const DEBUG_SEA_ZONE_CLICKS = false;
@@ -1057,6 +1066,19 @@ async function init() {
 
     // Create sync manager
     syncManager = createSyncManager(gameId, gameState);
+    unbindGameEventLog();
+    const gameEventLog = createGameEventLog({
+      gameId,
+      gameState,
+      lobbyCode: currentGameCode,
+      getWriterUid: () => authManager.getUserId?.() || authManager.getUser?.()?.id || null,
+      writer: createFirestoreEventWriter({ getDb: getFirebaseDb }),
+    });
+    bindGameEventLog(gameEventLog);
+    attachDiagnosticsConsole(gameEventLog);
+    gameEventLog.log('ui', {
+      payload: { action: 'sessionStart', gameId, lobbyCode: currentGameCode },
+    });
 
     const user = authManager.getUser();
 
@@ -1662,6 +1684,7 @@ async function init() {
         syncManager.stopSync();
         syncManager = null;
       }
+      unbindGameEventLog();
       if (multiplayerLobby) {
         multiplayerLobby.hide();
       }

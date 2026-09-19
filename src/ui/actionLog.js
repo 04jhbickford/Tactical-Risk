@@ -2,6 +2,7 @@
 // Now integrated into the sidebar/player panel
 
 import { possessivePhrase } from '../utils/possessive.js';
+import { emitGameEvent, mapActionLogTypeToKind, shouldFanOutActionLogType } from '../multiplayer/gameEventLog.js';
 
 export class ActionLog {
   constructor() {
@@ -67,6 +68,19 @@ export class ActionLog {
     // Trim old entries
     if (this.entries.length > this.maxEntries) {
       this.entries = this.entries.slice(-this.maxEntries);
+    }
+
+    // Cloud fan-out for UI-only actions (phase/move/combat already emit from gameState).
+    try {
+      if (shouldFanOutActionLogType(type)) {
+        emitGameEvent(mapActionLogTypeToKind(type), {
+          gameState: this.gameState,
+          territory: data?.territory || data?.to || null,
+          payload: { action: type, ...data },
+        });
+      }
+    } catch {
+      // fail-closed
     }
 
     // Note: Visual rendering is handled by PlayerPanel's Log tab

@@ -5,6 +5,7 @@ import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
 import { syncBottomSurfaces } from './bottomSurface.js';
 import { remainingAirLandingsToAssign } from '../state/airLanding.js';
+import { emitGameEvent, getGameEventLog } from '../multiplayer/gameEventLog.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -285,6 +286,12 @@ export class CombatUI {
     }
     if (skipped.length > 0) {
       this.gameState._notify?.();
+      try {
+        getGameEventLog()?.logSoftLockEscape({
+          reason: 'dequeue_resolved_combat_heads',
+          payload: { skipped },
+        });
+      } catch { /* fail-closed */ }
     }
     return skipped;
   }
@@ -681,6 +688,13 @@ export class CombatUI {
     this.combatState.phase = 'resolved';
     this.combatState.winner = 'defender';
     if (persist) this._persistResolvedCombat();
+    try {
+      getGameEventLog()?.logSoftLockEscape({
+        reason: 'attacker_wiped',
+        territory: this.currentTerritory,
+        payload: { persist: !!persist },
+      });
+    } catch { /* fail-closed */ }
     return true;
   }
 
@@ -1735,6 +1749,10 @@ export class CombatUI {
   // ahead of what actually committed; leaving that overlay up is a soft-lock.
   syncFromAuthoritativeState() {
     this.hide();
+    emitGameEvent('ui', {
+      gameState: this.gameState,
+      payload: { action: 'syncFromAuthoritativeState', softLockEscape: true },
+    });
     if (this.gameState?.turnPhase !== 'combat' || !this.hasCombats()) {
       return { shown: false, skipped: [] };
     }
@@ -3497,6 +3515,11 @@ export class CombatUI {
             break;
           case 'end-empty-attack':
             this._failCloseIfAttackerWiped({ persist: true });
+            emitGameEvent('ui', {
+              gameState: this.gameState,
+              territory: this.currentTerritory,
+              payload: { action: 'endBattle', softLockEscape: true },
+            });
             this._nextCombat();
             break;
         }

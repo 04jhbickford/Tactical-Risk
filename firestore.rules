@@ -45,6 +45,31 @@ service cloud.firestore {
         allow read: if request.auth != null;
         allow write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // Append-only diagnostics timeline. Does not cascade from /games.
+      // Clients may create events for a game they are seated in (or started).
+      // Bulk / cross-game pull is admin-only — see DIAGNOSTICS.md.
+      match /events/{eventId} {
+        function canAppendGameEvent() {
+          let game = get(/databases/$(database)/documents/games/$(gameId)).data;
+          return request.auth != null && (
+            isAdmin()
+            || (game.keys().hasAny(['playerUserIds'])
+                && request.auth.uid in game.playerUserIds)
+            || request.auth.uid == game.startedBy
+          );
+        }
+
+        allow create: if canAppendGameEvent()
+          && request.resource.data.keys().hasAll(['ts', 'kind', 'writerUid'])
+          && request.resource.data.kind in [
+            'phase', 'move', 'attack', 'aa', 'combat',
+            'purchase', 'retreat', 'error', 'ui'
+          ]
+          && request.resource.data.writerUid == request.auth.uid;
+        allow read: if isAdmin();
+        allow update, delete: if false;
+      }
     }
 
     // Legacy top-level presence collection (unused by current code, kept for

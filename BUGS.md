@@ -133,6 +133,31 @@ No Imagine world plate. Live `/` unchanged. Do not merge.
 
 ---
 
+## 9.19.26 — V2.81.55 cloud game-log + diagnostics (SCHEMA 11)
+
+James want: screenshot → Arc pulls cloud events for that game/moment →
+verify where in play it happened → diagnose/fix.
+
+Delivered: append-only `games/{id}/events` (fail-closed). Kinds
+phase/move/attack/aa/combat/purchase/retreat/error/ui. Dice faces via
+shared `_rollDie` land in aa/combat payloads. Existing
+`combatTelemetry` (last 40 on the game doc) kept; AI `resolveCombat`
+now records it too. Lookup: `tools/query-game-events.mjs` +
+`DIAGNOSTICS.md` + `window.__TR_DIAG__`. Rules: seated/startedBy
+append; admin-only read; no update/delete. SCORE.md. GAME_VERSION
+V2.81.55. Draft only — not production. No admin keys invented.
+
+### Smoke (this PR)
+
+- [ ] Multiplayer fight: `games/{id}/events` grows after phase, move,
+      AA/combat, purchase. A thrown write does not freeze the board.
+- [ ] Admin can list events; a seated non-admin cannot.
+- [ ] `node tools/query-game-events.mjs --print-query --lobby boysenberry --around "10:34 PT 19 Sep"`
+      prints lobby → gameId → client-side window.
+- [ ] `state.combatTelemetry` still present after a fight (SCHEMA 11).
+
+---
+
 ## 9.19.26 — V2.81.54 AA wipe soft-lock (SCHEMA 11)
 
 Sean Benson, game code/name `boysenberry`, ~10:34 PT 19 Sep. After AA
