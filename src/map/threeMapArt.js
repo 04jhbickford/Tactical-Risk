@@ -6,7 +6,7 @@ import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
-import { applyPaperUVs } from './threeMapPalette.js';
+import { applyPaperUVs, applyOceanUVs } from './threeMapPalette.js';
 import {
   applyWorldLandUVs,
   getWorldLandTex,
@@ -15,7 +15,7 @@ import {
   makeCoastShelfMaterial,
   RIVERS,
 } from './threeMapTerrain.js';
-import { territoryOutlineRings, waterOutlineRings, healLandRings } from './threeMapOutline.js';
+import { territoryOutlineRings, waterOutlineRings, healLandRings, dropSliverPolygons } from './threeMapOutline.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
@@ -272,7 +272,11 @@ function inflateRing(ring, amt) {
 }
 
 function landRingsOf(territory) {
-  return healLandRings(territory);
+  // P39: mesh fill uses live polygons (drop slivers only).
+  // Forced raster-union heal on every land stretched coasts into neighbors.
+  // Ink strokes dissolve separately via territoryOutlineRings BEFORE stroke.
+  void healLandRings;
+  return dropSliverPolygons(territory?.polygons || []);
 }
 
 function shapeFromRing(ring) {
@@ -429,7 +433,7 @@ export function makeBorderLine(ring, y, material) {
 }
 
 export function addTerritoryInk(group, territory, material, y, continentMat) {
-  // P33 HARD: dissolve multipolygons — stroke the outer union, never every poly.
+  // P39 HARD: dissolve / outer-union BEFORE stroke. Land ink ≥ sea-zone ink.
   for (const poly of territoryOutlineRings(territory)) {
     const ring = smoothRing(simplifyRing(poly), 1);
     if (!ring) continue;
@@ -601,6 +605,7 @@ export function makeSeaWaterMeshes(territory, material) {
     if (!ring) continue;
     const geom = new THREE.ShapeGeometry(shapeFromRing(ring));
     geom.rotateX(-Math.PI / 2);
+    applyOceanUVs(geom);
     const mesh = new THREE.Mesh(geom, material);
     mesh.position.y = 0.04;
     mesh.renderOrder = 1;

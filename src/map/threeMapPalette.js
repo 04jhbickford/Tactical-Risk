@@ -124,7 +124,7 @@ const PAPER_UV_SHIFT = {
   'South America': [0.08, 0.52],
   Oceania: [0.47, 0.29],
 };
-export const OCEAN_UV = 24;
+export const OCEAN_UV = 16;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
 export const GRAIN_MULTIPLY = 0.78;
@@ -337,9 +337,9 @@ function imageToTex(img, fallbackHex, grainImg = null, { srgb = true } = {}) {
 }
 
 function bakeOcean(img) {
-  // P37 STYLE REF: pale washed parchment sea. Never slate-teal candy.
+  // P39: authored hand-ripple sea is the albedo. Do not destipple to cream.
   if (!grainCanvas) grainCanvas = bakeGrainField(512);
-  const size = img ? (img.naturalWidth || img.width || 512) : 512;
+  const size = img ? (img.naturalWidth || img.width || 768) : 768;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -347,25 +347,7 @@ function bakeOcean(img) {
   ctx.fillStyle = PALETTE.oceanDeep;
   ctx.fillRect(0, 0, size, size);
   if (img) ctx.drawImage(img, 0, 0, size, size);
-  const shelf = ctx.createRadialGradient(size * 0.45, size * 0.42, size * 0.06, size * 0.5, size * 0.5, size * 0.92);
-  shelf.addColorStop(0, PALETTE.oceanReef || '#7AADB0');
-  shelf.addColorStop(0.22, PALETTE.oceanShelf);
-  shelf.addColorStop(0.52, mixHexCss(PALETTE.oceanShelf, PALETTE.oceanDeep, 0.40));
-  shelf.addColorStop(0.78, PALETTE.oceanDeep);
-  shelf.addColorStop(1, mixHexCss(PALETTE.oceanDeep, '#B8B4A4', 0.22));
-  ctx.globalCompositeOperation = 'soft-light';
-  ctx.globalAlpha = 0.90;
-  ctx.fillStyle = shelf;
-  ctx.fillRect(0, 0, size, size);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
   overlayPhoto(ctx, grainCanvas, size, OCEAN_GRAIN, 'overlay');
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.globalAlpha = OCEAN_TEAL_PUNCH;
-  ctx.fillStyle = PALETTE.oceanDeep;
-  ctx.fillRect(0, 0, size, size);
-  ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = 'source-over';
   oceanMap = canvasTex(canvas);
   return oceanMap;
 }
@@ -437,6 +419,17 @@ export function makePaperTexture() {
   if (paperTex) return paperTex;
   paperTex = bakeParchment(null);
   return paperTex;
+}
+
+export function applyOceanUVs(geometry) {
+  const pos = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  if (!pos || !uv) return;
+  for (let i = 0; i < pos.count; i++) {
+    uv.setXY(i, pos.getX(i) / OCEAN_UV, -pos.getZ(i) / OCEAN_UV);
+  }
+  uv.needsUpdate = true;
+  geometry.setAttribute('uv2', uv.clone());
 }
 
 export function applyPaperUVs(geometry, territory) {
@@ -535,32 +528,37 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0xd6d0bc,
-    roughness: 0.90,
+    // P39: map is the hero. White tint so hand-ripples are not cream-washed.
+    color: 0xffffff,
+    roughness: 0.92,
     metalness: 0.0,
-    envMapIntensity: 0.03,
-    emissive: 0xd2ccb8,
-    emissiveIntensity: 0.30,
+    envMapIntensity: 0.02,
+    emissive: 0xd8d2be,
+    emissiveIntensity: 0.12,
     transparent: false,
-    vertexColors: true,
+    vertexColors: false,
   });
-  // P38: kill stipple-looking ocean normal. Washed parchment-sea only.
-  if (mat.normalMap) mat.normalScale.set(0.10, 0.10);
+  if (mat.normalMap) mat.normalScale.set(0.16, 0.16);
   return mat;
 }
 
 export function makeSeaWaterMaterial() {
+  makePaperTexture();
+  if (!oceanMap) bakeOcean(null);
   return new THREE.MeshStandardMaterial({
-    // PLAYBOOK C: pale washed blue near coasts, fading into parchment.
-    color: 0xb4c6c2,
+    // P39: sea-zone albedo carries the same hand-ripple tile (not cream vertex).
+    map: oceanMap,
+    color: 0xffffff,
     transparent: true,
-    opacity: 0.12,
-    roughness: 0.88,
+    opacity: 0.78,
+    roughness: 0.92,
     metalness: 0.0,
     depthWrite: false,
     depthTest: true,
     side: THREE.DoubleSide,
-    envMapIntensity: 0.20,
+    envMapIntensity: 0.08,
+    emissive: 0xd4ceba,
+    emissiveIntensity: 0.08,
     polygonOffset: true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2,

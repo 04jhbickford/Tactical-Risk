@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""P37: bake a UV-aligned watercolor-parchment world land albedo.
+"""P39: bake a UV-aligned watercolor-parchment world land albedo.
 
 Layout is the live map (3500×2000) so applyWorldLandUVs sample 1:1.
-Hero art is STYLE REF watercolor plates (Oceania parchment lock),
-composited through live territory masks with feathered joins.
-NO rectangular paste boxes. Soft-light stain is OFF.
-NOT a copyright scan. NOT a runtime fillStain wash.
+Hero art is STYLE REF watercolor plates (Oceania beautiful lock),
+composited MASK-ONLY through live territory masks. Dest UV is
+positioning only — NEVER rectangular alpha, NEVER grow-dest stretch
+(.38 heal-stretch caused worse overlaps).
+
+Continent Risk washes ≤15% multiply UNDER paint. Plate art + parchment
+dominate. Quiet Imhof only — do not dilute GenerateImage beauty.
+Ocean ripple tile is authored separately (not destippled cream).
 
 Usage:
   python3 tools/bake-world-land-albedo.py --guide
@@ -23,11 +27,12 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'data' / 'territories.json'
 CONTINENTS = ROOT / 'data' / 'continents.json'
 BOARD = ROOT / 'assets' / 'three' / 'board'
+GEN39 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p39-gen'
 GEN37 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p37-gen'
 GEN36 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p36-gen'
 GEN34 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p34-gen'
 GEN33 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p33-gen'
-OUT_GUIDE = GEN37 / 'world-land-guide.png'
+OUT_GUIDE = GEN39 / 'world-land-guide.png'
 OUT_ATLAS = BOARD / 'world-land-albedo.png'
 OUT_NORMAL = BOARD / 'world-land-normal.png'
 OUT_AO = BOARD / 'world-land-ao.png'
@@ -39,8 +44,7 @@ ATLAS_W = 4096
 ATLAS_H = 2340
 
 # Printed A&A / Risk chroma (AA-PALETTE + AA-RISK-HOMAGE).
-# P38: Asia muted green (not USSR brown). Oceania teal-sage. SA warm tan.
-# Washes stay ≤22% multiply so parchment + STYLE REF still read.
+# P39: washes stay ≤15% multiply UNDER paint so plate art dominates.
 CONT_HEX = {
     'Europe': (0x6B, 0x7A, 0x4A),
     'Asia': (0x5F, 0x7A, 0x5A),
@@ -395,7 +399,8 @@ def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w
     Not GIS DEM. Not flat brown stamps. NW oblique light; steeper = darker.
     """
     cool = biome_cool_map(lands, w, h) if lands is not None else None
-    img = apply_imhof_painterly(img, land, height, strength=0.34, cool_map=cool)
+    # P39: quiet Imhof only — plates already carry STYLE REF hatching.
+    img = apply_imhof_painterly(img, land, height, strength=0.12, cool_map=cool)
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     try:
@@ -451,8 +456,8 @@ def apply_coastal_greens(img: Image.Image, lands, w: int, h: int) -> Image.Image
     fringe = ImageChops.multiply(edge.filter(ImageFilter.MaxFilter(15)), land)
     fringe = fringe.filter(ImageFilter.GaussianBlur(8))
     low = land_mask(lands, w, h, biomes={'lush', 'forest', 'jungle'})
-    img = grade_chroma(img, fringe, COAST_GREEN, amount=0.28)
-    img = grade_chroma(img, low, LOWLAND_GREEN, amount=0.18)
+    img = grade_chroma(img, fringe, COAST_GREEN, amount=0.12)
+    img = grade_chroma(img, low, LOWLAND_GREEN, amount=0.08)
     return img
 
 
@@ -632,14 +637,18 @@ def match_to_region(plate: Image.Image, dest: Image.Image, mask: Image.Image) ->
     dst_chroma = float(dst_mean.max() - dst_mean.min())
     if dst_chroma < 14:
         return plate
-    return Image.fromarray(np.clip(parr + (dst_mean - src_mean) * 0.40, 0, 255).astype('uint8'), 'RGB')
+    # P39: quiet join only. A 40% mean-shift toward khaki underpaint
+    # was the GIS flatten that killed plate beauty in .38.
+    return Image.fromarray(np.clip(parr + (dst_mean - src_mean) * 0.08, 0, 255).astype('uint8'), 'RGB')
 
 
 def paste_through_mask(img, plate, mask, dest_uv, src_frac, w, h, alpha=0.78, blur=56):
     """Place a plate into game UV. Alpha is the live land/continent mask only.
 
-    dest_uv is positioning. It is never a rectangular alpha — that was the
-    Australia / Africa plate-seam fail in .33–.36.
+    dest_uv is positioning ONLY. It is never a rectangular alpha and it is
+    never grown to the mask bbox — .38 grow-dest stretched plates and made
+    polygon overlaps worse. If mask extends past dest, those texels stay
+    on the previous layer (world plate / paper). Australia last.
     """
     if plate is None or mask is None:
         return img
@@ -652,15 +661,8 @@ def paste_through_mask(img, plate, mask, dest_uv, src_frac, w, h, alpha=0.78, bl
     rx1, ry1 = int(wx(dest_uv[2], w)), int(wy(dest_uv[3], h))
     if rx1 <= rx0 or ry1 <= ry0:
         return img
-    # Dest is positioning. If the live mask extends past the box (Cape /
-    # Australia class), grow dest so land is never cut by a rectangle.
-    mb = mask.getbbox()
-    if mb and (mb[0] < rx0 - 2 or mb[1] < ry0 - 2 or mb[2] > rx1 + 2 or mb[3] > ry1 + 2):
-        rx0, ry0 = min(rx0, mb[0]), min(ry0, mb[1])
-        rx1, ry1 = max(rx1, mb[2]), max(ry1, mb[3])
+    # P39 HARD: dest UV = position only. Do NOT grow dest to mask bbox.
     fitted = crop.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS)
-    # Alpha is the land mask. Dest box is only used to place the crop;
-    # a 1px box edge in open ocean is fine, a box edge on land is not.
     local = mask
     fitted = match_to_region(fitted, img.crop((rx0, ry0, rx1, ry1)), local.crop((rx0, ry0, rx1, ry1)))
     layer = img.copy()
@@ -770,42 +772,50 @@ def build_guide(lands, w=2048, h=1170) -> Image.Image:
 def build_atlas(lands) -> Image.Image:
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(first_existing(BOARD / 'board-parchment-tile.png', GEN37 / 'p37-parchment-grain-tile.png'))
-    world = load_rgb(first_existing(GEN37 / 'p37-world-watercolor.png'))
-    europe = load_rgb(first_existing(GEN37 / 'p37-europe-africa-theater.png'))
-    africa = load_rgb(first_existing(GEN37 / 'p37-africa-continent.png', GEN37 / 'p37-world-watercolor.png'))
-    asia = load_rgb(first_existing(GEN37 / 'p37-asia-continent.png', GEN37 / 'p37-world-watercolor.png'))
-    oceania = load_rgb(first_existing(GEN37 / 'p37-oceania-style-lock.png'))
+    world = load_rgb(first_existing(GEN39 / 'p39-world-watercolor.png', GEN37 / 'p37-world-watercolor.png'))
+    europe = load_rgb(first_existing(GEN39 / 'p39-europe-africa-theater.png', GEN37 / 'p37-europe-africa-theater.png'))
+    africa = load_rgb(first_existing(GEN39 / 'p39-africa-continent.png', GEN37 / 'p37-africa-continent.png'))
+    asia = load_rgb(first_existing(GEN39 / 'p39-asia-continent.png', GEN37 / 'p37-asia-continent.png'))
+    oceania = load_rgb(first_existing(
+        GEN39 / 'p39-oceania-style-lock.png',
+        GEN39 / 'style-ref-oceania-beautiful.png',
+        GEN37 / 'p37-oceania-style-lock.png',
+    ))
+    americas = load_rgb(first_existing(GEN39 / 'p39-americas-theater.png', GEN39 / 'p39-world-watercolor.png'))
     if not world or not europe or not oceania or not africa:
-        raise SystemExit('P37 fail-closed: missing STYLE REF watercolor plates')
+        raise SystemExit('P39 fail-closed: missing STYLE REF watercolor plates')
 
     paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
     paper = ImageEnhance.Color(paper).enhance(0.94)
     img = paper.copy()
     mask_all = land_mask(lands, w, h)
 
-    # P37 HARD: no Risk-candy continent underpaint. STYLE REF is one wash family.
-    img = Image.composite(paper, img, mask_all)
+    # P39 HARD: Risk washes ≤15% multiply UNDER paint. Plate art dominates.
+    under = paper.copy()
+    for key, rgb in CONT_HEX.items():
+        cm = land_mask(lands, w, h, continents={key})
+        under = multiply_continent(under, cm, rgb, amount=0.14, feather=14)
+    ussr = land_mask(lands, w, h, names=USSR_LANDS)
+    under = multiply_continent(under, ussr, USSR_HEX, amount=0.12, feather=14)
+    img = Image.composite(under, img, mask_all)
 
     world = match_parchment(world)
     europe = match_parchment(europe)
     africa = match_parchment(africa)
-    # Quiet faint political hairlines on the generated continent plate.
-    africa = Image.blend(africa, africa.filter(ImageFilter.MedianFilter(3)), 0.40)
+    africa = Image.blend(africa, africa.filter(ImageFilter.MedianFilter(3)), 0.28)
     asia = match_parchment(asia) if asia else world
     oceania = match_parchment(oceania)
+    americas = match_parchment(americas) if americas else world
 
     # Unifying watercolor base through ALL live land — never a rectangular box.
     img = paste_through_mask(
         img, world, mask_all,
         (80, 40, 3420, 1960), (0.02, 0.04, 0.98, 0.94),
-        w, h, alpha=0.70, blur=36,
+        w, h, alpha=0.82, blur=36,
     )
 
-    # Theater detail through continent masks only (feathered). Australia last.
-    # P37b HARD: the Europe/Africa plate is Med + Sahara only. Pasting it
-    # through all of Africa with dest y=1680 cut a rectangular L-band across
-    # the Cape (South Africa map y=1586–1923). Northern names only; dest
-    # stays north of Congo. Full AF is one continuous continent plate.
+    # Theater detail through continent masks only (feathered). Dest = position.
+    # Northern EU/AF names only — full AF is the continuous continent plate.
     north_af = {
         'Algeria', 'Anglo Sudan Egypt', 'French West Africa',
         'Italian East Africa', 'French Equatorial Africa',
@@ -815,76 +825,68 @@ def build_atlas(lands) -> Image.Image:
     img = paste_through_mask(
         img, europe, em,
         (560, 40, 1860, 1420), (0.02, 0.02, 0.98, 0.86),
-        w, h, alpha=0.88, blur=80,
+        w, h, alpha=0.90, blur=72,
     )
-    # One continuous Africa wash — dest covers the Cape. Mask-only alpha.
-    # Plate inset keeps the worn paper edge off the southern tip.
     af_all = land_mask(lands, w, h, continents={'Africa'})
     img = paste_through_mask(
         img, africa, af_all,
         (640, 790, 1560, 1960), (0.10, 0.07, 0.90, 0.86),
-        w, h, alpha=0.96, blur=56,
+        w, h, alpha=0.94, blur=48,
     )
-    img = flatten_region_luma(img, af_all, 0.72)
+    img = flatten_region_luma(img, af_all, 0.55)
     img = heal_horiz_luma_step(img, af_all, w, h)
     am = land_mask(lands, w, h, continents={'Asia'})
     img = paste_through_mask(
         img, asia, am,
         (1280, 20, 2680, 1320), (0.02, 0.02, 0.98, 0.98),
-        w, h, alpha=0.80, blur=72,
+        w, h, alpha=0.88, blur=64,
     )
-    # Australia from STYLE REF — tight land crop, never a sea-filled Oceania box.
+    nam = land_mask(lands, w, h, continents={'North America'})
+    img = paste_through_mask(
+        img, americas, nam,
+        (2760, 40, 3500, 1120), (0.02, 0.04, 0.58, 0.50),
+        w, h, alpha=0.88, blur=48,
+    )
+    sam = land_mask(lands, w, h, continents={'South America'})
+    img = paste_through_mask(
+        img, americas, sam,
+        (40, 1040, 560, 1900), (0.20, 0.48, 0.62, 0.98),
+        w, h, alpha=0.88, blur=48,
+    )
+    # Australia LAST — tight land crop from STYLE REF family. Never a sea box.
     aus = land_mask(lands, w, h, names={'Australia'})
     img = paste_through_mask(
         img, oceania, aus,
         (2094, 1460, 2619, 1933), (0.24, 0.30, 0.74, 0.76),
-        w, h, alpha=0.96, blur=28,
+        w, h, alpha=0.96, blur=22,
     )
     nz = land_mask(lands, w, h, names={'New Zealand'})
     img = paste_through_mask(
         img, oceania, nz,
         (2676, 1659, 2861, 1932), (0.80, 0.42, 0.96, 0.78),
-        w, h, alpha=0.92, blur=18,
+        w, h, alpha=0.92, blur=16,
     )
     ng = land_mask(lands, w, h, names={'New Guinea', 'East Indies', 'Borneo Celebes'})
     img = paste_through_mask(
         img, oceania, ng,
         (1972, 1217, 2629, 1454), (0.08, 0.02, 0.70, 0.30),
-        w, h, alpha=0.90, blur=22,
-    )
-    nam = land_mask(lands, w, h, continents={'North America'})
-    img = paste_through_mask(
-        img, world, nam,
-        (2760, 40, 3500, 1120), (0.02, 0.06, 0.30, 0.50),
-        w, h, alpha=0.84, blur=48,
-    )
-    sam = land_mask(lands, w, h, continents={'South America'})
-    img = paste_through_mask(
-        img, world, sam,
-        (40, 1040, 560, 1900), (0.10, 0.46, 0.32, 0.94),
-        w, h, alpha=0.84, blur=48,
+        w, h, alpha=0.90, blur=18,
     )
 
-    # PLAYBOOK Layer A: vegetation + painterly Imhof ink (structure first).
+    # Quiet fringe + quiet Imhof. Do not GIS-flatten the plates.
     img = apply_coastal_greens(img, lands, w, h)
     height = imhof_height(w, h)
     img = draw_imhof_peaks(img, mask_all, height, w, h, lands)
     img = draw_coast(img, mask_all, w, h)
 
-    # PLAYBOOK Layer B: Risk multiply ≤22%, feathered 8–20px. Wash second.
-    for key, rgb in CONT_HEX.items():
-        cm = land_mask(lands, w, h, continents={key})
-        img = multiply_continent(img, cm, rgb, amount=0.20, feather=12)
-    ussr = land_mask(lands, w, h, names=USSR_LANDS)
-    img = multiply_continent(img, ussr, USSR_HEX, amount=0.16, feather=12)
-    img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.14)
+    img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.06)
     img = kill_blotches(img, mask_all, 72)
 
     if parchment:
         tooth = ImageChops.soft_light(img, paper)
-        img = Image.composite(tooth, img, mask_all.point(lambda v: 28))
+        img = Image.composite(tooth, img, mask_all.point(lambda v: 22))
 
-    img = punch(img, color=1.18, contrast=1.12, sharp=1.10)
+    img = punch(img, color=1.16, contrast=1.10, sharp=1.08)
     img = Image.composite(img, paper, mask_all)
     void = draw_badges
     void = draw_rivers
@@ -895,33 +897,25 @@ def build_atlas(lands) -> Image.Image:
 
 
 def bake_ocean_wash():
-    tile = load_rgb(GEN37 / 'p37-ocean-wash-tile.png')
+    """P39: bind authored hand-ripple sea. Never destipple to cream wash."""
+    tile = load_rgb(first_existing(
+        GEN39 / 'p39-ocean-ripple-tile.png',
+        GEN37 / 'p37-ocean-wash-tile.png',
+    ))
     if not tile:
         return
-    tile = tile.resize((768, 768), Image.Resampling.LANCZOS)
-    # P38 craft C: destipple + pale parchment-sea. Optional hand ripples only.
-    tile = tile.filter(ImageFilter.GaussianBlur(2.2))
-    tile = ImageEnhance.Color(tile).enhance(0.48)
-    tile = ImageEnhance.Contrast(tile).enhance(0.70)
+    tile = tileable_paper(tile, 768)
+    # Keep ripple contrast. Quiet parchment grade only — do not blur away ink.
+    tile = ImageEnhance.Color(tile).enhance(0.82)
+    tile = ImageEnhance.Contrast(tile).enhance(1.18)
     try:
         import numpy as np
         arr = np.array(tile, dtype=np.float32)
-        lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
-        lum = np.clip((lum - 0.08) / 0.70, 0.62, 1.10)
-        target = np.array([0xD6, 0xD0, 0xBC], dtype=np.float32)
-        tile = Image.fromarray(np.clip(arr * 0.28 + (target * lum[..., None]) * 0.72, 0, 255).astype('uint8'), 'RGB')
-        tile = tile.filter(ImageFilter.GaussianBlur(1.1))
-        # Soft hand ripples — ink-first, never dotted stipple.
-        rip = Image.new('RGBA', tile.size, (0, 0, 0, 0))
-        rd = ImageDraw.Draw(rip)
-        tw, th = tile.size
-        for i in range(5):
-            y = int(th * (0.18 + i * 0.16))
-            pts = []
-            for x in range(0, tw + 8, 10):
-                pts.append((x, y + int(3.2 * np.sin(x / 38.0 + i * 0.7))))
-            rd.line(pts, fill=(90, 82, 68, 18), width=1)
-        tile = Image.alpha_composite(tile.convert('RGBA'), rip.filter(ImageFilter.GaussianBlur(0.8))).convert('RGB')
+        # Shift mean toward pale parchment-sea without flattening ripples.
+        mean = arr.reshape(-1, 3).mean(axis=0)
+        target = np.array([0xD8, 0xD2, 0xBE], dtype=np.float32)
+        arr = arr + (target - mean) * 0.22
+        tile = Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
     except ImportError:
         pass
     OUT_OCEAN.parent.mkdir(parents=True, exist_ok=True)
@@ -952,6 +946,7 @@ def main():
     args = ap.parse_args()
     if not args.guide and not args.atlas:
         args.guide = args.atlas = True
+    GEN39.mkdir(parents=True, exist_ok=True)
     GEN37.mkdir(parents=True, exist_ok=True)
     GEN36.mkdir(parents=True, exist_ok=True)
     GEN34.mkdir(parents=True, exist_ok=True)
