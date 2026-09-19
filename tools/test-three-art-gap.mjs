@@ -159,7 +159,7 @@ check('land lids use wash map not flat side',
 check('board textures keep fiber (no mipmaps)', /generateMipmaps = false/.test(palette));
 check('land/ocean are MeshStandard not MeshBasic',
   /MeshStandardMaterial/.test(palette) && /roughness: world \? 0\.88 : 0\.76/.test(palette)
-  && /roughness: 0\.86/.test(palette)
+  && /roughness: 0\.90/.test(palette)
   && /vertexColors: true/.test(palette)
   && !/new THREE\.MeshBasicMaterial/.test(palette));
 check('parchment normal + AO maps',
@@ -191,7 +191,7 @@ check('parchment tooth punches at 390 mid',
   && /GRAIN_MULTIPLY = 0\.78/.test(palette)
   && /macro paper tooth/.test(palette)
   && /TOOTH_NORMAL_MID = 2\.05/.test(palette)
-  && /IMHOF_NORMAL_SCALE = 0\.16/.test(palette)
+  && /IMHOF_NORMAL_SCALE = 0\.20/.test(palette)
   && /normalScale\.set\(n, n\)/.test(palette));
 check('lod tooth is loud mid / clean near',
   /TOOTH_NORMAL_NEAR = 1\.08/.test(palette)
@@ -202,7 +202,7 @@ check('lod tooth is loud mid / clean near',
 check('RoomEnvironment for ocean spec', /RoomEnvironment/.test(spike) && /PMREMGenerator/.test(spike));
 check('coast foam mask band', /makeFoamBandMeshes/.test(art) && /makeFoamMaterial/.test(palette));
 check('soft coast AO band', /makeCoastAoMeshes/.test(art) && /makeCoastAoMeshes/.test(spike));
-check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.08/.test(palette) && /vertexColors/.test(palette));
+check('ocean open-sea vertex darken', /OCEAN_OPEN_DARKEN = 0\.04/.test(palette) && /vertexColors/.test(palette));
 check('foam coast is a hairline', /makeLineMat\(PALETTE\.foam, 1\.15/.test(spike));
 check('select stack lift 2-4px / 150ms micro-settle',
   /liftSelected/.test(spike)

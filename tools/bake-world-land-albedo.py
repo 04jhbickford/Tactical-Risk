@@ -55,8 +55,8 @@ USSR_LANDS = {
     'Russia', 'Karelia S.S.R.', 'Ukraine S.S.R.', 'Novosibirsk',
     'Evenki National Okrug', 'Soviet Far East', 'Mongolia',
 }
-COAST_GREEN = (0x6E, 0x8C, 0x5E)
-LOWLAND_GREEN = (0x7A, 0x8E, 0x58)
+COAST_GREEN = (0x5A, 0x86, 0x52)
+LOWLAND_GREEN = (0x6E, 0x8A, 0x54)
 BIOME_OF = {
     'Finland Norway': 'snow', 'Sweden': 'snow', 'Evenki National Okrug': 'snow',
     'Alaska': 'snow', 'West Canada': 'snow', 'Soviet Far East': 'snow',
@@ -86,6 +86,8 @@ RIDGES = [
     [(220, 1230), (240, 1411), (285, 1635)],
     [(1550, 700), (1679, 600), (1905, 490)],
     [(1086, 160), (1070, 230), (1086, 280)],
+    # Great Dividing Range — Australia east (STYLE REF hatch family)
+    [(2580, 1480), (2640, 1560), (2688, 1660), (2660, 1740)],
 ]
 # Forest authorship lives in the theater plates + biome tiles.
 # Do NOT stamp oval blobs — Viz called .33 a wash+stamp family.
@@ -274,6 +276,10 @@ def imhof_height(w: int, h: int) -> Image.Image:
     blob(820, 980, 50, 18, 0.28)
     blob(1400, 620, 40, 16, 0.32)
     blob(1086, 200, 22, 50, 0.22)
+    # Great Dividing Range — STYLE REF east-Aus hatch
+    blob(2620, 1540, 26, 80, 0.58)
+    blob(2680, 1680, 20, 48, 0.42)
+    blob(2560, 1480, 22, 36, 0.32)
 
     for ridge in RIDGES:
         pts = [(wx(x, w), wy(y, h)) for x, y in ridge]
@@ -320,8 +326,8 @@ def apply_imhof_painterly(img: Image.Image, land: Image.Image, height: Image.Ima
         import numpy as np
     except ImportError:
         return apply_imhof(img, land, height, strength)
-    large = height.filter(ImageFilter.GaussianBlur(9))
-    shade = imhof_hillshade(large, azimuth=315.0, altitude=40.0)
+    large = height.filter(ImageFilter.GaussianBlur(6))
+    shade = imhof_hillshade(large, azimuth=315.0, altitude=38.0)
     arr = np.asarray(img, dtype=np.float32)
     s = np.asarray(shade, dtype=np.float32) / 255.0
     m = (np.asarray(land) > 8).astype(np.float32)
@@ -339,7 +345,7 @@ def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w
 
     Not GIS DEM. Not flat brown stamps. NW oblique light; steeper = darker.
     """
-    img = apply_imhof_painterly(img, land, height, strength=0.26)
+    img = apply_imhof_painterly(img, land, height, strength=0.34)
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     try:
@@ -351,7 +357,7 @@ def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w
     for ridge in RIDGES:
         pts = [(wx(x, w), wy(y, h)) for x, y in ridge]
         # Quiet crest only — never a continent-spanning ink slash.
-        d.line(pts, fill=(88, 70, 48, 42), width=max(1, w // 1600), joint='curve')
+        d.line(pts, fill=(88, 70, 48, 64), width=max(1, w // 1400), joint='curve')
         if len(pts) < 2:
             continue
         for i in range(len(pts) - 1):
@@ -374,7 +380,7 @@ def draw_imhof_peaks(img: Image.Image, land: Image.Image, height: Image.Image, w
                 else:
                     steep = 0.55
                 ln = max(3.0, (w / 340.0) * (0.55 + steep * 0.7))
-                ink = int(36 + steep * 70)
+                ink = int(48 + steep * 78)
                 d.line(
                     [(px, py), (px + nx * ln, py + ny * ln)],
                     fill=(70, 56, 38, ink),
@@ -395,8 +401,8 @@ def apply_coastal_greens(img: Image.Image, lands, w: int, h: int) -> Image.Image
     fringe = ImageChops.multiply(edge.filter(ImageFilter.MaxFilter(15)), land)
     fringe = fringe.filter(ImageFilter.GaussianBlur(8))
     low = land_mask(lands, w, h, biomes={'lush', 'forest', 'jungle'})
-    img = grade_chroma(img, fringe, COAST_GREEN, amount=0.22)
-    img = grade_chroma(img, low, LOWLAND_GREEN, amount=0.14)
+    img = grade_chroma(img, fringe, COAST_GREEN, amount=0.28)
+    img = grade_chroma(img, low, LOWLAND_GREEN, amount=0.18)
     return img
 
 
@@ -844,18 +850,29 @@ def bake_ocean_wash():
     if not tile:
         return
     tile = tile.resize((768, 768), Image.Resampling.LANCZOS)
-    # P38: destipple — wash toward STYLE REF parchment-sea. No dotted grain.
-    tile = tile.filter(ImageFilter.GaussianBlur(1.6))
-    tile = ImageEnhance.Color(tile).enhance(0.62)
-    tile = ImageEnhance.Contrast(tile).enhance(0.78)
+    # P38 craft C: destipple + pale parchment-sea. Optional hand ripples only.
+    tile = tile.filter(ImageFilter.GaussianBlur(2.2))
+    tile = ImageEnhance.Color(tile).enhance(0.48)
+    tile = ImageEnhance.Contrast(tile).enhance(0.70)
     try:
         import numpy as np
         arr = np.array(tile, dtype=np.float32)
         lum = (0.30 * arr[:, :, 0] + 0.59 * arr[:, :, 1] + 0.11 * arr[:, :, 2]) / 255.0
-        lum = np.clip((lum - 0.08) / 0.70, 0.55, 1.08)
-        target = np.array([0xC8, 0xC4, 0xB4], dtype=np.float32)
-        tile = Image.fromarray(np.clip(arr * 0.38 + (target * lum[..., None]) * 0.62, 0, 255).astype('uint8'), 'RGB')
-        tile = tile.filter(ImageFilter.GaussianBlur(0.8))
+        lum = np.clip((lum - 0.08) / 0.70, 0.62, 1.10)
+        target = np.array([0xD6, 0xD0, 0xBC], dtype=np.float32)
+        tile = Image.fromarray(np.clip(arr * 0.28 + (target * lum[..., None]) * 0.72, 0, 255).astype('uint8'), 'RGB')
+        tile = tile.filter(ImageFilter.GaussianBlur(1.1))
+        # Soft hand ripples — ink-first, never dotted stipple.
+        rip = Image.new('RGBA', tile.size, (0, 0, 0, 0))
+        rd = ImageDraw.Draw(rip)
+        tw, th = tile.size
+        for i in range(5):
+            y = int(th * (0.18 + i * 0.16))
+            pts = []
+            for x in range(0, tw + 8, 10):
+                pts.append((x, y + int(3.2 * np.sin(x / 38.0 + i * 0.7))))
+            rd.line(pts, fill=(90, 82, 68, 18), width=1)
+        tile = Image.alpha_composite(tile.convert('RGBA'), rip.filter(ImageFilter.GaussianBlur(0.8))).convert('RGB')
     except ImportError:
         pass
     OUT_OCEAN.parent.mkdir(parents=True, exist_ok=True)

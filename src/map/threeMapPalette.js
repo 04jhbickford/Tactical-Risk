@@ -131,13 +131,13 @@ export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 // P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
 export const OCEAN_GRAIN = 0.06;
-export const OCEAN_OPEN_DARKEN = 0.08;
-export const OCEAN_TEAL_PUNCH = 0.06;
+export const OCEAN_OPEN_DARKEN = 0.04;
+export const OCEAN_TEAL_PUNCH = 0.03;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
 export const TOOTH_NORMAL_NEAR = 1.08;
-export const IMHOF_NORMAL_SCALE = 0.16;
+export const IMHOF_NORMAL_SCALE = 0.20;
 export const TOOTH_ROUGH_MID = 0.76;
 export const TOOTH_ROUGH_NEAR = 0.86;
 
@@ -535,12 +535,12 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0xc8c4b4,
-    roughness: 0.86,
+    color: 0xd6d0bc,
+    roughness: 0.90,
     metalness: 0.0,
-    envMapIntensity: 0.04,
-    emissive: 0xc8c4b4,
-    emissiveIntensity: 0.22,
+    envMapIntensity: 0.03,
+    emissive: 0xd2ccb8,
+    emissiveIntensity: 0.30,
     transparent: false,
     vertexColors: true,
   });
@@ -596,10 +596,11 @@ export function makeOceanMesh(width, height) {
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // P35: keep the whole basin teal — shelf brightening made Med look like land.
-    colors[i * 3] = shade * 0.90;
-    colors[i * 3 + 1] = shade * 0.88;
-    colors[i * 3 + 2] = shade * 0.78;
+    // P38 craft C: STYLE REF washed parchment-sea. Pale cream, not grey-teal.
+    // Keep sea lighter than land interiors so Med cannot read as a land plate.
+    colors[i * 3] = shade * 1.04;
+    colors[i * 3 + 1] = shade * 1.01;
+    colors[i * 3 + 2] = shade * 0.94;
   }
   if (uv) {
     uv.needsUpdate = true;

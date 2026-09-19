@@ -119,12 +119,25 @@ async function main() {
   await shot('mid-land-sea.png');
   await shot('mid-continents.png');
   await shot('continents-wash.png');
-  await shot('land-borders.png');
+  await shot('europe-mid-hud-390.png');
+
+  // Gate stills use distinctive frames — not copies of the Europe mid plate.
+  await page.evaluate(() => {
+    window.__threeSpike.frameNear('Switzerland', { lift: 118, south: 14 });
+    window.__threeSpike.selectLand(null);
+  });
   await shot('mountains-relief.png');
+
+  await page.evaluate(() => window.__threeSpike.frameEuropeAfrica());
+  await shot('land-borders.png');
+  await shot('sea-zones-ink.png');
+
+  await page.evaluate(() => {
+    window.__threeSpike.frameAustralia({ lift: 168, south: 22 });
+    window.__threeSpike.selectLand(null);
+  });
   await shot('vegetation-coast.png');
   await shot('ocean-clean.png');
-  await shot('sea-zones-ink.png');
-  await shot('europe-mid-hud-390.png');
 
   await page.evaluate(() => window.__threeSpike.frameAfrica({ lift: 210, south: 30 }));
   await shot('africa-even.png');
@@ -152,7 +165,10 @@ async function main() {
   await shot('tan-units-contrast.png');
   await shot('unit-count-one.png');
 
-  await page.evaluate(() => window.__threeSpike.selectLand('East US'));
+  await page.evaluate(() => {
+    window.__threeSpike.frameNear('East US', { lift: 72, south: 10 });
+    window.__threeSpike.selectLand('East US');
+  });
   await shot('east-us-peek-one.png');
 
   await page.evaluate(() => window.__threeSpike.selectLand('Germany'));
@@ -160,6 +176,10 @@ async function main() {
   await shot('stack-expand.png');
   const stackExpand = await page.evaluate(() => window.__threeSpike.stackState('Germany'));
   const stackCollapse = await page.evaluate(() => window.__threeSpike.toggleStack('Germany'));
+  await page.evaluate(() => new Promise((r) => {
+    requestAnimationFrame(() => requestAnimationFrame(r));
+  }));
+  await new Promise((r) => setTimeout(r, 500));
   await shot('stack-collapse.png');
 
   const eastMed = await page.evaluate(() => window.__threeSpike.frameEastMed({ lift: 78, south: 11 }));
