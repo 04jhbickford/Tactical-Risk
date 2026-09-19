@@ -1847,6 +1847,7 @@ async function init() {
           combatUI.handleAirLandingComplete(result);
           territoryRenderer.clearAirLandingDestinations();
           camera.dirty = true;
+          syncManager?.pushStateNow?.();
         }
       );
       // Highlight valid destinations on map

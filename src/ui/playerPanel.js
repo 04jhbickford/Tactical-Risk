@@ -59,6 +59,12 @@ import {
 } from './peekFlush.js';
 import { resolveUndoAction, canUndoLastMove, shouldPassPlacementTurn, shouldApplyUndoAction } from '../state/undoPolicy.js';
 import {
+  shouldOfferEndPhaseDuringMove,
+  selectedMoveCount,
+} from '../state/airLanding.js';
+
+export { shouldOfferEndPhaseDuringMove, selectedMoveCount };
+import {
   capturePanelPointerLock,
   resolveLockedPanelClick,
   shouldBlockMapSelectAfterPanel,
@@ -856,6 +862,13 @@ export class PlayerPanel {
       if (currentUnit) {
         const unitKey = currentUnit.id || `${currentUnit.type}_${this.airLandingIndex}`;
         this.airLandingSelections[unitKey] = e.target.value;
+        this.gameState?.recordAirLandingSelection?.({
+          originTerritory: this.airLandingData.combatTerritory,
+          id: unitKey,
+          type: currentUnit.type,
+          quantity: currentUnit.quantity || 1,
+          destination: e.target.value,
+        });
         if (this.airLandingIndex < this.airLandingData.airUnitsToLand.length - 1) {
           this.airLandingIndex++;
         }
@@ -1374,6 +1387,9 @@ export class PlayerPanel {
     this.airLandingSelections = {};
     this.onAirLandingComplete = onComplete;
     this.activeTab = 'actions'; // Switch to actions tab
+    if (this.gameState?.addPendingAirLandings && combatTerritory) {
+      this.gameState.addPendingAirLandings(combatTerritory, airUnitsToLand || []);
+    }
             this._scheduleRender();
   }
 
@@ -1391,6 +1407,9 @@ export class PlayerPanel {
   revealActionsAfterResync() {
     this.isWaitingForSync = false;
     this.activeTab = 'actions';
+    if (this.gameState?.applyPendingAirLandings) {
+      this.gameState.applyPendingAirLandings({ unitDefs: this.unitDefs || {} });
+    }
     this.clearAirLanding();
   }
 
@@ -1451,6 +1470,13 @@ export class PlayerPanel {
     if (validDest) {
       const unitKey = currentUnit.id || `${currentUnit.type}_${this.airLandingIndex}`;
       this.airLandingSelections[unitKey] = territory.name;
+      this.gameState?.recordAirLandingSelection?.({
+        originTerritory: this.airLandingData.combatTerritory,
+        id: unitKey,
+        type: currentUnit.type,
+        quantity: currentUnit.quantity || 1,
+        destination: territory.name,
+      });
 
       // Move to next unit if available
       if (this.airLandingIndex < this.airLandingData.airUnitsToLand.length - 1) {
@@ -1778,9 +1804,13 @@ export class PlayerPanel {
       phase,
       turnPhase,
     });
-    const hasNamedMoveCta = !!this.movePendingDest && !phonePairHidesMoveConfirm;
-    if (phase === GAME_PHASES.PLAYING && !this.isAirLandingActive()
-      && !hasNamedMoveCta) {
+    const offerEndPhase = shouldOfferEndPhaseDuringMove({
+      airLandingActive: this.isAirLandingActive(),
+      movePendingDest: this.movePendingDest,
+      selectedMoveCount: selectedMoveCount(this.moveSelectedUnits),
+      hideMoveConfirm: phonePairHidesMoveConfirm,
+    });
+    if (phase === GAME_PHASES.PLAYING && offerEndPhase) {
       const hasUnresolvedCombats = turnPhase === TURN_PHASES.COMBAT &&
         this.gameState.combatQueue && this.gameState.combatQueue.length > 0;
 
@@ -4974,13 +5004,16 @@ export class PlayerPanel {
 
         // Handle confirm air landing
         if (action === 'confirm-air-landing') {
-          if (this.isAirLandingActive() && this.onAirLandingComplete) {
+          if (this.isAirLandingActive()) {
             // Build the landings map
             const landings = {};
             const crashes = [];
+            const pendingGroup = this.gameState?.getPendingAirLandings?.()
+              ?.find((entry) => entry.originTerritory === this.airLandingData.combatTerritory);
             this.airLandingData.airUnitsToLand.forEach((unit, idx) => {
               const unitKey = unit.id || `${unit.type}_${idx}`;
-              const dest = this.airLandingSelections[unitKey];
+              const pendingDest = pendingGroup?.units?.find((u) => (u.id || u.type) === unitKey)?.destination;
+              const dest = this.airLandingSelections[unitKey] || pendingDest;
               if (dest) {
                 landings[unitKey] = dest;
               } else if (!unit.landingOptions || unit.landingOptions.length === 0) {
@@ -4989,12 +5022,22 @@ export class PlayerPanel {
               }
             });
             // Pass result in expected format for combatUI.handleAirLandingComplete
-            this.onAirLandingComplete({
+            const payload = {
               landings,
               crashes,
               isRetreating: this.airLandingData.isRetreating,
               airUnitsToLand: this.airLandingData.airUnitsToLand,
-            });
+              combatTerritory: this.airLandingData.combatTerritory,
+            };
+            if (this.onAirLandingComplete) {
+              this.onAirLandingComplete(payload);
+            } else if (this.gameState?.applyAirLandings) {
+              this.gameState.applyAirLandings(this.airLandingData.combatTerritory, {
+                landings,
+                airUnitsToLand: this.airLandingData.airUnitsToLand,
+                unitDefs: this.unitDefs || {},
+              });
+            }
             this.clearAirLanding();
           }
           return;

@@ -10,6 +10,13 @@ import {
   shouldRestoreStartingDeployPool,
 } from './placementPass.js';
 import { resolveDeployedThisRoundAfterLoad } from './placeQueue.js';
+import {
+  applyAirLandingPlan,
+  buildLandingPlan,
+  markPendingAirLandingsApplied,
+  unappliedLandingPlan,
+  upsertPendingAirLanding,
+} from './airLanding.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -2254,6 +2261,9 @@ export class GameState {
           console.warn('Cannot advance to non-combat move: unresolved combats remain');
           return; // Don't advance, stay in current phase
         }
+        // Fail-closed: any post-combat landing the player already named
+        // must be on the board before NCM starts (Robert 19 Sep).
+        this.applyPendingAirLandings({ notify: false });
       } else if (nextPhase === TURN_PHASES.MOBILIZE) {
         // Check if there are any pending purchases to place
         const player = this.currentPlayer;
@@ -5058,17 +5068,96 @@ export class GameState {
   addPendingAirLandings(originTerritory, airUnits) {
     if (!airUnits || airUnits.length === 0) return;
 
-    // Check if we already have pending landings from this territory
-    const existing = this.pendingAirLandings.find(p => p.originTerritory === originTerritory);
-    if (existing) {
-      // Merge units
-      existing.units.push(...airUnits);
-    } else {
-      this.pendingAirLandings.push({
+    for (const unit of airUnits) {
+      this.pendingAirLandings = upsertPendingAirLanding(this.pendingAirLandings, {
         originTerritory,
-        units: [...airUnits]
+        id: unit.id,
+        type: unit.type,
+        quantity: unit.quantity || 1,
+        destination: unit.destination || null,
+        applied: !!unit.applied,
       });
     }
+  }
+
+  // Record one selected landing immediately so Confirm / NCM / a reload
+  // still has the destination even if the combat overlay is gone.
+  recordAirLandingSelection({
+    originTerritory,
+    id,
+    type,
+    quantity = 1,
+    destination,
+    notify = true,
+  } = {}) {
+    if (!originTerritory || !type || !destination) return this.pendingAirLandings;
+    this.pendingAirLandings = upsertPendingAirLanding(this.pendingAirLandings, {
+      originTerritory,
+      id,
+      type,
+      quantity,
+      destination,
+    });
+    if (notify) this._notify();
+    return this.pendingAirLandings;
+  }
+
+  // Board-level apply. Combat overlay callers must also drop those aircraft
+  // from combatState.attackers so _finalizeCombat cannot write them back.
+  applyAirLandings(originTerritory, {
+    landings = {},
+    airUnitsToLand = [],
+    unitDefs = {},
+    notify = true,
+  } = {}) {
+    const player = this.currentPlayer;
+    if (!player || !originTerritory) {
+      return { success: false, applied: [], error: 'No origin or current player' };
+    }
+
+    const sourceUnits = airUnitsToLand.length > 0
+      ? airUnitsToLand
+      : (this.pendingAirLandings.find((entry) => entry.originTerritory === originTerritory)?.units || []);
+    const plan = buildLandingPlan(sourceUnits, landings);
+    const applied = applyAirLandingPlan({
+      units: this.units,
+      territoryByName: this.territoryByName,
+      originTerritory,
+      owner: player.id,
+      plan,
+      unitDefs,
+    });
+
+    this.pendingAirLandings = markPendingAirLandingsApplied(
+      this.pendingAirLandings,
+      originTerritory,
+      applied
+    );
+    if (applied.length > 0) {
+      this.clearAirUnitOrigins(originTerritory);
+    }
+    if (notify) this._notify();
+    return { success: true, applied };
+  }
+
+  applyPendingAirLandings({ unitDefs = {}, notify = true } = {}) {
+    const leftover = unappliedLandingPlan(this.pendingAirLandings);
+    const appliedAll = [];
+    for (const entry of leftover) {
+      const result = this.applyAirLandings(entry.originTerritory, {
+        airUnitsToLand: entry.units,
+        landings: Object.fromEntries(
+          (entry.units || [])
+            .filter((unit) => unit.id && unit.destination)
+            .map((unit) => [unit.id, unit.destination])
+        ),
+        unitDefs,
+        notify: false,
+      });
+      if (result.applied?.length) appliedAll.push(...result.applied);
+    }
+    if (notify && appliedAll.length > 0) this._notify();
+    return { success: true, applied: appliedAll };
   }
 
   // Check if there are pending air landings
@@ -5150,6 +5239,12 @@ export class GameState {
       // Default false = AI pauses when no human is present. Old clients ignore
       // the extra field; a missing field loads as false. See aiPolicy.js.
       aiRunsWhenUnattended: this.aiRunsWhenUnattended ?? false,
+      // Additive: post-combat air landing plan. Must survive a mid-landing
+      // reload so Confirm / NCM can still move the aircraft.
+      pendingAirLandings: (this.pendingAirLandings || []).map((entry) => ({
+        originTerritory: entry.originTerritory,
+        units: (entry.units || []).map((unit) => ({ ...unit })),
+      })),
     };
   }
 
@@ -5235,7 +5330,12 @@ export class GameState {
 
     // Reset per-turn state on load (fresh state for the turn)
     this.rocketsUsedThisTurn = {};
-    this.pendingAirLandings = [];
+    // Restore named landings. Wiping this on every snapshot was the
+    // multiplayer path that discarded Eastern US after combat (Robert 19 Sep).
+    this.pendingAirLandings = (data.pendingAirLandings || []).map((entry) => ({
+      originTerritory: entry.originTerritory,
+      units: (entry.units || []).map((unit) => ({ ...unit })),
+    }));
     this.amphibiousTerritories = new Set();
     this.amphibiousAssaultDetails = {};
     this.moveHistory = [];

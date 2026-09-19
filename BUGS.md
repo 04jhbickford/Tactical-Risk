@@ -2,6 +2,48 @@
 
 ---
 
+## 9.19.26 — V2.81.52 post-combat air landing + NCM Done (SCHEMA 11)
+
+Robert Watts + Sean Benson (iMessage 19 Sep ~9:44am PT), live main
+multiplayer: after combat the UI asked where to land Air Force; Robert
+selected Eastern US for each aircraft. Non-combat opened and those air
+units had not moved there. Then NONCOMBAT MOVE — transport had moved to
+Inland Sea (Sea Zone 1) — Done / End Phase was not clickable.
+
+Cause (generic, not one hex): post-combat landing dests lived only in the
+combat overlay / player-panel map. `applyAirLandings` was listed on the
+multiplayer guard but did not exist. `pendingAirLandings` was never
+written and was wiped on every `loadFromJSON`. Confirm used a single
+unit-key shape, so a selected Eastern US could fail to apply; `_finalizeCombat`
+then left the aircraft on the battle hex (`moved: true`), so NCM could
+not fly them home. Separately, End Phase hid behind a named dest even
+when no units were still staged — a leftover Inland Sea dest after the
+transport moved painted a disabled Confirm and stole Done.
+
+Fix: record each landing on `gameState` as it is picked; persist
+`pendingAirLandings` in toJSON; `applyAirLandings` moves them on the
+board (id / type_index / type keys). Confirm, overlay-gone, NCM entry,
+and resync all apply leftover dests. End Phase stays up unless a legal
+move is staged (dest + count). SCHEMA 11. GAME_VERSION V2.81.52.
+No Three.js. Do not merge without James.
+
+### Smoke (this PR)
+
+- [ ] After a land battle with surviving fighters, pick Eastern US (or
+      another friendly-at-start land) for each aircraft → Confirm.
+      Those aircraft are on that land when NCM starts, not on the battle hex.
+- [ ] Same flow in multiplayer: partner sees the landed aircraft without
+      a refresh. Reload mid-landing still applies the named dests.
+- [ ] NCM: move a transport into a sea zone (Inland Sea / SZ1). End
+      Non-Combat Movement is clickable. A leftover dest with 0 units
+      staged must not hide / disable it.
+- [ ] Combat / Fortify Confirm (dest + units) still hides End Phase
+      until the move commits.
+- [ ] No-option aircraft still crash. Staying on a friendly-at-start
+      battle hex still works.
+
+---
+
 ## 9.17.26 — V2.81.51 mobile combat-move Confirm (SCHEMA 11)
 
 Sean Benson + Robert Watts (iMessage 17 Sep ~1:11pm PT): Sean was not sure
