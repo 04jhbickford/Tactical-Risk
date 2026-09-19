@@ -362,17 +362,19 @@ export function makeLandSealMeshes(territory, material) {
 }
 
 export function makeSelectWashMaterial() {
+  // P40b HARD: wash material is dead. Select is outline-only.
   return new THREE.MeshStandardMaterial({
     color: 0xc4a35a,
     transparent: true,
-    opacity: 0.32,
+    opacity: 0,
     roughness: 0.88,
     metalness: 0,
     depthWrite: false,
     depthTest: true,
     side: THREE.DoubleSide,
-    emissive: 0xc4a35a,
-    emissiveIntensity: 0.20,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    visible: false,
     polygonOffset: true,
     polygonOffsetFactor: -2,
     polygonOffsetUnits: -2,
@@ -380,6 +382,14 @@ export function makeSelectWashMaterial() {
 }
 
 export function makeSelectWashMeshes(territory, material, height) {
+  // P40b HARD: never emit a fill mesh. Outline stroke only.
+  void territory;
+  void material;
+  void height;
+  return [];
+}
+
+export function makeSelectWashMeshesHeld(territory, material, height) {
   const meshes = [];
   if (!territory || territory.isWater || !material) return meshes;
   // P33 HARD: outer union only — China must not flash an internal seam.
@@ -434,6 +444,7 @@ export function makeBorderLine(ring, y, material) {
 
 export function addTerritoryInk(group, territory, material, y, continentMat) {
   // P39 HARD: dissolve / outer-union BEFORE stroke. Land ink ≥ sea-zone ink.
+  // dissolve multipolygons into one outer ring, then stroke.
   for (const poly of territoryOutlineRings(territory)) {
     const ring = smoothRing(simplifyRing(poly), 1);
     if (!ring) continue;
