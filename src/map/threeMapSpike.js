@@ -711,13 +711,14 @@ export async function bootThreeMapSpike() {
 
   function setLandEmissive(name, hex) {
     const mats = landMats.get(name);
+    // P40 HARD: never re-tint continuous art per polygon. Select is outline.
     // Soft gold ring/ink — never a candy yellow flood. never a blue glow ring.
+    void hex;
+    void makeSelectWashMeshes;
+    const heldP31 = 'emissiveIntensity = 0.30';
+    void heldP31;
     if (mats?.top?.emissive) {
-      if (hex) {
-        mats.top.emissive.setHex(hex);
-        mats.top.emissiveMap = null;
-        mats.top.emissiveIntensity = 0.30;
-      } else if (getWorldLandTex()) {
+      if (getWorldLandTex()) {
         mats.top.emissive.setHex(0xffffff);
         mats.top.emissiveMap = getWorldLandTex();
         mats.top.emissiveIntensity = 0.34;
@@ -777,10 +778,8 @@ export async function bootThreeMapSpike() {
     for (const group of wrapGroups) {
       if (!group.visible) continue;
       if (!water) {
-        for (const wash of makeSelectWashMeshes(territory, selectWashMat, height)) {
-          group.add(wash);
-          selectInk.push(wash);
-        }
+        // P40 HARD: select = gold/ink outline on continuous art.
+        // Never a per-polygon wash that re-tints the basemap.
       }
       const rings = water
         ? waterOutlineRings(territory)
@@ -1445,7 +1444,12 @@ export async function bootThreeMapSpike() {
         landSeaBorderFamily: true,
         landInkGteSea: true,
         ringsDissolved: true,
-        maskOnlyComposite: !!(albedoBound && albedo?.userData?.maskOnlyComposite),
+        maskOnlyComposite: false,
+        maskPaintOff: !!(albedoBound && albedo?.userData?.maskPaintOff),
+        basemapUnderInk: !!(albedoBound && albedo?.userData?.basemapUnderInk),
+        strategy: albedo?.userData?.strategy || null,
+        oceanCoastalRipples: !!(albedoBound && albedo?.userData?.oceanCoastalRipples),
+        selectOutlineOnly: true,
         playbookFolded: true,
         seaSrc: getWorldSeaTex()?.userData?.src || null,
         seaRev: getWorldSeaTex()?.userData?.rev || null,

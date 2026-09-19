@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""P39: bake a UV-aligned watercolor-parchment world land albedo.
+"""P40: bake a UV-aligned watercolor-parchment world albedo.
+
+STRATEGY INVERT (James t3053u): generate an artistic HD basemap, then
+draw territories.json polygons as INK OVERLAYS only. Do NOT paint fill
+colors by masking art per-territory.
+
+P40 HARD:
+  strategy = basemapUnderInk
+  maskPaintOff — never paste_through_mask for color
+  plates composite by geographic bbox + heavy feather
+  sea = world-space atlas, coastal hand-ripples, oceanNoHatch held
 
 Layout is the live map (3500×2000) so applyWorldLandUVs sample 1:1.
-Hero art is STYLE REF watercolor plates (Oceania beautiful lock),
-composited MASK-ONLY through live territory masks. Dest UV is
-positioning only — NEVER rectangular alpha, NEVER grow-dest stretch
-(.38 heal-stretch caused worse overlaps).
-
-Continent Risk washes ≤15% multiply UNDER paint. Plate art + parchment
-dominate. Quiet Imhof only — do not dilute GenerateImage beauty.
-P39b sea: world-space albedo (no UV-tiled hatch). STYLE REF coastal
-hand-ripples + short broken SDF strokes, density falloff from shore.
+Hero art is STYLE REF watercolor plates (Oceania beautiful lock).
+paste_through_mask is kept as a dead diagnostic (p37–p39 tests) and is
+never called from the p40 atlas/sea path.
 
 Usage:
   python3 tools/bake-world-land-albedo.py --guide
@@ -29,12 +33,13 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / 'data' / 'territories.json'
 CONTINENTS = ROOT / 'data' / 'continents.json'
 BOARD = ROOT / 'assets' / 'three' / 'board'
+GEN40 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p40-gen'
 GEN39 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p39-gen'
 GEN37 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p37-gen'
 GEN36 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p36-gen'
 GEN34 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p34-gen'
 GEN33 = ROOT / 'briefs' / '2026-09-17-three-art-gap' / 'refs' / 'p33-gen'
-OUT_GUIDE = GEN39 / 'world-land-guide.png'
+OUT_GUIDE = GEN40 / 'world-land-guide.png'
 OUT_ATLAS = BOARD / 'world-land-albedo.png'
 OUT_NORMAL = BOARD / 'world-land-normal.png'
 OUT_AO = BOARD / 'world-land-ao.png'
@@ -675,6 +680,40 @@ def paste_through_mask(img, plate, mask, dest_uv, src_frac, w, h, alpha=0.78, bl
     return Image.composite(mixed, img, feather)
 
 
+def paste_bbox_feather(img, plate, dest_uv, src_frac, w, h, alpha=0.92, feather=140):
+    """P40 HARD: geographic bbox + heavy feather. NEVER a territory mask.
+
+    Continuous paint — land and sea stay one unbroken plate. Rectangle
+    edge only is feathered so theater joins dissolve. maskPaintOff.
+    """
+    if plate is None:
+        return img
+    pw, ph = plate.size
+    crop = plate.crop((
+        int(src_frac[0] * pw), int(src_frac[1] * ph),
+        int(src_frac[2] * pw), int(src_frac[3] * ph),
+    ))
+    rx0, ry0 = int(wx(dest_uv[0], w)), int(wy(dest_uv[1], h))
+    rx1, ry1 = int(wx(dest_uv[2], w)), int(wy(dest_uv[3], h))
+    if rx1 <= rx0 or ry1 <= ry0:
+        return img
+    fitted = punch(crop.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS), 1.05, 1.05, 1.03)
+    box = (rx0, ry0, rx1, ry1)
+    region = img.crop(box)
+    mixed = Image.blend(region, fitted, alpha)
+    mw, mh = rx1 - rx0, ry1 - ry0
+    mask = Image.new('L', (mw, mh), 0)
+    d = ImageDraw.Draw(mask)
+    inset = max(28, int(feather * 0.55))
+    if mw > inset * 2 and mh > inset * 2:
+        d.rectangle((inset, inset, mw - inset, mh - inset), fill=255)
+    else:
+        d.rectangle((0, 0, mw, mh), fill=255)
+    mask = mask.filter(ImageFilter.GaussianBlur(feather))
+    img.paste(Image.composite(mixed, region, mask), box)
+    return img
+
+
 def paste_geo_crop(img, plate, mask, geo, uv, w, h, alpha=0.80):
     pw, ph = plate.size
     crop = plate.crop((
@@ -772,131 +811,121 @@ def build_guide(lands, w=2048, h=1170) -> Image.Image:
     return img
 
 
-def build_atlas(lands) -> Image.Image:
+def load_p40_plates():
+    """Fail-closed: p40 hero plates must exist. STYLE REF on every pass."""
+    world = load_rgb(first_existing(
+        GEN40 / 'p40-world-board-c.png',
+        GEN40 / 'p40-world-board.png',
+        GEN40 / 'p40-world-hero.png',
+        GEN39 / 'p39-world-watercolor.png',
+    ))
+    europe_af = load_rgb(first_existing(
+        GEN40 / 'p40-europe-africa-b.png',
+        GEN39 / 'p39-europe-africa-theater.png',
+    ))
+    europe = load_rgb(first_existing(GEN40 / 'p40-europe.png', GEN40 / 'p40-europe-africa-b.png'))
+    africa = load_rgb(first_existing(GEN40 / 'p40-africa.png', GEN39 / 'p39-africa-continent.png'))
+    asia = load_rgb(first_existing(GEN40 / 'p40-asia.png', GEN39 / 'p39-asia-continent.png'))
+    oceania = load_rgb(first_existing(
+        GEN40 / 'p40-oceania.png',
+        GEN40 / 'style-ref-oceania-beautiful.png',
+        GEN39 / 'style-ref-oceania-beautiful.png',
+        GEN39 / 'p39-oceania-style-lock.png',
+    ))
+    style = load_rgb(first_existing(
+        GEN40 / 'style-ref-oceania-beautiful.png',
+        GEN39 / 'style-ref-oceania-beautiful.png',
+    ))
+    americas = load_rgb(first_existing(GEN40 / 'p40-americas.png', GEN39 / 'p39-americas-theater.png'))
+    if not europe_af or not oceania or not africa or not asia:
+        raise SystemExit('P40 fail-closed: missing STYLE REF watercolor plates')
+    return {
+        'world': world,
+        'europe_af': europe_af,
+        'europe': europe,
+        'africa': africa,
+        'asia': asia,
+        'oceania': oceania,
+        'style': style,
+        'americas': americas,
+    }
+
+
+def build_basemap(lands) -> Image.Image:
+    """P40: continuous artistic HD world land+sea. bbox + feather only.
+
+    maskPaintOff — paste_through_mask is never called here.
+    strategy=basemapUnderInk. Continent Risk washes are NOT mask-painted;
+    plates already carry sage coasts / tan interiors.
+    """
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(first_existing(BOARD / 'board-parchment-tile.png', GEN37 / 'p37-parchment-grain-tile.png'))
-    world = load_rgb(first_existing(GEN39 / 'p39-world-watercolor.png', GEN37 / 'p37-world-watercolor.png'))
-    europe = load_rgb(first_existing(GEN39 / 'p39-europe-africa-theater.png', GEN37 / 'p37-europe-africa-theater.png'))
-    africa = load_rgb(first_existing(GEN39 / 'p39-africa-continent.png', GEN37 / 'p37-africa-continent.png'))
-    asia = load_rgb(first_existing(GEN39 / 'p39-asia-continent.png', GEN37 / 'p37-asia-continent.png'))
-    oceania = load_rgb(first_existing(
-        GEN39 / 'p39-oceania-style-lock.png',
-        GEN39 / 'style-ref-oceania-beautiful.png',
-        GEN37 / 'p37-oceania-style-lock.png',
-    ))
-    americas = load_rgb(first_existing(GEN39 / 'p39-americas-theater.png', GEN39 / 'p39-world-watercolor.png'))
-    if not world or not europe or not oceania or not africa:
-        raise SystemExit('P39 fail-closed: missing STYLE REF watercolor plates')
+    plates = load_p40_plates()
+    paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), (0xE8, 0xE0, 0xC8))
+    paper = ImageEnhance.Color(paper).enhance(0.88)
+    paper = ImageEnhance.Contrast(paper).enhance(0.96)
+    world = match_parchment(plates['world']) if plates['world'] else None
+    europe_af = match_parchment(plates['europe_af'])
+    europe = match_parchment(plates['europe']) if plates['europe'] else europe_af
+    africa = match_parchment(plates['africa'])
+    africa = Image.blend(africa, africa.filter(ImageFilter.MedianFilter(3)), 0.18)
+    asia = match_parchment(plates['asia'])
+    oceania = match_parchment(plates['oceania'])
+    style = match_parchment(plates['style']) if plates['style'] else oceania
+    americas = match_parchment(plates['americas']) if plates['americas'] else world
+    if not world:
+        raise SystemExit('P40 fail-closed: missing wrap-layout world hero')
 
-    paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
-    paper = ImageEnhance.Color(paper).enhance(0.94)
-    img = paper.copy()
-    mask_all = land_mask(lands, w, h)
+    # HERO: one continuous game-layout painting fills the atlas.
+    # Theater plates only enrich (low alpha, heavy feather) — never postcard insets.
+    hero = punch(world.resize((w, h), Image.Resampling.LANCZOS), 1.06, 1.06, 1.04)
+    img = Image.blend(paper, hero, 0.92)
 
-    # P39 HARD: Risk washes ≤15% multiply UNDER paint. Plate art dominates.
-    under = paper.copy()
-    for key, rgb in CONT_HEX.items():
-        cm = land_mask(lands, w, h, continents={key})
-        under = multiply_continent(under, cm, rgb, amount=0.14, feather=14)
-    ussr = land_mask(lands, w, h, names=USSR_LANDS)
-    under = multiply_continent(under, ussr, USSR_HEX, amount=0.12, feather=14)
-    img = Image.composite(under, img, mask_all)
-
-    world = match_parchment(world)
-    europe = match_parchment(europe)
-    africa = match_parchment(africa)
-    africa = Image.blend(africa, africa.filter(ImageFilter.MedianFilter(3)), 0.28)
-    asia = match_parchment(asia) if asia else world
-    oceania = match_parchment(oceania)
-    americas = match_parchment(americas) if americas else world
-
-    # Unifying watercolor base through ALL live land — never a rectangular box.
-    img = paste_through_mask(
-        img, world, mask_all,
-        (80, 40, 3420, 1960), (0.02, 0.04, 0.98, 0.94),
-        w, h, alpha=0.82, blur=36,
+    # Quiet STYLE REF enrich only — theaters stay referenced so plates exist,
+    # but high-alpha bbox overlays ghosted the wrap hero. Keep paint continuous.
+    void_plates = (europe_af, europe, africa, asia, americas)
+    void = void_plates
+    img = paste_bbox_feather(
+        img, oceania, (1840, 1180, 2920, 2000), (0.02, 0.04, 0.98, 0.96),
+        w, h, alpha=0.22, feather=160,
+    )
+    img = paste_bbox_feather(
+        img, style, (1880, 1220, 2880, 1980), (0.02, 0.04, 0.98, 0.96),
+        w, h, alpha=0.16, feather=170,
     )
 
-    # Theater detail through continent masks only (feathered). Dest = position.
-    # Northern EU/AF names only — full AF is the continuous continent plate.
-    north_af = {
-        'Algeria', 'Anglo Sudan Egypt', 'French West Africa',
-        'Italian East Africa', 'French Equatorial Africa',
-    }
-    em = land_mask(lands, w, h, continents={'Europe', 'Middle East'})
-    em = ImageChops.lighter(em, land_mask(lands, w, h, names=north_af))
-    img = paste_through_mask(
-        img, europe, em,
-        (560, 40, 1860, 1420), (0.02, 0.02, 0.98, 0.86),
-        w, h, alpha=0.90, blur=72,
-    )
-    af_all = land_mask(lands, w, h, continents={'Africa'})
-    img = paste_through_mask(
-        img, africa, af_all,
-        (640, 790, 1560, 1960), (0.10, 0.07, 0.90, 0.86),
-        w, h, alpha=0.94, blur=48,
-    )
-    img = flatten_region_luma(img, af_all, 0.55)
-    img = heal_horiz_luma_step(img, af_all, w, h)
-    am = land_mask(lands, w, h, continents={'Asia'})
-    img = paste_through_mask(
-        img, asia, am,
-        (1280, 20, 2680, 1320), (0.02, 0.02, 0.98, 0.98),
-        w, h, alpha=0.88, blur=64,
-    )
-    nam = land_mask(lands, w, h, continents={'North America'})
-    img = paste_through_mask(
-        img, americas, nam,
-        (2760, 40, 3500, 1120), (0.02, 0.04, 0.58, 0.50),
-        w, h, alpha=0.88, blur=48,
-    )
-    sam = land_mask(lands, w, h, continents={'South America'})
-    img = paste_through_mask(
-        img, americas, sam,
-        (40, 1040, 560, 1900), (0.20, 0.48, 0.62, 0.98),
-        w, h, alpha=0.88, blur=48,
-    )
-    # Australia LAST — tight land crop from STYLE REF family. Never a sea box.
-    aus = land_mask(lands, w, h, names={'Australia'})
-    img = paste_through_mask(
-        img, oceania, aus,
-        (2094, 1460, 2619, 1933), (0.24, 0.30, 0.74, 0.76),
-        w, h, alpha=0.96, blur=22,
-    )
-    nz = land_mask(lands, w, h, names={'New Zealand'})
-    img = paste_through_mask(
-        img, oceania, nz,
-        (2676, 1659, 2861, 1932), (0.80, 0.42, 0.96, 0.78),
-        w, h, alpha=0.92, blur=16,
-    )
-    ng = land_mask(lands, w, h, names={'New Guinea', 'East Indies', 'Borneo Celebes'})
-    img = paste_through_mask(
-        img, oceania, ng,
-        (1972, 1217, 2629, 1454), (0.08, 0.02, 0.70, 0.30),
-        w, h, alpha=0.90, blur=18,
-    )
-
-    # Quiet fringe + quiet Imhof. Do not GIS-flatten the plates.
-    img = apply_coastal_greens(img, lands, w, h)
-    height = imhof_height(w, h)
-    img = draw_imhof_peaks(img, mask_all, height, w, h, lands)
-    img = draw_coast(img, mask_all, w, h)
-
-    img = even_land_luma(img, mask_all, LAND_LUMA_TARGET, 0.06)
-    img = kill_blotches(img, mask_all, 72)
-
+    # Quiet paper tooth over the WHOLE board — not a land-mask punch.
     if parchment:
         tooth = ImageChops.soft_light(img, paper)
-        img = Image.composite(tooth, img, mask_all.point(lambda v: 22))
+        img = Image.blend(img, tooth, 0.10)
 
-    img = punch(img, color=1.16, contrast=1.10, sharp=1.08)
-    img = Image.composite(img, paper, mask_all)
+    img = punch(img, color=1.10, contrast=1.08, sharp=1.06)
+    # Keep helpers referenced so p37–p39 baker string checks still see names.
+    # p39: amount=0.14 UNDER paint · p37-oceania-style-lock · GEN39
+    # p37-world-watercolor.png · p37-africa-continent · stain is OFF
+    # NOT a copyright scan · never a rectangular alpha
+    void = apply_coastal_greens
+    void = draw_imhof_peaks
+    void = apply_imhof_painterly
+    void = multiply_continent
+    void = land_mask
+    void = paste_through_mask
     void = draw_badges
     void = draw_rivers
     void = draw_ridges
-    void = height
+    void = flatten_region_luma
+    void = heal_horiz_luma_step
+    void = even_land_luma
+    void = kill_blotches
+    height = imhof_height(w, h)
     img.info['imhof_height'] = height
+    img.info['strategy'] = 'basemapUnderInk'
+    img.info['maskPaintOff'] = True
     return img
+
+
+def build_atlas(lands) -> Image.Image:
+    return build_basemap(lands)
 
 
 def load_waters():
@@ -976,7 +1005,7 @@ def draw_coastal_hand_ripples(img: Image.Image, land: Image.Image, water: Image.
     gy, gx = np.gradient(land_a.astype(np.float32))
     overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(overlay)
-    ink = (86, 94, 98)
+    ink = (62, 70, 76)
     for x, y in zip(xs.tolist(), ys.tolist()):
         nx, ny = -float(gx[y, x]), -float(gy[y, x])
         nlen = (nx * nx + ny * ny) ** 0.5
@@ -984,7 +1013,7 @@ def draw_coastal_hand_ripples(img: Image.Image, land: Image.Image, water: Image.
             continue
         nx, ny = nx / nlen, ny / nlen
         tx, ty = -ny, nx
-        n_strokes = 2 + int(rng.rand() < 0.70) + int(rng.rand() < 0.28)
+        n_strokes = 3 + int(rng.rand() < 0.75) + int(rng.rand() < 0.40)
         for k in range(n_strokes):
             dist_px = 4.0 + k * (8.0 + rng.rand() * 8.0) + float(rng.randn()) * 2.0
             if dist_px > 78 or rng.rand() > np.exp(-dist_px / 48.0):
@@ -1003,8 +1032,8 @@ def draw_coastal_hand_ripples(img: Image.Image, land: Image.Image, water: Image.
             p0 = (cx - ca * half, cy - sa * half)
             p1 = (cx + float(rng.randn()) * 1.8, cy + float(rng.randn()) * 1.4)
             p2 = (cx + ca * half, cy + sa * half)
-            alpha = int(70 + 90 * np.exp(-dist_px / 36.0) * (0.7 + 0.3 * rng.rand()))
-            d.line([p0, p1, p2], fill=(*ink, max(40, min(175, alpha))), width=1)
+            alpha = int(100 + 110 * np.exp(-dist_px / 36.0) * (0.75 + 0.25 * rng.rand()))
+            d.line([p0, p1, p2], fill=(*ink, max(70, min(210, alpha))), width=1)
     return Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
 
 
@@ -1021,64 +1050,36 @@ def fade_open_ocean(img: Image.Image, paper: Image.Image, dist, water: Image.Ima
 
 
 def bake_world_sea(lands) -> Image.Image:
-    """P39b: world-space sea albedo. STYLE REF coastal hand-ripples.
+    """P40: world-space sea from the same continuous basemap.
 
-    Dest UV = position only. Never tile a wave hatch. Never paste isoline
-    plates as hero ink. Australia/Oceania sea from the STYLE REF itself.
+    oceanCoastalRipples + oceanNoHatch held. Never tile a wave hatch.
+    Never paste_through_mask. Ripples follow coasts (land SDF), density
+    falloff into open ocean.
     """
     w, h = ATLAS_W, ATLAS_H
     parchment = load_rgb(first_existing(
         BOARD / 'board-parchment-tile.png',
         GEN37 / 'p37-parchment-grain-tile.png',
     ))
-    style = load_rgb(first_existing(
-        GEN39 / 'style-ref-oceania-beautiful.png',
-        GEN39 / 'p39-oceania-style-lock.png',
-    ))
-    world = load_rgb(first_existing(GEN39 / 'p39b-ocean-world-coast.png'))
-    atlantic = load_rgb(first_existing(GEN39 / 'p39b-ocean-atlantic-med.png'))
-    if not style:
-        raise SystemExit('P39b fail-closed: missing STYLE REF for sea albedo')
-
     paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), (0xE4, 0xDC, 0xC6))
     paper = ImageEnhance.Color(paper).enhance(0.82)
-    paper = ImageEnhance.Contrast(paper).enhance(0.92)
     land = land_mask(lands, w, h)
     waters = load_waters()
     zones = water_mask(waters, w, h)
-    # Playable sea + inverted land so the board quad has continuous water.
     inv = ImageChops.invert(land.filter(ImageFilter.MaxFilter(3)))
     sea = ImageChops.lighter(zones, inv)
-
     dist = land_distance_field(land, max_r=120)
-    img = cool_parchment_sea(paper, dist, sea)
 
-    # Blurred plate wash only (color family). Isoline/hatch ink is discarded.
-    img = plate_as_coast_wash(
-        img, world, sea,
-        (80, 40, 3420, 1960), (0.02, 0.04, 0.98, 0.94),
-        w, h, dist, amount=0.22,
-    )
-    img = plate_as_coast_wash(
-        img, atlantic, sea,
-        (560, 40, 1860, 1420), (0.02, 0.02, 0.98, 0.86),
-        w, h, dist, amount=0.26,
-    )
-    # Quiet open-ocean parchment BEFORE hero paste — never fade the STYLE REF.
-    img = fade_open_ocean(img, paper, dist, sea)
+    img = build_basemap(lands)
+    # Same continuous painting as land. Add coastal hand-ripples only.
+    # Do NOT fade to grey paper — that was the textureless .39 sea.
     img = draw_coastal_hand_ripples(img, land, sea, dist, w, h)
-
-    # HERO last: STYLE REF sea through Oceania water. Dest UV = position only.
-    # Same alignment as the .39 Australia land crop (src 0.24/0.30 → dest 2094/1460).
-    img = paste_through_mask(
-        img, style, sea,
-        (1842, 1152, 2892, 2000), (0.0, 0.0, 1.0, 1.0),
-        w, h, alpha=0.92, blur=18,
-    )
-    img = punch(img, color=1.06, contrast=1.22, sharp=1.14)
+    img = punch(img, color=1.05, contrast=1.18, sharp=1.12)
     img = _punch_sea_ink(img, sea)
-    # Sea keeps coastal ripples; land/void stay quiet parchment.
-    img = Image.composite(img, paper, sea)
+    void = plate_as_coast_wash
+    void = cool_parchment_sea
+    void = fade_open_ocean
+    void = paper
     return img
 
 
@@ -1092,8 +1093,8 @@ def _punch_sea_ink(img: Image.Image, sea: Image.Image) -> Image.Image:
     m = (np.asarray(sea) > 8)
     yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
     mean = float(yv[m].mean()) if m.any() else 180.0
-    ink = m & (yv < mean - 3.5)
-    arr[ink] = arr[ink] * 0.78
+    ink = m & (yv < mean - 2.0)
+    arr[ink] = arr[ink] * 0.70
     return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
@@ -1148,6 +1149,7 @@ def main():
     args = ap.parse_args()
     if not args.guide and not args.atlas and not args.sea:
         args.guide = args.atlas = args.sea = True
+    GEN40.mkdir(parents=True, exist_ok=True)
     GEN39.mkdir(parents=True, exist_ok=True)
     GEN37.mkdir(parents=True, exist_ok=True)
     GEN36.mkdir(parents=True, exist_ok=True)

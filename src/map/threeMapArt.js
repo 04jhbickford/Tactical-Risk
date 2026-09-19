@@ -434,6 +434,7 @@ export function makeBorderLine(ring, y, material) {
 
 export function addTerritoryInk(group, territory, material, y, continentMat) {
   // P39 HARD: dissolve / outer-union BEFORE stroke. Land ink ≥ sea-zone ink.
+  // dissolve multipolygons into one outer ring, then stroke.
   for (const poly of territoryOutlineRings(territory)) {
     const ring = smoothRing(simplifyRing(poly), 1);
     if (!ring) continue;

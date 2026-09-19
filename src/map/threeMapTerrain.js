@@ -16,7 +16,7 @@ export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
 export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
 export const WORLD_LAND_NORMAL = 'assets/three/board/world-land-normal.png';
 export const WORLD_SEA_ALBEDO = 'assets/three/board/world-sea-albedo.png';
-export const WORLD_LAND_ALBEDO_REV = 'p39b';
+export const WORLD_LAND_ALBEDO_REV = 'p40';
 
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',
@@ -688,11 +688,11 @@ export async function loadWorldLandAlbedo() {
   const img = await new Promise((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error(`P39 fail-closed: ${src} failed to load`));
+    el.onerror = () => reject(new Error(`P40 fail-closed: ${src} failed to load`));
     el.src = src;
   });
   if (!img.width || img.width < 4096) {
-    throw new Error(`P39 fail-closed: albedo too small ${img.width}×${img.height}`);
+    throw new Error(`P40 fail-closed: albedo too small ${img.width}×${img.height}`);
   }
   const tex = await textureFromImage(img);
   tex.userData = {
@@ -704,10 +704,14 @@ export async function loadWorldLandAlbedo() {
     imhofRelief: true,
     landcoverBound: true,
     canvasTooth: true,
-    maskOnlyComposite: true,
+    maskOnlyComposite: false,
+    maskPaintOff: true,
+    strategy: 'basemapUnderInk',
+    basemapUnderInk: true,
     oceanRipples: true,
     oceanNoHatch: true,
     coastalHandRipples: true,
+    oceanCoastalRipples: true,
     src: WORLD_LAND_ALBEDO,
     rev: WORLD_LAND_ALBEDO_REV,
     width: img.width,
@@ -745,11 +749,11 @@ export async function loadWorldSeaAlbedo() {
   const img = await new Promise((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error(`P39b fail-closed: ${src} failed to load`));
+    el.onerror = () => reject(new Error(`P40 fail-closed: ${src} failed to load`));
     el.src = src;
   });
   if (!img.width || img.width < 4096) {
-    throw new Error(`P39b fail-closed: sea albedo too small ${img.width}×${img.height}`);
+    throw new Error(`P40 fail-closed: sea albedo too small ${img.width}×${img.height}`);
   }
   const tex = await textureFromImage(img);
   tex.userData = {
@@ -757,6 +761,9 @@ export async function loadWorldSeaAlbedo() {
     oceanRipples: true,
     oceanNoHatch: true,
     coastalHandRipples: true,
+    oceanCoastalRipples: true,
+    maskPaintOff: true,
+    strategy: 'basemapUnderInk',
     styleRef: 'oceania-beautiful',
     src: WORLD_SEA_ALBEDO,
     rev: WORLD_LAND_ALBEDO_REV,
