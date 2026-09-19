@@ -151,8 +151,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       color:#c8c0b0;
     }
     #three-peek .three-peek-row {
-      display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;
+      display:flex; flex-wrap:nowrap; gap:6px; margin-top:8px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
     }
+    #three-peek .three-peek-row::-webkit-scrollbar { display:none; }
+    #three-peek .three-peek-unit { flex:0 0 auto; }
     #three-peek .three-peek-unit {
       position:relative; width:56px; height:56px;
       display:inline-flex; align-items:center; justify-content:center;
