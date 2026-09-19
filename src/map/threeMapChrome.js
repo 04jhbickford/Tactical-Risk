@@ -664,12 +664,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     api.setStacksExpanded(!api.stacksExpanded);
     if (typeof api.onStackToggle === 'function') api.onStackToggle(api.stacksExpanded);
   });
+  api.peek.addEventListener('pointerdown', (e) => e.stopPropagation());
+  api.peek.addEventListener('mouseup', (e) => e.stopPropagation());
   api.peek.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-unit-type]');
     if (!chip) return;
     e.stopPropagation();
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
   });
+  api.battleEl.addEventListener('pointerdown', (e) => e.stopPropagation());
+  api.battleEl.addEventListener('mouseup', (e) => e.stopPropagation());
   api.battleEl.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-loss-type]');
     if (!chip) return;

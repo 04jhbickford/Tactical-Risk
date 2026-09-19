@@ -2,6 +2,15 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.6 chip taps reach pickers
+
+Window mouseup was treating HUD chip taps as map taps and rebuilding
+the peek/battle card before click, so INF/FTR and casualty chips did
+nothing. Chrome events no longer select land. Still no Try. Preview
+only. Do not merge to main.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.5 manual combat-move (no Try)
 
 James he-correct: do not auto-play the combat move. Remove Try combat

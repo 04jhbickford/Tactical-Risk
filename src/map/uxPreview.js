@@ -323,6 +323,12 @@ export async function bootUxPreview() {
     camera.dirty = true;
   }
 
+  function eventFromChrome(e) {
+    const node = e?.target;
+    if (!node || typeof node.closest !== 'function') return false;
+    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-phase-strip');
+  }
+
   canvas.addEventListener('mousedown', (e) => camera.onMouseDown(e));
   canvas.addEventListener('mousemove', (e) => {
     if (camera.onMouseMove(e)) {
@@ -339,6 +345,10 @@ export async function bootUxPreview() {
     canvas.classList.remove('is-panning');
     if (wasDrag) return;
     if (chrome.isSheetOpen()) return;
+    // Peek / loss chips live in the HUD. A window mouseup used to
+    // rebuild that HUD before the chip click, so unit and casualty
+    // taps never registered.
+    if (eventFromChrome(e)) return;
     selectLand(pickAt(e.clientX, e.clientY));
   });
   canvas.addEventListener('wheel', (e) => camera.onWheel(e), { passive: false });
@@ -380,7 +390,7 @@ export async function bootUxPreview() {
     if (e.touches.length === 0) {
       const wasDrag = camera.onMouseUp();
       canvas.classList.remove('is-panning');
-      if (wasDrag || chrome.isSheetOpen()) return;
+      if (wasDrag || chrome.isSheetOpen() || eventFromChrome(e)) return;
       const t = e.changedTouches[0];
       if (t) selectLand(pickAt(t.clientX, t.clientY));
     }
