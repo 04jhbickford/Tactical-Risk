@@ -303,7 +303,8 @@ export async function bootThreeMapSpike() {
   scene.add(board);
   const wrapGroups = createWrapGroups(board);
 
-  const landBorderMat = makeLineMat(PALETTE.border, 0.85, 0.68);
+  // P38 HARD: land ink same weight family as sea-zone closed rings.
+  const landBorderMat = makeLineMat(PALETTE.border, 2.7, 0.87);
   const foamMat = makeLineMat(PALETTE.foam, 1.15, 0.62);
   const foamBandMat = makeFoamMaterial();
   const coastAoMat = makeCoastAoMaterial();
@@ -412,6 +413,8 @@ export async function bootThreeMapSpike() {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
+          // P38: alphaTest so keyed holes cannot show parchment through plastic.
+          alphaTest: 0.42,
           // P37: never depth-test against Italy's lid or the peek sheet.
           depthTest: false,
           depthWrite: false,
@@ -1388,9 +1391,11 @@ export async function bootThreeMapSpike() {
         geoUnmirror: true,
         evenParchment: true,
         parchmentFloor: 0.48,
-        quietLanes: true,
+        quietLanes: false,
+        seaLanes: false,
+        oceanNoStipple: true,
         paintedMountains: true,
-        noHatchRidges: true,
+        noHatchRidges: false,
         unitNoClip: true,
         japanLod: true,
         japanHome: true,
@@ -1406,12 +1411,12 @@ export async function bootThreeMapSpike() {
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
-        continentPunch: albedoBound ? 0 : 0.22,
+        continentPunch: 0.20,
         seaDeckClear: true,
         eastMedPinSouth: true,
         noBlotchAtlas: true,
         albedoRev: albedo?.userData?.rev || null,
-        imhofRelief: false,
+        imhofRelief: true,
         watercolorParchment: !!(albedoBound && albedo?.userData?.watercolorParchment),
         styleRef: albedo?.userData?.styleRef || null,
         featheredJoins: !!(albedoBound && albedo?.userData?.featheredJoins),
@@ -1423,6 +1428,12 @@ export async function bootThreeMapSpike() {
         unitBgUnified: true,
         seaInkClosedRings: true,
         stackToggle: true,
+        unitCountOne: true,
+        landSliversHealed: true,
+        opaquePlastic: true,
+        coastalGreens: true,
+        landSeaBorderFamily: true,
+        playbookFolded: true,
       };
     },
   };

@@ -57,12 +57,12 @@ export const PALETTE = {
 // at mid 390. Quiet print hexes, not candy primaries, not Confirm gold.
 export const REGION_WASH = {
   Europe: '#6B7A4A',
-  Asia: '#8A7355',
+  Asia: '#5F7A5A',
   Africa: '#B08948',
   'Middle East': '#A09058',
   'North America': '#6A8B6E',
-  'South America': '#5A8A72',
-  Oceania: '#7A6B8A',
+  'South America': '#9B7E5A',
+  Oceania: '#6A8B8A',
   // Leftover tile key only — never remap live bonus groups onto this.
   USSR: '#8A7355',
 };
@@ -97,7 +97,7 @@ export const USSR_LANDS = new Set([
 export const PLASTIC = {
   Germans: '#6A6C68',
   Russians: '#2F7A2A',
-  British: '#B89050',
+  British: '#8E6A38',
   Americans: '#4E6828',
   Japanese: '#D24A1C',
 };
@@ -130,14 +130,14 @@ export const OCEAN_UV = 24;
 export const GRAIN_MULTIPLY = 0.78;
 export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 // P35 HARD: warm parchment grain at 0.50 turned teal sea into stained land.
-export const OCEAN_GRAIN = 0.14;
-export const OCEAN_OPEN_DARKEN = 0.08;
-export const OCEAN_TEAL_PUNCH = 0.06;
+export const OCEAN_GRAIN = 0.06;
+export const OCEAN_OPEN_DARKEN = 0.04;
+export const OCEAN_TEAL_PUNCH = 0.03;
 export const TOOTH_STRENGTH = 0.42;
 // P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
 export const TOOTH_NORMAL_MID = 2.05;
 export const TOOTH_NORMAL_NEAR = 1.08;
-export const IMHOF_NORMAL_SCALE = 0.16;
+export const IMHOF_NORMAL_SCALE = 0.20;
 export const TOOTH_ROUGH_MID = 0.76;
 export const TOOTH_ROUGH_NEAR = 0.86;
 
@@ -535,24 +535,26 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    color: 0xc8c4b4,
-    roughness: 0.86,
+    color: 0xd6d0bc,
+    roughness: 0.90,
     metalness: 0.0,
-    envMapIntensity: 0.04,
-    emissive: 0xc8c4b4,
-    emissiveIntensity: 0.22,
+    envMapIntensity: 0.03,
+    emissive: 0xd2ccb8,
+    emissiveIntensity: 0.30,
     transparent: false,
     vertexColors: true,
   });
-  if (mat.normalMap) mat.normalScale.set(0.72, 0.72);
+  // P38: kill stipple-looking ocean normal. Washed parchment-sea only.
+  if (mat.normalMap) mat.normalScale.set(0.10, 0.10);
   return mat;
 }
 
 export function makeSeaWaterMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0xc8c4b4,
+    // PLAYBOOK C: pale washed blue near coasts, fading into parchment.
+    color: 0xb4c6c2,
     transparent: true,
-    opacity: 0.16,
+    opacity: 0.12,
     roughness: 0.88,
     metalness: 0.0,
     depthWrite: false,
@@ -595,10 +597,10 @@ export function makeOceanMesh(width, height) {
     const d = Math.hypot(pos.getX(i) - shelfX, pos.getZ(i) - shelfZ);
     const t = Math.min(1, Math.max(0, (d - 28) / 160));
     const shade = 1 - t * OCEAN_OPEN_DARKEN;
-    // P35: keep the whole basin teal — shelf brightening made Med look like land.
-    colors[i * 3] = shade * 0.90;
-    colors[i * 3 + 1] = shade * 0.88;
-    colors[i * 3 + 2] = shade * 0.78;
+    // PLAYBOOK C: pale washed blue near coasts (low t) fading to parchment (open).
+    colors[i * 3] = shade * (0.96 + t * 0.08);
+    colors[i * 3 + 1] = shade * (1.00 + t * 0.01);
+    colors[i * 3 + 2] = shade * (1.04 - t * 0.10);
   }
   if (uv) {
     uv.needsUpdate = true;

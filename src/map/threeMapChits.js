@@ -533,6 +533,8 @@ function sampleCell(img, type) {
 function keyBackdrop(pix) {
   // P37 HARD: every mini is bare plastic + contact shadow. Drop black
   // rectangular sheets and leftover paper so infantry/tank/ship match.
+  // P38: do NOT key mid-luma parchment-like sculpt — that punched holes
+  // so tan plastic showed the board through the body.
   const d = pix.data;
   const w = pix.width;
   const h = pix.height;
@@ -558,8 +560,71 @@ function keyBackdrop(pix) {
     const lum = r * 0.299 + g * 0.587 + b * 0.114;
     const sat = Math.max(r, g, b) - Math.min(r, g, b);
     const dist = Math.hypot(r - bg[0], g - bg[1], b - bg[2]);
-    if ((lum < 26 && sat < 18) || (lum > 236 && sat < 24) || dist < 28) {
+    if ((lum < 26 && sat < 18) || (lum > 248 && sat < 16) || dist < 16) {
       d[i + 3] = 0;
+    }
+  }
+}
+
+function isTanPlastic(hex) {
+  const [r, g, b] = hexRgb(hex);
+  return r > 130 && g > 90 && b < 130 && r - b > 28;
+}
+
+function sealSculptHoles(pix, fillRgb, tan) {
+  // P38: close interior alpha holes so parchment cannot show through.
+  // Do NOT stamp a disc — keep the molded silhouette.
+  const d = pix.data;
+  const w = pix.width;
+  const h = pix.height;
+  const a0 = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) a0[i] = d[i * 4 + 3];
+  let cur = a0;
+  for (let pass = 0; pass < 3; pass++) {
+    const next = new Uint8Array(cur);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (cur[i] > 40) continue;
+        let n = 0;
+        if (cur[i - 1] > 80) n += 1;
+        if (cur[i + 1] > 80) n += 1;
+        if (cur[i - w] > 80) n += 1;
+        if (cur[i + w] > 80) n += 1;
+        if (n >= 2) next[i] = 255;
+      }
+    }
+    cur = next;
+  }
+  // ≥2px dark outline (256 tex → ~8px ≈ 2px+ on a 64px sprite).
+  let rim = new Uint8Array(w * h);
+  const outlinePasses = tan ? 3 : 2;
+  let edge = cur;
+  for (let pass = 0; pass < outlinePasses; pass++) {
+    const next = new Uint8Array(edge);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        if (edge[i] > 40) continue;
+        if (edge[i - 1] > 80 || edge[i + 1] > 80 || edge[i - w] > 80 || edge[i + w] > 80) {
+          next[i] = 255;
+          rim[i] = tan ? 235 : 210;
+        }
+      }
+    }
+    edge = next;
+  }
+  for (let i = 0; i < w * h; i++) {
+    if (a0[i] < 16 && cur[i] > 80) {
+      d[i * 4] = fillRgb[0];
+      d[i * 4 + 1] = fillRgb[1];
+      d[i * 4 + 2] = fillRgb[2];
+      d[i * 4 + 3] = 255;
+    } else if (a0[i] < 16 && rim[i] > 0) {
+      d[i * 4] = tan ? 22 : 14;
+      d[i * 4 + 1] = tan ? 16 : 12;
+      d[i * 4 + 2] = tan ? 10 : 8;
+      d[i * 4 + 3] = rim[i];
     }
   }
 }
@@ -571,14 +636,16 @@ function paintMoldedMini(ctx, {
   w = 256,
   h = 256,
   shadow = true,
+  badge = true,
 } = {}) {
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
   const cy = h / 2;
   const s = Math.min(w, h) * 0.42;
   if (shadow) drawContactShadow(ctx, cx, cy + s * 0.12, s);
+  const bodyHex = isTanPlastic(ownerColor) ? mixRgb(ownerColor, '#3A2A14', 0.22) : ownerColor;
   const src = sampleCell(atlasImage(type), type);
-  const [fr, fg, fb] = hexRgb(ownerColor || '#8E8F8C');
+  const [fr, fg, fb] = hexRgb(bodyHex || '#8E8F8C');
   if (src) {
     const tmp = document.createElement('canvas');
     tmp.width = 256;
@@ -610,6 +677,7 @@ function paintMoldedMini(ctx, {
       d[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
       d[i + 3] = a;
     }
+    sealSculptHoles(pix, [fr, fg, fb], isTanPlastic(bodyHex));
     tx.putImageData(pix, 0, 0);
     const dw = w * 0.96;
     const dh = h * 0.96;
@@ -636,11 +704,11 @@ function paintMoldedMini(ctx, {
     ctx.stroke();
     ctx.restore();
   }
-  if (quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
+  if (badge && quantity >= 1) drawBadge(ctx, w * 0.82, h * 0.86, quantity, Math.min(w, h) * 0.85);
 }
 
-export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true } = {}) {
-  paintMoldedMini(ctx, { type, ownerColor, quantity, w, h, shadow });
+export function paintPiece(ctx, { type, ownerColor, quantity, w = 256, h = 256, shadow = true, badge = true } = {}) {
+  paintMoldedMini(ctx, { type, ownerColor, quantity, w, h, shadow, badge });
 }
 
 export function paintPip(ctx, { ownerColor, total, size = 256 } = {}) {
@@ -697,10 +765,15 @@ export function makeOverflowTexture(plus) {
   return chitTex(canvas);
 }
 
-export function pieceIconDataUrl(type, ownerColor, quantity = 1) {
+export function pieceIconDataUrl(type, ownerColor, quantity = 0) {
+  // P38 HARD: peek/HUD shows ONE number (the <b> count). Never bake a
+  // leading "1" badge into the icon (that was the "1 2" / "1 1" bug).
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 128;
-  paintPiece(canvas.getContext('2d'), { type, ownerColor, quantity, w: 128, h: 128 });
+  paintPiece(canvas.getContext('2d'), {
+    type, ownerColor, quantity: 0, w: 128, h: 128, badge: false,
+  });
+  void quantity;
   return canvas.toDataURL('image/png');
 }
