@@ -55,5 +55,5 @@ unitCountOne  opaquePlastic  stackToggle  seaInkClosedRings
 - `africa-even.png` / `stack-expand.png` / `stack-collapse.png`
 - `computed.json`
 
-**Vercel:** https://tactical-risk20-89c8siwxu-james-projects-20d8de40.vercel.app/?three=1  
+**Vercel:** https://tactical-risk20-os8692fwq-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/64 (stacked on PR63 / `.38`)
