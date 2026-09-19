@@ -6,7 +6,7 @@ import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { MAP_WIDTH, MAP_HEIGHT } from './camera.js';
-import { applyPaperUVs, applyOceanUVs } from './threeMapPalette.js';
+import { applyPaperUVs } from './threeMapPalette.js';
 import {
   applyWorldLandUVs,
   getWorldLandTex,
@@ -605,7 +605,7 @@ export function makeSeaWaterMeshes(territory, material) {
     if (!ring) continue;
     const geom = new THREE.ShapeGeometry(shapeFromRing(ring));
     geom.rotateX(-Math.PI / 2);
-    applyOceanUVs(geom);
+    applyWorldLandUVs(geom);
     const mesh = new THREE.Mesh(geom, material);
     mesh.position.y = 0.04;
     mesh.renderOrder = 1;
@@ -643,6 +643,19 @@ export function makeBoardTexturePlane() {
   // Intentionally empty — a full-map textured quad was the neon-teal
   // rectangle / ghost-tile artifact. Ocean is a scene-level plane now.
   return null;
+}
+
+export function makeBoardSeaMesh(material) {
+  // P39b: board-sized sea samples world-sea-albedo 1:1. Never UV-tile.
+  const geo = new THREE.PlaneGeometry(WORLD_W, WORLD_H, 1, 1);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(WORLD_W / 2, 0, -WORLD_H / 2);
+  applyWorldLandUVs(geo);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.y = -0.06;
+  mesh.renderOrder = 0;
+  mesh.userData.kind = 'board-sea';
+  return mesh;
 }
 
 export function createWrapGroups(parent) {

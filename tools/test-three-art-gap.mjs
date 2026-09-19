@@ -863,9 +863,21 @@ check('p39 ocean ripples authored and bound as sea albedo',
   /p39-ocean-ripple-tile/.test(albedoBaker)
   && /hand-ripple/.test(albedoBaker)
   && /vertexColors: false/.test(palette)
-  && /applyOceanUVs/.test(art)
   && /oceanRipples: true/.test(spike)
   && /styleRef: 'oceania-beautiful'/.test(terrain));
+check('p39b world-sea albedo — no UV hatch tile',
+  pngOk('assets/three/board/world-sea-albedo.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39b-ocean-oceania-coast.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/style-ref-oceania-beautiful.png')
+  && /bake_world_sea/.test(albedoBaker)
+  && /draw_coastal_hand_ripples/.test(albedoBaker)
+  && /world-sea-albedo/.test(albedoBaker)
+  && /WORLD_SEA_ALBEDO/.test(terrain)
+  && /oceanNoHatch: true/.test(spike)
+  && /coastalHandRipples: true/.test(spike)
+  && /makeBoardSeaMesh/.test(art)
+  && /applyWorldLandUVs\(geom\)/.test(art)
+  && !/uv\.setXY\(i, pos\.getX\(i\) \/ OCEAN_UV/.test(palette));
 check('p39 inspect flags + held .38 wins',
   /maskOnlyComposite/.test(spike)
   && /unitCountOne: true/.test(spike)
@@ -885,7 +897,7 @@ check('p39 required stills',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/stack-expand.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/stack-collapse.png'));
 check('p39 SCORE states four P0 gates',
-  /albedoRev=p39/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
+  /albedoRev=p39b/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
   && /styleRef=oceania-beautiful/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
   && /oceanRipples/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
   && /landInkGteSea/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))

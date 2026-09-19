@@ -40,6 +40,7 @@ import {
   addSeaLaneLines,
   addSeaZoneInk,
   makeSeaWaterMeshes,
+  makeBoardSeaMesh,
 } from './threeMapArt.js';
 import { territoryOutlineRings, waterOutlineRings } from './threeMapOutline.js';
 import {
@@ -55,6 +56,7 @@ import {
   regionWashFor,
   plasticColor,
   setWorldLandMap,
+  setWorldSeaMap,
   getPaperImage,
   bonusContinent,
   REGION_WASH,
@@ -65,7 +67,7 @@ import {
   makeOverflowTexture,
   loadUnitAtlases,
 } from './threeMapChits.js';
-import { bakeWorldLandAtlas, getWorldLandTex, getWorldLandNormal } from './threeMapTerrain.js';
+import { bakeWorldLandAtlas, getWorldLandTex, getWorldLandNormal, loadWorldSeaAlbedo, getWorldSeaTex } from './threeMapTerrain.js';
 import { injectThreeChrome } from './threeMapChrome.js';
 import {
   lodBand,
@@ -260,6 +262,8 @@ export async function bootThreeMapSpike() {
   const lands = territories.filter((t) => !t.isWater);
   const worldLand = await bakeWorldLandAtlas(lands, getPaperImage());
   setWorldLandMap(worldLand, getWorldLandNormal());
+  const worldSea = await loadWorldSeaAlbedo();
+  setWorldSeaMap(worldSea);
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
   const landHeights = new Map();
@@ -381,6 +385,7 @@ export async function bootThreeMapSpike() {
       }
     }
     const seaWaterMat = makeSeaWaterMaterial();
+    group.add(makeBoardSeaMesh(seaWaterMat));
     for (const water of territories.filter((t) => t.isWater)) {
       for (const sea of makeSeaWaterMeshes(water, seaWaterMat)) {
         group.add(sea);
@@ -1396,6 +1401,9 @@ export async function bootThreeMapSpike() {
         seaLanes: false,
         oceanNoStipple: true,
         oceanRipples: true,
+        oceanNoHatch: true,
+        coastalHandRipples: true,
+        worldSeaBound: !!getWorldSeaTex(),
         paintedMountains: true,
         noHatchRidges: false,
         unitNoClip: true,
@@ -1439,6 +1447,8 @@ export async function bootThreeMapSpike() {
         ringsDissolved: true,
         maskOnlyComposite: !!(albedoBound && albedo?.userData?.maskOnlyComposite),
         playbookFolded: true,
+        seaSrc: getWorldSeaTex()?.userData?.src || null,
+        seaRev: getWorldSeaTex()?.userData?.rev || null,
       };
     },
   };

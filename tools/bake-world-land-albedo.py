@@ -9,11 +9,13 @@ positioning only — NEVER rectangular alpha, NEVER grow-dest stretch
 
 Continent Risk washes ≤15% multiply UNDER paint. Plate art + parchment
 dominate. Quiet Imhof only — do not dilute GenerateImage beauty.
-Ocean ripple tile is authored separately (not destippled cream).
+P39b sea: world-space albedo (no UV-tiled hatch). STYLE REF coastal
+hand-ripples + short broken SDF strokes, density falloff from shore.
 
 Usage:
   python3 tools/bake-world-land-albedo.py --guide
   python3 tools/bake-world-land-albedo.py --atlas
+  python3 tools/bake-world-land-albedo.py --sea
 """
 from __future__ import annotations
 
@@ -38,6 +40,7 @@ OUT_NORMAL = BOARD / 'world-land-normal.png'
 OUT_AO = BOARD / 'world-land-ao.png'
 OUT_HEIGHT = GEN37 / 'world-land-height.png'
 OUT_OCEAN = BOARD / 'board-ocean-tile.png'
+OUT_SEA = BOARD / 'world-sea-albedo.png'
 
 MAP_W, MAP_H = 3500, 2000
 ATLAS_W = 4096
@@ -896,6 +899,188 @@ def build_atlas(lands) -> Image.Image:
     return img
 
 
+def load_waters():
+    territories = json.loads(DATA.read_text())
+    return [t for t in territories if t.get('isWater')]
+
+
+def water_mask(waters, w, h) -> Image.Image:
+    mask = Image.new('L', (w, h), 0)
+    d = ImageDraw.Draw(mask)
+    for t in waters:
+        for poly in t.get('polygons') or []:
+            pts = poly_xy(poly, w, h)
+            if len(pts) >= 3:
+                d.polygon(pts, fill=255)
+    return mask
+
+
+def land_distance_field(land: Image.Image, max_r=110):
+    """Chebyshev-ish distance to land, downsampled. No scipy."""
+    import numpy as np
+    sw, sh = max(256, land.size[0] // 4), max(146, land.size[1] // 4)
+    small = np.asarray(land.resize((sw, sh), Image.Resampling.NEAREST)) > 8
+    d = np.where(small, 0.0, float(max_r)).astype(np.float32)
+    steps = max(8, max_r // 4)
+    for _ in range(steps):
+        up = np.pad(d, ((1, 0), (0, 0)), constant_values=max_r)[:-1]
+        down = np.pad(d, ((0, 1), (0, 0)), constant_values=max_r)[1:]
+        left = np.pad(d, ((0, 0), (1, 0)), constant_values=max_r)[:, :-1]
+        right = np.pad(d, ((0, 0), (0, 1)), constant_values=max_r)[:, 1:]
+        d = np.minimum(d, np.minimum(np.minimum(up, down), np.minimum(left, right)) + 1.0)
+    d = np.clip(d * 4.0, 0, max_r)
+    full = Image.fromarray(d.astype('uint8'), 'L').resize(land.size, Image.Resampling.BILINEAR)
+    return np.asarray(full, dtype=np.float32)
+
+
+def cool_parchment_sea(paper: Image.Image, dist, water: Image.Image) -> Image.Image:
+    """Soft cool pale wash on aged parchment. Empty open ocean."""
+    import numpy as np
+    arr = np.asarray(paper, dtype=np.float32)
+    sea = (np.asarray(water) > 8).astype(np.float32)[..., None]
+    # Near-shore gets a slightly cooler, slightly darker wash — not teal.
+    prox = np.clip(np.exp(-dist / 62.0), 0, 1)[..., None]
+    cool = np.array([0xC2, 0xCC, 0xC8], dtype=np.float32)
+    parchment = np.array([0xE8, 0xE2, 0xD0], dtype=np.float32)
+    wash = parchment * (1.0 - 0.48 * prox) + cool * (0.48 * prox)
+    out = arr * (1.0 - 0.72 * sea) + wash * (0.72 * sea)
+    return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+
+
+def plate_as_coast_wash(img, plate, water, dest_uv, src_frac, w, h, dist, amount=0.28):
+    """Blurred plate color only — never paste isoline/hatch ink."""
+    if plate is None:
+        return img
+    blurred = plate.filter(ImageFilter.GaussianBlur(7.5))
+    blurred = ImageEnhance.Color(blurred).enhance(0.72)
+    return paste_through_mask(
+        img, blurred, water, dest_uv, src_frac, w, h, alpha=amount, blur=48,
+    )
+
+
+def draw_coastal_hand_ripples(img: Image.Image, land: Image.Image, water: Image.Image, dist, w, h):
+    """Short broken copperplate dashes that follow coasts. Never closed isolines
+    and never a repeating horizontal hatch tile."""
+    import numpy as np
+    rng = np.random.RandomState(39)
+    land_a = np.asarray(land) > 8
+    water_a = np.asarray(water) > 8
+    dil = land.filter(ImageFilter.MaxFilter(5))
+    edge = ImageChops.subtract(dil, land)
+    ys, xs = np.where(np.asarray(edge) > 24)
+    if xs.size == 0:
+        return img
+    if xs.size > 16000:
+        pick = rng.choice(xs.size, 16000, replace=False)
+        xs, ys = xs[pick], ys[pick]
+    gy, gx = np.gradient(land_a.astype(np.float32))
+    overlay = Image.new('RGBA', (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    ink = (86, 94, 98)
+    for x, y in zip(xs.tolist(), ys.tolist()):
+        nx, ny = -float(gx[y, x]), -float(gy[y, x])
+        nlen = (nx * nx + ny * ny) ** 0.5
+        if nlen < 1e-5:
+            continue
+        nx, ny = nx / nlen, ny / nlen
+        tx, ty = -ny, nx
+        n_strokes = 2 + int(rng.rand() < 0.70) + int(rng.rand() < 0.28)
+        for k in range(n_strokes):
+            dist_px = 4.0 + k * (8.0 + rng.rand() * 8.0) + float(rng.randn()) * 2.0
+            if dist_px > 78 or rng.rand() > np.exp(-dist_px / 48.0):
+                continue
+            cx = x + nx * dist_px + float(rng.randn()) * 1.8
+            cy = y + ny * dist_px + float(rng.randn()) * 1.6
+            ix, iy = int(cx), int(cy)
+            if ix < 1 or iy < 1 or ix >= w - 1 or iy >= h - 1:
+                continue
+            if not water_a[iy, ix]:
+                continue
+            length = 10.0 + rng.rand() * 18.0
+            ang = np.arctan2(ty, tx) + float(rng.randn()) * 0.28
+            half = length * 0.5
+            ca, sa = float(np.cos(ang)), float(np.sin(ang))
+            p0 = (cx - ca * half, cy - sa * half)
+            p1 = (cx + float(rng.randn()) * 1.8, cy + float(rng.randn()) * 1.4)
+            p2 = (cx + ca * half, cy + sa * half)
+            alpha = int(70 + 90 * np.exp(-dist_px / 36.0) * (0.7 + 0.3 * rng.rand()))
+            d.line([p0, p1, p2], fill=(*ink, max(40, min(175, alpha))), width=1)
+    return Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+
+
+def fade_open_ocean(img: Image.Image, paper: Image.Image, dist, water: Image.Image) -> Image.Image:
+    """Open ocean returns to quiet parchment — kills leftover hatch/isolines."""
+    import numpy as np
+    arr = np.asarray(img, dtype=np.float32)
+    base = np.asarray(paper, dtype=np.float32)
+    sea = (np.asarray(water) > 8).astype(np.float32)[..., None]
+    # Keep plate/strokes near shore; parchment wins past ~90px.
+    keep = np.clip(np.exp(-np.maximum(dist - 8.0, 0.0) / 46.0), 0, 1)[..., None]
+    out = arr * (1.0 - sea) + (arr * keep + base * (1.0 - keep)) * sea
+    return Image.fromarray(np.clip(out, 0, 255).astype('uint8'), 'RGB')
+
+
+def bake_world_sea(lands) -> Image.Image:
+    """P39b: world-space sea albedo. STYLE REF coastal hand-ripples.
+
+    Dest UV = position only. Never tile a wave hatch. Never paste isoline
+    plates as hero ink. Australia/Oceania sea from the STYLE REF itself.
+    """
+    w, h = ATLAS_W, ATLAS_H
+    parchment = load_rgb(first_existing(
+        BOARD / 'board-parchment-tile.png',
+        GEN37 / 'p37-parchment-grain-tile.png',
+    ))
+    style = load_rgb(first_existing(
+        GEN39 / 'style-ref-oceania-beautiful.png',
+        GEN39 / 'p39-oceania-style-lock.png',
+    ))
+    world = load_rgb(first_existing(GEN39 / 'p39b-ocean-world-coast.png'))
+    atlantic = load_rgb(first_existing(GEN39 / 'p39b-ocean-atlantic-med.png'))
+    if not style:
+        raise SystemExit('P39b fail-closed: missing STYLE REF for sea albedo')
+
+    paper = tile_image(tileable_paper(parchment, 768), w, h) if parchment else Image.new('RGB', (w, h), (0xE4, 0xDC, 0xC6))
+    paper = ImageEnhance.Color(paper).enhance(0.82)
+    paper = ImageEnhance.Contrast(paper).enhance(0.92)
+    land = land_mask(lands, w, h)
+    waters = load_waters()
+    zones = water_mask(waters, w, h)
+    # Playable sea + inverted land so the board quad has continuous water.
+    inv = ImageChops.invert(land.filter(ImageFilter.MaxFilter(3)))
+    sea = ImageChops.lighter(zones, inv)
+
+    dist = land_distance_field(land, max_r=120)
+    img = cool_parchment_sea(paper, dist, sea)
+
+    # Blurred plate wash only (color family). Isoline/hatch ink is discarded.
+    img = plate_as_coast_wash(
+        img, world, sea,
+        (80, 40, 3420, 1960), (0.02, 0.04, 0.98, 0.94),
+        w, h, dist, amount=0.22,
+    )
+    img = plate_as_coast_wash(
+        img, atlantic, sea,
+        (560, 40, 1860, 1420), (0.02, 0.02, 0.98, 0.86),
+        w, h, dist, amount=0.26,
+    )
+    # Quiet open-ocean parchment BEFORE hero paste — never fade the STYLE REF.
+    img = fade_open_ocean(img, paper, dist, sea)
+    img = draw_coastal_hand_ripples(img, land, sea, dist, w, h)
+
+    # HERO last: STYLE REF sea through Oceania water. Dest UV = position only.
+    # Same alignment as the .39 Australia land crop (src 0.24/0.30 → dest 2094/1460).
+    img = paste_through_mask(
+        img, style, sea,
+        (1842, 1152, 2892, 2000), (0.0, 0.0, 1.0, 1.0),
+        w, h, alpha=0.92, blur=18,
+    )
+    img = punch(img, color=1.06, contrast=1.10, sharp=1.08)
+    # Sea keeps coastal ripples; land/void stay quiet parchment.
+    img = Image.composite(img, paper, sea)
+    return img
+
+
 def bake_ocean_wash():
     """P39: bind authored hand-ripple sea. Never destipple to cream wash."""
     tile = load_rgb(first_existing(
@@ -943,9 +1128,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--guide', action='store_true')
     ap.add_argument('--atlas', action='store_true')
+    ap.add_argument('--sea', action='store_true')
     args = ap.parse_args()
-    if not args.guide and not args.atlas:
-        args.guide = args.atlas = True
+    if not args.guide and not args.atlas and not args.sea:
+        args.guide = args.atlas = args.sea = True
     GEN39.mkdir(parents=True, exist_ok=True)
     GEN37.mkdir(parents=True, exist_ok=True)
     GEN36.mkdir(parents=True, exist_ok=True)
@@ -969,6 +1155,11 @@ def main():
         print(f'wrote {OUT_AO} {ao.size}')
         print(f'wrote {OUT_NORMAL} {normal.size}')
         print(f'wrote {OUT_HEIGHT} {height.size}')
+    if args.sea:
+        sea = bake_world_sea(lands)
+        OUT_SEA.parent.mkdir(parents=True, exist_ok=True)
+        sea.save(OUT_SEA, 'PNG', optimize=True)
+        print(f'wrote {OUT_SEA} {sea.size}')
 
 
 if __name__ == '__main__':

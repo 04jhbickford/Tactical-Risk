@@ -210,7 +210,7 @@ async function main() {
     join(outDir, 'europe-mid-390.png'),
     styleRef,
     join(outDir, 'mid-vs-style-ref.png'),
-    'p39 mid',
+    'p39b mid',
     'STYLE REF',
   );
 }
