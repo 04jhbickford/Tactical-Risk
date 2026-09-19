@@ -2,6 +2,18 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.3 mobile combat / battle / air-land
+
+James: keep playing Three UX. Give him a combat move, a battle, and an
+airplane landing on ~390 phone chrome. Preview only (`?three=1`).
+Do not merge to main. Live Canvas untouched.
+
+Seeded Karelia S.S.R. → Finland Norway pocket. Confirm gold only when
+the verb is ready. After landing, Confirm is idle Replay (does not stick).
+Phase guide is a one-line strip, not a Got it modal. Stacks stay no-overlap.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.1 main art + Three UX (preview only)
 
 James t3069u: side-project art wasn’t working. Use **main** tiles /

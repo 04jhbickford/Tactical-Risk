@@ -23,9 +23,33 @@ import {
   reportStartupStatus,
 } from '../ui/startupLoader.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
+import {
+  PHASE,
+  SELECT_GOLD,
+  LAND_TEAL,
+  createScenario,
+  applyScenarioPocket,
+  tapLand,
+  pickUnit,
+  confirm as confirmPlay,
+  confirmLabel,
+  confirmGold,
+  confirmEnabled,
+  guideCopy,
+  highlights,
+  battleCard,
+  inspectPlay,
+  dismissGuide,
+  driveCombatMove,
+  driveBattleMid,
+  driveAirChoice,
+  driveLanded,
+  resetScenario,
+} from './uxPreviewScenario.js';
 
-const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
+const POCKET_FIT = { minX: 1080, minY: 70, maxX: 1640, maxY: 560 };
+const LAND_FIT = { minX: 1180, minY: 90, maxX: 1760, maxY: 720 };
 
 function applyLiveContinents(list, bonusGroups) {
   const of = new Map();
@@ -37,15 +61,20 @@ function applyLiveContinents(list, bonusGroups) {
   }
 }
 
-function strokeSelectOutline(ctx, territory, territoryRenderer, zoom) {
+function strokeSelectOutline(ctx, territory, territoryRenderer, zoom, {
+  color = SELECT_GOLD,
+  dashed = false,
+  width = 3.4,
+} = {}) {
   if (!territory) return;
   ctx.save();
-  ctx.strokeStyle = SELECT_GOLD;
+  ctx.strokeStyle = color;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  ctx.lineWidth = Math.max(2.4, 3.4 / Math.max(0.18, zoom));
+  ctx.lineWidth = Math.max(2.2, width / Math.max(0.18, zoom));
   ctx.shadowColor = 'rgba(30, 36, 32, 0.72)';
-  ctx.shadowBlur = 10 / Math.max(0.18, zoom);
+  ctx.shadowBlur = dashed ? 0 : 10 / Math.max(0.18, zoom);
+  if (dashed) ctx.setLineDash([10 / Math.max(0.18, zoom), 7 / Math.max(0.18, zoom)]);
   if (territory.polygons.length === 1) {
     territoryRenderer._strokePoly(ctx, territory.polygons[0]);
   } else {
@@ -106,8 +135,12 @@ export async function bootUxPreview() {
   const mapRenderer = new MapRenderer();
   const territoryRenderer = new TerritoryRenderer(territories, continents);
   const territoryMap = new TerritoryMap(territories);
-  const placements = { ...(setup.classic?.unitPlacements || {}) };
-  const owners = setup.classic?.territoryOwners || {};
+  const classicPlacements = { ...(setup.classic?.unitPlacements || {}) };
+  const classicOwners = setup.classic?.territoryOwners || {};
+  const pocket = applyScenarioPocket(classicPlacements, classicOwners);
+  const placements = pocket.placements;
+  const owners = pocket.owners;
+  let play = createScenario({ placements, owners });
   const stressOn = (() => {
     const params = new URLSearchParams(location.search);
     const v = String(params.get('stress') || '').toLowerCase();
@@ -124,7 +157,7 @@ export async function bootUxPreview() {
   const chrome = injectThreeChrome({
     seat: 'Russians',
     ipc: russians?.startingPUs || 24,
-    phase: 'PLACE',
+    phase: PHASE.COMBAT_MOVE,
   });
   chrome.setSeat('Russians', russians?.color || '#B22222');
 
@@ -145,17 +178,49 @@ export async function bootUxPreview() {
   window.addEventListener('resize', resizeCanvas);
 
   let selected = null;
-  let selectedUnitType = null;
-  let confirmed = false;
   let stacksExpanded = false;
   let hover = null;
 
+  function landByName(name) {
+    return territories.find((t) => t.name === name) || null;
+  }
+
+  function syncSelectionFromPlay() {
+    selected = landByName(play.selected);
+  }
+
   function paintChrome() {
-    chrome.paintSelection({
-      land: selected,
-      stacks: selected ? (placements[selected.name] || []) : [],
-      unitType: selectedUnitType,
-      confirmed,
+    chrome.setPhase(play.phase);
+    const marks = highlights(play);
+    let focusName = play.selected || marks.origin || marks.dest || null;
+    if (play.phase === PHASE.COMBAT_MOVE && (play.selected === play.origin || play.destPicked)) {
+      focusName = play.origin;
+    }
+    if (play.phase === PHASE.AIR_LAND && !play.landingDest) {
+      focusName = play.dest;
+    }
+    const land = landByName(focusName);
+    const picked = Object.keys(play.selectedUnits || {}).filter((t) => play.selectedUnits[t]);
+    let route = '';
+    if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
+      route = `${play.origin} → ${play.dest}`;
+    } else if (play.phase === PHASE.AIR_LAND) {
+      route = play.landingDest ? `Land in ${play.landingDest}` : 'Pick teal land';
+    } else if (play.phase === PHASE.DONE && play.landingDest) {
+      route = `Landed · ${play.landingDest}`;
+    }
+    chrome.paintPlay({
+      land,
+      stacks: land ? (placements[land.name] || []) : [],
+      unitTypes: picked,
+      label: confirmLabel(play),
+      gold: confirmGold(play),
+      enabled: confirmEnabled(play),
+      guide: guideCopy(play),
+      guideOn: play.guideOn,
+      battle: battleCard(play),
+      replay: play.phase === PHASE.DONE,
+      route,
     });
   }
 
@@ -164,10 +229,14 @@ export async function bootUxPreview() {
     camera.dirty = true;
   };
   chrome.onUnitPick = (type) => {
-    selectedUnitType = type || null;
-    confirmed = false;
+    pickUnit(play, type);
+    syncSelectionFromPlay();
     paintChrome();
     camera.dirty = true;
+  };
+  chrome.onGuideDismiss = () => {
+    dismissGuide(play);
+    paintChrome();
   };
 
   function fitEurope() {
@@ -178,7 +247,19 @@ export async function bootUxPreview() {
       fillFrame: true,
     });
   }
-  fitEurope();
+  function fitPocket() {
+    const bounds = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
+      ? LAND_FIT
+      : POCKET_FIT;
+    camera.fitBounds(bounds, {
+      padding: 12,
+      padTop: 56,
+      padBottom: 132,
+      fillFrame: false,
+    });
+  }
+  fitPocket();
+  paintChrome();
 
   function pickAt(sx, sy) {
     const world = camera.screenToWorld(sx, sy);
@@ -194,9 +275,9 @@ export async function bootUxPreview() {
   }
 
   function selectLand(next) {
-    selected = next || null;
-    selectedUnitType = null;
-    confirmed = false;
+    tapLand(play, next?.name);
+    syncSelectionFromPlay();
+    if (play.phase === PHASE.AIR_LAND && play.landingDest) fitPocket();
     paintChrome();
     camera.dirty = true;
   }
@@ -268,14 +349,18 @@ export async function bootUxPreview() {
     const btn = e.target.closest('[data-zoom]');
     if (!btn) return;
     e.stopPropagation();
-    if (btn.dataset.zoom === 'fit') fitEurope();
+    if (btn.dataset.zoom === 'fit') fitPocket();
     else camera.zoomBy(btn.dataset.zoom);
   });
   chrome.confirm.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!selected || chrome.confirm.disabled) return;
-    confirmed = true;
+    if (chrome.confirm.disabled) return;
+    const before = play.phase;
+    confirmPlay(play);
+    syncSelectionFromPlay();
+    if (play.phase !== before) fitPocket();
     paintChrome();
+    camera.dirty = true;
   });
 
   function paint() {
@@ -305,7 +390,41 @@ export async function bootUxPreview() {
       territoryRenderer.renderOwnershipOverlays(ctx, camera.zoom);
       territoryRenderer.renderTerrainTexture(ctx, camera.zoom);
       territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
-      if (selected) strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom);
+      const marks = highlights(play);
+      const byName = (name) => territories.find((t) => t.name === name);
+      for (const name of marks.legal || []) {
+        strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          dashed: true,
+          width: 2.6,
+        });
+      }
+      for (const name of marks.landable || []) {
+        strokeSelectOutline(ctx, byName(name), territoryRenderer, camera.zoom, {
+          color: LAND_TEAL,
+          dashed: true,
+          width: 2.8,
+        });
+      }
+      if (marks.origin) {
+        strokeSelectOutline(ctx, byName(marks.origin), territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          width: 3.2,
+        });
+      }
+      if (marks.dest) {
+        strokeSelectOutline(ctx, byName(marks.dest), territoryRenderer, camera.zoom, {
+          color: SELECT_GOLD,
+          width: 3.6,
+        });
+      }
+      if (selected && selected.name !== marks.origin && selected.name !== marks.dest) {
+        const landColor = (marks.landable || []).includes(selected.name) ? LAND_TEAL : SELECT_GOLD;
+        strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom, {
+          color: landColor,
+          width: 3.2,
+        });
+      }
       renderPreviewStacks(ctx, {
         territories,
         placements,
@@ -402,9 +521,10 @@ export async function bootUxPreview() {
       owners: Object.keys(owners).length,
       placements: Object.keys(placements).length,
       continents: continents.length,
-      idleConfirm: 'Select a territory',
+      idleConfirm: 'Select your stack',
       confirmGold: SELECT_GOLD,
       stress: stressOn,
+      play: inspectPlay(play),
     };
   };
 
@@ -415,7 +535,23 @@ export async function bootUxPreview() {
       if (t) selectLand(t);
       return t?.name || null;
     },
+    pickUnit: (type) => {
+      pickUnit(play, type);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return { ...(play.selectedUnits || {}) };
+    },
+    confirm: () => {
+      confirmPlay(play);
+      syncSelectionFromPlay();
+      fitPocket();
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
     frameEurope: fitEurope,
+    framePocket: fitPocket,
     frameNear: () => frameNamed('Germany', 1.15),
     frameJapan: () => frameNamed('Japan', 1.15),
     frameNamed,
@@ -433,6 +569,26 @@ export async function bootUxPreview() {
     overlapReport: () => overlapReport(currentLayouts()),
     layouts: currentLayouts,
     chrome,
+    playInspect: () => inspectPlay(play),
+    reset: () => {
+      resetScenario(play);
+      syncSelectionFromPlay();
+      fitPocket();
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
+    drive: (step) => {
+      if (step === 'move') driveCombatMove(play);
+      else if (step === 'battle') driveBattleMid(play);
+      else if (step === 'air') driveAirChoice(play);
+      else if (step === 'landed') driveLanded(play, 'Russia');
+      syncSelectionFromPlay();
+      fitPocket();
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
+    },
   };
 
   console.log('[ux-preview]', inspect());

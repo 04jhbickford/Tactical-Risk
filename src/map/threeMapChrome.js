@@ -218,7 +218,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       bottom:calc(74px + env(safe-area-inset-bottom, 0px));
       z-index:28; display:flex; flex-direction:column; gap:8px;
     }
-    html.three-spike.has-l1 #three-zoom {
+    html.three-spike.has-l1 #three-zoom,
+    html.three-spike.has-battle #three-zoom {
       bottom:calc(208px + env(safe-area-inset-bottom, 0px));
     }
     html.three-spike.has-l2 #three-zoom { display:none; }
@@ -236,6 +237,67 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-zoom button[data-zoom="fit"] { font-size:12px; letter-spacing:0.02em; }
     #three-phase-guide { display:none !important; }
+    #three-guide {
+      display:none; pointer-events:auto;
+      min-height:36px; padding:8px 10px; border-radius:12px;
+      background:rgba(30,36,32,0.42);
+      -webkit-backdrop-filter:saturate(1.35) blur(16px);
+      backdrop-filter:saturate(1.35) blur(16px);
+      border:1px solid rgba(255,255,255,0.10);
+      color:#E8E2D4;
+      font:500 13px/1.35 -apple-system,"SF Pro Text",sans-serif;
+      display:none;
+      align-items:flex-start; gap:8px;
+    }
+    #three-guide.is-on { display:flex; }
+    #three-guide span { flex:1; }
+    #three-guide button {
+      flex:0 0 auto; width:36px; height:36px; margin:-4px -4px 0 0;
+      border:0; border-radius:10px; background:transparent; color:#c8c0b0;
+      font:600 16px/1 -apple-system,sans-serif; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    #three-battle {
+      display:none; pointer-events:none;
+      padding:10px 12px; border-radius:12px;
+      background:rgba(30,36,32,0.55);
+      -webkit-backdrop-filter:saturate(1.35) blur(18px);
+      backdrop-filter:saturate(1.35) blur(18px);
+      color:#E8E2D4;
+      border:1px solid rgba(255,255,255,0.14);
+      box-shadow:0 8px 24px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.10);
+    }
+    #three-battle.is-on { display:block; pointer-events:auto; }
+    #three-battle .three-battle-kicker {
+      margin:0; font:600 11px/1 -apple-system,sans-serif;
+      letter-spacing:0.08em; text-transform:uppercase; color:#C4A35A;
+    }
+    #three-battle strong {
+      display:block; margin-top:4px;
+      font:600 17px/1.2 -apple-system,"SF Pro Text",sans-serif;
+    }
+    #three-battle .three-battle-body {
+      margin-top:4px; font:400 13px/1.35 -apple-system,"SF Pro Text",sans-serif;
+      color:#c8c0b0;
+    }
+    #three-battle .three-dice {
+      display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;
+    }
+    #three-battle .three-die {
+      width:28px; height:28px; border-radius:8px;
+      display:inline-flex; align-items:center; justify-content:center;
+      background:rgba(240,230,210,0.14);
+      border:1px solid rgba(255,255,255,0.12);
+      font:700 13px/1 -apple-system,sans-serif;
+      font-variant-numeric:tabular-nums;
+    }
+    #three-battle .three-die.is-hit {
+      background:#C4A35A; color:#1E2420; border-color:transparent;
+    }
+    #three-battle .three-die.is-def { opacity:0.88; }
+    html.three-spike.has-battle #three-zoom,
+    html.three-spike.has-l2 #three-zoom { display:none; }
+    html.three-spike.has-battle #three-stack-toggle { display:none; }
     #three-sheet {
       display:none; position:absolute; left:0; right:0; bottom:0; z-index:40;
       max-height:min(52dvh, 420px);
@@ -261,6 +323,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-l0 .three-l0-ver { display:none; }
       #three-peek .three-peek-unit { width:48px; height:48px; }
       #three-peek .three-peek-unit img { width:40px; height:40px; }
+      #three-guide { font-size:12px; }
+      #three-battle strong { font-size:16px; }
+      #three-battle .three-die { width:26px; height:26px; }
     }
   `;
   document.head.appendChild(style);
@@ -284,7 +349,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   zoom.innerHTML = `
     <button type="button" data-zoom="in" aria-label="Zoom in">+</button>
     <button type="button" data-zoom="out" aria-label="Zoom out">−</button>
-    <button type="button" data-zoom="fit" aria-label="Fit Europe">Fit</button>
+    <button type="button" data-zoom="fit" aria-label="Fit pocket">Fit</button>
   `;
   document.body.appendChild(zoom);
 
@@ -292,8 +357,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bottom.id = 'three-bottom';
   bottom.innerHTML = `
     <button type="button" id="three-stack-toggle" aria-pressed="false">Expand stacks</button>
+    <div id="three-guide" aria-live="polite"></div>
+    <div id="three-battle"></div>
     <div id="three-peek"></div>
-    <button type="button" id="three-confirm" class="is-idle" disabled>Select a territory</button>
+    <button type="button" id="three-confirm" class="is-idle" disabled>Select your stack</button>
   `;
   document.body.appendChild(bottom);
 
@@ -315,6 +382,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     bottom,
     sheet,
     peek: bottom.querySelector('#three-peek'),
+    guideEl: bottom.querySelector('#three-guide'),
+    battleEl: bottom.querySelector('#three-battle'),
     confirm: bottom.querySelector('#three-confirm'),
     phaseEl: l0.querySelector('#three-phase'),
     seatEl: l0.querySelector('#three-seat'),
@@ -327,6 +396,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     stacksExpanded: false,
     onStackToggle: null,
     onUnitPick: null,
+    onGuideDismiss: null,
     setSeat(name, color) {
       api.seatEl.textContent = name;
       if (color) api.pipEl.style.background = color;
@@ -339,9 +409,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     syncLayers() {
       const l2 = sheet.classList.contains('is-open');
-      const l1 = !l2 && api.peek.classList.contains('is-on');
+      const battleOn = api.battleEl.classList.contains('is-on');
+      const l1 = !l2 && !battleOn && api.peek.classList.contains('is-on');
       document.documentElement.classList.toggle('has-l1', l1);
       document.documentElement.classList.toggle('has-l2', l2);
+      document.documentElement.classList.toggle('has-battle', battleOn);
       document.documentElement.classList.toggle('has-stacks', api.stacksExpanded);
     },
     setSheetOpen(open) {
@@ -353,11 +425,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     isSheetOpen() {
       return sheet.classList.contains('is-open');
     },
-    setConfirmIdle() {
+    setConfirmIdle(label = 'Select your stack') {
       api.confirm.disabled = true;
       api.confirm.classList.remove('is-ready');
       api.confirm.classList.add('is-idle');
-      api.confirm.textContent = 'Select a territory';
+      api.confirm.textContent = label;
       api.confirm.style.removeProperty('background');
       api.confirm.style.removeProperty('color');
     },
@@ -367,15 +439,98 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.confirm.classList.add('is-ready');
       api.confirm.textContent = label;
     },
+    setConfirmReplay(label) {
+      api.confirm.disabled = false;
+      api.confirm.classList.remove('is-ready');
+      api.confirm.classList.add('is-idle');
+      api.confirm.textContent = label;
+      api.confirm.style.removeProperty('background');
+      api.confirm.style.removeProperty('color');
+    },
+    setGuide(text, on = true) {
+      api.guideOn = !!on && !!text;
+      if (!api.guideOn) {
+        api.guideEl.classList.remove('is-on');
+        api.guideEl.innerHTML = '';
+        return false;
+      }
+      api.guideEl.innerHTML = `<span>${text}</span><button type="button" data-guide="dismiss" aria-label="Dismiss tip">×</button>`;
+      api.guideEl.classList.add('is-on');
+      return true;
+    },
+    setBattle(card) {
+      if (!card) {
+        api.battleEl.classList.remove('is-on');
+        api.battleEl.innerHTML = '';
+        api.syncLayers();
+        return;
+      }
+      const dice = (card.dice || []).map((d) => {
+        const hit = d.hit ? ' is-hit' : '';
+        const side = d.side === 'def' ? ' is-def' : '';
+        return `<span class="three-die${hit}${side}" title="${d.type || ''}">${d.face}</span>`;
+      }).join('');
+      api.battleEl.innerHTML = `
+        <p class="three-battle-kicker">${card.kicker || 'Battle'}</p>
+        <strong>${card.title || ''}</strong>
+        <div class="three-battle-body">${card.body || ''}</div>
+        ${dice ? `<div class="three-dice">${dice}</div>` : ''}`;
+      api.battleEl.classList.add('is-on');
+      api.syncLayers();
+    },
     setStacksExpanded(on) {
       api.stacksExpanded = !!on;
       stackToggle.setAttribute('aria-pressed', api.stacksExpanded ? 'true' : 'false');
       stackToggle.textContent = api.stacksExpanded ? 'Collapse stacks' : 'Expand stacks';
       api.syncLayers();
     },
-    showGuide(_on = false) {
-      api.guideOn = false;
-      return false;
+    showGuide(on = false, text = '') {
+      return api.setGuide(text, on);
+    },
+    paintPlay({
+      land = null,
+      stacks = [],
+      unitType = null,
+      unitTypes = null,
+      label = null,
+      gold = false,
+      enabled = false,
+      guide = '',
+      guideOn = false,
+      battle = null,
+      replay = false,
+      route = '',
+    } = {}) {
+      api.setGuide(guide, guideOn);
+      api.setBattle(battle);
+      if (battle) {
+        api.peek.classList.remove('is-on');
+        api.peek.textContent = '';
+      } else if (!land) {
+        api.peek.classList.remove('is-on');
+        api.peek.textContent = '';
+      } else {
+        const owner = stacks[0]?.owner || (!land.isWater ? land.originalOwner : '');
+        const ipcLine = !land.isWater ? `${printIpc(land)} IPC` : '';
+        const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
+        api.peek.innerHTML = `<strong>${land.name}</strong>
+          <div class="three-peek-meta">${[owner, ipcLine, route].filter(Boolean).join(' · ')}</div>
+          ${iconRowHtml(stacks)}`;
+        api.peek.dataset.rosterTotal = String(rosterTotal);
+        const pickedTypes = [
+          ...(Array.isArray(unitTypes) ? unitTypes : []),
+          ...(unitType ? [unitType] : []),
+        ];
+        for (const type of pickedTypes) {
+          const picked = api.peek.querySelector(`[data-unit-type="${type}"]`);
+          if (picked) picked.classList.add('is-picked');
+        }
+        if (!api.isSheetOpen()) api.peek.classList.add('is-on');
+      }
+      if (replay) api.setConfirmReplay(label || 'Replay scenario');
+      else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
+      else api.setConfirmIdle(label || 'Select your stack');
+      api.syncLayers();
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
       if (api.isSheetOpen()) {
@@ -445,6 +600,13 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (!chip) return;
     e.stopPropagation();
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
+  });
+  api.guideEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-guide="dismiss"]');
+    if (!btn) return;
+    e.stopPropagation();
+    api.setGuide('', false);
+    if (typeof api.onGuideDismiss === 'function') api.onGuideDismiss();
   });
   api.setStacksExpanded(false);
   api.showGuide(false);
