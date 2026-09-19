@@ -23,8 +23,34 @@ export function getEnemyCombatUnits(units, currentPlayerId, areAllies = () => fa
   ));
 }
 
+export function getFriendlyCombatUnits(units, currentPlayerId) {
+  return (units || []).filter((u) => (
+    !!u
+    && (Number(u.quantity) || 0) > 0
+    && u.owner === currentPlayerId
+    && u.type !== 'factory'
+  ));
+}
+
+export function countLivingUnits(units, { excludeTypes = [] } = {}) {
+  const skip = new Set(excludeTypes);
+  return (units || []).reduce((sum, u) => {
+    if (!u || skip.has(u.type)) return sum;
+    return sum + (Number(u.quantity) || 0);
+  }, 0);
+}
+
 export function territoryHasEnemyCombatUnits(units, currentPlayerId, areAllies) {
   return getEnemyCombatUnits(units, currentPlayerId, areAllies).length > 0;
+}
+
+// Queue head is done when the attacker is already gone (AA wipe / last
+// round synced) or no enemy combat units remain. Either way, do not paint
+// a 0-attacker rematch that can only sit on Roll Dice.
+export function territoryCombatAlreadyResolved(units, currentPlayerId, areAllies) {
+  const enemies = getEnemyCombatUnits(units, currentPlayerId, areAllies);
+  const friendlies = getFriendlyCombatUnits(units, currentPlayerId);
+  return enemies.length === 0 || friendlies.length === 0;
 }
 
 export function summarizeCombatForce(units) {
@@ -242,7 +268,9 @@ export class CombatUI {
   }
 
   // Queue head with no enemy combat units is already resolved (win committed
-  // or empty). Do not paint a 0-defender rematch. AA-only still counts.
+  // or empty). A 0-attacker leftover (AA wipe synced, reload before Next)
+  // is also done — do not paint Roll Dice with nobody left to fight.
+  // AA-only still counts while attacking air (or any friendly combat unit) remains.
   _dequeueResolvedCombatHeads() {
     const skipped = [];
     if (!this.gameState) return skipped;
@@ -251,7 +279,7 @@ export class CombatUI {
     while (this.gameState.combatQueue?.length > 0) {
       const name = this.gameState.combatQueue[0];
       const units = this.gameState.getUnitsAt?.(name) || this.gameState.units?.[name] || [];
-      if (territoryHasEnemyCombatUnits(units, playerId, areAllies)) break;
+      if (!territoryCombatAlreadyResolved(units, playerId, areAllies)) break;
       this.gameState.combatQueue.shift();
       skipped.push(name);
     }
@@ -411,6 +439,13 @@ export class CombatUI {
     };
 
     this.lastRolls = null;
+
+    // Fail-closed: never open Roll Dice / rolling with nobody left to attack
+    // (reload after AA wipe synced 0 attackers but dequeue missed).
+    if (countLivingUnits(this.combatState.attackers) <= 0) {
+      this.combatState.phase = 'resolved';
+      this.combatState.winner = 'defender';
+    }
   }
 
   _calculateBombardment() {
@@ -531,8 +566,16 @@ export class CombatUI {
     }
   }
 
+  _rollD6(context = 'combat') {
+    if (typeof this.gameState?._rollDie === 'function') {
+      return this.gameState._rollDie(context);
+    }
+    return Math.floor(Math.random() * 6) + 1;
+  }
+
   _rollAAFire() {
     const { attackers } = this.combatState;
+    const attackForceBefore = summarizeCombatForce(attackers);
 
     // Count attacking aircraft
     const attackingAir = attackers.filter(u => {
@@ -540,13 +583,13 @@ export class CombatUI {
       return def && def.isAir;
     });
 
-    const totalAircraft = attackingAir.reduce((sum, u) => sum + u.quantity, 0);
+    const totalAircraft = attackingAir.reduce((sum, u) => sum + (Number(u.quantity) || 0), 0);
 
     // Roll 1 die per aircraft, hits on 1
     const rolls = [];
     let hits = 0;
     for (let i = 0; i < totalAircraft; i++) {
-      const roll = Math.floor(Math.random() * 6) + 1;
+      const roll = this._rollD6('aa');
       const hit = roll === 1;
       rolls.push({ roll, hit });
       if (hit) hits++;
@@ -565,6 +608,17 @@ export class CombatUI {
     } else {
       this.combatState.selectedAACasualties = {};
     }
+
+    this.gameState?.recordCombatTelemetry?.({
+      kind: 'aa',
+      territory: this.currentTerritory,
+      hits,
+      rolls: rolls.map((r) => r.roll),
+      attackForce: attackForceBefore,
+      defenseForce: summarizeCombatForce(this.combatState.defenders),
+      survivors: summarizeCombatForce(this.combatState.attackers),
+      wiped: countLivingUnits(this.combatState.attackers) <= 0,
+    });
 
     // Stay on a readable result step (hits and 0-hits). Continue proceeds.
     this.combatState.phase = AA_RESULT_PHASE;
@@ -591,14 +645,20 @@ export class CombatUI {
     const { attackers, selectedAACasualties, totalAttackerLosses } = this.combatState;
     if (selectedAACasualties && !this.combatState.aaCasualtiesApplied) {
       for (const [type, count] of Object.entries(selectedAACasualties)) {
-        const unit = attackers.find(u => u.type === type);
-        if (unit) {
-          unit.quantity -= count;
-          totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
+        let remaining = Number(count) || 0;
+        for (const unit of attackers.filter((u) => u.type === type)) {
+          if (remaining <= 0) break;
+          const take = Math.min(Number(unit.quantity) || 0, remaining);
+          unit.quantity = (Number(unit.quantity) || 0) - take;
+          remaining -= take;
         }
+        totalAttackerLosses[type] = (totalAttackerLosses[type] || 0) + count;
       }
-      this.combatState.attackers = attackers.filter(u => u.quantity > 0);
+      this.combatState.attackers = attackers.filter(u => (Number(u.quantity) || 0) > 0);
       this.combatState.aaCasualtiesApplied = true;
+      // Persist the board immediately so a reload cannot resurrect dead air
+      // or reopen this fight as Roll Dice with 0 attackers.
+      this._syncCombatStateToGame();
     }
 
     if (proceed) {
@@ -609,26 +669,37 @@ export class CombatUI {
 
   _confirmAAResults() {
     this._proceedAfterAAFire();
+    if (this.combatState.phase === 'resolved') {
+      this._persistResolvedCombat();
+    }
     this._render();
   }
 
+  _failCloseIfAttackerWiped({ persist = false } = {}) {
+    if (!this.combatState) return false;
+    if (countLivingUnits(this.combatState.attackers) > 0) return false;
+    this.combatState.phase = 'resolved';
+    this.combatState.winner = 'defender';
+    if (persist) this._persistResolvedCombat();
+    return true;
+  }
+
+  _persistResolvedCombat() {
+    if (!this.combatState || this.combatState._finalized) return;
+    this._finalizeCombat();
+  }
+
   _proceedAfterAAFire() {
-    // Move to ready phase if there are still attackers
-    if (this._getTotalUnits(this.combatState.attackers) > 0 &&
-        this._getTotalUnits(this.combatState.defenders.filter(u => u.type !== 'aaGun')) > 0) {
-      // A&A Submarine Rules: Check for submarine first strike before regular combat
-      if (this.combatState.hasSubmarineFirstStrike && !this.combatState.submarineFirstStrikeFired) {
-        this.combatState.phase = 'submarineFirstStrike';
-      } else {
-        this.combatState.phase = 'ready';
-      }
-    } else if (this._getTotalUnits(this.combatState.attackers) === 0) {
-      this.combatState.phase = 'resolved';
-      this.combatState.winner = 'defender';
-    } else {
-      // Only AA guns left defending - attacker wins
+    if (this._failCloseIfAttackerWiped()) return;
+    if (countLivingUnits(this.combatState.defenders, { excludeTypes: ['aaGun'] }) <= 0) {
       this.combatState.phase = 'resolved';
       this.combatState.winner = 'attacker';
+      return;
+    }
+    if (this.combatState.hasSubmarineFirstStrike && !this.combatState.submarineFirstStrikeFired) {
+      this.combatState.phase = 'submarineFirstStrike';
+    } else {
+      this.combatState.phase = 'ready';
     }
   }
 
@@ -850,7 +921,7 @@ export class CombatUI {
     for (const unit of airUnits) {
       if (remaining <= 0) break;
       const take = Math.min(unit.quantity, remaining);
-      selected[unit.type] = take;
+      selected[unit.type] = (selected[unit.type] || 0) + take;
       remaining -= take;
     }
 
@@ -866,7 +937,7 @@ export class CombatUI {
   }
 
   _getTotalUnits(units) {
-    return units.reduce((sum, u) => sum + u.quantity, 0);
+    return countLivingUnits(units);
   }
 
   _rollDice() {
@@ -915,7 +986,7 @@ export class CombatUI {
             attackValue += 1;
           }
 
-          const roll = Math.floor(Math.random() * 6) + 1;
+          const roll = this._rollD6('attack');
           const hit = roll <= attackValue;
           attackRolls.push({ roll, hit, unitType: unit.type, attackValue });
           if (hit) attackHits++;
@@ -941,7 +1012,7 @@ export class CombatUI {
           defenseValue += 1;
         }
 
-        const roll = Math.floor(Math.random() * 6) + 1;
+        const roll = this._rollD6('defense');
         const hit = roll <= defenseValue;
         defenseRolls.push({ roll, hit, unitType: unit.type, defenseValue });
         if (hit) defenseHits++;
@@ -957,10 +1028,23 @@ export class CombatUI {
     this.combatState.defenderSubHits = defenderSubHits;
 
     this.lastRolls = { attackRolls, defenseRolls, attackHits, defenseHits, attackerSubHits, defenderSubHits };
+    this.gameState?.recordCombatTelemetry?.({
+      kind: 'combat',
+      territory: this.currentTerritory,
+      hits: { attack: attackHits, defense: defenseHits },
+      attackRolls: attackRolls.map((r) => r.roll),
+      defenseRolls: defenseRolls.map((r) => r.roll),
+      attackForce: summarizeCombatForce(attackers),
+      defenseForce: summarizeCombatForce(defenders),
+    });
     return { attackHits, defenseHits };
   }
 
   async _animateDiceRoll() {
+    if (this._failCloseIfAttackerWiped({ persist: true })) {
+      this._render();
+      return { attackHits: 0, defenseHits: 0 };
+    }
     this.combatState.phase = 'rolling';
     this._render();
 
@@ -1502,6 +1586,7 @@ export class CombatUI {
   }
 
   _finalizeCombat() {
+    if (this.combatState?._finalized) return;
     // Apply final state to game
     const player = this.gameState.currentPlayer;
     const units = [];
@@ -1641,6 +1726,7 @@ export class CombatUI {
       }
     }
 
+    this.combatState._finalized = true;
     this.gameState._notify();
   }
 
@@ -1667,6 +1753,7 @@ export class CombatUI {
     this.gameState?.pauseNotifications?.();
     try {
       while (this.combatState.phase !== 'resolved' && this.combatState.phase !== 'airLanding') {
+        if (this._failCloseIfAttackerWiped({ persist: true })) break;
         if (this.combatState.phase === 'bombardment') {
           this._fireBombardment();
           await new Promise(r => setTimeout(r, 150));
@@ -1700,6 +1787,11 @@ export class CombatUI {
         if (this.combatState.phase === 'selectCasualties') {
           this._applyCasualties();
           await new Promise(r => setTimeout(r, 150));
+        }
+        if (this.combatState.phase === 'rolling') {
+          // Animation never completed (no rAF / overlay resync). Do not spin.
+          this._failCloseIfAttackerWiped({ persist: true });
+          break;
         }
       }
 
@@ -2140,6 +2232,14 @@ export class CombatUI {
           </div>
         </div>
       `;
+    } else if (phase === 'rolling') {
+      if (countLivingUnits(this.combatState.attackers) <= 0) {
+        html += `
+          <button class="combat-btn next" data-action="end-empty-attack">
+            End Battle
+          </button>
+        `;
+      }
     } else if (phase === 'ready') {
       // Show submarine first strike result if just fired
       const { subFirstStrikeRolls, submarineFirstStrikeFired } = this.combatState;
@@ -2515,6 +2615,12 @@ export class CombatUI {
     }
     if (phase === 'selectRetreat') {
       return `<p class="phone-combat-cta-hint">Tap a land above</p>`;
+    }
+    if (phase === 'rolling') {
+      if (countLivingUnits(this.combatState.attackers) <= 0) {
+        return `<button class="combat-btn next" data-action="end-empty-attack">End Battle</button>`;
+      }
+      return `<p class="phone-combat-cta-hint">Rolling…</p>`;
     }
     return '';
   }
@@ -3387,6 +3493,10 @@ export class CombatUI {
             break;
           case 'next':
             this._finalizeCombat();
+            this._nextCombat();
+            break;
+          case 'end-empty-attack':
+            this._failCloseIfAttackerWiped({ persist: true });
             this._nextCombat();
             break;
         }
