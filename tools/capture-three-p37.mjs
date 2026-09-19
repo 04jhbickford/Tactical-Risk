@@ -122,6 +122,11 @@ async function main() {
   await shot('europe-mid-hud-390.png');
   await shot('sea-zones-ink.png');
   if (quick) {
+    await page.evaluate(() => window.__threeSpike.selectLand('Germany'));
+    await shot('stack-expand.png');
+    const stackExpand = await page.evaluate(() => window.__threeSpike.stackState('Germany'));
+    const stackCollapse = await page.evaluate(() => window.__threeSpike.toggleStack('Germany'));
+    await shot('stack-collapse.png');
     await page.evaluate(() => window.__threeSpike.frameAfrica({ lift: 210, south: 30 }));
     await shot('africa-even.png');
     await page.evaluate(() => {
@@ -144,7 +149,7 @@ async function main() {
       version: window.__threeSpike.inspect().version,
       inspect: window.__threeSpike.inspect(),
     }));
-    writeFileSync(join(outDir, 'computed.json'), JSON.stringify({ ...computed, eastMed, centralMed }, null, 2));
+    writeFileSync(join(outDir, 'computed.json'), JSON.stringify({ ...computed, eastMed, centralMed, stackExpand, stackCollapse }, null, 2));
     await browser.close();
     if (server) server.close();
     const styleRef = join(root, 'briefs/2026-09-17-three-art-gap/refs/p37-gen/p37-oceania-style-lock.png');
@@ -164,6 +169,10 @@ async function main() {
 
   await page.evaluate(() => window.__threeSpike.selectLand('Germany'));
   await shot('europe-mid-select-390.png');
+  await shot('stack-expand.png');
+  const stackExpand = await page.evaluate(() => window.__threeSpike.stackState('Germany'));
+  const stackCollapse = await page.evaluate(() => window.__threeSpike.toggleStack('Germany'));
+  await shot('stack-collapse.png');
 
   const eastMed = await page.evaluate(() => window.__threeSpike.frameEastMed({ lift: 78, south: 11 }));
   await shot('east-med-select-no-clip.png');
@@ -239,6 +248,8 @@ async function main() {
   computed.idle = idle;
   computed.eastMedCapture = eastMed;
   computed.centralMedCapture = centralMed;
+  computed.stackExpand = stackExpand;
+  computed.stackCollapse = stackCollapse;
   writeFileSync(join(outDir, 'computed.json'), JSON.stringify(computed, null, 2));
   console.log(JSON.stringify(computed, null, 2));
 

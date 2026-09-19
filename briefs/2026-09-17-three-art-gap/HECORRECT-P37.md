@@ -36,6 +36,8 @@ burned labels, Africa brightness blotches.
    select still works.
 4. Hold China outer-union, no names/IPC, mid pip+N, Japan multi-type,
    Confirm exclusive gold.
+5. Unit stack toggle (t3034u): tap stack icon expands troops; tap the
+   same control again collapses to the compact pip. Toggle, not one-way.
 
 ## Fail closed if
 - Mid still ≠ STYLE REF family
@@ -46,4 +48,5 @@ burned labels, Africa brightness blotches.
 - China seam
 - Labels / IPC return
 - Confirm loses gold
+- Stack expand is sticky (second tap does not collapse)
 - Live Canvas touched

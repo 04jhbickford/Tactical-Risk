@@ -47,6 +47,7 @@ Med ships above Italy. China outer-union. No labels/IPC. Confirm gold.
 | No map labels / no baked IPC | **PASS** | Name sprites gone. Atlas has no +N pills. Counts in HUD/peek only. |
 | Mid pip+N / Japan multi-type | **PASS** | Mid idle pip+N. `japan-near.png`: INF + tank + sea + peek fighter/FAC/AA. |
 | Confirm exclusive gold / idle quiet-dark | **PASS** | Confirm `#C4A35A`. Idle `rgba(30, 36, 32, 0.88)` / Select a territory. |
+| Stack toggle (t3034u) | **PASS** | `stack-expand.png` → molded troops. `stack-collapse.png` → same control collapses to pip+N. `stackToggle: true`. Not sticky. |
 
 ## BAR-POLYTOPIA-ROOT-TTR
 | Gate | Verdict | Note |
@@ -69,6 +70,9 @@ inspect:      paintedAlbedo · albedoBound · stainFallback=false · 4096×2340
               featheredJoins · evenLighting · imhofRelief=false
               continentPunch=0 · seaDeckClear · eastMedPinSouth
               unitBgUnified · seaInkClosedRings · noMapLabels · noBakedIpc
+              stackToggle
+stackExpand:  pip=false minis=true selected
+stackCollapse: pip=true minis=false selected (same land; not sticky)
 continents:   7 (NA 24 / SA 12 / EU 30 / ME 18 / AF 27 / AS 33 / OC 39)
 ```
 
@@ -77,6 +81,7 @@ continents:   7 (NA 24 / SA 12 / EU 30 / ME 18 / AF 27 / AS 33 / OC 39)
 - `australia-vs-style-ref.png` / `australia-no-seam.png`
 - `africa-even.png` / `sea-zones-ink.png`
 - `med-no-clip.png` / `unit-bg-unified.png`
+- `stack-expand.png` / `stack-collapse.png` — t3034u toggle proof
 - `china-hold.png` / `japan-near.png`
 - `computed.json` — machine-read CSS + inspect + eastMed deck
 - `vercel-live-mid-390.png` — live preview `?three=1` = `V2.81.51-three-polish.37`

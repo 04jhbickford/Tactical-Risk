@@ -655,6 +655,8 @@ export async function bootThreeMapSpike() {
   let selectedName = null;
   let selectedUnitType = null;
   let confirmed = false;
+  const forceCollapsed = new Set();
+  const forceExpanded = new Set();
   let hoveredName = null;
   const pointers = new Map();
   let gesturePinch = false;
@@ -682,6 +684,7 @@ export async function bootThreeMapSpike() {
       return {
         territory: spriteHits[0].object.userData.territory,
         unitType: spriteHits[0].object.userData.unitType || null,
+        stackControl: true,
       };
     }
     const hits = raycaster.intersectObjects(pickables.filter((m) => m.visible && m.parent?.visible), false);
@@ -813,7 +816,8 @@ export async function bootThreeMapSpike() {
         const dense = isDenseBand(band);
         const plan = nearLayout(rec.stacks);
         // Near/select never falls back to pip — molded minis only.
-        const collapse = !showMinis(band, selected);
+        // P37: stack-icon tap toggles expand/collapse. Second tap closes.
+        const collapse = !isStackExpanded(rec.territory.name, band, selected);
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
         rec.pip.position.set(rec.homeX, rec.height + (rec.territory.isWater ? 0.55 : 0.38), rec.homeZ);
@@ -906,6 +910,35 @@ export async function bootThreeMapSpike() {
     }
   }
 
+  function isStackExpanded(name, band = currentBand(), selected = selectedName === name) {
+    if (!name) return false;
+    if (forceCollapsed.has(name)) return false;
+    if (forceExpanded.has(name)) return true;
+    return showMinis(band, selected);
+  }
+
+  function clearStackForces(keep = null) {
+    for (const n of [...forceCollapsed]) {
+      if (n !== keep) forceCollapsed.delete(n);
+    }
+    for (const n of [...forceExpanded]) {
+      if (n !== keep) forceExpanded.delete(n);
+    }
+  }
+
+  function stackStateOf(name) {
+    const rec = unitRecords.find((r) => r.territory.name === name && r.copy === 0)
+      || unitRecords.find((r) => r.territory.name === name);
+    const expanded = isStackExpanded(name);
+    return {
+      name,
+      expanded,
+      pip: !!rec?.pip?.visible,
+      minis: !!(rec?.expanded || []).some((s) => s.visible),
+      selected: selectedName === name,
+    };
+  }
+
   function paintSelection(picked, { hover = false } = {}) {
     const next = picked?.territory || null;
     const unitType = picked?.unitType || null;
@@ -916,6 +949,29 @@ export async function bootThreeMapSpike() {
       return;
     }
     if (chrome.isSheetOpen()) chrome.setSheetOpen(false);
+    const stackTap = !!picked?.stackControl && next;
+    if (stackTap && selectedName === next.name && isStackExpanded(next.name, currentBand(), true)) {
+      forceCollapsed.add(next.name);
+      forceExpanded.delete(next.name);
+      selectedUnitType = null;
+      confirmed = false;
+      selectLiftStarted = performance.now();
+      syncDensity();
+      chrome.paintSelection({
+        land: next,
+        stacks: stacksFor(next.name, placements),
+        unitType: null,
+        confirmed: false,
+      });
+      return;
+    }
+    if (next) {
+      forceCollapsed.delete(next.name);
+      clearStackForces(next.name);
+    } else {
+      forceCollapsed.clear();
+      forceExpanded.clear();
+    }
     if (selectedName) setLandEmissive(selectedName, 0x000000);
     selectedName = next ? next.name : null;
     if (next && !next.isWater) setLandEmissive(next.name, 0xC4A35A);
@@ -1134,6 +1190,15 @@ export async function bootThreeMapSpike() {
     selectLand(name, unitType = null) {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
+    },
+    toggleStack(name) {
+      const land = territories.find((t) => t.name === name) || null;
+      if (!land) return stackStateOf(name);
+      paintSelection({ territory: land, stackControl: true });
+      return stackStateOf(name);
+    },
+    stackState(name) {
+      return stackStateOf(name);
     },
     frameNear(name, opts = {}) {
       const land = lands.find((t) => t.name === name);
@@ -1357,6 +1422,7 @@ export async function bootThreeMapSpike() {
         normalBound: !!getWorldLandNormal(),
         unitBgUnified: true,
         seaInkClosedRings: true,
+        stackToggle: true,
       };
     },
   };

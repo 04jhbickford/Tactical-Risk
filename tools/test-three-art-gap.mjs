@@ -264,7 +264,7 @@ check('spike mid pip ignores type / primaryType',
   && !/makePipTexture\([^)]+type/.test(spike));
 check('near never collapses typed chits back to pip',
   /Near\/select never falls back to pip/.test(spike)
-  && /const collapse = !showMinis\(band, selected\)/.test(spike)
+  && /isStackExpanded/.test(spike)
   && !/dense \|\| shouldCollapse/.test(spike));
 check('select or near shows molded minis; mid idle stays pip',
   showMinis('near', false) && showMinis('mid', true) && !showMinis('mid', false)
@@ -747,6 +747,12 @@ check('p37 Med ships stay above Italy and unclipped',
   && /frameAustralia/.test(spike)
   && /depthTest: false/.test(spike)
   && /renderOrder = t\.isWater \? 36 : 24/.test(spike));
+check('p37 stack icon tap toggles expand/collapse',
+  /stackControl/.test(spike)
+  && /toggleStack/.test(spike)
+  && /forceCollapsed/.test(spike)
+  && /Second tap closes/.test(spike)
+  && /stackToggle: true/.test(spike));
 check('p37 Confirm gold + China hold stay',
   /#three-confirm\.is-ready:not\(:disabled\):not\(\.is-idle\) \{[\s\S]*?background:#C4A35A/.test(chrome)
   && /outer union only/.test(art)
@@ -760,7 +766,9 @@ check('p37 required stills',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/unit-bg-unified.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/china-hold.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/japan-near.png')
-  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/vercel-live-mid-390.png'));
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/vercel-live-mid-390.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/stack-expand.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/stack-collapse.png'));
 check('p37 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p37/SCORE.md')));
 
 if (failures) {
