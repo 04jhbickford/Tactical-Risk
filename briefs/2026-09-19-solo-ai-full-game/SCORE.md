@@ -16,5 +16,6 @@ noLobby=true
 | Phase cycle | **DONE** — tech skip, purchase tiles, combat-move, battle, air land, NCM, place, collect |
 | .11 IA | **KEEP** — horizontal tiles +/−, YOU Confirm, THEY cheapest, split air dests |
 | Pocket demo | **KEEP** — `?three=1` / `?max=1` still `bootUxPreview` |
+| Browser | **PASS** — splash → tech → buy tiles → Karelia attack → battle YOU hits → NCM → place factory tiles → Collect 6 IPC → Germans AI thinking |
 
-**PR:** side branch only vs `cursor/unit-sheet-clickthrough-d314` (hold merge)
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/81 (draft · hold merge)
