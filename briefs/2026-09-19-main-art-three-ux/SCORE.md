@@ -43,5 +43,7 @@ germans=?three=1&germans=1
 - `casualty-select-390.png` — choice exists, Confirm after pick
 - `germans-ukraine-karelia-390.png` — previously stuck, now solvable
 
-**Vercel:** (pending this deploy)
+**Vercel:** https://tactical-risk20-7sj92pce2-james-projects-20d8de40.vercel.app/?three=1
+**Germans:** https://tactical-risk20-7sj92pce2-james-projects-20d8de40.vercel.app/?three=1&germans=1
+**Git alias:** https://tactical-risk20-git-cursor-mobil-9c9397-james-projects-20d8de40.vercel.app/?three=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · do not merge)

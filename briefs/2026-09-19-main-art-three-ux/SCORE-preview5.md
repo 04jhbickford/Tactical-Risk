@@ -29,3 +29,7 @@ manualOnly=true
 2. Tap INF (and FTR if you want) — chips gold, steppers.
 3. Tap enemy dest. Gold **Confirm: Move to …** / **Attack …**.
 4. Battle: if you have a choice, tap the unit that takes the hit, then Confirm.
+
+**Vercel:** https://tactical-risk20-7sj92pce2-james-projects-20d8de40.vercel.app/?three=1
+**Germans:** https://tactical-risk20-7sj92pce2-james-projects-20d8de40.vercel.app/?three=1&germans=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/73 (draft · hold merge)
