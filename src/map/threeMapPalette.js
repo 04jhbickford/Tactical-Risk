@@ -124,7 +124,7 @@ const PAPER_UV_SHIFT = {
   'South America': [0.08, 0.52],
   Oceania: [0.47, 0.29],
 };
-export const OCEAN_UV = 16;
+export const OCEAN_UV = 48;
 // Image-gen wash tiles ARE the albedo. Do not flatten to hex + 14% — that
 // was the GIS fail. GRAIN_* only feeds the procedural fallback sheet.
 export const GRAIN_MULTIPLY = 0.78;
@@ -347,6 +347,13 @@ function bakeOcean(img) {
   ctx.fillStyle = PALETTE.oceanDeep;
   ctx.fillRect(0, 0, size, size);
   if (img) ctx.drawImage(img, 0, 0, size, size);
+  // Punch ripple ink so it survives ACES + 390 mid. Never destipple.
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = '#6A5A48';
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
   overlayPhoto(ctx, grainCanvas, size, OCEAN_GRAIN, 'overlay');
   oceanMap = canvasTex(canvas);
   return oceanMap;
@@ -528,13 +535,14 @@ export function makeOceanMaterial() {
   const mat = new THREE.MeshStandardMaterial({
     map: oceanMap,
     normalMap: oceanNormal || null,
-    // P39: map is the hero. White tint so hand-ripples are not cream-washed.
+    // P39: map is the hero. Emissive floor so ACES cannot cream-wash ripples.
     color: 0xffffff,
-    roughness: 0.92,
+    roughness: 0.94,
     metalness: 0.0,
-    envMapIntensity: 0.02,
-    emissive: 0xd8d2be,
-    emissiveIntensity: 0.12,
+    envMapIntensity: 0,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.62,
+    emissiveMap: oceanMap,
     transparent: false,
     vertexColors: false,
   });
@@ -550,15 +558,16 @@ export function makeSeaWaterMaterial() {
     map: oceanMap,
     color: 0xffffff,
     transparent: true,
-    opacity: 0.78,
-    roughness: 0.92,
+    opacity: 0.88,
+    roughness: 0.94,
     metalness: 0.0,
     depthWrite: false,
     depthTest: true,
     side: THREE.DoubleSide,
-    envMapIntensity: 0.08,
-    emissive: 0xd4ceba,
-    emissiveIntensity: 0.08,
+    envMapIntensity: 0,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.55,
+    emissiveMap: oceanMap,
     polygonOffset: true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits: 2,

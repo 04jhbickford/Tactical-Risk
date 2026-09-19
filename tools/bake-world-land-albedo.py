@@ -906,8 +906,8 @@ def bake_ocean_wash():
         return
     tile = tileable_paper(tile, 768)
     # Keep ripple contrast. Quiet parchment grade only — do not blur away ink.
-    tile = ImageEnhance.Color(tile).enhance(0.82)
-    tile = ImageEnhance.Contrast(tile).enhance(1.18)
+    tile = ImageEnhance.Color(tile).enhance(0.88)
+    tile = ImageEnhance.Contrast(tile).enhance(1.45)
     try:
         import numpy as np
         arr = np.array(tile, dtype=np.float32)
