@@ -31,3 +31,9 @@ Open `?three=1&max=1`. Tap **Karelia** → steppers (no zoom over +/−) → tap
 
 ## Counts (unchanged)
 Karelia RUS INF×10 ART×6 TNK×6 FTR×4 BMB×3. Ukraine GER INF×8 ART×4 TNK×4 FTR×3 AA×3.
+
+## Stills @390
+- `preview9-you-assign-gold-390.png` — YOU ART−1, gold **Confirm: Take hits**
+
+**Vercel:** https://tactical-risk20-git-cursor-casua-adb3da-james-projects-20d8de40.vercel.app/?three=1&max=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/79 (draft · hold merge · base PR76 tip)
