@@ -23,8 +23,15 @@ import {
   reportStartupStatus,
 } from '../ui/startupLoader.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
+import {
+  createPreviewFlow,
+  DEMO,
+  FLOW_INSPECT,
+  FLOW_COMBAT_MOVE,
+} from './uxPreviewFlows.js';
 
 const SELECT_GOLD = '#C4A35A';
+const ATTACK_CORAL = '#C45A5A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
 
 function applyLiveContinents(list, bonusGroups) {
@@ -37,10 +44,10 @@ function applyLiveContinents(list, bonusGroups) {
   }
 }
 
-function strokeSelectOutline(ctx, territory, territoryRenderer, zoom) {
+function strokeSelectOutline(ctx, territory, territoryRenderer, zoom, color = SELECT_GOLD) {
   if (!territory) return;
   ctx.save();
-  ctx.strokeStyle = SELECT_GOLD;
+  ctx.strokeStyle = color;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   ctx.lineWidth = Math.max(2.4, 3.4 / Math.max(0.18, zoom));
@@ -120,13 +127,28 @@ export async function bootUxPreview() {
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
   const russians = factions.find((f) => f.id === 'Russians');
+  const germans = factions.find((f) => f.id === 'Germans');
+  const inspectOnly = (() => {
+    const params = new URLSearchParams(location.search);
+    const v = String(params.get('inspect') || '').toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+  })();
+
+  const flow = createPreviewFlow({
+    placements,
+    owners,
+    mode: inspectOnly ? FLOW_INSPECT : FLOW_COMBAT_MOVE,
+  });
 
   const chrome = injectThreeChrome({
-    seat: 'Russians',
-    ipc: russians?.startingPUs || 24,
-    phase: 'PLACE',
+    seat: inspectOnly ? 'Russians' : DEMO.seat,
+    ipc: inspectOnly ? (russians?.startingPUs || 24) : DEMO.ipc,
+    phase: inspectOnly ? 'PLACE' : 'COMBAT MOVE',
   });
-  chrome.setSeat('Russians', russians?.color || '#B22222');
+  chrome.setSeat(
+    inspectOnly ? 'Russians' : DEMO.seat,
+    inspectOnly ? (russians?.color || '#B22222') : (germans?.color || DEMO.seatColor),
+  );
 
   reportStartupStatus('Loading main tiles and unit chits…', 52);
   const { images, ready: imagesReady } = preloadUnitImages(
@@ -150,13 +172,72 @@ export async function bootUxPreview() {
   let stacksExpanded = false;
   let hover = null;
 
+  function landByName(name) {
+    return territories.find((t) => t.name === name) || null;
+  }
+
   function paintChrome() {
-    chrome.paintSelection({
-      land: selected,
-      stacks: selected ? (placements[selected.name] || []) : [],
-      unitType: selectedUnitType,
-      confirmed,
+    const snap = flow.snapshot();
+    if (snap.mode === FLOW_INSPECT) {
+      chrome.setPhase('PLACE');
+      chrome.setDoneButton({ on: false });
+      chrome.paintSelection({
+        land: selected,
+        stacks: selected ? (placements[selected.name] || []) : [],
+        unitType: selectedUnitType,
+        confirmed,
+      });
+      return;
+    }
+    if (snap.mode === FLOW_COMBAT_MOVE) {
+      chrome.setPhase('COMBAT MOVE');
+      const src = landByName(DEMO.source);
+      chrome.setDoneButton({
+        label: 'End Combat Movement →',
+        on: snap.done,
+        disabled: !snap.done,
+      });
+      chrome.paintCombatMove({
+        land: src,
+        stacks: placements[DEMO.source] || [],
+        staged: snap.staged,
+        dest: snap.dest,
+        cta: flow.currentCta(),
+      });
+      selected = src;
+      return;
+    }
+    if (snap.mode === FLOW_BATTLE) {
+      chrome.setPhase('BATTLE');
+      chrome.setDoneButton({ on: false });
+      chrome.paintBattle({
+        dest: snap.dest || DEMO.dests[0],
+        phase: snap.battlePhase,
+        step: snap.battleStep,
+        hint: snap.battleHint,
+        attHits: snap.attHits,
+        defHits: snap.defHits,
+        retreated: snap.retreated,
+        cta: flow.currentCta(),
+      });
+      selected = landByName(snap.dest || DEMO.source);
+      return;
+    }
+    chrome.setPhase('LAND AIR');
+    chrome.setDoneButton({ on: false });
+    chrome.paintAirLanding({
+      remaining: snap.airRemaining,
+      units: flow.state.airUnits,
+      landings: snap.landings,
+      options: DEMO.landingOptions,
+      cta: flow.currentCta(),
     });
+    selected = landByName(flow.selectedName());
+  }
+
+  function refresh() {
+    paintChrome();
+    camera.dirty = true;
   }
 
   chrome.onStackToggle = (on) => {
@@ -164,10 +245,48 @@ export async function bootUxPreview() {
     camera.dirty = true;
   };
   chrome.onUnitPick = (type) => {
-    selectedUnitType = type || null;
-    confirmed = false;
-    paintChrome();
-    camera.dirty = true;
+    if (flow.snapshot().mode === FLOW_INSPECT) {
+      selectedUnitType = type || null;
+      confirmed = false;
+      paintChrome();
+      camera.dirty = true;
+      return;
+    }
+    flow.tapUnit(type);
+    refresh();
+  };
+  chrome.onConfirm = () => {
+    if (flow.snapshot().mode === FLOW_INSPECT) {
+      confirmed = true;
+      paintChrome();
+      return;
+    }
+    flow.confirm();
+    refresh();
+  };
+  chrome.onDone = () => {
+    flow.confirm();
+    refresh();
+  };
+  chrome.onFlowAction = (action, extra) => {
+    if (action === 'start-inspect') {
+      flow.flowAction('start-inspect');
+      chrome.setSeat('Russians', russians?.color || '#B22222');
+      chrome.setIpc(russians?.startingPUs || 24);
+      selected = null;
+      refresh();
+      return;
+    }
+    if (action === 'start-combat') {
+      flow.startCombatMove();
+      chrome.setSeat(DEMO.seat, germans?.color || DEMO.seatColor);
+      chrome.setIpc(DEMO.ipc);
+      fitEast();
+      refresh();
+      return;
+    }
+    flow.flowAction(action, extra);
+    refresh();
   };
 
   function fitEurope() {
@@ -178,7 +297,16 @@ export async function bootUxPreview() {
       fillFrame: true,
     });
   }
-  fitEurope();
+  function fitEast() {
+    camera.fitBounds(DEMO.eastFit, {
+      padding: 12,
+      padTop: 56,
+      padBottom: 132,
+      fillFrame: true,
+    });
+  }
+  if (inspectOnly) fitEurope();
+  else fitEast();
 
   function pickAt(sx, sy) {
     const world = camera.screenToWorld(sx, sy);
@@ -194,6 +322,11 @@ export async function bootUxPreview() {
   }
 
   function selectLand(next) {
+    if (flow.snapshot().mode !== FLOW_INSPECT) {
+      if (next?.name) flow.tapLand(next.name);
+      refresh();
+      return;
+    }
     selected = next || null;
     selectedUnitType = null;
     confirmed = false;
@@ -273,9 +406,6 @@ export async function bootUxPreview() {
   });
   chrome.confirm.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (!selected || chrome.confirm.disabled) return;
-    confirmed = true;
-    paintChrome();
   });
 
   function paint() {
@@ -305,7 +435,22 @@ export async function bootUxPreview() {
       territoryRenderer.renderOwnershipOverlays(ctx, camera.zoom);
       territoryRenderer.renderTerrainTexture(ctx, camera.zoom);
       territoryRenderer.renderTerritoryOutlines(ctx, camera.zoom);
-      if (selected) strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom);
+      const highlights = flow.highlightNames();
+      for (const name of highlights) {
+        const t = landByName(name);
+        if (!t) continue;
+        const attack = DEMO.dests.includes(name) || DEMO.landingOptions.includes(name);
+        strokeSelectOutline(
+          ctx,
+          t,
+          territoryRenderer,
+          camera.zoom,
+          attack && name !== DEMO.source ? ATTACK_CORAL : SELECT_GOLD,
+        );
+      }
+      if (selected && !highlights.includes(selected.name)) {
+        strokeSelectOutline(ctx, selected, territoryRenderer, camera.zoom);
+      }
       renderPreviewStacks(ctx, {
         territories,
         placements,
@@ -405,11 +550,13 @@ export async function bootUxPreview() {
       idleConfirm: 'Select a territory',
       confirmGold: SELECT_GOLD,
       stress: stressOn,
+      flow: flow.snapshot(),
     };
   };
 
   window.__uxPreview = {
     inspect,
+    flow,
     selectLand: (name) => {
       const t = territories.find((x) => x.name === name);
       if (t) selectLand(t);
@@ -433,8 +580,36 @@ export async function bootUxPreview() {
     overlapReport: () => overlapReport(currentLayouts()),
     layouts: currentLayouts,
     chrome,
+    startCombatMove: () => {
+      flow.startCombatMove();
+      chrome.setSeat(DEMO.seat, germans?.color || DEMO.seatColor);
+      chrome.setIpc(DEMO.ipc);
+      fitEast();
+      refresh();
+    },
+    tapLand: (name) => {
+      flow.tapLand(name);
+      refresh();
+      return flow.snapshot();
+    },
+    tapUnit: (type) => {
+      flow.tapUnit(type);
+      refresh();
+      return flow.snapshot();
+    },
+    confirmFlow: () => {
+      flow.confirm();
+      refresh();
+      return flow.snapshot();
+    },
+    flowAction: (action, extra) => {
+      flow.flowAction(action, extra);
+      refresh();
+      return flow.snapshot();
+    },
   };
 
+  paintChrome();
   console.log('[ux-preview]', inspect());
   reportStartupStatus('Preview ready', 100);
   dismissStartupLoader();

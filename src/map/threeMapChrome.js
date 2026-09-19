@@ -213,6 +213,85 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       backdrop-filter:none;
       box-shadow:inset 0 1px 0 rgba(255,248,230,0.28);
     }
+    #three-done {
+      display:none; pointer-events:auto;
+      min-height:44px; height:44px; width:100%;
+      border:1px solid rgba(255,255,255,0.12); border-radius:12px;
+      background:rgba(30,36,32,0.62); color:#E8E2D4;
+      font:600 14px/1 -apple-system,"SF Pro Text",sans-serif;
+      cursor:pointer;
+    }
+    #three-done.is-on { display:flex; align-items:center; justify-content:center; }
+    #three-done:disabled { opacity:0.38; cursor:default; }
+    #three-flow {
+      display:none; pointer-events:auto;
+      max-height:min(38dvh, 320px);
+      overflow:auto;
+      padding:10px 12px;
+      border-radius:14px;
+      background:rgba(30,36,32,0.78);
+      -webkit-backdrop-filter:saturate(1.35) blur(20px);
+      backdrop-filter:saturate(1.35) blur(20px);
+      border:1px solid rgba(255,255,255,0.12);
+      color:#E8E2D4;
+    }
+    #three-flow.is-on { display:block; }
+    #three-flow .three-flow-head {
+      display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+      font:600 13px/1.2 -apple-system,"SF Pro Text",sans-serif;
+      letter-spacing:0.04em; text-transform:uppercase; opacity:0.78;
+    }
+    #three-flow .three-flow-title {
+      margin:6px 0 4px;
+      font:600 17px/1.2 -apple-system,"SF Pro Text",sans-serif;
+      letter-spacing:-0.01em; text-transform:none; opacity:1;
+    }
+    #three-flow .three-flow-hint {
+      margin:0 0 8px;
+      font:400 13px/1.35 -apple-system,"SF Pro Text",sans-serif;
+      color:#c8c0b0;
+    }
+    #three-flow .three-flow-steps {
+      display:flex; gap:6px; margin:0 0 10px;
+    }
+    #three-flow .three-flow-step {
+      flex:1; min-height:32px; border-radius:999px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.04);
+      color:#E8E2D4; font:600 11px/32px -apple-system,sans-serif;
+      text-align:center; letter-spacing:0.04em; text-transform:uppercase;
+    }
+    #three-flow .three-flow-step.is-on {
+      background:#C4A35A; color:#1E2420; border-color:transparent;
+    }
+    #three-flow .three-flow-row {
+      display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;
+    }
+    #three-flow .three-flow-chip,
+    #three-flow .three-flow-dest {
+      min-height:44px; padding:0 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06); color:#E8E2D4;
+      font:600 13px/1 -apple-system,"SF Pro Text",sans-serif;
+      cursor:pointer;
+    }
+    #three-flow .three-flow-chip.is-on,
+    #three-flow .three-flow-dest.is-on {
+      box-shadow:0 0 0 2px #C4A35A;
+    }
+    #three-flow .three-flow-secondary {
+      display:flex; gap:8px; margin-top:8px;
+    }
+    #three-flow .three-flow-secondary button {
+      flex:1; min-height:44px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.06); color:#E8E2D4;
+      font:600 14px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+    }
+    #three-peek .three-peek-unit.is-staged {
+      box-shadow:0 0 0 2px #C4A35A;
+    }
+    #three-peek .three-peek-unit.is-staged b { background:#C4A35A; color:#1E2420; }
     #three-zoom {
       position:absolute; right:max(10px, env(safe-area-inset-right));
       bottom:calc(74px + env(safe-area-inset-bottom, 0px));
@@ -221,7 +300,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     html.three-spike.has-l1 #three-zoom {
       bottom:calc(208px + env(safe-area-inset-bottom, 0px));
     }
-    html.three-spike.has-l2 #three-zoom { display:none; }
+    html.three-spike.has-l2 #three-zoom,
+    html.three-spike.has-flow #three-zoom { display:none; }
     #three-zoom button {
       width:44px; height:44px; border-radius:12px;
       border:1px solid rgba(255,255,255,0.12);
@@ -293,6 +373,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bottom.innerHTML = `
     <button type="button" id="three-stack-toggle" aria-pressed="false">Expand stacks</button>
     <div id="three-peek"></div>
+    <div id="three-flow"></div>
+    <button type="button" id="three-done">End Combat Movement →</button>
     <button type="button" id="three-confirm" class="is-idle" disabled>Select a territory</button>
   `;
   document.body.appendChild(bottom);
@@ -302,6 +384,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   sheet.innerHTML = `
     <h2>Match</h2>
     <button type="button" class="three-sheet-row" data-sheet="close">Back to board</button>
+    <button type="button" class="three-sheet-row" data-sheet="combat">Combat Move demo</button>
+    <button type="button" class="three-sheet-row" data-sheet="inspect">Inspect board</button>
     <button type="button" class="three-sheet-row" data-sheet="canvas">Open live Canvas (no preview)</button>
     <p class="three-sheet-note">Preview only · main art · Three UX · SCHEMA ${SCHEMA_VERSION} · do not merge.</p>
   `;
@@ -315,7 +399,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     bottom,
     sheet,
     peek: bottom.querySelector('#three-peek'),
+    flow: bottom.querySelector('#three-flow'),
+    doneBtn: bottom.querySelector('#three-done'),
     confirm: bottom.querySelector('#three-confirm'),
+    onConfirm: null,
+    onDone: null,
+    onFlowAction: null,
     phaseEl: l0.querySelector('#three-phase'),
     seatEl: l0.querySelector('#three-seat'),
     ipcEl: l0.querySelector('#three-ipc'),
@@ -339,10 +428,33 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     syncLayers() {
       const l2 = sheet.classList.contains('is-open');
-      const l1 = !l2 && api.peek.classList.contains('is-on');
+      const flowOn = api.flow.classList.contains('is-on');
+      const l1 = !l2 && (api.peek.classList.contains('is-on') || flowOn);
       document.documentElement.classList.toggle('has-l1', l1);
       document.documentElement.classList.toggle('has-l2', l2);
+      document.documentElement.classList.toggle('has-flow', flowOn);
       document.documentElement.classList.toggle('has-stacks', api.stacksExpanded);
+    },
+    setFlowOpen(on, html = '') {
+      if (html) api.flow.innerHTML = html;
+      api.flow.classList.toggle('is-on', !!on);
+      if (!on) api.flow.innerHTML = '';
+      api.syncLayers();
+    },
+    setDoneButton({ label = '', on = false, disabled = true } = {}) {
+      api.doneBtn.textContent = label || 'End Combat Movement →';
+      api.doneBtn.classList.toggle('is-on', !!on);
+      api.doneBtn.disabled = !!disabled;
+    },
+    applyCta(cta) {
+      if (!cta || cta.disabled) {
+        api.confirm.disabled = true;
+        api.confirm.classList.remove('is-ready');
+        api.confirm.classList.add('is-idle');
+        api.confirm.textContent = cta?.label || 'Select a territory';
+        return;
+      }
+      api.setConfirmReady(cta.label);
     },
     setSheetOpen(open) {
       sheet.classList.toggle('is-open', !!open);
@@ -378,6 +490,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       return false;
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
+      api.setFlowOpen(false);
+      api.setDoneButton({ on: false });
       if (api.isSheetOpen()) {
         api.peek.classList.remove('is-on');
       }
@@ -411,6 +525,105 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           : `Confirm: ${land.name}`);
       }
     },
+    paintCombatMove({ land = null, stacks = [], staged = {}, dest = null, cta = null } = {}) {
+      api.setFlowOpen(false);
+      if (!land) {
+        api.peek.classList.remove('is-on');
+        api.peek.textContent = '';
+        api.applyCta(cta || { label: 'Select a territory', disabled: true });
+        api.syncLayers();
+        return;
+      }
+      const destLine = dest ? `→ ${dest}` : 'Tap a highlighted land';
+      const stagedLine = Object.entries(staged).filter(([, n]) => n > 0).map(([t, n]) => `${shortType(t)}×${n}`).join(' ');
+      api.peek.innerHTML = `<strong>${land.name}</strong>
+        <div class="three-peek-meta">${['Germans', destLine, stagedLine].filter(Boolean).join(' · ')}</div>
+        ${iconRowHtml(stacks)}`;
+      for (const [type, n] of Object.entries(staged || {})) {
+        if (!n) continue;
+        const chip = api.peek.querySelector(`[data-unit-type="${type}"]`);
+        if (chip) {
+          chip.classList.add('is-staged', 'is-picked');
+          const badge = chip.querySelector('b');
+          if (badge) badge.textContent = String(n);
+        }
+      }
+      api.peek.classList.add('is-on');
+      api.applyCta(cta);
+      api.syncLayers();
+    },
+    paintBattle({
+      dest = 'Karelia S.S.R.',
+      phase = 'ready',
+      step = 'odds',
+      hint = '',
+      attHits = 0,
+      defHits = 0,
+      cta = null,
+      retreated = false,
+    } = {}) {
+      const steps = ['odds', 'select', 'resolve'].map((id) => (
+        `<span class="three-flow-step${id === step ? ' is-on' : ''}">${id}</span>`
+      )).join('');
+      let body = '';
+      if (phase === 'aaFire') {
+        body = `<p class="three-flow-hint">Karelia AA vs attacking fighter. 1 die, hit on 1.</p>`;
+      } else if (phase === 'aaResults') {
+        body = `<p class="three-flow-hint">AA misses. Fighter stays in the fight.</p>`;
+      } else if (phase === 'ready') {
+        body = `<div class="three-flow-secondary">
+          <button type="button" data-flow="auto-battle">Auto Battle</button>
+          <button type="button" data-flow="retreat">Retreat</button>
+        </div>`;
+      } else if (phase === 'selectCasualties') {
+        body = `<p class="three-flow-hint">Assign hits, then Confirm. Att ${attHits}/1 · Def ${defHits}/1.</p>
+          <div class="three-flow-row">
+            <button type="button" class="three-flow-chip${attHits ? ' is-on' : ''}" data-flow="assign-att">Attacker INF</button>
+            <button type="button" class="three-flow-chip${defHits ? ' is-on' : ''}" data-flow="assign-def">Defender INF</button>
+          </div>`;
+      } else if (phase === 'selectRetreat') {
+        body = `<p class="three-flow-hint">Choose retreat</p>
+          <button type="button" class="three-flow-dest" data-flow="pick-landing" data-name="Ukraine S.S.R.">Ukraine S.S.R.</button>`;
+      } else if (phase === 'resolved') {
+        body = `<p class="three-flow-hint">${retreated ? 'Defender holds · retreated' : 'Attacker wins'}. Land surviving aircraft next.</p>`;
+      }
+      api.setFlowOpen(true, `
+        <div class="three-flow-head"><span>Battle · 1/1</span><span>${dest}</span></div>
+        <div class="three-flow-title">${dest}</div>
+        <div class="three-flow-steps">${steps}</div>
+        <p class="three-flow-hint">${hint || ''}</p>
+        ${body}
+      `);
+      api.peek.classList.remove('is-on');
+      api.applyCta(cta);
+      api.syncLayers();
+    },
+    paintAirLanding({
+      remaining = 1,
+      units = [],
+      landings = {},
+      options = [],
+      cta = null,
+    } = {}) {
+      const cards = (units || []).map((u, i) => {
+        const key = u.id || `${u.type}_${i}`;
+        const dest = landings[key] || u.destination || '';
+        return `<div class="three-flow-hint">${shortType(u.type)} ${i + 1} · ${dest || 'tap a highlighted land'}</div>`;
+      }).join('');
+      const dests = (options || []).map((name) => (
+        `<button type="button" class="three-flow-dest${Object.values(landings).includes(name) ? ' is-on' : ''}" data-flow="pick-landing" data-name="${name}">${name}</button>`
+      )).join('');
+      api.setFlowOpen(true, `
+        <div class="three-flow-head"><span>Land air</span><span>${remaining} remaining</span></div>
+        <div class="three-flow-title">Move Air Units To Landing Zone</div>
+        <p class="three-flow-hint">${remaining} / ${units.length || 1} UNITS REMAINING</p>
+        ${cards}
+        <div class="three-flow-row">${dests}</div>
+      `);
+      api.peek.classList.remove('is-on');
+      api.applyCta(cta);
+      api.syncLayers();
+    },
   };
 
   api.menuBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -427,11 +640,41 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       location.href = stripPreviewParams(location.href);
       return;
     }
+    if (row.dataset.sheet === 'combat' && typeof api.onFlowAction === 'function') {
+      api.setSheetOpen(false);
+      api.onFlowAction('start-combat');
+      return;
+    }
+    if (row.dataset.sheet === 'inspect' && typeof api.onFlowAction === 'function') {
+      api.setSheetOpen(false);
+      api.onFlowAction('start-inspect');
+      return;
+    }
     api.setSheetOpen(false);
   });
   api.confirm.addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     e.preventDefault();
+  });
+  api.confirm.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (api.confirm.disabled) return;
+    if (typeof api.onConfirm === 'function') api.onConfirm();
+  });
+  api.doneBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  api.doneBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (api.doneBtn.disabled) return;
+    if (typeof api.onDone === 'function') api.onDone();
+  });
+  api.flow.addEventListener('pointerdown', (e) => e.stopPropagation());
+  api.flow.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-flow]');
+    if (!btn) return;
+    e.stopPropagation();
+    if (typeof api.onFlowAction === 'function') {
+      api.onFlowAction(btn.dataset.flow, { name: btn.dataset.name });
+    }
   });
   zoom.addEventListener('pointerdown', (e) => e.stopPropagation());
   stackToggle.addEventListener('pointerdown', (e) => e.stopPropagation());
