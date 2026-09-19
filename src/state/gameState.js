@@ -17,6 +17,7 @@ import {
   unappliedLandingPlan,
   upsertPendingAirLanding,
 } from './airLanding.js';
+import { emitGameEvent, summarizeUnits } from '../multiplayer/gameEventLog.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -1749,6 +1750,15 @@ export class GameState {
     }
 
     this._notify();
+    emitGameEvent('purchase', {
+      gameState: this,
+      payload: {
+        unitType,
+        quantity: 1,
+        ipcDelta: -cost,
+        territory: territory || null,
+      },
+    });
     return { success: true };
   }
 
@@ -2193,6 +2203,10 @@ export class GameState {
     this._clearMovedFlags();
     this._notify();
     this.autoSave(); // Auto-save after each turn
+    emitGameEvent('phase', {
+      gameState: this,
+      payload: { action: 'turnStart', round: this.round },
+    });
   }
 
   // Helper: populate friendly territories at turn start (for air landing validation)
@@ -2308,6 +2322,10 @@ export class GameState {
 
     this._notify();
     this.autoSave(); // Auto-save after each phase change
+    emitGameEvent('phase', {
+      gameState: this,
+      payload: { action: 'nextPhase', turnPhase: this.turnPhase },
+    });
   }
 
   // Get current turn phase name
@@ -2339,6 +2357,15 @@ export class GameState {
     }
 
     this._notify();
+    emitGameEvent('purchase', {
+      gameState: this,
+      payload: {
+        unitType,
+        quantity,
+        ipcDelta: -totalCost,
+        via: 'purchaseForMobilization',
+      },
+    });
     return true;
   }
 
@@ -2921,6 +2948,19 @@ export class GameState {
     }
 
     this._notify();
+    const isAttack = isCombatMove && isEnemy && !captured;
+    emitGameEvent(isAttack ? 'attack' : 'move', {
+      gameState: this,
+      territory: toTerritory,
+      payload: {
+        from: fromTerritory,
+        to: toTerritory,
+        units: summarizeUnits(unitsToMove),
+        combatMove: isCombatMove,
+        captured,
+        cardAwarded: cardAwarded || null,
+      },
+    });
     return {
       success: true,
       from: fromTerritory,
@@ -2929,7 +2969,7 @@ export class GameState {
       shipIds: movedShipIds.length > 0 ? movedShipIds : undefined,
       captured,
       cardAwarded,
-      isAttack: isCombatMove && isEnemy && !captured,
+      isAttack,
       blitzedCaptures: blitzedCaptures.length > 0 ? blitzedCaptures : undefined,
     };
   }
@@ -3273,6 +3313,14 @@ export class GameState {
     this.units[destination] = destUnits;
 
     this._notify();
+    emitGameEvent('retreat', {
+      gameState: this,
+      territory: combatTerritory,
+      payload: {
+        destination,
+        units: summarizeUnits(unitsToRetreat),
+      },
+    });
     return { success: true };
   }
 
@@ -3582,6 +3630,18 @@ export class GameState {
       result.resolved = false;
     }
 
+    this.recordCombatTelemetry({
+      kind: 'combat',
+      territory,
+      hits: { attack: totalAttackHits, defense: defenseHits },
+      attackRolls: attackRolls.map((r) => r.roll),
+      defenseRolls: defenseRolls.map((r) => r.roll),
+      attackForce: attackers,
+      defenseForce: combatDefenders,
+      survivors: remainingAttackers,
+      wiped: remainingAttackers.length === 0,
+    });
+
     this._notify();
     return result;
   }
@@ -3636,6 +3696,24 @@ export class GameState {
     if (this.combatTelemetry.length > 40) {
       this.combatTelemetry = this.combatTelemetry.slice(-40);
     }
+    const kind = entry.kind === 'aa' ? 'aa' : 'combat';
+    emitGameEvent(kind, {
+      gameState: this,
+      territory: entry.territory || null,
+      payload: {
+        hits: entry.hits ?? 0,
+        rolls: capRolls(entry.rolls),
+        attackRolls: capRolls(entry.attackRolls),
+        defenseRolls: capRolls(entry.defenseRolls),
+        forcesBefore: {
+          attack: capForce(entry.attackForce),
+          defense: capForce(entry.defenseForce),
+        },
+        forcesAfter: { attack: capForce(entry.survivors) },
+        wiped: !!entry.wiped,
+        via: 'combatTelemetry',
+      },
+    });
   }
 
   getCombatTelemetry() {
@@ -3909,6 +3987,10 @@ export class GameState {
     }
 
     this.playerState[player.id].ipcs += income;
+    emitGameEvent('ui', {
+      gameState: this,
+      payload: { action: 'collectIncome', ipcDelta: income },
+    });
   }
 
   _clearMovedFlags() {
