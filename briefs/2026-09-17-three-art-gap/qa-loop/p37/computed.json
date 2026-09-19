@@ -1,5 +1,5 @@
 {
-  "version": "V2.81.51-three-polish.37",
+  "version": "V2.81.52-three-polish.37",
   "inspect": {
     "name": "Alaska",
     "verts": 125028,
@@ -18,7 +18,7 @@
     "landSeal": true,
     "atlas": true,
     "palette": "aa-hecorrect-11",
-    "version": "V2.81.51-three-polish.37",
+    "version": "V2.81.52-three-polish.37",
     "lod": "near",
     "regionWash": true,
     "plastic": true,
@@ -69,7 +69,7 @@
     "seaDeckClear": true,
     "eastMedPinSouth": true,
     "noBlotchAtlas": true,
-    "albedoRev": "p37",
+    "albedoRev": "p37b",
     "imhofRelief": false,
     "watercolorParchment": true,
     "styleRef": "oceania-watercolor",
