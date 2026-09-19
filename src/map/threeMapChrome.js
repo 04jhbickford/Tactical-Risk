@@ -34,15 +34,43 @@ export function stackSummary(stacks) {
     .join(' ');
 }
 
-function iconRowHtml(stacks) {
+const STATIC_CHIP_TYPES = new Set(['factory', 'aaGun']);
+
+function iconRowHtml(stacks, { pickedTypes = [], interactive = true } = {}) {
   if (!stacks?.length) return '';
   return `<div class="three-peek-row">${stacks.map((s) => {
     const src = getUnitIconPath(s.type, s.owner) || '';
-    return `<button type="button" class="three-peek-unit" data-unit-type="${s.type}" title="${formatUnitName(s.type)}">
+    const canToggle = interactive && !STATIC_CHIP_TYPES.has(s.type);
+    const picked = pickedTypes.includes(s.type) ? ' is-picked' : '';
+    const attrs = canToggle
+      ? `type="button" class="three-peek-unit${picked}" data-unit-type="${s.type}"`
+      : `type="button" class="three-peek-unit is-static" disabled`;
+    return `<button ${attrs} title="${formatUnitName(s.type)}">
       <img src="${src}" alt="${shortType(s.type)}" width="36" height="36">
       <b>${s.quantity}</b>
     </button>`;
   }).join('')}</div>`;
+}
+
+function casualtyRowHtml(side) {
+  if (!side || side.need <= 0) return '';
+  const role = side.side === 'def' ? 'Their loss' : 'Your loss';
+  const hint = side.choice
+    ? `pick ${side.need}`
+    : `${side.need} forced`;
+  const chips = (side.pool || []).map((s) => {
+    const n = Number(side.pending?.[s.type]) || 0;
+    const on = n > 0 ? ' is-picked' : '';
+    const src = getUnitIconPath(s.type, side.owner) || '';
+    return `<button type="button" class="three-peek-unit${on}" data-casualty-side="${side.side}" data-casualty-type="${s.type}" title="${formatUnitName(s.type)}">
+      <img src="${src}" alt="${shortType(s.type)}" width="36" height="36">
+      <b>${n || s.quantity}</b>
+    </button>`;
+  }).join('');
+  return `<div class="three-casualty" data-casualty-side="${side.side}">
+    <p class="three-casualty-label">${role} · ${hint} · ${side.picked}/${side.need}</p>
+    <div class="three-peek-row">${chips}</div>
+  </div>`;
 }
 
 function printIpc(land) {
@@ -166,8 +194,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       color:inherit; padding:0; cursor:pointer;
       -webkit-tap-highlight-color:transparent;
     }
-    #three-peek .three-peek-unit.is-picked {
+    #three-peek .three-peek-unit.is-picked,
+    #three-battle .three-peek-unit.is-picked {
       box-shadow:0 0 0 2px #C4A35A;
+    }
+    #three-peek .three-peek-unit.is-static {
+      opacity:0.45; cursor:default;
     }
     #three-peek .three-peek-unit img { width:48px; height:48px; display:block; }
     #three-peek .three-peek-unit b {
@@ -315,6 +347,31 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       background:#C4A35A; color:#1E2420; border-color:transparent;
     }
     #three-battle .three-die.is-def { opacity:0.88; }
+    #three-battle .three-casualty { margin-top:8px; }
+    #three-battle .three-casualty-label {
+      margin:0 0 6px; font:600 12px/1.3 -apple-system,"SF Pro Text",sans-serif;
+      color:#F4E8C4;
+    }
+    #three-battle .three-peek-row {
+      display:flex; flex-wrap:nowrap; gap:6px; margin-top:0;
+      overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
+    }
+    #three-battle .three-peek-unit {
+      position:relative; width:48px; height:48px;
+      display:inline-flex; align-items:center; justify-content:center;
+      background:rgba(240,230,210,0.16);
+      border:1px solid rgba(255,255,255,0.10);
+      border-radius:12px; color:inherit; padding:0; cursor:pointer;
+      -webkit-tap-highlight-color:transparent;
+    }
+    #three-battle .three-peek-unit img { width:40px; height:40px; display:block; }
+    #three-battle .three-peek-unit b {
+      position:absolute; right:-2px; bottom:-2px;
+      min-width:16px; height:16px; padding:0 4px;
+      border-radius:999px; background:#1A1610; color:#F4EFE4;
+      font:700 11px/16px -apple-system,"SF Pro Text",sans-serif;
+      font-variant-numeric:tabular-nums; text-align:center;
+    }
     html.three-spike.has-battle #three-zoom,
     html.three-spike.has-l2 #three-zoom { display:none; }
     html.three-spike.has-battle #three-stack-toggle { display:none; }
@@ -388,7 +445,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     <div id="three-guide" aria-live="polite"></div>
     <div id="three-battle"></div>
     <div id="three-peek"></div>
-    <button type="button" id="three-confirm" class="is-idle" disabled>Tap the glowing red stack</button>
+    <button type="button" id="three-confirm" class="is-idle" disabled>Tap a glowing stack</button>
   `;
   document.body.appendChild(bottom);
 
@@ -425,6 +482,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     stacksExpanded: false,
     onStackToggle: null,
     onUnitPick: null,
+    onCasualtyPick: null,
     onGuideDismiss: null,
     setSeat(name, color) {
       api.seatEl.textContent = name;
@@ -454,7 +512,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     isSheetOpen() {
       return sheet.classList.contains('is-open');
     },
-    setConfirmIdle(label = 'Tap the glowing red stack') {
+    setConfirmIdle(label = 'Tap a glowing stack') {
       api.confirm.disabled = true;
       api.confirm.classList.remove('is-ready');
       api.confirm.classList.add('is-idle');
@@ -510,11 +568,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const side = d.side === 'def' ? ' is-def' : '';
         return `<span class="three-die${hit}${side}" title="${d.type || ''}">${d.face}</span>`;
       }).join('');
+      const att = casualtyRowHtml(card.casualty?.att);
+      const def = casualtyRowHtml(card.casualty?.def);
       api.battleEl.innerHTML = `
         <p class="three-battle-kicker">${card.kicker || 'Battle'}</p>
         <strong>${card.title || ''}</strong>
         <div class="three-battle-body">${card.body || ''}</div>
-        ${dice ? `<div class="three-dice">${dice}</div>` : ''}`;
+        ${dice ? `<div class="three-dice">${dice}</div>` : ''}
+        ${att}${def}`;
       api.battleEl.classList.add('is-on');
       api.syncLayers();
     },
@@ -559,23 +620,19 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const owner = stacks[0]?.owner || (!land.isWater ? land.originalOwner : '');
         const ipcLine = !land.isWater ? `${printIpc(land)} IPC` : '';
         const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
-        api.peek.innerHTML = `<strong>${land.name}</strong>
-          <div class="three-peek-meta">${[owner, ipcLine, route].filter(Boolean).join(' · ')}</div>
-          ${iconRowHtml(stacks)}`;
-        api.peek.dataset.rosterTotal = String(rosterTotal);
         const pickedTypes = [
           ...(Array.isArray(unitTypes) ? unitTypes : []),
           ...(unitType ? [unitType] : []),
         ];
-        for (const type of pickedTypes) {
-          const picked = api.peek.querySelector(`[data-unit-type="${type}"]`);
-          if (picked) picked.classList.add('is-picked');
-        }
+        api.peek.innerHTML = `<strong>${land.name}</strong>
+          <div class="three-peek-meta">${[owner, ipcLine, route].filter(Boolean).join(' · ')}</div>
+          ${iconRowHtml(stacks, { pickedTypes, interactive: true })}`;
+        api.peek.dataset.rosterTotal = String(rosterTotal);
         if (!api.isSheetOpen()) api.peek.classList.add('is-on');
       }
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
       else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
-      else api.setConfirmIdle(label || 'Tap the glowing red stack');
+      else api.setConfirmIdle(label || 'Tap a glowing stack');
       api.syncLayers();
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
@@ -643,9 +700,17 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   });
   api.peek.addEventListener('click', (e) => {
     const chip = e.target.closest('[data-unit-type]');
-    if (!chip) return;
+    if (!chip || chip.disabled) return;
     e.stopPropagation();
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
+  });
+  api.battleEl.addEventListener('click', (e) => {
+    const chip = e.target.closest('[data-casualty-side]');
+    if (!chip) return;
+    e.stopPropagation();
+    if (typeof api.onCasualtyPick === 'function') {
+      api.onCasualtyPick(chip.dataset.casualtySide, chip.dataset.casualtyType);
+    }
   });
   api.guideEl.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-guide="dismiss"]');

@@ -29,8 +29,10 @@ import {
   LAND_TEAL,
   createScenario,
   applyScenarioPocket,
+  attachConnections,
   tapLand,
   pickUnit,
+  pickCasualty,
   confirm as confirmPlay,
   confirmLabel,
   confirmGold,
@@ -100,6 +102,43 @@ function selectRingCount(territory, territoryRenderer) {
   return edges?.length ? 1 : territory.polygons.length;
 }
 
+function shortLandName(name) {
+  return String(name || '')
+    .replace(' S.S.R.', '')
+    .replace(' Norway', '');
+}
+
+function renderLandNameLabels(ctx, {
+  territories,
+  names,
+  zoom,
+  emphasize = [],
+}) {
+  const want = new Set((names || []).filter(Boolean));
+  if (!want.size) return;
+  const hot = new Set(emphasize || []);
+  const z = Math.max(0.22, zoom);
+  const font = Math.max(10, Math.min(14, 13 / z * 0.55));
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 ${font}px -apple-system, "SF Pro Text", sans-serif`;
+  ctx.lineJoin = 'round';
+  for (const t of territories || []) {
+    if (!want.has(t.name) || t.isWater) continue;
+    const c = territoryCenter(t);
+    if (!c) continue;
+    const label = shortLandName(t.name);
+    const y = c.y + 28 / z;
+    ctx.lineWidth = Math.max(2.4, 3.4 / z);
+    ctx.strokeStyle = 'rgba(20,16,10,0.82)';
+    ctx.strokeText(label, c.x, y);
+    ctx.fillStyle = hot.has(t.name) ? SELECT_GOLD : '#F4EFE4';
+    ctx.fillText(label, c.x, y);
+  }
+  ctx.restore();
+}
+
 export async function bootUxPreview() {
   reportStartupStatus('UX preview — loading main map art…', 28);
 
@@ -143,7 +182,7 @@ export async function bootUxPreview() {
   const pocket = applyScenarioPocket(classicPlacements, classicOwners);
   const placements = pocket.placements;
   const owners = pocket.owners;
-  let play = createScenario({ placements, owners });
+  let play = attachConnections(createScenario({ placements, owners }), territories);
   const stressOn = (() => {
     const params = new URLSearchParams(location.search);
     const v = String(params.get('stress') || '').toLowerCase();
@@ -199,8 +238,8 @@ export async function bootUxPreview() {
     chrome.setPhase(play.phase);
     const marks = highlights(play);
     let focusName = play.selected || marks.dest || null;
-    if (play.phase === PHASE.COMBAT_MOVE && (play.selected === play.origin || play.destPicked || Object.keys(play.selectedUnits || {}).length)) {
-      focusName = play.origin;
+    if (play.phase === PHASE.COMBAT_MOVE && (play.attackFrom || play.destPicked || Object.keys(play.selectedUnits || {}).length)) {
+      focusName = play.attackFrom || play.origin;
     }
     if (play.phase === PHASE.AIR_LAND && !play.landingDest) {
       focusName = play.dest;
@@ -209,7 +248,7 @@ export async function bootUxPreview() {
     const picked = Object.keys(play.selectedUnits || {}).filter((t) => play.selectedUnits[t]);
     let route = '';
     if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
-      route = `${play.origin} → ${play.dest}`;
+      route = `${play.attackFrom || play.origin} → ${play.destPicked}`;
     } else if (play.phase === PHASE.AIR_LAND) {
       route = play.landingDest ? `Land in ${play.landingDest}` : 'Pick teal land';
     } else if (play.phase === PHASE.DONE && play.landingDest) {
@@ -238,6 +277,12 @@ export async function bootUxPreview() {
   chrome.onUnitPick = (type) => {
     pickUnit(play, type);
     syncSelectionFromPlay();
+    if (play.phase === PHASE.COMBAT_MOVE) fitPocket();
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onCasualtyPick = (side, type) => {
+    pickCasualty(play, side, type);
     paintChrome();
     camera.dirty = true;
   };
@@ -255,9 +300,12 @@ export async function bootUxPreview() {
     });
   }
   function pocketBounds() {
+    const marks = highlights(play);
     const names = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
       ? [play.origin, play.dest, 'Russia']
-      : [play.origin, play.dest];
+      : (marks.legal || []).length
+        ? [play.attackFrom || play.origin, play.destPicked, ...(marks.legal || [])]
+        : [play.attackFrom || play.origin, play.dest];
     const pts = names.map((n) => {
       const t = territories.find((x) => x.name === n);
       return t && territoryCenter(t);
@@ -313,7 +361,9 @@ export async function bootUxPreview() {
   function selectLand(next) {
     tapLand(play, next?.name);
     syncSelectionFromPlay();
-    if (play.phase === PHASE.AIR_LAND && play.landingDest) fitPocket();
+    if (play.phase === PHASE.COMBAT_MOVE || (play.phase === PHASE.AIR_LAND && play.landingDest)) {
+      fitPocket();
+    }
     paintChrome();
     camera.dirty = true;
   }
@@ -474,33 +524,39 @@ export async function bootUxPreview() {
         placements,
         images,
         zoom: camera.zoom,
-        selectedName: selected?.name || null,
+        selectedName: selected?.name || play.attackFrom || null,
         stacksExpanded,
         factionColors,
         pulseNames: marks.pulse || [],
         pulseWave: wave,
       });
-      if (pulsing.has(play.origin) && play.phase === PHASE.COMBAT_MOVE) {
-        const originLand = byName(play.origin);
-        const center = originLand && territoryCenter(originLand);
-        if (center) {
+      renderLandNameLabels(ctx, {
+        territories,
+        names: marks.labels,
+        zoom: camera.zoom,
+        emphasize: [...(marks.pulse || []), marks.origin, marks.dest],
+      });
+      if (play.phase === PHASE.COMBAT_MOVE) {
+        for (const name of marks.origins || []) {
+          if (!pulsing.has(name)) continue;
+          const originLand = byName(name);
+          const center = originLand && territoryCenter(originLand);
+          if (!center) continue;
           const z = Math.max(0.22, camera.zoom);
           const w = 54 / z;
           const h = 22 / z;
-          const x = center.x;
-          const y = center.y - 40 / z;
           ctx.save();
           ctx.globalAlpha = 0.78 + 0.22 * wave;
           ctx.fillStyle = SELECT_GOLD;
           ctx.beginPath();
-          ctx.roundRect(x - w / 2, y - h / 2, w, h, h / 2);
+          ctx.roundRect(center.x - w / 2, center.y - 40 / z - h / 2, w, h, h / 2);
           ctx.fill();
           ctx.fillStyle = '#1E2420';
           ctx.font = `700 ${14 / z}px -apple-system, "SF Pro Text", sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.globalAlpha = 1;
-          ctx.fillText('TAP', x, y);
+          ctx.fillText('TAP', center.x, center.y - 40 / z);
           ctx.restore();
         }
       }
@@ -592,7 +648,7 @@ export async function bootUxPreview() {
       owners: Object.keys(owners).length,
       placements: Object.keys(placements).length,
       continents: continents.length,
-      idleConfirm: 'Tap the glowing red stack',
+      idleConfirm: 'Tap a glowing stack',
       phaseStrip: guideSteps(play),
       pulse: highlights(play).pulse,
       pocket: {
@@ -619,9 +675,16 @@ export async function bootUxPreview() {
     pickUnit: (type) => {
       pickUnit(play, type);
       syncSelectionFromPlay();
+      if (play.phase === PHASE.COMBAT_MOVE) fitPocket();
       paintChrome();
       camera.dirty = true;
       return { ...(play.selectedUnits || {}) };
+    },
+    pickCasualty: (side, type) => {
+      pickCasualty(play, side, type);
+      paintChrome();
+      camera.dirty = true;
+      return inspectPlay(play);
     },
     confirm: () => {
       confirmPlay(play);

@@ -2,6 +2,24 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.5 James he-correct (manual combat)
+
+James: hybrid combat UX still started the move for him. He-correct.
+Remove **Try combat move** and any wizard that pre-stages. Manual only:
+attack-from → units → attack-to → Confirm. Preview only. Hold merge.
+
+Discoverability without Try: land name labels, pulse legal origin, after
+units pulse legal targets (Finland **and** Ukraine / East Europe from
+Karelia), gray Confirm says why it is disabled.
+
+Chips toggle. Attack/Confirm enables when staged + dest — including the
+Ukraine→Karelia-style adjacent path that stayed gray.
+
+Casualty picker whenever more than one unit type can take the hit.
+Never auto-resolve an optional casualty (demo DEF 1 vs INF+FTR waits).
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.4 combat-move start affordances
 
 James could not figure out how to *initiate* a combat move on `?three=1`
