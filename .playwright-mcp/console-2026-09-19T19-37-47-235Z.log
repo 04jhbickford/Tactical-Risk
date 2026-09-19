@@ -1,3 +1,0 @@
-[     157ms] [ERROR] Failed to load resource: the server responded with a status of 404 (File not found) @ http://127.0.0.1:8765/favicon.ico:0
-[     890ms] [LOG] MapRenderer: loaded 112 base tiles, 112 relief tiles, smallMap: true @ http://127.0.0.1:8765/src/map/mapRenderer.js:37
-[     910ms] [LOG] [ux-preview] {artSource: main, uxSource: threePreview, sideProject: true, doNotMerge: true, version: V2.81.53-ux-preview.7} @ http://127.0.0.1:8765/src/map/uxPreview.js:747

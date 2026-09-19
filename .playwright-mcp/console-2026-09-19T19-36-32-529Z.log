@@ -1,3 +1,0 @@
-[    1275ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/favicon.ico:0
-[    2857ms] [LOG] MapRenderer: loaded 112 base tiles, 112 relief tiles, smallMap: true @ https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/src/map/mapRenderer.js:37
-[    2883ms] [LOG] [ux-preview] {artSource: main, uxSource: threePreview, sideProject: true, doNotMerge: true, version: V2.81.53-ux-preview.7} @ https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/src/map/uxPreview.js:746
