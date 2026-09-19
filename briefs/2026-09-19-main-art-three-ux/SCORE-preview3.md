@@ -37,5 +37,5 @@ flow=combatMove→battle→airLanding
 ## Proof
 `node tools/test-ux-preview-flows.mjs` — Attack CTA, cas lock, Done at 0 remaining, fighter lands on Germany.
 
-**Vercel:** https://tactical-risk20-kvjuvavy7-james-projects-20d8de40.vercel.app/?three=1
+**Vercel:** https://tactical-risk20-mj209syzi-james-projects-20d8de40.vercel.app/?three=1  (HTTP 200)
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/68 (draft · do not merge)
