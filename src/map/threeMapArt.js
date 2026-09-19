@@ -15,7 +15,7 @@ import {
   makeCoastShelfMaterial,
   RIVERS,
 } from './threeMapTerrain.js';
-import { territoryOutlineRings } from './threeMapOutline.js';
+import { territoryOutlineRings, waterOutlineRings } from './threeMapOutline.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
@@ -535,6 +535,25 @@ function addLaneSegment(group, a, b, material, y) {
   line.userData.kind = 'sea-lane';
   group.add(line);
 }
+
+export function addSeaZoneInk(group, territory, material, y = 0.06) {
+  // P37 HARD: closed water rings only. No centroid dots. No land.
+  if (!territory?.isWater || !material) return 0;
+  let n = 0;
+  for (const poly of waterOutlineRings(territory)) {
+    const ring = smoothRing(simplifyRing(poly, 0.85), 1);
+    if (!ring || ring.length < 4) continue;
+    const line = makeBorderLine(ring, y, material);
+    line.userData.territory = territory;
+    line.userData.kind = 'sea-ink';
+    line.renderOrder = 8;
+    group.add(line);
+    n += 1;
+  }
+  return n;
+}
+
+export { waterOutlineRings };
 
 export function addSeaLaneLines(group, waters, material, y = 0.05) {
   // P30 HARD: printed A&A sea-lane ink on ocean — dashed, muted, non-emissive.

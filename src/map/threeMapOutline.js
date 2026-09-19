@@ -171,3 +171,23 @@ export function territoryOutlineRings(territory) {
 export function outlineRingCount(territory) {
   return territoryOutlineRings(territory).length;
 }
+
+export function waterOutlineRings(territory) {
+  // P37 HARD: sea-zone ink is the real water polygon closed rings.
+  // Never centroid dots. Never land. Kill centroid-sized dots.
+  if (!territory?.isWater) return [];
+  return (territory.polygons || []).filter((poly) => {
+    if (!poly || poly.length < 4) return false;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const [x, y] of poly) {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+    return (maxX - minX) >= 48 && (maxY - minY) >= 36;
+  });
+}

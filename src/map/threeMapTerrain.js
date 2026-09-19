@@ -15,7 +15,7 @@ export const BAKE_H = 1170;
 export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
 export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
 export const WORLD_LAND_NORMAL = 'assets/three/board/world-land-normal.png';
-export const WORLD_LAND_ALBEDO_REV = 'p36';
+export const WORLD_LAND_ALBEDO_REV = 'p37b';
 
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',
@@ -686,16 +686,20 @@ export async function loadWorldLandAlbedo() {
   const img = await new Promise((resolve, reject) => {
     const el = new Image();
     el.onload = () => resolve(el);
-    el.onerror = () => reject(new Error(`P36 fail-closed: ${src} failed to load`));
+    el.onerror = () => reject(new Error(`P37 fail-closed: ${src} failed to load`));
     el.src = src;
   });
   if (!img.width || img.width < 4096) {
-    throw new Error(`P36 fail-closed: albedo too small ${img.width}×${img.height}`);
+    throw new Error(`P37 fail-closed: albedo too small ${img.width}×${img.height}`);
   }
   const tex = await textureFromImage(img);
   tex.userData = {
     paintedAlbedo: true,
-    imhofRelief: true,
+    styleRef: 'oceania-watercolor',
+    watercolorParchment: true,
+    featheredJoins: true,
+    evenLighting: true,
+    imhofRelief: false,
     landcoverBound: true,
     canvasTooth: true,
     src: WORLD_LAND_ALBEDO,

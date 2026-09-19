@@ -38,9 +38,10 @@ import {
   makeCoastShelfMeshes,
   addRiverLines,
   addSeaLaneLines,
+  addSeaZoneInk,
   makeSeaWaterMeshes,
 } from './threeMapArt.js';
-import { territoryOutlineRings } from './threeMapOutline.js';
+import { territoryOutlineRings, waterOutlineRings } from './threeMapOutline.js';
 import {
   PALETTE,
   FACTION_WASH,
@@ -321,7 +322,9 @@ export async function bootThreeMapSpike() {
     dashSize: 5.4,
     gapSize: 7.2,
   });
-  lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, ...continentMats.values());
+  const seaInkMat = makeLineMat('#3A2E22', 2.8, 0.88);
+  seaInkMat.depthTest = false;
+  lineMats.push(landBorderMat, foamMat, riverMat, selectHaloMat, selectMat, seaLaneMat, seaInkMat, ...continentMats.values());
 
   for (const land of lands) {
     const owner = owners[land.name] || land.originalOwner;
@@ -381,6 +384,7 @@ export async function bootThreeMapSpike() {
         group.add(sea);
         pickables.push(sea);
       }
+      addSeaZoneInk(group, water, seaInkMat, 0.16);
     }
     addRiverLines(group, riverMat, 0.28);
     addSeaLaneLines(group, territories.filter((t) => t.isWater), seaLaneMat, 0.05);
@@ -408,14 +412,15 @@ export async function bootThreeMapSpike() {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
-          depthTest: !!t.isWater,
+          // P37: never depth-test against Italy's lid or the peek sheet.
+          depthTest: false,
           depthWrite: false,
           toneMapped: false,
         }));
         sprite.center.set(0.5, 0.16);
         sprite.scale.set(5.5, 5.5, 1);
         sprite.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
-        sprite.renderOrder = t.isWater ? 32 : 24;
+        sprite.renderOrder = t.isWater ? 36 : 24;
         sprite.userData.territory = t;
         sprite.userData.unitType = stack.type;
         sprite.userData.kind = 'chit';
@@ -428,14 +433,14 @@ export async function bootThreeMapSpike() {
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
-        depthTest: !!t.isWater,
+        depthTest: false,
         depthWrite: false,
         toneMapped: false,
       }));
       pip.center.set(0.5, 0.16);
       pip.scale.set(6.4, 6.4, 1);
       pip.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
-      pip.renderOrder = t.isWater ? 33 : 25;
+      pip.renderOrder = t.isWater ? 37 : 25;
       pip.userData.territory = t;
       pip.userData.kind = 'pip';
       pip.visible = false;
@@ -444,14 +449,14 @@ export async function bootThreeMapSpike() {
       const overflow = new THREE.Sprite(new THREE.SpriteMaterial({
         map: overflowTexture(1),
         transparent: true,
-        depthTest: !!t.isWater,
+        depthTest: false,
         depthWrite: false,
         toneMapped: false,
       }));
       overflow.center.set(0.5, 0.16);
       overflow.scale.set(4.2, 4.2, 1);
       overflow.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
-      overflow.renderOrder = t.isWater ? 33 : 25;
+      overflow.renderOrder = t.isWater ? 37 : 25;
       overflow.userData.territory = t;
       overflow.userData.kind = 'overflow';
       overflow.visible = false;
@@ -475,29 +480,33 @@ export async function bootThreeMapSpike() {
     }
   }
 
-  // P30: lift hemi + warm ground so floored parchment cannot fall to void.
+  // P37: scanned-paper light. ACESFilmicToneMapping + RoomEnvironment +
+  // hemi 0.78 / key 1.18 blew STYLE REF watercolor to pale cream.
   // Keep warm-key-cool-fill sculpt. MeshStandard only. No neon.
-  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 0.78);
+  const hemi = new THREE.HemisphereLight(0xD8D2C4, 0x5A5040, 1.08);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xFFE2B0, 1.18);
+  const key = new THREE.DirectionalLight(0xFFE2B0, 0.24);
   key.position.set(-96, 58, -28);
   key.target.position.set(WORLD_W * 0.42, 0, -WORLD_H * 0.38);
   scene.add(key);
   scene.add(key.target);
-  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.48);
+  const fill = new THREE.DirectionalLight(0x7E9AAB, 0.14);
   fill.position.set(72, 24, 44);
   scene.add(fill);
-  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.16);
+  const bounce = new THREE.DirectionalLight(0x6A5A40, 0.08);
   bounce.position.set(12, -14, 22);
   scene.add(bounce);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.22;
+  renderer.toneMapping = THREE.LinearToneMapping; // paper; ACESFilmicToneMapping washed chroma
+  renderer.toneMappingExposure = 2.08;
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.08).texture;
+  // Paper albedo is the hero — IBL washed sage/tan to cream.
+  scene.environment = null;
+  void pmrem;
+  void RoomEnvironment;
   renderer.domElement.id = 'threeCanvas';
   document.body.appendChild(renderer.domElement);
 
@@ -646,6 +655,8 @@ export async function bootThreeMapSpike() {
   let selectedName = null;
   let selectedUnitType = null;
   let confirmed = false;
+  const forceCollapsed = new Set();
+  const forceExpanded = new Set();
   let hoveredName = null;
   const pointers = new Map();
   let gesturePinch = false;
@@ -673,6 +684,7 @@ export async function bootThreeMapSpike() {
       return {
         territory: spriteHits[0].object.userData.territory,
         unitType: spriteHits[0].object.userData.unitType || null,
+        stackControl: true,
       };
     }
     const hits = raycaster.intersectObjects(pickables.filter((m) => m.visible && m.parent?.visible), false);
@@ -694,9 +706,15 @@ export async function bootThreeMapSpike() {
     if (mats?.top?.emissive) {
       if (hex) {
         mats.top.emissive.setHex(hex);
+        mats.top.emissiveMap = null;
         mats.top.emissiveIntensity = 0.30;
+      } else if (getWorldLandTex()) {
+        mats.top.emissive.setHex(0xffffff);
+        mats.top.emissiveMap = getWorldLandTex();
+        mats.top.emissiveIntensity = 0.34;
       } else {
         mats.top.emissive.setHex(0x000000);
+        mats.top.emissiveMap = null;
         mats.top.emissiveIntensity = 0;
       }
     }
@@ -755,8 +773,11 @@ export async function bootThreeMapSpike() {
           selectInk.push(wash);
         }
       }
-      for (const poly of territoryOutlineRings(territory)) {
-        const ring = simplifyRing(poly, 0.28);
+      const rings = water
+        ? waterOutlineRings(territory)
+        : territoryOutlineRings(territory);
+      for (const poly of rings) {
+        const ring = simplifyRing(poly, water ? 0.85 : 0.28);
         if (!ring) continue;
         const halo = makeBorderLine(ring, y, selectHaloMat);
         halo.renderOrder = 9;
@@ -795,7 +816,8 @@ export async function bootThreeMapSpike() {
         const dense = isDenseBand(band);
         const plan = nearLayout(rec.stacks);
         // Near/select never falls back to pip — molded minis only.
-        const collapse = !showMinis(band, selected);
+        // P37: stack-icon tap toggles expand/collapse. Second tap closes.
+        const collapse = !isStackExpanded(rec.territory.name, band, selected);
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
         rec.pip.position.set(rec.homeX, rec.height + (rec.territory.isWater ? 0.55 : 0.38), rec.homeZ);
@@ -888,6 +910,35 @@ export async function bootThreeMapSpike() {
     }
   }
 
+  function isStackExpanded(name, band = currentBand(), selected = selectedName === name) {
+    if (!name) return false;
+    if (forceCollapsed.has(name)) return false;
+    if (forceExpanded.has(name)) return true;
+    return showMinis(band, selected);
+  }
+
+  function clearStackForces(keep = null) {
+    for (const n of [...forceCollapsed]) {
+      if (n !== keep) forceCollapsed.delete(n);
+    }
+    for (const n of [...forceExpanded]) {
+      if (n !== keep) forceExpanded.delete(n);
+    }
+  }
+
+  function stackStateOf(name) {
+    const rec = unitRecords.find((r) => r.territory.name === name && r.copy === 0)
+      || unitRecords.find((r) => r.territory.name === name);
+    const expanded = isStackExpanded(name);
+    return {
+      name,
+      expanded,
+      pip: !!rec?.pip?.visible,
+      minis: !!(rec?.expanded || []).some((s) => s.visible),
+      selected: selectedName === name,
+    };
+  }
+
   function paintSelection(picked, { hover = false } = {}) {
     const next = picked?.territory || null;
     const unitType = picked?.unitType || null;
@@ -898,6 +949,29 @@ export async function bootThreeMapSpike() {
       return;
     }
     if (chrome.isSheetOpen()) chrome.setSheetOpen(false);
+    const stackTap = !!picked?.stackControl && next;
+    if (stackTap && selectedName === next.name && isStackExpanded(next.name, currentBand(), true)) {
+      forceCollapsed.add(next.name);
+      forceExpanded.delete(next.name);
+      selectedUnitType = null;
+      confirmed = false;
+      selectLiftStarted = performance.now();
+      syncDensity();
+      chrome.paintSelection({
+        land: next,
+        stacks: stacksFor(next.name, placements),
+        unitType: null,
+        confirmed: false,
+      });
+      return;
+    }
+    if (next) {
+      forceCollapsed.delete(next.name);
+      clearStackForces(next.name);
+    } else {
+      forceCollapsed.clear();
+      forceExpanded.clear();
+    }
     if (selectedName) setLandEmissive(selectedName, 0x000000);
     selectedName = next ? next.name : null;
     if (next && !next.isWater) setLandEmissive(next.name, 0xC4A35A);
@@ -1095,7 +1169,7 @@ export async function bootThreeMapSpike() {
   const europeNorthOnScreen = ukXY && germanyXY && ukXY.y < germanyXY.y + 80;
   const ukWestOfGermany = ukXY && germanyXY && ukXY.x < germanyXY.x;
   const westEuropeWestOfGermany = westEuropeXY && germanyXY && westEuropeXY.x < germanyXY.x;
-  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=slate-teal`, {
+  console.log(`[three-spike] ${GAME_VERSION} SCHEMA ${SCHEMA_VERSION} lands=${lands.length} wrap=frustum art=aa-plastic ocean=parchment-wash`, {
     africaSouthOfEurope,
     africaNotUnderNA,
     africaSouthOnScreen,
@@ -1116,6 +1190,15 @@ export async function bootThreeMapSpike() {
     selectLand(name, unitType = null) {
       const land = territories.find((t) => t.name === name) || null;
       paintSelection(land ? { territory: land, unitType } : null);
+    },
+    toggleStack(name) {
+      const land = territories.find((t) => t.name === name) || null;
+      if (!land) return stackStateOf(name);
+      paintSelection({ territory: land, stackControl: true });
+      return stackStateOf(name);
+    },
+    stackState(name) {
+      return stackStateOf(name);
     },
     frameNear(name, opts = {}) {
       const land = lands.find((t) => t.name === name);
@@ -1175,6 +1258,53 @@ export async function bootThreeMapSpike() {
         pin: c,
       };
     },
+    frameAustralia(opts = {}) {
+      const land = lands.find((t) => t.name === 'Australia');
+      const c = land && territoryCenter(land);
+      if (!c) return false;
+      const p = worldToScene(c.x, c.y);
+      camera.position.set(p.x, opts.lift ?? 168, p.z - (opts.south ?? 22));
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      syncDensity();
+      return currentBand();
+    },
+    frameAfrica(opts = {}) {
+      const land = lands.find((t) => t.name === 'Belgian Congo')
+        || lands.find((t) => t.name === 'Congo')
+        || lands.find((t) => t.name === 'French Equatorial Africa');
+      const c = land && territoryCenter(land);
+      if (!c) return false;
+      const p = worldToScene(c.x, c.y);
+      camera.position.set(p.x, opts.lift ?? 198, p.z - (opts.south ?? 28));
+      controls.target.set(p.x, 0, p.z);
+      applyZoomCap();
+      controls.update();
+      syncDensity();
+      return currentBand();
+    },
+    frameCentralMed(opts = {}) {
+      const pin = SEA_ZONE_CENTERS['Central Mediteranean Sea Zone'];
+      if (!pin) return false;
+      const p = worldToScene(pin.x, pin.y);
+      camera.position.set(p.x, opts.lift ?? 78, p.z - (opts.south ?? 9));
+      controls.target.set(p.x, 1.2, p.z);
+      applyZoomCap();
+      controls.update();
+      window.__threeSpike.selectLand('Central Mediteranean Sea Zone');
+      syncDensity();
+      const rec = unitRecords.find((r) => r.territory.name === 'Central Mediteranean Sea Zone');
+      const italyH = landHeights.get('South Europe') || 0;
+      return {
+        band: currentBand(),
+        deck: rec?.height ?? null,
+        italyHeight: italyH,
+        shipsAboveItaly: !!(rec && rec.height > italyH + 0.4),
+        pin,
+        rings: waterOutlineRings(territories.find((t) => t.name === 'Central Mediteranean Sea Zone')).length,
+      };
+    },
     frameChina(opts = {}) {
       const land = lands.find((t) => t.name === 'China');
       const c = land && territoryCenter(land);
@@ -1226,7 +1356,7 @@ export async function bootThreeMapSpike() {
         europeNorthOnScreen,
         ukWestOfGermany,
         westEuropeWestOfGermany,
-        waterInk: false,
+        waterInk: true,
         foam: true,
         bevel: true,
         landSeal: true,
@@ -1276,16 +1406,23 @@ export async function bootThreeMapSpike() {
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
-        continentPunch: 0.22,
+        continentPunch: albedoBound ? 0 : 0.22,
         seaDeckClear: true,
         eastMedPinSouth: true,
         noBlotchAtlas: true,
         albedoRev: albedo?.userData?.rev || null,
-        imhofRelief: !!(albedoBound && albedo?.userData?.imhofRelief),
+        imhofRelief: false,
+        watercolorParchment: !!(albedoBound && albedo?.userData?.watercolorParchment),
+        styleRef: albedo?.userData?.styleRef || null,
+        featheredJoins: !!(albedoBound && albedo?.userData?.featheredJoins),
+        evenLighting: !!(albedoBound && albedo?.userData?.evenLighting),
         landcoverBound: !!(albedoBound && albedo?.userData?.landcoverBound),
         canvasTooth: !!(albedoBound && albedo?.userData?.canvasTooth),
         paintedRelief: albedoBound,
         normalBound: !!getWorldLandNormal(),
+        unitBgUnified: true,
+        seaInkClosedRings: true,
+        stackToggle: true,
       };
     },
   };

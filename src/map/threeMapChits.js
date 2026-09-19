@@ -10,8 +10,10 @@ import { PLASTIC, PALETTE } from './threeMapPalette.js';
 const CREAM = PALETTE.cream || '#F0E6D2';
 
 export const UNIT_ATLAS = {
-  land: 'assets/three/units/units-land-minis.png',
-  naval: 'assets/three/units/units-naval-minis.png',
+  // P37: plastic atlas is complete unclipped minis. Minis sheet had black
+  // rectangular cells + ships sliced across the grid ("clipped by sheet").
+  land: 'assets/three/units/units-land-plastic.png',
+  naval: 'assets/three/units/units-naval-plastic.png',
 };
 
 export const ATLAS_CELL = {
@@ -528,6 +530,40 @@ function sampleCell(img, type) {
   return { img, sx: cell.col * cw, sy: cell.row * ch, cw, ch };
 }
 
+function keyBackdrop(pix) {
+  // P37 HARD: every mini is bare plastic + contact shadow. Drop black
+  // rectangular sheets and leftover paper so infantry/tank/ship match.
+  const d = pix.data;
+  const w = pix.width;
+  const h = pix.height;
+  const sample = (x, y) => {
+    const i = (y * w + x) * 4;
+    return [d[i], d[i + 1], d[i + 2]];
+  };
+  const corners = [
+    sample(2, 2), sample(w - 3, 2), sample(2, h - 3), sample(w - 3, h - 3),
+  ];
+  const bg = corners.reduce((acc, c) => {
+    acc[0] += c[0] / 4;
+    acc[1] += c[1] / 4;
+    acc[2] += c[2] / 4;
+    return acc;
+  }, [0, 0, 0]);
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i];
+    const g = d[i + 1];
+    const b = d[i + 2];
+    const a = d[i + 3];
+    if (a < 8) continue;
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    const sat = Math.max(r, g, b) - Math.min(r, g, b);
+    const dist = Math.hypot(r - bg[0], g - bg[1], b - bg[2]);
+    if ((lum < 26 && sat < 18) || (lum > 236 && sat < 24) || dist < 28) {
+      d[i + 3] = 0;
+    }
+  }
+}
+
 function paintMoldedMini(ctx, {
   type,
   ownerColor,
@@ -550,6 +586,7 @@ function paintMoldedMini(ctx, {
     const tx = tmp.getContext('2d');
     tx.drawImage(src.img, src.sx, src.sy, src.cw, src.ch, 0, 0, 256, 256);
     const pix = tx.getImageData(0, 0, 256, 256);
+    keyBackdrop(pix);
     const d = pix.data;
     for (let i = 0; i < d.length; i += 4) {
       const a = d[i + 3];
