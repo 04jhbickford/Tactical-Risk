@@ -2,6 +2,16 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.12-solo vs AI (side only)
+
+James cold-start: complete real game vs AI on the Three `.11` shell.
+No lobby, no Firebase. `?three=1&solo=1` boots classic 5-faction,
+James=Russians, 4× Medium AI. Main `GameState` + `AIController`
+behind tile +/−, YOU casualty Confirm, split air land. Pocket
+`?three=1` / `?max=1` unchanged. Hold merge. Do not merge to main.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.11 tiles + split air land
 
 James: air land must pick WHICH planes land WHERE (partial by type
