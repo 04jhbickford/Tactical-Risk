@@ -534,16 +534,16 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
 }
 
 export function makeOceanMaterial() {
-  // P39b: surround plane is parchment only — never a UV-tiled wave hatch.
+  // P39b: surround is quiet parchment sea — never a UV-tiled wave hatch.
   makePaperTexture();
   const mat = new THREE.MeshStandardMaterial({
     map: paperTex,
-    color: 0xd4cfc0,
+    color: 0xe8e2d4,
     roughness: 0.96,
     metalness: 0.0,
     envMapIntensity: 0,
-    emissive: 0x000000,
-    emissiveIntensity: 0,
+    emissive: 0xe4dcc8,
+    emissiveIntensity: 0.40,
     transparent: false,
     vertexColors: false,
   });
@@ -558,7 +558,7 @@ export function makeSeaWaterMaterial() {
   return new THREE.MeshStandardMaterial({
     // P39b: world-space coastal hand-ripples. Clamp atlas — no hatch tile.
     map: sea,
-    color: 0xffffff,
+    color: 0xeef2ee,
     transparent: false,
     opacity: 1,
     roughness: 0.94,
@@ -567,8 +567,8 @@ export function makeSeaWaterMaterial() {
     depthTest: true,
     side: THREE.DoubleSide,
     envMapIntensity: 0,
-    emissive: 0xffffff,
-    emissiveIntensity: worldSeaMap ? 0.36 : 0,
+    emissive: 0xf4f6f2,
+    emissiveIntensity: worldSeaMap ? 0.62 : 0,
     emissiveMap: worldSeaMap ? sea : null,
     vertexColors: false,
     polygonOffset: true,

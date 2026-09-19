@@ -48,6 +48,9 @@
     "seaLanes": false,
     "oceanNoStipple": true,
     "oceanRipples": true,
+    "oceanNoHatch": true,
+    "coastalHandRipples": true,
+    "worldSeaBound": true,
     "paintedMountains": true,
     "noHatchRidges": false,
     "unitNoClip": true,
@@ -72,7 +75,7 @@
     "seaDeckClear": true,
     "eastMedPinSouth": true,
     "noBlotchAtlas": true,
-    "albedoRev": "p39",
+    "albedoRev": "p39b",
     "imhofRelief": true,
     "watercolorParchment": true,
     "styleRef": "oceania-beautiful",
@@ -93,7 +96,9 @@
     "landInkGteSea": true,
     "ringsDissolved": true,
     "maskOnlyComposite": true,
-    "playbookFolded": true
+    "playbookFolded": true,
+    "seaSrc": "assets/three/board/world-sea-albedo.png",
+    "seaRev": "p39b"
   },
   "confirmReady": {
     "background": "rgb(196, 163, 90)",

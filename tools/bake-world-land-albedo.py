@@ -1075,10 +1075,26 @@ def bake_world_sea(lands) -> Image.Image:
         (1842, 1152, 2892, 2000), (0.0, 0.0, 1.0, 1.0),
         w, h, alpha=0.92, blur=18,
     )
-    img = punch(img, color=1.06, contrast=1.10, sharp=1.08)
+    img = punch(img, color=1.06, contrast=1.22, sharp=1.14)
+    img = _punch_sea_ink(img, sea)
     # Sea keeps coastal ripples; land/void stay quiet parchment.
     img = Image.composite(img, paper, sea)
     return img
+
+
+def _punch_sea_ink(img: Image.Image, sea: Image.Image) -> Image.Image:
+    """Darken stroke texels so they survive ACES at 390. Not a hatch."""
+    try:
+        import numpy as np
+    except ImportError:
+        return ImageEnhance.Contrast(img).enhance(1.12)
+    arr = np.asarray(img, dtype=np.float32)
+    m = (np.asarray(sea) > 8)
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    mean = float(yv[m].mean()) if m.any() else 180.0
+    ink = m & (yv < mean - 3.5)
+    arr[ink] = arr[ink] * 0.78
+    return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
 def bake_ocean_wash():
