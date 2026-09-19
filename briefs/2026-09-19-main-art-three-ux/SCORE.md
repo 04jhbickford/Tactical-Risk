@@ -39,3 +39,7 @@ Russians · **Karelia S.S.R.** (INF×3 + FTR×1) → **Finland Norway** or **Ukr
 - `combat-move-steppers-390.png` — INF 0/3 FTR 0/1, no map steal
 - `combat-move-partial-inf-390.png` — INF 1/3 after +
 - `air-land-planes-390.png` — fighter only + Confirm land
+
+**Vercel:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1
+**Deployment:** https://tactical-risk20-i37yer16j-james-projects-20d8de40.vercel.app/?three=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/76 (draft · hybrid lineage · do not merge to main)
