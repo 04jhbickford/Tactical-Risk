@@ -86,5 +86,6 @@
   "landSliversHealed": true,
   "opaquePlastic": true,
   "coastalGreens": true,
-  "landSeaBorderFamily": true
+  "landSeaBorderFamily": true,
+  "playbookFolded": true
 }

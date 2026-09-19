@@ -73,6 +73,7 @@ stack:        expand minis=true → collapse pip=true
 - `africa-even.png` / `stack-expand.png` / `stack-collapse.png`
 - `computed.json` / `vercel-live-mid-390.png` / `vercel-live-inspect.json`
 
-**Vercel:** https://tactical-risk20-o4v7vvzcn-james-projects-20d8de40.vercel.app/?three=1  
+**Vercel:** https://tactical-risk20-crn1y2qrw-james-projects-20d8de40.vercel.app/?three=1  
+
 
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/63 (stacked on PR62 / `.37b`)
