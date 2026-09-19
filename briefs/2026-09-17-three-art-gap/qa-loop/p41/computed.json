@@ -78,7 +78,7 @@
     "albedoRev": "p41",
     "imhofRelief": true,
     "watercolorParchment": true,
-    "styleRef": "oceania-beautiful",
+    "styleRef": "grok-imagine-world",
     "featheredJoins": true,
     "evenLighting": true,
     "landcoverBound": true,
@@ -272,5 +272,5 @@
     "minis": false,
     "selected": true
   },
-  "selectInterior": "SELECT_INTERIOR 175 [{'x': 347, 'y': 741, 'ink': (91, 81, 50), 'sel': (204, 179, 110), 'delta': 113}, {'x': 365, 'y': 741, 'ink': (26, 22, 16), 'sel': (201, 176, 105), 'delta': 175}, {'x': 329, 'y': 741, 'ink': (164, 145, 91), 'sel': (206, 182, 114), 'delta': 42}, {'x': 347, 'y': 759, 'ink': (199, 174, 106), 'sel': (199, 174, 106), 'delta': 0}, {'x': 347, 'y': 723, 'ink': (86, 84, 77), 'sel': (26, 22, 16), 'delta': 62}, {'x': 359, 'y': 753, 'ink': (206, 184, 117), 'sel': (206, 184, 117), 'delta': 0}, {'x': 335, 'y': 729, 'ink': (209, 194, 168), 'sel': (195, 170, 100), 'delta': 68}]"
+  "selectInterior": "SELECT_INTERIOR 179 [{'x': 347, 'y': 741, 'ink': (89, 79, 41), 'sel': (197, 173, 90), 'delta': 108}, {'x': 365, 'y': 741, 'ink': (26, 22, 16), 'sel': (205, 183, 99), 'delta': 179}, {'x': 329, 'y': 741, 'ink': (155, 137, 70), 'sel': (195, 171, 87), 'delta': 40}, {'x': 347, 'y': 759, 'ink': (191, 175, 88), 'sel': (191, 175, 88), 'delta': 0}, {'x': 347, 'y': 723, 'ink': (86, 84, 77), 'sel': (26, 22, 16), 'delta': 62}, {'x': 359, 'y': 753, 'ink': (200, 182, 96), 'sel': (200, 182, 96), 'delta': 0}, {'x': 335, 'y': 729, 'ink': (209, 194, 168), 'sel': (188, 162, 80), 'delta': 88}]"
 }

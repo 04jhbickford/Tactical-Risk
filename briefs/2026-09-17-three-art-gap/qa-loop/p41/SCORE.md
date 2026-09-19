@@ -60,5 +60,5 @@ selectOutlineOnly  selectWash=false  selectFill=false  selectEmissiveWash=false
 
 **One line:** Imagine WORLD hero wrap-registered to live coasts; ink sits on paint
 
-**Vercel:** (preview pending bake)  
+**Vercel:** https://tactical-risk20-m19ionyab-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/66 (stacked on PR65 / `.40b`)
