@@ -876,6 +876,12 @@ async function init() {
         break;
 
       case 'next-phase':
+        playerPanel.commitAirLandingsIfReady?.();
+        if (gameState.turnPhase === TURN_PHASES.COMBAT
+          && (gameState.combatQueue?.length || 0) > 0) {
+          camera.dirty = true;
+          break;
+        }
         const prevPlayer = gameState.currentPlayer;
         const prevRound = gameState.round;
 
@@ -1847,6 +1853,7 @@ async function init() {
           combatUI.handleAirLandingComplete(result);
           territoryRenderer.clearAirLandingDestinations();
           camera.dirty = true;
+          syncManager?.pushStateNow?.();
         }
       );
       // Highlight valid destinations on map

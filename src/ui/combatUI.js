@@ -4,6 +4,7 @@ import { getUnitIconPath } from '../utils/unitIcons.js';
 import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
 import { syncBottomSurfaces } from './bottomSurface.js';
+import { remainingAirLandingsToAssign } from '../state/airLanding.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
 // aircraft, hit on 1, cheapest aircraft first, no attacker choice.
@@ -1152,46 +1153,61 @@ export class CombatUI {
   }
 
   _confirmAirLandings() {
-    const player = this.gameState.currentPlayer;
     const { airUnitsToLand, selectedLandings, attackers } = this.combatState;
 
-    // Group landings by destination to batch moves of same unit type
-    const landingsByDest = {}; // { destination: { unitType: quantity } }
     const crashes = {}; // { unitType: quantity }
 
     // Check if current territory was friendly at turn start (valid to stay)
     const friendlyAtStart = this.gameState.friendlyTerritoriesAtTurnStart || new Set();
     const canStayInCurrent = friendlyAtStart.has(this.currentTerritory);
 
+    // Merge overlay selections with any destinations already recorded on
+    // gameState so a key mismatch (id vs type_index) cannot drop a pick.
+    const pendingGroup = this.gameState.getPendingAirLandings?.()
+      ?.find((entry) => entry.originTerritory === this.currentTerritory);
+    const mergedLandings = { ...(selectedLandings || {}) };
+    if (pendingGroup) {
+      for (const unit of pendingGroup.units || []) {
+        if (unit.id && unit.destination && !mergedLandings[unit.id]) {
+          mergedLandings[unit.id] = unit.destination;
+        }
+      }
+    }
+
+    const applied = this.gameState.applyAirLandings(this.currentTerritory, {
+      landings: mergedLandings,
+      airUnitsToLand,
+      unitDefs: this.unitDefs,
+      notify: false,
+    });
+    const landedByType = {};
+    for (const item of applied.applied || []) {
+      if (item.stayed) continue;
+      landedByType[item.type] = (landedByType[item.type] || 0) + (item.quantity || 1);
+    }
+
     // Process each air unit landing (now individually tracked by ID)
-    for (const airUnit of airUnitsToLand) {
-      // Use unit ID for individual tracking (allows same type to land at different locations)
-      const unitKey = airUnit.id || airUnit.type;
-      const destination = selectedLandings[unitKey];
+    airUnitsToLand.forEach((airUnit, index) => {
+      const destination = mergedLandings[airUnit.id]
+        || mergedLandings[`${airUnit.type}_${index}`]
+        || mergedLandings[airUnit.type]
+        || airUnit.destination;
 
       if (airUnit.landingOptions.length === 0) {
-        // No valid landing - unit crashes
         crashes[airUnit.type] = (crashes[airUnit.type] || 0) + airUnit.quantity;
         console.log(`${airUnit.type} crashed - no valid landing location`);
       } else if (destination && destination !== this.currentTerritory) {
-        // Track this landing to another territory
-        if (!landingsByDest[destination]) {
-          landingsByDest[destination] = {};
-        }
-        landingsByDest[destination][airUnit.type] =
-          (landingsByDest[destination][airUnit.type] || 0) + airUnit.quantity;
+        // Board apply already moved these. Still drop them from attackers
+        // so _finalizeCombat cannot write them back onto the battle hex.
       } else if (destination === this.currentTerritory && canStayInCurrent) {
         // Explicitly selected current territory and it's valid - unit stays
-        // (do nothing, unit remains in attackers)
       } else if (!destination && canStayInCurrent) {
         // No selection made but current territory is valid - unit stays
-        // (do nothing, unit remains in attackers)
       } else {
-        // No valid destination selected and cannot stay in current territory - crash!
         crashes[airUnit.type] = (crashes[airUnit.type] || 0) + airUnit.quantity;
         console.log(`${airUnit.type} crashed - no landing selected and cannot stay in captured territory`);
       }
-    }
+    });
 
     // Apply crashes - reduce attacker quantities
     for (const [unitType, crashCount] of Object.entries(crashes)) {
@@ -1201,51 +1217,12 @@ export class CombatUI {
       }
     }
 
-    // Apply landings - move units from attackers to destinations
-    for (const [destination, unitTypes] of Object.entries(landingsByDest)) {
-      for (const [unitType, quantity] of Object.entries(unitTypes)) {
-        // Remove from attackers
-        const attackerUnit = attackers.find(u => u.type === unitType);
-        if (attackerUnit) {
-          attackerUnit.quantity = Math.max(0, attackerUnit.quantity - quantity);
-        }
-
-        // Check if landing on carrier (sea zone destination)
-        const destT = this.gameState.territoryByName[destination];
-        if (destT?.isWater) {
-          // Land on carrier - add to carrier's aircraft array ONLY (not as standalone unit)
-          const seaUnits = this.gameState.units[destination] || [];
-          const carriers = seaUnits.filter(u => u.type === 'carrier' && u.owner === player.id);
-          const carrierDef = this.unitDefs.carrier;
-
-          let remainingToAdd = quantity;
-          for (const carrier of carriers) {
-            if (remainingToAdd <= 0) break;
-            carrier.aircraft = carrier.aircraft || [];
-            const capacity = (carrierDef?.aircraftCapacity || 2) - carrier.aircraft.length;
-            const toAdd = Math.min(remainingToAdd, capacity);
-            for (let i = 0; i < toAdd; i++) {
-              carrier.aircraft.push({ type: unitType, owner: player.id });
-            }
-            remainingToAdd -= toAdd;
-          }
-        } else {
-          // Land on land territory - add as standalone unit
-          const destUnits = this.gameState.units[destination] || [];
-          const existing = destUnits.find(u => u.type === unitType && u.owner === player.id);
-          if (existing) {
-            existing.quantity += quantity;
-            existing.moved = true;
-          } else {
-            destUnits.push({
-              type: unitType,
-              quantity: quantity,
-              owner: player.id,
-              moved: true
-            });
-          }
-          this.gameState.units[destination] = destUnits;
-        }
+    // Remove landed aircraft from attackers so finalize cannot restore them
+    for (const [unitType, quantity] of Object.entries(landedByType)) {
+      if (quantity <= 0) continue;
+      const attackerUnit = attackers.find(u => u.type === unitType);
+      if (attackerUnit) {
+        attackerUnit.quantity = Math.max(0, attackerUnit.quantity - quantity);
       }
     }
 
@@ -1321,12 +1298,26 @@ export class CombatUI {
     }
   }
 
-  // Called from external AirLandingUI when landing selection is complete
+  // Called from external AirLandingUI / player panel when landing selection is complete
   handleAirLandingComplete(result) {
-    if (!this.combatState) return;
+    const origin = result?.combatTerritory || this.currentTerritory;
+    if (!this.combatState) {
+      // Overlay was dismissed (resync / hide) — still land from board state.
+      if (origin && this.gameState?.applyAirLandings) {
+        this.gameState.applyAirLandings(origin, {
+          landings: result?.landings || {},
+          airUnitsToLand: result?.airUnitsToLand || [],
+          unitDefs: this.unitDefs,
+        });
+      }
+      return;
+    }
 
     // Apply landings from the external UI
     this.combatState.selectedLandings = result.landings || {};
+    if (origin && origin !== this.currentTerritory) {
+      this.currentTerritory = origin;
+    }
     this._confirmAirLandings();
   }
 
@@ -1736,10 +1727,12 @@ export class CombatUI {
       this.gameState?.resumeNotifications?.({ flush: true });
     }
 
-    // Persist the completed (or air-landing) battle in one shot — the per-round
-    // notifies were suppressed above, so this is the only Firestore write.
+    // Persist the completed battle in one shot — the per-round notifies were
+    // suppressed above. Do not write while air landing is still open: that
+    // snapshot has aircraft on the battle hex and races the landing apply.
+    const waitingForLanding = this.combatState?.phase === 'airLanding';
     const sync = this.gameState?.syncManager;
-    if (sync?.pushStateNow) {
+    if (sync?.pushStateNow && !waitingForLanding) {
       await sync.pushStateNow();
     }
   }
@@ -2268,13 +2261,9 @@ export class CombatUI {
       `;
     } else if (phase === 'airLanding') {
       const { airUnitsToLand, selectedLandings } = this.combatState;
-      // Use unit ID for individual tracking (allows same type to land at different locations)
-      const allSelected = airUnitsToLand.every(u => {
-        const unitKey = u.id || u.type;
-        return u.landingOptions.length === 0 || selectedLandings[unitKey];
-      });
+      const remaining = remainingAirLandingsToAssign(airUnitsToLand, selectedLandings);
       html += `
-        <button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>
+        <button class="combat-btn confirm" data-action="confirm-landing" ${remaining > 0 ? 'disabled' : ''}>
           Confirm Landings
         </button>
       `;
@@ -2518,11 +2507,8 @@ export class CombatUI {
     }
     if (phase === 'airLanding') {
       const { airUnitsToLand, selectedLandings } = this.combatState;
-      const allSelected = airUnitsToLand.every((u) => {
-        const unitKey = u.id || u.type;
-        return u.landingOptions.length === 0 || selectedLandings[unitKey];
-      });
-      return `<button class="combat-btn confirm" data-action="confirm-landing" ${!allSelected ? 'disabled' : ''}>Confirm Landings</button>`;
+      const remaining = remainingAirLandingsToAssign(airUnitsToLand, selectedLandings);
+      return `<button class="combat-btn confirm" data-action="confirm-landing" ${remaining > 0 ? 'disabled' : ''}>Confirm Landings</button>`;
     }
     if (phase === 'resolved') {
       return `<button class="combat-btn next" data-action="next">${this.gameState.combatQueue.length > 1 ? 'Next Battle' : 'End Combat Phase'}</button>`;
