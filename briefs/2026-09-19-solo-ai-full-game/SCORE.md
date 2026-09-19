@@ -18,4 +18,5 @@ noLobby=true
 | Pocket demo | **KEEP** — `?three=1` / `?max=1` still `bootUxPreview` |
 | Browser | **PASS** — splash → tech → buy tiles → Karelia attack → battle YOU hits → NCM → place factory tiles → Collect 6 IPC → Germans AI thinking |
 
+**URL:** https://tactical-risk20-git-cursor-solo-e60af5-james-projects-20d8de40.vercel.app/?three=1&solo=1
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/81 (draft · hold merge)
