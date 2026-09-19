@@ -65,7 +65,8 @@ export function rectFromElement(el) {
 export function chromeHitRectsFrom(api = {}) {
   const els = [];
   const push = (el) => {
-    if (el) els.push(el);
+    if (!el || el.hidden) return;
+    els.push(el);
   };
   push(api.zoom);
   push(api.l0);

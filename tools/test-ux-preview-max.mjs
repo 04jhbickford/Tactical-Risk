@@ -18,6 +18,7 @@ import {
   driveBattleMid,
   driveAirChoice,
   lossesReady,
+  pickLoss,
   stackQty,
 } from '../src/map/uxPreviewScenario.js';
 import { isMaxBattleRequested } from '../src/map/uxPreviewFlag.js';
@@ -69,10 +70,23 @@ assert(mid.phase === PHASE.BATTLE, 'max entered battle');
 assert(mid.battle.step === 'combatResult', 'first-round result');
 assert(mid.battle.attackHits === 2, 'scripted 2 ATK hits');
 assert(mid.battle.defenseHits === 1, 'scripted 1 DEF hit');
-assert(lossesReady(mid) === false, 'mixed types — optional casualties');
+assert(lossesReady(mid) === false, 'YOU not assigned yet');
+assert(confirmEnabled(mid) === false, 'Confirm waits on YOU');
 assert(battleCard(mid).pickers?.length >= 1, 'casualty pickers shown');
+assert(battleCard(mid).lanes?.length === 2, 'ATK/DEF lanes');
+assert(battleCard(mid).lanes[0].side === 'atk' && battleCard(mid).lanes[1].side === 'def', 'you attack / they defend');
+assert(String(battleCard(mid).body).includes('You take 1'), 'YOU absorb DEF hits');
+assert(String(battleCard(mid).body).includes('they take 2'), 'THEY absorb ATK hits');
 assert(mid.battle.defForced === false, 'defender has a choice');
 assert(mid.battle.attForced === false, 'attacker has a choice');
+assert((mid.battle.pendingDef.infantry || 0) + (mid.battle.pendingDef.artillery || 0) === 2, 'THEY cheapest auto');
+pickLoss(mid, 'att', 'artillery');
+assert(mid.battle.pendingAtt.artillery === 1, 'YOU ART −1');
+assert(lossesReady(mid) === true, 'YOU pick is enough');
+assert(confirmEnabled(mid) === true, 'Confirm gold after YOU only');
+assert(confirmLabel(mid) === 'Confirm: Take hits', 'hits CTA after YOU');
+pickLoss(mid, 'def', 'armour');
+assert(mid.battle.pendingDef.armour === 1, 'THEY tap still registers');
 
 const air = createScenario({ max: true });
 driveAirChoice(air);

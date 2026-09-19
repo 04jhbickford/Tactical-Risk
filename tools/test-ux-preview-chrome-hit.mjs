@@ -7,6 +7,7 @@ import {
   sealChromeEvent,
   clientPointOf,
   eventElement,
+  chromeHitRectsFrom,
 } from '../src/map/threeChromeEvents.js';
 
 let failures = 0;
@@ -79,6 +80,19 @@ assert(shouldIgnoreMapHit({
   clientY: touch.y,
   rects: [peek],
 }) === true, 'touch on INF + ignored by map');
+
+const hiddenZoom = {
+  hidden: true,
+  getBoundingClientRect() {
+    return { left: 336, right: 380, top: 360, bottom: 500, width: 44, height: 140 };
+  },
+};
+const peekEl = {
+  classList: { contains: (c) => c === 'is-on' },
+  getBoundingClientRect() { return { left: 0, right: 390, top: 520, bottom: 780, width: 390, height: 260 }; },
+};
+const rectsOpen = chromeHitRectsFrom({ zoom: hiddenZoom, peek: peekEl, confirm: peekEl });
+assert(!rectsOpen.some((r) => r.top === 360 && r.left === 336), 'hidden zoom is not a hit rect');
 
 if (failures) {
   console.error(`${failures} ux-preview chrome-hit checks failed`);

@@ -2,6 +2,19 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.8 max-tip he-correct
+
+James from Karelia combat-move + ROUND 1 stills on PR76 `?three=1&max=1`.
+
+1. Zoom +/−/Fit sat on INF/ART/TNK steppers. Hide zoom while sheet / battle is open.
+2. YOU ART−1 left Confirm grey because Confirm waited on THEY too. Solo: YOU assigns enable Confirm; THEY is cheapest-auto and still tappable.
+3. Shrink unit sheet — denser bottom rows, more map.
+4. Combat IA: split ATK (you attack / gold) vs DEF (they defend / steel); show hits and who absorbs what.
+
+Keep max seed, steppers, Congo eat, planes-only land, no Try. Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.7-max fat Karelia→Ukraine
 
 James wanted a bigger battle sim on the preview.7 / PR76 tip.
