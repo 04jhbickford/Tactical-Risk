@@ -31,11 +31,14 @@
   "tryCombatMove": false,
   "guideOn": false,
   "guideBlocksBoard": false,
-  "vercel": "https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1",
+  "vercel": "https://tactical-risk20-git-cursor-air-l-39e813-james-projects-20d8de40.vercel.app/?three=1&max=1",
+  "pr": "https://github.com/04jhbickford/Tactical-Risk/pull/80",
   "stills": [
-    "preview8-sheet-no-zoom-390.png",
-    "preview8-you-assign-gold-390.png",
-    "preview8-dense-sheet-390.png",
-    "preview8-battle-ia-split-390.png"
+    "preview11-combat-tiles-390.png",
+    "preview11-casualty-tiles-390.png",
+    "preview11-air-land-assign-390.png",
+    "preview11-air-land-ftr2-390.png",
+    "preview11-russia-landed-390.png",
+    "preview11-vercel-combat-tiles-390.png"
   ]
 }

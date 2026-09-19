@@ -17,5 +17,12 @@ tesla=off
 
 THEY is read-only cheapest (badge only) and fully visible.
 
-**URL:** (Vercel preview after push)
-**PR:** draft · hold merge · hybrid lineage (not main)
+**URL:** https://tactical-risk20-git-cursor-air-l-39e813-james-projects-20d8de40.vercel.app/?three=1&max=1
+**PR:** https://github.com/04jhbickford/Tactical-Risk/pull/80 (draft · hold merge · hybrid lineage)
+
+Stills @390:
+- `preview11-combat-tiles-390.png` — origin INF/ART/TNK/FTR/BMB tiles + +/−
+- `preview11-casualty-tiles-390.png` — YOU tiles + THEY INF badge + gold Confirm
+- `preview11-air-land-assign-390.png` — Russia dest, FTR/BMB at 0, Assign planes
+- `preview11-air-land-ftr2-390.png` — 2 FTR to Russia, 5 left, not dump-all
+- `preview11-russia-landed-390.png` — Russia INF×1 FTR×2 strip after split land
