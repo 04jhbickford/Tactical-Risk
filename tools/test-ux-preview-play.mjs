@@ -19,6 +19,7 @@ import {
   highlights,
   battleCard,
   inspectPlay,
+  airLandRoster,
   driveCombatMove,
   driveBattleMid,
   driveAirChoice,
@@ -138,7 +139,11 @@ assert(stackQty(move.placements[SCENARIO.dest], 'infantry', 'Russians') === 2, '
 confirm(move);
 assert(move.phase === PHASE.AIR_LAND, 'air land');
 assert(confirmGold(move) === false, 'air idle not gold');
+assert(confirmLabel(move) === 'Confirm land', 'planes-only Confirm land');
 assert(highlights(move).landable.includes('Russia'), 'russia landable');
+const planes = airLandRoster(move);
+assert(planes.length === 1 && planes[0].type === 'fighter', 'air roster is planes only');
+assert(!planes.some((p) => p.type === 'infantry'), 'dest INF not in air sheet');
 
 tapLand(move, 'Germany');
 assert(move.landingDest == null, 'illegal land ignored');

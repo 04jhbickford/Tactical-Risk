@@ -1,0 +1,11 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - button "Menu" [ref=e12] [cursor=pointer]: ☰
+    - generic [ref=e13]: COMBAT MOVE
+    - generic [ref=e14]: Russians
+    - generic [ref=e17]: IPC 24
+  - generic [ref=e18]:
+    - button "Zoom in" [ref=e19] [cursor=pointer]: +
+    - button "Zoom out" [ref=e20] [cursor=pointer]: −
+    - button "Fit pocket" [ref=e21] [cursor=pointer]: Fit
+  - button "Select units" [disabled] [ref=e22]

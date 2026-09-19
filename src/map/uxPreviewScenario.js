@@ -437,7 +437,7 @@ export function confirmLabel(state) {
     return 'Battle';
   }
   if (state.phase === PHASE.AIR_LAND) {
-    if (!state.landingDest) return 'Tap a landable territory';
+    if (!state.landingDest) return 'Confirm land';
     return `Confirm: Land in ${state.landingDest}`;
   }
   if (state.phase === PHASE.DONE) {
@@ -446,6 +446,13 @@ export function confirmLabel(state) {
       : 'Replay scenario';
   }
   return 'Select units';
+}
+
+export function airLandRoster(state) {
+  if (state?.phase !== PHASE.AIR_LAND) return [];
+  return Object.entries(state.selectedUnits || {})
+    .filter(([, n]) => Number(n) > 0)
+    .map(([type, quantity]) => ({ type, quantity: Number(quantity) || 0 }));
 }
 
 export function guideCopy(state) {
@@ -834,6 +841,7 @@ export function inspectPlay(state) {
     landingDest: state?.landingDest || null,
     landed: !!state?.landed,
     selectedUnits: { ...(state?.selectedUnits || {}) },
+    airLandRoster: airLandRoster(state),
     confirmLabel: confirmLabel(state),
     confirmGold: confirmGold(state),
     confirmEnabled: confirmEnabled(state),

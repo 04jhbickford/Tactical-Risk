@@ -4,14 +4,18 @@
 
 ## 9.19.26 — V2.81.53-ux-preview.7 unit sheet click-through
 
-James stills (hybrid Three only): Combat Move sheet on Karelia with
-INF [-] 0/3 [+] and FTR steppers. Tap + did not increment — the map
-under the button selected Congo / French Equatorial Africa. Classic
-HUD click-through.
+James he-correct on preview.6, folded here. Three bars:
 
-Fix: steppers on the origin sheet; stopPropagation + preventDefault
-on pointerdown/touchstart/click for sheet / peek / confirm / zoom;
-canvas ignores hits in those screen rects. Preview only. Do not merge.
+1. Partial-select: INF/FTR `[-] n/max [+]` steppers (not all-or-nothing
+   chips). Send 1 of 3 INF.
+2. Congo click-through P0: sheet +/− eat all touches (bubble-phase
+   stopPropagation / preventDefault + canvas ignores the sheet rect).
+   Map must not select Congo / FEA under INF +.
+3. Air landing: do not open the dest unit sheet. Planes-only peek +
+   Confirm land.
+
+Keep: manual FROM→units→TO→Confirm, no Try, casualty picker, preview.6
+chip mouseup fix. Tesla / Viz off. Preview only. Do not merge.
 
 ---
 

@@ -1,11 +1,16 @@
 // Hybrid Three HUD hit isolation. Preview only.
 // Classic click-through: a stepper / zoom tap must not select the land
 // under the chrome (Congo / FEA under INF + at 390).
+//
+// Do NOT stopPropagation in capture on an ancestor. That eats the
+// child's pointer before [data-step] can fire. Seal on bubble so
+// children activate, then the surface keeps the event off the canvas.
 
 import { isPointInPanelRect } from '../ui/panelClickLock.js';
 
 export const CHROME_DOWN_EVENTS = ['pointerdown', 'touchstart', 'mousedown'];
 export const CHROME_UP_EVENTS = ['pointerup', 'touchend', 'mouseup', 'click'];
+export const CHROME_ALL_EVENTS = [...CHROME_DOWN_EVENTS, ...CHROME_UP_EVENTS];
 
 export function sealChromeEvent(e, { prevent = true } = {}) {
   if (!e) return;
@@ -91,36 +96,32 @@ export function shouldIgnoreMapHit({
 export function sealChromeControl(el) {
   if (!el || el.dataset?.chromeSealed === '1') return el;
   if (el.dataset) el.dataset.chromeSealed = '1';
-  for (const type of CHROME_DOWN_EVENTS) {
-    el.addEventListener(type, (e) => sealChromeEvent(e, { prevent: true }), {
-      capture: true,
-      passive: false,
-    });
-  }
-  for (const type of CHROME_UP_EVENTS) {
+  for (const type of CHROME_ALL_EVENTS) {
     el.addEventListener(type, (e) => {
-      sealChromeEvent(e, { prevent: type === 'click' });
-    }, { capture: true });
+      const prevent = type === 'pointerdown' || type === 'touchstart' || type === 'click';
+      sealChromeEvent(e, { prevent });
+    }, { passive: false });
   }
   return el;
 }
 
-// pointerdown preventDefault can swallow click. Activate on pointerup,
-// ignore a trailing click in the same gesture.
+// Activate on pointerdown (touch-safe). Debounce swallows the
+// trailing pointerup/click from the same gesture.
 export function bindSealedActivate(root, selector, handler) {
   if (!root || typeof handler !== 'function') return;
-  sealChromeControl(root);
   let lastAt = 0;
   const fire = (e) => {
     const node = eventElement(e);
     const hit = selector ? node?.closest?.(selector) : root;
     if (!hit || hit.disabled) return;
+    if (selector && root !== hit && !root.contains(hit)) return;
     const now = Date.now();
     if (now - lastAt < 280) return;
     lastAt = now;
     handler(e, hit);
   };
-  root.addEventListener('pointerdown', fire, { capture: true });
-  root.addEventListener('pointerup', fire, { capture: true });
-  root.addEventListener('click', fire, { capture: true });
+  root.addEventListener('pointerdown', fire);
+  root.addEventListener('pointerup', fire);
+  root.addEventListener('click', fire);
+  sealChromeControl(root);
 }

@@ -618,6 +618,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         ${dice ? `<div class="three-dice">${dice}</div>` : ''}
         ${pickers ? `<div class="three-pickers">${pickers}</div>` : ''}`;
       api.battleEl.classList.add('is-on');
+      api.wirePeekButtons();
       api.syncLayers();
     },
     setStacksExpanded(on) {
@@ -629,12 +630,70 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     showGuide(on = false, text = '') {
       return api.setGuide(text, on);
     },
+    wirePeekButtons() {
+      const stamp = (el) => {
+        if (!el || el.dataset.wired === '1') return;
+        el.dataset.wired = '1';
+      };
+      api.peek.querySelectorAll('[data-step]').forEach((btn) => {
+        stamp(btn);
+        let last = 0;
+        const activate = (e) => {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          if (btn.disabled) return;
+          const now = Date.now();
+          if (now - last < 280) return;
+          last = now;
+          if (typeof api.onUnitStep === 'function') {
+            api.onUnitStep(btn.dataset.unitType, Number(btn.dataset.step));
+          }
+        };
+        btn.onpointerdown = activate;
+        btn.ontouchstart = activate;
+        btn.onclick = activate;
+      });
+      api.peek.querySelectorAll('button.three-peek-unit[data-unit-type]').forEach((chip) => {
+        stamp(chip);
+        let last = 0;
+        const activate = (e) => {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          if (api.peek.dataset.airLand === '1') return;
+          const now = Date.now();
+          if (now - last < 280) return;
+          last = now;
+          if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
+        };
+        chip.onpointerdown = activate;
+        chip.ontouchstart = activate;
+        chip.onclick = activate;
+      });
+      api.battleEl.querySelectorAll('[data-loss-type]').forEach((chip) => {
+        stamp(chip);
+        let last = 0;
+        const activate = (e) => {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          const now = Date.now();
+          if (now - last < 280) return;
+          last = now;
+          if (typeof api.onLossPick === 'function') {
+            api.onLossPick(chip.dataset.lossSide, chip.dataset.lossType);
+          }
+        };
+        chip.onpointerdown = activate;
+        chip.ontouchstart = activate;
+        chip.onclick = activate;
+      });
+    },
     paintPlay({
       land = null,
       stacks = [],
       unitType = null,
       unitTypes = null,
       steppers = null,
+      airLand = false,
       label = null,
       gold = false,
       enabled = false,
@@ -651,9 +710,19 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       if (battle) {
         api.peek.classList.remove('is-on');
         api.peek.textContent = '';
+      } else if (airLand) {
+        const title = land?.name || 'Land aircraft';
+        const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
+        api.peek.innerHTML = `<strong>${title}</strong>
+          <div class="three-peek-meta">${route || 'Selected aircraft'}</div>
+          ${iconRowHtml(stacks)}`;
+        api.peek.dataset.rosterTotal = String(rosterTotal);
+        api.peek.dataset.airLand = '1';
+        if (!api.isSheetOpen()) api.peek.classList.add('is-on');
       } else if (!land) {
         api.peek.classList.remove('is-on');
         api.peek.textContent = '';
+        delete api.peek.dataset.airLand;
       } else {
         const owner = stacks[0]?.owner || (!land.isWater ? land.originalOwner : '');
         const ipcLine = !land.isWater ? `${printIpc(land)} IPC` : '';
@@ -662,6 +731,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           <div class="three-peek-meta">${[owner, ipcLine, route].filter(Boolean).join(' · ')}</div>
           ${steppers?.length ? stepperRowHtml(steppers) : iconRowHtml(stacks)}`;
         api.peek.dataset.rosterTotal = String(rosterTotal);
+        delete api.peek.dataset.airLand;
         const pickedTypes = [
           ...(Array.isArray(unitTypes) ? unitTypes : []),
           ...(unitType ? [unitType] : []),
@@ -675,6 +745,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
       else if (gold && enabled) api.setConfirmReady(label || 'Confirm');
       else api.setConfirmIdle(label || 'Select units');
+      api.wirePeekButtons();
       api.syncLayers();
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
@@ -730,12 +801,13 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     api.setStacksExpanded(!api.stacksExpanded);
     if (typeof api.onStackToggle === 'function') api.onStackToggle(api.stacksExpanded);
   });
-  bindSealedActivate(api.peek, '[data-step]', (e, btn) => {
+  bindSealedActivate(api.bottom, '[data-step]', (e, btn) => {
     if (typeof api.onUnitStep === 'function') {
       api.onUnitStep(btn.dataset.unitType, Number(btn.dataset.step));
     }
   });
-  bindSealedActivate(api.peek, 'button.three-peek-unit[data-unit-type]', (e, chip) => {
+  bindSealedActivate(api.bottom, 'button.three-peek-unit[data-unit-type]', (e, chip) => {
+    if (api.peek?.dataset?.airLand === '1') return;
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
   });
   bindSealedActivate(api.battleEl, '[data-loss-type]', (e, chip) => {

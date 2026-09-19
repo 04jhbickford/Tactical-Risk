@@ -210,10 +210,10 @@ export async function bootUxPreview() {
     if (play.phase === PHASE.COMBAT_MOVE && (play.selected === play.origin || play.destPicked || Object.keys(play.selectedUnits || {}).length)) {
       focusName = play.origin;
     }
-    if (play.phase === PHASE.AIR_LAND && !play.landingDest) {
-      focusName = play.dest;
-    }
-    const land = landByName(focusName);
+    const airLand = play.phase === PHASE.AIR_LAND;
+    const land = airLand
+      ? (play.landingDest ? landByName(play.landingDest) : null)
+      : landByName(focusName);
     const picked = Object.keys(play.selectedUnits || {}).filter((t) => play.selectedUnits[t]);
     const showSteppers = play.phase === PHASE.COMBAT_MOVE
       && land
@@ -229,19 +229,25 @@ export async function bootUxPreview() {
           owner: s.owner,
         }))
       : null;
+    const planeStacks = airLand
+      ? Object.entries(play.selectedUnits || {})
+        .filter(([, n]) => Number(n) > 0)
+        .map(([type, quantity]) => ({ type, quantity, owner: 'Russians' }))
+      : null;
     let route = '';
     if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
       route = `${play.origin} → ${play.destPicked}`;
-    } else if (play.phase === PHASE.AIR_LAND) {
-      route = play.landingDest ? `Land in ${play.landingDest}` : 'Pick teal land';
+    } else if (airLand) {
+      route = play.landingDest ? `Confirm land · ${play.landingDest}` : 'Pick a teal land';
     } else if (play.phase === PHASE.DONE && play.landingDest) {
       route = `Landed · ${play.landingDest}`;
     }
     chrome.paintPlay({
-      land,
-      stacks: land ? (placements[land.name] || []) : [],
+      land: airLand ? (land || { name: 'Land aircraft' }) : land,
+      stacks: airLand ? (planeStacks || []) : (land ? (placements[land.name] || []) : []),
       unitTypes: picked,
       steppers,
+      airLand,
       label: confirmLabel(play),
       gold: confirmGold(play),
       enabled: confirmEnabled(play),
