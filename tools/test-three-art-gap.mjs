@@ -759,7 +759,8 @@ check('p37 required stills',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/med-no-clip.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/unit-bg-unified.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/china-hold.png')
-  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/japan-near.png'));
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/japan-near.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p37/vercel-live-mid-390.png'));
 check('p37 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p37/SCORE.md')));
 
 if (failures) {

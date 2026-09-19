@@ -79,7 +79,8 @@ continents:   7 (NA 24 / SA 12 / EU 30 / ME 18 / AF 27 / AS 33 / OC 39)
 - `med-no-clip.png` / `unit-bg-unified.png`
 - `china-hold.png` / `japan-near.png`
 - `computed.json` — machine-read CSS + inspect + eastMed deck
-- `vercel-live-mid-390.png` — live preview `?three=1` (QA commit)
+- `vercel-live-mid-390.png` — live preview `?three=1` = `V2.81.51-three-polish.37`
+- `vercel-live-inspect.json` — `albedoBound` · `albedoRev=p37` · `styleRef=oceania-watercolor`
 
-**Vercel:** see PR / `vercel-live-inspect.json`  
+**Vercel:** https://tactical-risk20-jbxcs9844-james-projects-20d8de40.vercel.app/?three=1  
 **PR:** https://github.com/04jhbickford/Tactical-Risk/pull/62 (stacked on PR61 / `.36`)
