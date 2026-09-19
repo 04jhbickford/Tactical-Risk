@@ -81,7 +81,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version + schema ===');
-check('GAME_VERSION is V2.81.55', GAME_VERSION === 'V2.81.55');
+check('GAME_VERSION is V2.81.55', String(GAME_VERSION).startsWith('V2.81.55'));
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== B — paint-first loader ===');

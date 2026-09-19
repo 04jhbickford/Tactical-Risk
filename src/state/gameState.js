@@ -64,6 +64,34 @@ export const TURN_PHASE_NAMES = {
 // that is the V2.73 dump combo. Playing UI still requires phase === PLAYING.
 export const SETUP_TURN_PHASE = 'setup';
 
+// Classic 1942 historical capitals. Needed for mobilize capacity (capital=20)
+// and AI purchase — `_initClassicMode` used to leave capitalTerritory null.
+export const CLASSIC_CAPITALS = {
+  Russians: 'Russia',
+  Germans: 'Germany',
+  British: 'United Kingdom',
+  Japanese: 'Japan',
+  Americans: 'East US',
+};
+
+export function stampClassicCapitals(state) {
+  if (!state || (state.gameMode && state.gameMode !== 'classic')) return 0;
+  let stamped = 0;
+  for (const player of state.players || []) {
+    const name = CLASSIC_CAPITALS[player.id];
+    if (!name) continue;
+    const land = state.territoryState?.[name];
+    if (!land) continue;
+    land.isCapital = true;
+    if (!land.originalOwner) land.originalOwner = player.id;
+    if (!state.playerState[player.id]) continue;
+    state.playerState[player.id].capitalTerritory = name;
+    state.playerState[player.id].hasPlacedCapital = true;
+    stamped += 1;
+  }
+  return stamped;
+}
+
 export function resolvePersistedTurnPhase(phase, turnPhase) {
   if (phase !== GAME_PHASES.PLAYING) return SETUP_TURN_PHASE;
   return turnPhase || TURN_PHASES.DEVELOP_TECH;
@@ -274,6 +302,7 @@ export class GameState {
 
     // Multiplayer state
     this.isMultiplayer = false;
+    this.soloLocal = false; // Three vs-AI: skip lobby autosave slot
     this.syncManager = null; // Reference to SyncManager for pushing state changes
 
     // Turn events for turn summary modal (multiplayer)
@@ -493,6 +522,8 @@ export class GameState {
         capitalTerritory: null,
       };
     }
+
+    stampClassicCapitals(this);
 
     this.phase = GAME_PHASES.PLAYING;
     this.currentPlayerIndex = 0;
@@ -5520,7 +5551,7 @@ export class GameState {
     // Online games persist in Firestore — never write them to the local
     // autosave slot, or they'd overwrite a hotseat save AND show up in
     // "My Games" as a broken 'local' game with no sync manager
-    if (this.isMultiplayer) return false;
+    if (this.isMultiplayer || this.soloLocal) return false;
     try {
       const data = JSON.stringify(this.toJSON());
       localStorage.setItem('tacticalRisk_autoSave', data);

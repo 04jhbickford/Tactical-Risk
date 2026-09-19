@@ -27,9 +27,16 @@ import {
   shouldIgnoreMapHit,
 } from './threeChromeEvents.js';
 import { SELECT_GOLD, LAND_TEAL } from './uxPreviewScenario.js';
-import { GameState, GAME_PHASES, TURN_PHASES, SETUP_TURN_PHASE } from '../state/gameState.js';
+import { GameState, GAME_PHASES, TURN_PHASES, SETUP_TURN_PHASE, stampClassicCapitals } from '../state/gameState.js';
 import { AIController } from '../ai/aiController.js';
 import { createSoloSession } from './uxSoloAdapter.js';
+import {
+  clearSoloSave,
+  hasSoloSave,
+  readSoloSave,
+  soloNewGameHref,
+  writeSoloSave,
+} from './uxSoloSave.js';
 
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
 
@@ -79,6 +86,7 @@ function classicRoster(setup, seatId, aiLevel) {
 }
 
 function prepareClassicTurn(gameState) {
+  stampClassicCapitals(gameState);
   if (gameState.phase === GAME_PHASES.PLAYING && gameState.turnPhase === SETUP_TURN_PHASE) {
     gameState.turnPhase = TURN_PHASES.DEVELOP_TECH;
   }
@@ -89,6 +97,11 @@ function prepareClassicTurn(gameState) {
     if (!gameState.riskCards[p.id]) gameState.riskCards[p.id] = [];
   }
   gameState._initFriendlyTerritoriesAtTurnStart?.();
+}
+
+function restartSolo() {
+  clearSoloSave();
+  location.href = soloNewGameHref(location.href);
 }
 
 export async function bootUxSolo() {
@@ -137,11 +150,26 @@ export async function bootUxSolo() {
 
   const gameState = new GameState(setup, territories, continents);
   gameState.isMultiplayer = false;
+  gameState.soloLocal = true;
   gameState.unitDefs = unitDefs;
   gameState.initGame('classic', classicRoster(setup, seatId, aiLevel), { alliancesEnabled: true });
+
+  const saved = readSoloSave();
+  let resumed = false;
+  if (saved?.state) {
+    try {
+      gameState.loadFromJSON(saved.state);
+      gameState.isMultiplayer = false;
+      gameState.soloLocal = true;
+      resumed = true;
+    } catch (err) {
+      console.warn('Solo autosave discarded:', err);
+      clearSoloSave();
+    }
+  }
   prepareClassicTurn(gameState);
 
-  const session = createSoloSession({ gameState, unitDefs, seatId });
+  const session = createSoloSession({ gameState, unitDefs, seatId, hasSave: resumed });
   const ai = new AIController();
   ai.setUnitDefs(unitDefs);
   ai.setCanAct(() => !!session.ui.started && !gameState.gameOver);
@@ -179,6 +207,14 @@ export async function bootUxSolo() {
   if (note) {
     note.textContent = `Solo vs AI · ${GAME_VERSION} · SCHEMA ${SCHEMA_VERSION} · no lobby · do not merge.`;
   }
+  const newGameBtn = document.createElement('button');
+  newGameBtn.type = 'button';
+  newGameBtn.className = 'three-sheet-row';
+  newGameBtn.dataset.sheet = 'new-solo';
+  newGameBtn.textContent = 'New Game vs AI';
+  if (note) chrome.sheet.insertBefore(newGameBtn, note);
+  else chrome.sheet?.appendChild(newGameBtn);
+  bindSealedActivate(newGameBtn, null, () => restartSolo());
 
   reportStartupStatus('Loading tiles and unit chits…', 52);
   const { images, ready: imagesReady } = preloadUnitImages(
@@ -381,8 +417,15 @@ export async function bootUxSolo() {
   });
   bindSealedActivate(chrome.confirm, null, () => {
     if (chrome.confirm.disabled) return;
+    if (gameState.gameOver) {
+      restartSolo();
+      return;
+    }
     session.confirm();
-    if (session.ui.started) ai.checkAndProcessAI();
+    if (session.ui.started) {
+      writeSoloSave({ gameState, seatId, aiLevel });
+      ai.checkAndProcessAI();
+    }
     paintChrome();
     camera.dirty = true;
   });
@@ -390,6 +433,9 @@ export async function bootUxSolo() {
   gameState.subscribe(() => {
     territoryRenderer.setGameState(gameState);
     session.syncMode();
+    if (session.ui.started && !gameState.gameOver) {
+      writeSoloSave({ gameState, seatId, aiLevel });
+    }
     paintChrome();
     camera.dirty = true;
   });
@@ -504,10 +550,16 @@ export async function bootUxSolo() {
       ai: aiLevel,
       lobby: false,
       firebase: false,
+      resumed,
+      hasSave: hasSoloSave(),
+      capitals: Object.fromEntries(
+        (gameState.players || []).map((p) => [p.id, gameState.playerState[p.id]?.capitalTerritory || null]),
+      ),
       mapSize: { w: MAP_WIDTH },
       lod: lodBandFromZoom(camera.zoom),
       play: session.inspect(),
     }),
+    newGame: () => restartSolo(),
     confirm: () => {
       session.confirm();
       paintChrome();

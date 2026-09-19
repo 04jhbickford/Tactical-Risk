@@ -106,9 +106,10 @@ export function isHumanTurn(gameState, seatId) {
   return !!p && p.id === seatId && !p.isAI;
 }
 
-export function createSoloSession({ gameState, unitDefs, seatId }) {
+export function createSoloSession({ gameState, unitDefs, seatId, hasSave = false }) {
   const ui = {
     started: false,
+    hasSave: !!hasSave,
     seatId,
     selected: null,
     picked: {},
@@ -295,8 +296,7 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
 
   function confirm() {
     if (gameState.gameOver) {
-      location.reload();
-      return;
+      return { replay: true };
     }
     if (!ui.started) {
       start();
@@ -479,10 +479,14 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
 
   function confirmModel() {
     if (!ui.started) {
-      return { label: 'Confirm: Start vs AI', gold: true, enabled: true };
+      return {
+        label: ui.hasSave ? 'Continue' : 'New Game vs AI',
+        gold: true,
+        enabled: true,
+      };
     }
     if (gameState.gameOver) {
-      return { label: 'New Game', gold: true, enabled: true, replay: true };
+      return { label: 'New Game vs AI', gold: true, enabled: true, replay: true };
     }
     if (!human()) {
       return { label: ui.notice || 'AI playing…', gold: false, enabled: false };
@@ -604,7 +608,11 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
     const airLand = ui.mode === 'airLand';
     const moveFrom = (ui.mode === 'combatMove' || ui.mode === 'ncm') ? findStagedOrigin() : null;
     let route = ui.notice || '';
-    if (ui.mode === 'splash') route = 'Russians vs 4 AI · classic board';
+    if (ui.mode === 'splash') {
+      route = ui.hasSave
+        ? 'Continue saved game · or New Game vs AI in the sheet'
+        : 'New Game vs AI · classic 1942 · 1 human + 4 medium AI';
+    }
     if ((ui.mode === 'combatMove' || ui.mode === 'ncm') && ui.dest) {
       route = `${moveFrom || ''} → ${ui.dest}`;
     }
@@ -644,6 +652,7 @@ export function createSoloSession({ gameState, unitDefs, seatId }) {
   function inspect() {
     return {
       started: ui.started,
+      hasSave: !!ui.hasSave,
       mode: ui.mode,
       phase: gameState.phase,
       turnPhase: gameState.turnPhase,
