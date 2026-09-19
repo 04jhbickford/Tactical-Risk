@@ -49,9 +49,10 @@ import {
 } from './uxPreviewScenario.js';
 
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
-// Finland Norway (1002,220) + Karelia (1313,250) + Russia (1651,357).
-const POCKET_FIT = { minX: 960, minY: 80, maxX: 1720, maxY: 380 };
-const LAND_FIT = { minX: 980, minY: 70, maxX: 1820, maxY: 460 };
+// Finland Norway (1002,220) + Karelia (1313,250). Tight so 390 can zoom in.
+const POCKET_FIT = { minX: 980, minY: 90, maxX: 1380, maxY: 340 };
+// Include Russia (1651,357) after the take.
+const LAND_FIT = { minX: 980, minY: 70, maxX: 1760, maxY: 430 };
 
 function applyLiveContinents(list, bonusGroups) {
   const of = new Map();
@@ -197,8 +198,8 @@ export async function bootUxPreview() {
   function paintChrome() {
     chrome.setPhase(play.phase);
     const marks = highlights(play);
-    let focusName = play.selected || marks.origin || marks.dest || null;
-    if (play.phase === PHASE.COMBAT_MOVE && (play.selected === play.origin || play.destPicked)) {
+    let focusName = play.selected || marks.dest || null;
+    if (play.phase === PHASE.COMBAT_MOVE && (play.selected === play.origin || play.destPicked || Object.keys(play.selectedUnits || {}).length)) {
       focusName = play.origin;
     }
     if (play.phase === PHASE.AIR_LAND && !play.landingDest) {
@@ -257,12 +258,24 @@ export async function bootUxPreview() {
     const bounds = play.phase === PHASE.AIR_LAND || play.phase === PHASE.DONE
       ? LAND_FIT
       : POCKET_FIT;
-    camera.fitBounds(bounds, {
-      padding: 12,
-      padTop: 92,
-      padBottom: 144,
-      fillFrame: false,
-    });
+    const dpr = devicePixelRatio || 1;
+    const cssW = canvas.width / dpr;
+    const cssH = canvas.height / dpr;
+    const padTop = 96;
+    const padBottom = 150;
+    const availW = Math.max(1, cssW - 24);
+    const availH = Math.max(1, cssH - padTop - padBottom);
+    const bw = Math.max(1, bounds.maxX - bounds.minX);
+    const bh = Math.max(1, bounds.maxY - bounds.minY);
+    const fit = Math.min(availW / bw, availH / bh);
+    const readable = play.phase === PHASE.COMBAT_MOVE ? 1.12 : 0.92;
+    camera.zoom = Math.max(camera.minZoom, Math.min(2.2, Math.max(readable, fit)));
+    const visualCenterY = padTop + availH / 2;
+    camera.x = (bounds.minX + bounds.maxX) / 2;
+    camera.y = (bounds.minY + bounds.maxY) / 2 - (visualCenterY - cssH / 2) / camera.zoom;
+    camera._targetX = null;
+    camera._targetY = null;
+    camera.dirty = true;
   }
   fitPocket();
   paintChrome();
@@ -565,6 +578,14 @@ export async function bootUxPreview() {
       idleConfirm: 'Tap the glowing red stack',
       phaseStrip: guideSteps(play),
       pulse: highlights(play).pulse,
+      pocket: {
+        camera: { x: Number(camera.x.toFixed(1)), y: Number(camera.y.toFixed(1)) },
+        kareliaScreen: (() => {
+          const t = territories.find((x) => x.name === 'Karelia S.S.R.');
+          const c = t && territoryCenter(t);
+          return c ? camera.worldToScreen(c.x, c.y) : null;
+        })(),
+      },
       confirmGold: SELECT_GOLD,
       stress: stressOn,
       play: inspectPlay(play),

@@ -246,17 +246,21 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       pointer-events:none;
     }
     #three-phase-strip .three-steps {
-      display:flex; align-items:center; flex-wrap:wrap; gap:2px 0;
+      display:flex; align-items:center; flex-wrap:nowrap; gap:0;
       min-height:36px; padding:7px 10px; border-radius:12px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;
       background:rgba(30,36,32,0.58);
       -webkit-backdrop-filter:saturate(1.35) blur(16px);
       backdrop-filter:saturate(1.35) blur(16px);
       border:1px solid rgba(255,255,255,0.12);
       color:#E8E2D4;
     }
+    #three-phase-strip .three-steps::-webkit-scrollbar { display:none; }
     #three-phase-strip .three-step {
+      flex:0 0 auto;
       display:inline; font:500 12px/1.35 -apple-system,"SF Pro Text",sans-serif;
       color:rgba(232,226,212,0.55);
+      white-space:nowrap;
     }
     #three-phase-strip .three-step i {
       font-style:normal; font-weight:700; color:rgba(232,226,212,0.42);
