@@ -323,6 +323,21 @@ export function pickUnit(state, type) {
   return state;
 }
 
+// Combat-move sheet steppers: INF [-] 0/3 [+]. One tap = ±1.
+export function adjustUnit(state, type, delta = 1) {
+  if (!state || state.phase !== PHASE.COMBAT_MOVE) return state;
+  const have = stackQty(state.placements[state.origin], type);
+  if (have <= 0) return state;
+  const step = Number(delta);
+  if (!Number.isFinite(step) || step === 0) return state;
+  const cur = Number(state.selectedUnits[type]) || 0;
+  const next = Math.max(0, Math.min(have, cur + step));
+  if (next <= 0) delete state.selectedUnits[type];
+  else state.selectedUnits[type] = next;
+  if (!hasGround(state.selectedUnits)) state.destPicked = null;
+  return state;
+}
+
 export function assignedCount(taken) {
   return Object.values(taken || {}).reduce((n, q) => n + (Number(q) || 0), 0);
 }

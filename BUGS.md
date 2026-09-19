@@ -2,6 +2,19 @@
 
 ---
 
+## 9.19.26 — V2.81.53-ux-preview.7 unit sheet click-through
+
+James stills (hybrid Three only): Combat Move sheet on Karelia with
+INF [-] 0/3 [+] and FTR steppers. Tap + did not increment — the map
+under the button selected Congo / French Equatorial Africa. Classic
+HUD click-through.
+
+Fix: steppers on the origin sheet; stopPropagation + preventDefault
+on pointerdown/touchstart/click for sheet / peek / confirm / zoom;
+canvas ignores hits in those screen rects. Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.6 chip taps reach pickers
 
 Window mouseup was treating HUD chip taps as map taps and rebuilding

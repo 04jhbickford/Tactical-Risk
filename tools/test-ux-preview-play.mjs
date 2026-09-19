@@ -10,6 +10,7 @@ import {
   createScenario,
   tapLand,
   pickUnit,
+  adjustUnit,
   pickLoss,
   confirm,
   confirmLabel,
@@ -53,6 +54,23 @@ tapLand(move, SCENARIO.origin);
 assert(move.selected === SCENARIO.origin, 'origin selected');
 assert(confirmLabel(move) === 'Select units', 'select units after origin');
 assert(!highlights(move).pulse.includes(SCENARIO.origin), 'origin pulse stops after tap');
+
+const stepped = createScenario();
+tapLand(stepped, SCENARIO.origin);
+assert((stepped.selectedUnits.infantry || 0) === 0, 'INF starts 0/3');
+adjustUnit(stepped, 'infantry', 1);
+assert(stepped.selectedUnits.infantry === 1, 'INF + → 1/3');
+adjustUnit(stepped, 'infantry', 1);
+adjustUnit(stepped, 'infantry', 1);
+assert(stepped.selectedUnits.infantry === 3, 'INF + + + → 3/3');
+adjustUnit(stepped, 'infantry', 1);
+assert(stepped.selectedUnits.infantry === 3, 'INF + at max stays 3');
+adjustUnit(stepped, 'infantry', -1);
+assert(stepped.selectedUnits.infantry === 2, 'INF − → 2/3');
+adjustUnit(stepped, 'fighter', 1);
+assert(stepped.selectedUnits.fighter === 1, 'FTR + → 1/1');
+adjustUnit(stepped, 'fighter', 1);
+assert(stepped.selectedUnits.fighter === 1, 'FTR + at max stays 1');
 
 tapLand(move, 'Ukraine S.S.R.');
 assert(move.destPicked == null, 'ukraine dest ignored until units');

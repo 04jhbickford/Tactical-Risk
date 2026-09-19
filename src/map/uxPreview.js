@@ -24,6 +24,11 @@ import {
 } from '../ui/startupLoader.js';
 import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
 import {
+  bindSealedActivate,
+  clientPointOf,
+  shouldIgnoreMapHit,
+} from './threeChromeEvents.js';
+import {
   PHASE,
   SELECT_GOLD,
   LAND_TEAL,
@@ -31,6 +36,8 @@ import {
   applyScenarioPocket,
   tapLand,
   pickUnit,
+  adjustUnit,
+  pickedCount,
   confirm as confirmPlay,
   confirmLabel,
   confirmGold,
@@ -207,6 +214,20 @@ export async function bootUxPreview() {
     }
     const land = landByName(focusName);
     const picked = Object.keys(play.selectedUnits || {}).filter((t) => play.selectedUnits[t]);
+    const showSteppers = play.phase === PHASE.COMBAT_MOVE
+      && land
+      && land.name === play.origin
+      && (play.selected === play.origin || pickedCount(play.selectedUnits) || play.destPicked);
+    const steppers = showSteppers
+      ? (placements[land.name] || [])
+        .filter((s) => s.type !== 'factory' && s.type !== 'aaGun' && (s.quantity || 0) > 0)
+        .map((s) => ({
+          type: s.type,
+          have: s.quantity,
+          picked: Number(play.selectedUnits?.[s.type]) || 0,
+          owner: s.owner,
+        }))
+      : null;
     let route = '';
     if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
       route = `${play.origin} → ${play.destPicked}`;
@@ -219,6 +240,7 @@ export async function bootUxPreview() {
       land,
       stacks: land ? (placements[land.name] || []) : [],
       unitTypes: picked,
+      steppers,
       label: confirmLabel(play),
       gold: confirmGold(play),
       enabled: confirmEnabled(play),
@@ -237,6 +259,12 @@ export async function bootUxPreview() {
   };
   chrome.onUnitPick = (type) => {
     pickUnit(play, type);
+    syncSelectionFromPlay();
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onUnitStep = (type, delta) => {
+    adjustUnit(play, type, delta);
     syncSelectionFromPlay();
     paintChrome();
     camera.dirty = true;
@@ -329,10 +357,29 @@ export async function bootUxPreview() {
     return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-phase-strip');
   }
 
-  canvas.addEventListener('mousedown', (e) => camera.onMouseDown(e));
+  function ignoreMapHit(e) {
+    const pt = clientPointOf(e);
+    return shouldIgnoreMapHit({
+      sheetOpen: chrome.isSheetOpen(),
+      targetInChrome: eventFromChrome(e),
+      clientX: pt?.x,
+      clientY: pt?.y,
+      rects: chrome.hitRects(),
+    });
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (ignoreMapHit(e)) return;
+    camera.onMouseDown(e);
+  });
   canvas.addEventListener('mousemove', (e) => {
     if (camera.onMouseMove(e)) {
       canvas.classList.add('is-panning');
+      return;
+    }
+    if (ignoreMapHit(e)) {
+      hover = null;
+      canvas.classList.remove('is-hovering');
       return;
     }
     const hit = pickAt(e.clientX, e.clientY);
@@ -344,17 +391,19 @@ export async function bootUxPreview() {
     const wasDrag = camera.onMouseUp();
     canvas.classList.remove('is-panning');
     if (wasDrag) return;
-    if (chrome.isSheetOpen()) return;
-    // Peek / loss chips live in the HUD. A window mouseup used to
-    // rebuild that HUD before the chip click, so unit and casualty
-    // taps never registered.
-    if (eventFromChrome(e)) return;
+    // Peek / steppers / zoom live in the HUD. A window mouseup used
+    // to select the land under INF + (Congo / FEA at 390).
+    if (ignoreMapHit(e)) return;
     selectLand(pickAt(e.clientX, e.clientY));
   });
   canvas.addEventListener('wheel', (e) => camera.onWheel(e), { passive: false });
 
   let pinch = null;
   canvas.addEventListener('touchstart', (e) => {
+    if (ignoreMapHit(e)) {
+      e.preventDefault();
+      return;
+    }
     if (e.touches.length === 2) {
       e.preventDefault();
       const [a, b] = e.touches;
@@ -390,21 +439,17 @@ export async function bootUxPreview() {
     if (e.touches.length === 0) {
       const wasDrag = camera.onMouseUp();
       canvas.classList.remove('is-panning');
-      if (wasDrag || chrome.isSheetOpen() || eventFromChrome(e)) return;
+      if (wasDrag || ignoreMapHit(e)) return;
       const t = e.changedTouches[0];
       if (t) selectLand(pickAt(t.clientX, t.clientY));
     }
   });
 
-  chrome.zoom.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-zoom]');
-    if (!btn) return;
-    e.stopPropagation();
+  bindSealedActivate(chrome.zoom, '[data-zoom]', (e, btn) => {
     if (btn.dataset.zoom === 'fit') fitPocket();
     else camera.zoomBy(btn.dataset.zoom);
   });
-  chrome.confirm.addEventListener('click', (e) => {
-    e.stopPropagation();
+  bindSealedActivate(chrome.confirm, null, () => {
     if (chrome.confirm.disabled) return;
     const before = play.phase;
     confirmPlay(play);
@@ -636,6 +681,14 @@ export async function bootUxPreview() {
       camera.dirty = true;
       return { ...(play.selectedUnits || {}) };
     },
+    adjustUnit: (type, delta = 1) => {
+      adjustUnit(play, type, delta);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return { ...(play.selectedUnits || {}) };
+    },
+    blocksMapAt: (x, y) => chrome.blocksMapAt(x, y),
     pickLoss: (side, type) => {
       pickLoss(play, side, type);
       paintChrome();
