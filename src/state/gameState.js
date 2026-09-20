@@ -18,6 +18,8 @@ import {
   upsertPendingAirLanding,
 } from './airLanding.js';
 import { emitGameEvent, summarizeUnits } from '../multiplayer/gameEventLog.js';
+import { stripUndefinedDeep } from './persistState.js';
+import { shouldCaptureOccupiedTerritory } from './territoryCapture.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -2277,7 +2279,23 @@ export class GameState {
           continue;
         }
       } else if (nextPhase === TURN_PHASES.NON_COMBAT_MOVE) {
-        // Block advancing if there are unresolved combats
+        // Won fights that never ran _finalizeCombat still occupy the hex.
+        // Flip those owners before the combat-queue gate or NCM isEnemy check.
+        this.ensureOccupationOwners({ notify: false });
+        if (this.combatQueue && this.combatQueue.length > 0) {
+          this.combatQueue = this.combatQueue.filter((name) => {
+            const units = this.units[name] || [];
+            const playerId = this.currentPlayer?.id;
+            const hasEnemy = units.some((u) =>
+              u.owner !== playerId && !this.areAllies(playerId, u.owner)
+              && u.type !== 'factory' && u.type !== 'aaGun' && (u.quantity || 0) > 0
+            );
+            const hasFriendly = units.some((u) =>
+              u.owner === playerId && (u.quantity || 0) > 0 && u.type !== 'factory'
+            );
+            return hasEnemy && hasFriendly;
+          });
+        }
         if (this.combatQueue && this.combatQueue.length > 0) {
           // Cannot advance - combats must be resolved first
           console.warn('Cannot advance to non-combat move: unresolved combats remain');
@@ -2395,10 +2413,16 @@ export class GameState {
     const isEnemy = toOwner && toOwner !== player.id && !this.areAllies(player.id, toOwner);
     const isAllied = toOwner && toOwner !== player.id && this.areAllies(player.id, toOwner);
 
+    // Heal a won combat whose owner flip never persisted (dequeue / failed
+    // push). Must run before the NCM isEnemy gate so West Canada is legal.
+    this.ensureOccupationOwners({ unitDefs, notify: false });
+    const healedOwner = this.getOwner(toTerritory);
+    const healedEnemy = healedOwner && healedOwner !== player.id && !this.areAllies(player.id, healedOwner);
+
     // Non-combat move rules
     if (isNonCombatMove) {
       // Cannot enter enemy territory
-      if (isEnemy) {
+      if (healedEnemy) {
         return { success: false, error: 'Cannot enter enemy territory in non-combat move' };
       }
       // Can freely pass through allied territories
@@ -2866,13 +2890,13 @@ export class GameState {
             // Track for undo
             blitzedCaptures.push({ territory: blitzedTerrName, previousOwner: blitzedOwner });
 
-            // Capture the territory
-            this.territoryState[blitzedTerrName].owner = player.id;
-
-            // Award Risk card for conquering (one per turn per Risk rules)
-            if (!this.conqueredThisTurn[player.id]) {
-              this.conqueredThisTurn[player.id] = true;
-              cardAwarded = this.awardRiskCard(player.id);
+            const occupied = this.captureOccupiedTerritory(blitzedTerrName, {
+              unitDefs,
+              notify: false,
+              force: true,
+            });
+            if (occupied.captured && occupied.cardAwarded) {
+              cardAwarded = occupied.cardAwarded;
             }
           }
         }
@@ -2880,20 +2904,10 @@ export class GameState {
     }
 
     if (!toT?.isWater && isEnemy && movedLandUnits) {
-      // Check if there are any enemy units remaining
-      const enemyUnits = this.units[toTerritory]?.filter(u =>
-        u.owner !== player.id && !this.areAllies(player.id, u.owner)
-      ) || [];
-      if (enemyUnits.length === 0) {
-        // Capture the territory immediately
-        this.territoryState[toTerritory].owner = player.id;
+      const occupied = this.captureOccupiedTerritory(toTerritory, { unitDefs, notify: false });
+      if (occupied.captured) {
         captured = true;
-
-        // Award Risk card for conquering (one per turn per Risk rules)
-        if (!this.conqueredThisTurn[player.id]) {
-          this.conqueredThisTurn[player.id] = true;
-          cardAwarded = this.awardRiskCard(player.id);
-        }
+        cardAwarded = occupied.cardAwarded || cardAwarded;
       }
     }
 
@@ -3484,30 +3498,7 @@ export class GameState {
     if (attackers.length === 0 || combatDefenders.length === 0) {
       // Attacker wins if there are no combat defenders
       if (attackers.length > 0) {
-        // Capture territory - either from enemy defenders (factories/AA) or undefended enemy territory
-        const t = this.territoryByName[territory];
-        if (!t?.isWater) {
-          const currentOwner = this.territoryState[territory]?.owner;
-          // Capture if territory belongs to enemy or neutral
-          if (!currentOwner || (currentOwner !== player.id && !this.areAllies(player.id, currentOwner))) {
-            this.territoryState[territory].owner = player.id;
-            // Transfer factory and AA gun ownership (captured, not destroyed - A&A Anniversary rules)
-            for (const unit of units) {
-              if (unit.type === 'factory' || unit.type === 'aaGun') {
-                unit.owner = player.id;
-                // Ensure unit has quantity (safeguard)
-                if (!unit.quantity || unit.quantity < 1) {
-                  unit.quantity = 1;
-                }
-              }
-            }
-            // Award Risk card for conquering
-            if (!this.conqueredThisTurn[player.id]) {
-              this.conqueredThisTurn[player.id] = true;
-              this.awardRiskCard(player.id);
-            }
-          }
-        }
+        this.captureOccupiedTerritory(territory, { unitDefs, notify: false });
       }
       // Repair damaged ships at end of combat
       this._repairDamagedShips(units, unitDefs);
@@ -3581,34 +3572,8 @@ export class GameState {
         // Naval battle won - mark sea zone as cleared for shore bombardment
         this.markSeaZoneCleared(territory);
       } else {
-        // Land battle won - capture territory
-        const defender = allDefenders[0]?.owner;
-        this.territoryState[territory].owner = player.id;
-
-        // Log territory capture for turn summary modal (multiplayer)
-        this.logTerritoryCapture(territory, defender, player.id);
-
-        // Transfer factory and AA gun ownership to the winner (captured, not destroyed - A&A Anniversary rules)
-        const territoryUnits = this.units[territory] || [];
-        for (const unit of territoryUnits) {
-          if (unit.type === 'factory' || unit.type === 'aaGun') {
-            unit.owner = player.id;
-            // Ensure unit has quantity (safeguard)
-            if (!unit.quantity || unit.quantity < 1) {
-              unit.quantity = 1;
-            }
-          }
-        }
-
-        // Award Risk card for conquering (one per turn per Risk rules)
-        if (!this.conqueredThisTurn[player.id]) {
-          this.conqueredThisTurn[player.id] = true;
-          const cardType = this.awardRiskCard(player.id);
-          result.cardAwarded = cardType;
-        }
-
-        // Handle capital capture (IPC transfer, victory check)
-        this.handleCapitalCapture(territory, player.id, defender);
+        const occupied = this.captureOccupiedTerritory(territory, { unitDefs, notify: false });
+        if (occupied.cardAwarded) result.cardAwarded = occupied.cardAwarded;
       }
       // Repair surviving damaged ships
       this._repairDamagedShips(this.units[territory], unitDefs);
@@ -4033,6 +3998,72 @@ export class GameState {
     }
   }
 
+  // One owner-flip path for combat UI, resolveCombat, empty-hex moves, and
+  // the V2.81.54 dequeue that used to skip _finalizeCombat.
+  captureOccupiedTerritory(territory, { unitDefs = {}, notify = true, force = false } = {}) {
+    const player = this.currentPlayer;
+    if (!player || !territory) return { captured: false };
+    const t = this.territoryByName[territory];
+    const currentOwner = this.territoryState[territory]?.owner ?? null;
+    if (!shouldCaptureOccupiedTerritory({
+      territoryName: territory,
+      isWater: !!t?.isWater,
+      currentOwner,
+      playerId: player.id,
+      units: this.units[territory] || [],
+      unitDefs,
+      areAllies: (a, b) => this.areAllies(a, b),
+      force,
+    })) {
+      return { captured: false };
+    }
+
+    if (!this.territoryState[territory]) {
+      this.territoryState[territory] = { owner: null, isCapital: false };
+    }
+    this.territoryState[territory].owner = player.id;
+
+    const units = this.units[territory] || [];
+    for (const unit of units) {
+      if (unit.type === 'factory' || unit.type === 'aaGun') {
+        unit.owner = player.id;
+        if (!unit.quantity || unit.quantity < 1) unit.quantity = 1;
+      }
+    }
+
+    this.logTerritoryCapture(territory, currentOwner, player.id);
+
+    let cardAwarded = null;
+    if (!this.conqueredThisTurn[player.id]) {
+      this.conqueredThisTurn[player.id] = true;
+      cardAwarded = this.awardRiskCard(player.id, { notify: false });
+    }
+
+    if (currentOwner && currentOwner !== player.id) {
+      this.handleCapitalCapture(territory, player.id, currentOwner);
+    }
+
+    if (notify) this._notify();
+    return { captured: true, previousOwner: currentOwner, cardAwarded };
+  }
+
+  ensureOccupationOwners({ unitDefs = {}, territory = null, notify = false } = {}) {
+    const names = territory
+      ? [territory]
+      : [...new Set([
+        ...Object.keys(this.units || {}),
+        ...Object.keys(this.territoryState || {}),
+      ])];
+    let any = false;
+    for (const name of names) {
+      if (!name) continue;
+      const result = this.captureOccupiedTerritory(name, { unitDefs, notify: false });
+      if (result.captured) any = true;
+    }
+    if (notify && any) this._notify();
+    return any;
+  }
+
   // Handle capital capture - called when territory ownership changes
   handleCapitalCapture(territory, newOwner, previousOwner) {
     // Check if this territory is a capital
@@ -4282,18 +4313,26 @@ export class GameState {
       ...result
     });
 
-    // Also add to turnEvents for turn summary modal (multiplayer)
-    this.turnEvents.push({
+    // Never write `undefined` — Firestore rejects the whole game doc
+    // (post-combat hiccup + ownership revert). JSON.stringify hides this.
+    const winner = result?.winner;
+    const outcome = (winner === 'attacker' || winner === result?.attacker)
+      ? 'attacker'
+      : 'defender';
+    const event = {
       type: 'combat',
-      playerId: this.currentPlayer?.id,
+      playerId: this.currentPlayer?.id ?? null,
       timestamp: Date.now(),
-      territory: result.territory,
-      attacker: result.attacker,
-      defender: result.defender,
-      outcome: result.winner === result.attacker ? 'attacker' : 'defender',
-      attackerLosses: result.attackerLosses,
-      defenderLosses: result.defenderLosses
-    });
+      territory: result?.territory ?? null,
+      attacker: result?.attacker ?? null,
+      defender: result?.defender ?? null,
+      outcome,
+    };
+    if (result?.attackerLosses != null) event.attackerLosses = result.attackerLosses;
+    if (result?.defenderLosses != null) event.defenderLosses = result.defenderLosses;
+    if (result?.attackerSurvivors != null) event.attackerSurvivors = result.attackerSurvivors;
+    if (result?.defenderSurvivors != null) event.defenderSurvivors = result.defenderSurvivors;
+    this.turnEvents.push(event);
   }
 
   // Get combat log for display
@@ -4312,11 +4351,11 @@ export class GameState {
   logTerritoryCapture(territory, fromPlayer, toPlayer) {
     this.turnEvents.push({
       type: 'territory_captured',
-      playerId: toPlayer,
+      playerId: toPlayer ?? null,
       timestamp: Date.now(),
-      territory,
-      fromPlayer,
-      toPlayer
+      territory: territory ?? null,
+      fromPlayer: fromPlayer ?? null,
+      toPlayer: toPlayer ?? null,
     });
   }
 
@@ -4406,7 +4445,7 @@ export class GameState {
   // --- RISK Cards System ---
 
   // Award a RISK card to player (called on successful territory capture)
-  awardRiskCard(playerId) {
+  awardRiskCard(playerId, { notify = true } = {}) {
     if (!this.riskCards[playerId]) {
       this.riskCards[playerId] = [];
     }
@@ -4428,7 +4467,7 @@ export class GameState {
     }
 
     this.riskCards[playerId].push(cardType);
-    this._notify();
+    if (notify) this._notify();
     return cardType;
   }
 
@@ -5326,7 +5365,7 @@ export class GameState {
   }
 
   toJSON() {
-    return {
+    return stripUndefinedDeep({
       version: 11, // v11: Added turn events for turn summary modal
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
@@ -5371,7 +5410,7 @@ export class GameState {
         originTerritory: entry.originTerritory,
         units: (entry.units || []).map((unit) => ({ ...unit })),
       })),
-    };
+    });
   }
 
   loadFromJSON(data) {

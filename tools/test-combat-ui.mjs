@@ -100,19 +100,32 @@ function makeGame({
     turnPhase,
     units,
     notified: 0,
+    territoryState: { [territory]: { owner: 'p2' } },
+    conqueredThisTurn: {},
     getUnitsAt(name) { return this.units[name] || []; },
     areAllies() { return false; },
     getPlayer(id) {
       if (id === 'p1') return this.currentPlayer;
       return { id: 'p2', name: 'James', color: '#00c' };
     },
-    getOwner() { return 'p2'; },
+    getOwner(name) { return this.territoryState[name]?.owner || 'p2'; },
     hasAmphibiousAssault() { return false; },
     territoryByName: { [territory]: { isWater: false, connections: [] } },
     combatTelemetry: [],
     combatLog: [],
     recordCombatTelemetry(entry) { this.combatTelemetry.push({ ...entry }); },
     logCombat(result) { this.combatLog.push(result); },
+    captureOccupiedTerritory(name) {
+      const list = this.units[name] || [];
+      const land = list.some((u) => u.owner === 'p1' && ['infantry', 'armour', 'artillery'].includes(u.type) && u.quantity > 0);
+      const enemy = list.some((u) => u.owner !== 'p1' && u.type !== 'factory' && u.type !== 'aaGun' && u.quantity > 0);
+      if (land && !enemy) {
+        if (!this.territoryState[name]) this.territoryState[name] = { owner: 'p2' };
+        this.territoryState[name].owner = 'p1';
+        return { captured: true };
+      }
+      return { captured: false };
+    },
     _notify() { this.notified += 1; },
   };
 }
@@ -127,7 +140,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.55', GAME_VERSION === 'V2.81.55');
+check('GAME_VERSION is V2.81.56', GAME_VERSION === 'V2.81.56');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
@@ -226,6 +239,8 @@ console.log('=== showNextCombat / syncFromAuthoritativeState skip empty rematch 
   check('already-won queue head is dequeued', game.combatQueue.length === 0);
   check('popup stays hidden (no 0-enemy retry)', ui.el.classList.contains('hidden'));
   check('dequeue notifies so the queue can persist', game.notified >= 1);
+  check('factory-only leftover flips owner on dequeue (not left German)',
+    game.territoryState[territory].owner === 'p1');
 }
 
 {

@@ -14,6 +14,7 @@ import { getAuthManager } from './auth.js';
 import { GAME_VERSION, compareGameVersions } from '../version.js';
 import { createPushQueue } from './pushCoalesce.js';
 import { shouldApplyRemoteGameState } from '../state/placementPass.js';
+import { stripUndefinedDeep } from '../state/persistState.js';
 import {
   shouldReplaceSnapshotListener,
   shouldResumeSnapshots,
@@ -498,7 +499,7 @@ export class SyncManager {
   // transaction error propagates to the retry loop.
   async _pushOnce() {
     const gameRef = doc(this.db, 'games', this.gameId);
-    const state = this.gameState.toJSON();
+    const state = stripUndefinedDeep(this.gameState.toJSON());
     const currentPlayer = this.gameState.currentPlayer;
     const currentPlayerId = currentPlayer?.oderId || null;
 

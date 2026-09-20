@@ -2,6 +2,58 @@
 
 ---
 
+## 9.20.26 — V2.81.56 conquer owner flip + post-combat hiccup (SCHEMA 11)
+
+James / Robert Watts + Sean Benson, live canvas `tactical-risk20.vercel.app`
+(V2.81.55), US theater screenshots ~9:29. Combat "worked" then:
+
+1. Territories did not flip to the conquering team (West Canada stayed
+   German).
+2. "Hiccup" toast right after combat.
+3. Fighters looked gone (West US start fighter + turn-1 buy).
+4. After NCM 2 infantry West US → East US, remaining infantry could not
+   enter West Canada.
+
+Firestore `games/{id}/events` not pulled here (no admin
+`FIREBASE_ID_TOKEN`; repo ships no service account). Diagnosis from
+code + the toast copy (`push_failed` → "Connection hiccup").
+
+Cause (shared, not one hex):
+
+- `combatUI._finalizeCombat` was the only UI path that wrote
+  `territoryState.owner`. V2.81.54 `_dequeueResolvedCombatHeads` treats
+  "no enemy combat units" as done and dequeues **without** capturing.
+  `_syncCombatStateToGame` persisted dead defenders but not the owner.
+  Overlay dismiss / air-landing-without-combatState also skipped
+  finalize. `nextPhase` then saw an empty queue and entered NCM.
+- `logCombat` stuffed `attackerLosses` / `defenderLosses` as
+  `undefined` into `turnEvents`. Firestore rejects undefined on
+  `transaction.update`. First casualty push (no log) can succeed; the
+  finalize push fails → hiccup → exhaust reload of last confirmed doc
+  (units updated, owner not). Same poison can drop a landing write, so
+  the West US fighter never appears where they expected.
+
+Fix: `captureOccupiedTerritory` / `ensureOccupationOwners` on GameState
+(land units only; factory/AA transfer; no throw on missing state).
+Dequeue, casualty sync, finalize, resolveCombat, empty-hex / blitz
+moves, NCM entry, and `canMoveTo` all use it. `logCombat` omits missing
+fields; `toJSON` + sync push run `stripUndefinedDeep`. SCHEMA 11.
+GAME_VERSION V2.81.56. Draft only — do not merge without James.
+
+### Smoke (this PR)
+
+- [ ] Land combat win (infantry ± fighters) into West Canada: owner
+      flips immediately; map flag / NCM treat it as friendly.
+- [ ] After that win, NCM 2 infantry West US → East US, then 1 leftover
+      West US → West Canada succeeds.
+- [ ] Air-only win still does not capture.
+- [ ] Surviving fighters stay on the board (battle hex or named
+      landing). Turn-1 purchased fighters stay in the mobilize queue.
+- [ ] No "Connection hiccup" toast after a normal land combat. Partner
+      sees the new owner without refresh.
+
+---
+
 ## 9.19.26 — V2.81.55 cloud game-log + diagnostics (SCHEMA 11)
 
 James want: screenshot → Arc pulls cloud events for that game/moment →

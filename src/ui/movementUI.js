@@ -213,6 +213,13 @@ export class MovementUI {
   canMoveTo(territory) {
     if (!this.selectedFrom) return false;
 
+    // Flip owners for won-but-unpersisted occupations so NCM highlights
+    // newly captured West Canada as friendly.
+    this.gameState.ensureOccupationOwners?.({
+      unitDefs: this.unitDefs || {},
+      notify: false,
+    });
+
     const player = this.gameState.currentPlayer;
     const toOwner = this.gameState.getOwner(territory.name);
     const isEnemy = toOwner && toOwner !== player.id &&
