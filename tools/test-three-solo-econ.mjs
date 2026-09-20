@@ -26,6 +26,7 @@ import {
   inspectPlay,
   chromeModel,
   factoryDests,
+  BUY_TYPES,
 } from '../src/map/threeSoloPlay.js';
 import { startClassicSolo } from '../src/map/threeSoloMatch.js';
 import { createScenario } from '../src/map/uxPreviewScenario.js';
@@ -64,6 +65,8 @@ function scriptRng(faces) {
 // --- S8 tech skip still works (S2 path) ---
 const skip = fresh();
 assert(skip.gameState.turnPhase === TURN_PHASES.DEVELOP_TECH, 'open tech');
+assert(typeof skip.gameState.getCollectIncomeAmount === 'function', 'income preview on GameState');
+assert(skip.gameState.getCollectIncomeAmount('Russians') >= 10, 'classic Russia collects ≥ capital 10');
 assert(confirmLabel(skip).startsWith('End Phase'), 'skip tech End Phase');
 const model = chromeModel(skip);
 assert(model.steppers?.some((s) => s.type === 'techDie'), 'tech die stepper');
@@ -138,6 +141,9 @@ assert(qty(buy, 'Russia', 'infantry', 'Russians') === rusInf + 2, '2 infantry pl
 assert(pendingQty(buy) === 0, 'queue empty');
 assert(canEndPhase(buy) === true, 'End Phase after place');
 confirm(buy);
+assert(!!buy.income, 'income gate after place');
+assert(buy.income.amount > 0, 'classic Russia has income');
+confirm(buy);
 assert(buy.gameState.currentPlayer.id === 'Germans', 'income → German AI');
 
 // --- S9 victory + New Game ---
@@ -152,6 +158,19 @@ assert(confirmEnabled(win) === true, 'victory Confirm on');
 assert(chromeModel(win).battle?.kicker === 'Victory', 'victory card');
 confirm(win);
 assert(win._newGame === true, 'Confirm requests New Game');
+
+const lose = fresh();
+lose.gameState.territoryState.Russia.owner = 'Germans';
+lose.gameState.territoryState['United Kingdom'].owner = 'Germans';
+lose.gameState._checkVictoryConditions();
+assert(lose.gameState.gameOver === true, 'axis game over');
+assert(lose.gameState.winner === 'Axis', 'Axis win');
+assert(chromeModel(lose).battle?.kicker === 'Defeat', 'defeat card for human Allies');
+assert(confirmLabel(lose) === 'New Game vs AI', 'lose Confirm');
+
+assert(BUY_TYPES.includes('carrier'), 'full navy in shop');
+assert(BUY_TYPES.includes('tacticalBomber'), 'TAC in shop');
+assert(chromeModel(fresh()).steppers.some((s) => s.type === 'techDie'), 'tech stepper still');
 
 const pocket = createScenario();
 assert(pocket.id === 'karelia-finland-air', 'pocket seed untouched');

@@ -225,6 +225,7 @@ export class GameState {
     this.gameOver = false;
     this.winner = null; // 'Allies', 'Axis', or player name
     this.winCondition = null;
+    this.lastIncome = null;
 
     // Combat log for current round
     this.combatLog = [];
@@ -3961,6 +3962,32 @@ export class GameState {
     this.pendingPurchases = this.pendingPurchases.filter(p => p.owner !== player.id);
   }
 
+  // Preview collect-income IPCs (capital 10 + production + continent bonus).
+  getCollectIncomeAmount(playerId = this.currentPlayer?.id) {
+    if (!playerId) return 0;
+    if (!this.canCollectIncome(playerId)) return 0;
+
+    let income = 0;
+    const capitalTerritory = this.playerState[playerId]?.capitalTerritory;
+
+    for (const [territory, state] of Object.entries(this.territoryState)) {
+      if (state.owner !== playerId) continue;
+      if (territory === capitalTerritory) {
+        income += 10;
+        continue;
+      }
+      const t = this.territoryByName[territory];
+      if (t && t.production) income += t.production;
+    }
+
+    for (const continent of this.continents || []) {
+      if (this.controlsContinent(playerId, continent.name)) {
+        income += continent.bonus;
+      }
+    }
+    return income;
+  }
+
   // Collect income from territories
   _collectIncome() {
     const player = this.currentPlayer;
@@ -3969,36 +3996,17 @@ export class GameState {
     // Repair damaged battleships at turn end (A&A Anniversary rule)
     this._repairPlayerBattleships(player.id);
 
-    // Cannot collect income if capital is captured
-    if (!this.canCollectIncome(player.id)) {
-      return;
+    const blocked = !this.canCollectIncome(player.id);
+    const income = this.getCollectIncomeAmount(player.id);
+    if (!blocked) {
+      this.playerState[player.id].ipcs += income;
     }
-
-    let income = 0;
-    const capitalTerritory = this.playerState[player.id]?.capitalTerritory;
-
-    for (const [territory, state] of Object.entries(this.territoryState)) {
-      if (state.owner === player.id) {
-        // Capitals always produce 10 IPCs
-        if (territory === capitalTerritory) {
-          income += 10;
-        } else {
-          const t = this.territoryByName[territory];
-          if (t && t.production) {
-            income += t.production;
-          }
-        }
-      }
-    }
-
-    // Add continent bonuses
-    for (const continent of this.continents) {
-      if (this.controlsContinent(player.id, continent.name)) {
-        income += continent.bonus;
-      }
-    }
-
-    this.playerState[player.id].ipcs += income;
+    this.lastIncome = {
+      playerId: player.id,
+      amount: income,
+      blocked,
+      round: this.round,
+    };
     emitGameEvent('ui', {
       gameState: this,
       payload: { action: 'collectIncome', ipcDelta: income },

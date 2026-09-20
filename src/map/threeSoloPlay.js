@@ -40,6 +40,7 @@ export const PLAY_STAGE = {
   COMBAT_RESULT: BATTLE_STEP.COMBAT_RESULT,
   WON: BATTLE_STEP.WON,
   AIR_LAND: 'airLand',
+  INCOME: 'income',
   DONE: 'done',
 };
 
@@ -62,13 +63,21 @@ const COMBAT_ORDER = [
 const AIR_ORDER = ['fighter', 'tacticalBomber', 'bomber'];
 const BUY_TYPES = [
   'infantry', 'artillery', 'armour',
-  'fighter', 'bomber',
+  'fighter', 'tacticalBomber', 'bomber',
   'aaGun', 'factory',
-  'submarine', 'destroyer', 'transport',
+  'submarine', 'destroyer', 'cruiser', 'battleship', 'carrier', 'transport',
 ];
+const BUY_SHORT = {
+  infantry: 'INF', artillery: 'ART', armour: 'TNK',
+  fighter: 'FTR', tacticalBomber: 'TAC', bomber: 'BMB',
+  aaGun: 'AA', factory: 'FAC',
+  submarine: 'SUB', destroyer: 'DD', cruiser: 'CA',
+  battleship: 'BB', carrier: 'CV', transport: 'TRN',
+};
 const TECH_DIE = 'techDie';
+const RISK_CARDS = 'riskCards';
 const LAND_TEAL = '#5BA8A0';
-export { LAND_TEAL, BUY_TYPES, TECH_DIE };
+export { LAND_TEAL, BUY_TYPES, BUY_SHORT, TECH_DIE, RISK_CARDS };
 
 export function createSoloPlay(gameState, unitDefs = {}) {
   return {
@@ -82,6 +91,7 @@ export function createSoloPlay(gameState, unitDefs = {}) {
     battle: null,
     landing: null,
     tech: emptyTech(),
+    income: null,
     aiStatus: null,
     rng: null,
     _newGame: false,
@@ -102,6 +112,7 @@ export function resetUi(play) {
   play.battle = null;
   play.landing = null;
   play.tech = emptyTech();
+  play.income = null;
   play.targetShipId = null;
   refreshStage(play);
   return play;
@@ -475,6 +486,7 @@ function moveDestLegal(play) {
 export function playStage(play) {
   if (!play?.gameState) return PLAY_STAGE.IDLE;
   if (isGameOver(play)) return PLAY_STAGE.DONE;
+  if (play.income) return PLAY_STAGE.INCOME;
   if (play.landing) return PLAY_STAGE.AIR_LAND;
   if (play.battle?.step) return play.battle.step;
   const phase = play.gameState.turnPhase;
@@ -498,11 +510,43 @@ export function phaseStrip(play) {
     const capital = play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT;
     return { steps: ['Capital', 'Deploy'], current: capital ? 1 : 2 };
   }
-  const current = TURN_PHASE_ORDER.indexOf(play.gameState?.turnPhase);
+  const incomeIdx = TURN_PHASE_ORDER.indexOf(TURN_PHASES.COLLECT_INCOME);
+  const current = play.income
+    ? incomeIdx
+    : TURN_PHASE_ORDER.indexOf(play.gameState?.turnPhase);
   return {
     steps: TURN_PHASE_ORDER.map((p) => STRIP_SHORT[p] || TURN_PHASE_NAMES[p]),
     current: current >= 0 ? current + 1 : 1,
   };
+}
+
+export function purchasableTypes(play) {
+  const defs = play?.unitDefs || {};
+  return BUY_TYPES.filter((type) => !!defs[type]);
+}
+
+export function incomePreview(play) {
+  const gs = play?.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!gs || !id) return { amount: 0, blocked: true };
+  const blocked = gs.canCollectIncome?.(id) === false;
+  const amount = Number(gs.getCollectIncomeAmount?.(id)) || 0;
+  return { amount, blocked };
+}
+
+export function wouldCollectOnEnd(play) {
+  if (!isPlaying(play) || !isHumanTurn(play) || isGameOver(play)) return false;
+  if (play.landing || play.battle) return false;
+  const phase = play.gameState.turnPhase;
+  if (phase === TURN_PHASES.COLLECT_INCOME) return true;
+  if (phase === TURN_PHASES.MOBILIZE) {
+    return pendingQty(play) <= 0 && !pickedCount(play.selectedUnits);
+  }
+  if (phase === TURN_PHASES.NON_COMBAT_MOVE) {
+    const hasBuy = pendingPurchasesOf(play).some((p) => (Number(p.quantity) || 0) > 0);
+    return ncmAirRemaining(play) <= 0 && !pickedCount(play.selectedUnits) && !hasBuy;
+  }
+  return false;
 }
 
 export function ncmAirRemaining(play) {
@@ -591,6 +635,7 @@ export function canEndPhase(play) {
     return !!gs.canFinishPlacementRound?.(gs.currentPlayer.id, play.unitDefs, { allowNavalSkip: true });
   }
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
+  if (play.income) return true;
   if (play.landing) return remainingAirCount(play) <= 0;
   if (play.battle) return play.battle.step === BATTLE_STEP.WON && !play.landing;
   const phase = play.gameState.turnPhase;
@@ -688,6 +733,7 @@ export function syncPlay(play) {
       play.battle = null;
       play.landing = null;
       play.tech = emptyTech();
+      play.income = null;
     }
   }
   if (phase === TURN_PHASES.COMBAT && isHumanTurn(play) && !play.battle && !play.landing && !isGameOver(play)) {
@@ -818,6 +864,26 @@ function failCloseIfWiped(play) {
   return true;
 }
 
+// Steal aa-combat-dice-calc-pattern from combatUI: artillery 1:1, jets, superSubs, heavyBombers.
+function attackValueOf(play, type, owner, supported) {
+  let value = Number(defOf(play, type).attack) || 0;
+  if (type === 'infantry' && supported) value += 1;
+  if (type === 'fighter' && play.gameState.hasTech?.(owner, 'jets')) value += 1;
+  if (type === 'submarine' && play.gameState.hasTech?.(owner, 'superSubs')) value += 1;
+  return value;
+}
+
+function defenseValueOf(play, type, owner) {
+  let value = Number(defOf(play, type).defense) || 0;
+  if (type === 'fighter' && play.gameState.hasTech?.(owner, 'jets')) value += 1;
+  return value;
+}
+
+function attackDicePerUnit(play, type, owner) {
+  if (type === 'bomber' && play.gameState.hasTech?.(owner, 'heavyBombers')) return 2;
+  return 1;
+}
+
 function rollCombat(play) {
   const battle = play.battle;
   const dest = battle.dest;
@@ -831,26 +897,35 @@ function rollCombat(play) {
   const defenders = combatUnitsAt(play, dest, defOwner);
   battle.round += 1;
 
+  let supportedInfantry = attackers
+    .filter((u) => u.type === 'artillery')
+    .reduce((n, u) => n + (Number(u.quantity) || 0), 0);
+
   const attackDice = [];
   let attackHits = 0;
   for (const unit of attackers) {
-    const def = defOf(play, unit.type);
+    const diceEach = attackDicePerUnit(play, unit.type, player.id);
     for (let i = 0; i < (unit.quantity || 0); i++) {
-      const face = rollDie(play, 'attack');
-      const hit = face <= (def.attack || 0);
-      attackDice.push({ type: unit.type, face, hit, side: 'atk' });
-      if (hit) attackHits += 1;
+      const supported = unit.type === 'infantry' && supportedInfantry > 0;
+      if (supported) supportedInfantry -= 1;
+      const value = attackValueOf(play, unit.type, player.id, supported);
+      for (let d = 0; d < diceEach; d++) {
+        const face = rollDie(play, 'attack');
+        const hit = face <= value;
+        attackDice.push({ type: unit.type, face, hit, side: 'atk', value });
+        if (hit) attackHits += 1;
+      }
     }
   }
 
   const defenseDice = [];
   let defenseHits = 0;
   for (const unit of defenders) {
-    const def = defOf(play, unit.type);
+    const value = defenseValueOf(play, unit.type, defOwner);
     for (let i = 0; i < (unit.quantity || 0); i++) {
       const face = rollDie(play, 'defense');
-      const hit = face <= (def.defense || 0);
-      defenseDice.push({ type: unit.type, face, hit, side: 'def' });
+      const hit = face <= value;
+      defenseDice.push({ type: unit.type, face, hit, side: 'def', value });
       if (hit) defenseHits += 1;
     }
   }
@@ -1161,6 +1236,10 @@ export function adjustUnit(play, type, delta = 1) {
   }
 
   if (phase === TURN_PHASES.PURCHASE) {
+    if (type === RISK_CARDS) {
+      if (step > 0) play.gameState.tradeRiskCards?.(play.gameState.currentPlayer.id);
+      return play;
+    }
     if (step > 0) play.gameState.addToPendingPurchases(type, play.unitDefs);
     else play.gameState.removeFromPendingPurchases(type, play.unitDefs);
     return play;
@@ -1300,6 +1379,7 @@ export function confirmEnabled(play) {
     return canEndPhase(play);
   }
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
+  if (play.income) return true;
   if (play.landing) {
     return !!play.landing.dest && pickedCount(play.landing.pick) > 0;
   }
@@ -1333,6 +1413,7 @@ export function confirmGold(play) {
 export function canUndo(play) {
   syncPlay(play);
   if (!play?.gameState || !isHumanTurn(play) || isGameOver(play)) return false;
+  if (play.income) return true;
   if (play.battle) return false;
   if (play.tech?.rolls || play.tech?.breakthrough) return false;
   const gs = play.gameState;
@@ -1355,6 +1436,11 @@ export function canUndo(play) {
 
 export function undoLast(play) {
   if (!canUndo(play)) return play;
+  if (play.income) {
+    play.income = null;
+    refreshStage(play);
+    return play;
+  }
   const gs = play.gameState;
   if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
     gs.undoLastCapital?.();
@@ -1405,6 +1491,10 @@ export function confirmLabel(play) {
     if (canEndPhase(play)) return wave.passLabel;
     if (pickedCount(play.selectedUnits)) return `Pick a land · ${wave.placed} of ${wave.limit}`;
     return wave.passLabel;
+  }
+  if (play.income) {
+    if (play.income.blocked) return 'Confirm: No income · capital lost';
+    return `Confirm: Collect ${play.income.amount} IPC`;
   }
   if (play.landing) {
     if (!play.landing.dest) return 'Pick a teal land';
@@ -1505,6 +1595,13 @@ export function confirm(play) {
     }
     return play;
   }
+  if (play.income) {
+    play.income = null;
+    resetUi(play);
+    play.gameState.nextPhase();
+    syncPlay(play);
+    return play;
+  }
   if (play.landing) return applyLanding(play);
   if (play.battle) {
     const step = play.battle.step;
@@ -1573,6 +1670,11 @@ export function confirm(play) {
     return play;
   }
   if (canEndPhase(play)) {
+    if (wouldCollectOnEnd(play) && !play.income) {
+      play.income = incomePreview(play);
+      refreshStage(play);
+      return play;
+    }
     resetUi(play);
     play.gameState.nextPhase();
     syncPlay(play);
@@ -1592,6 +1694,7 @@ export function highlights(play) {
     teal: LAND_TEAL,
   };
   if (isGameOver(play)) return out;
+  if (play.income) return out;
   if (play.landing) {
     out.dest = play.landing.origin;
     out.landable = [...play.landing.landable];
@@ -1638,16 +1741,43 @@ export function highlights(play) {
   return out;
 }
 
+export function humanWon(play) {
+  const gs = play?.gameState;
+  if (!gs?.gameOver) return false;
+  const humans = (gs.players || []).filter((p) => !p.isAI);
+  if (!humans.length) return false;
+  const winner = gs.winner;
+  if (winner === 'Allies') return humans.some((p) => p.alliance === 'Allies');
+  if (winner === 'Axis') return humans.some((p) => p.alliance === 'Axis');
+  if (String(winner || '').startsWith('Team')) {
+    return humans.some((p) => `Team ${p.teamId}` === winner);
+  }
+  return humans.some((p) => p.name === winner || p.id === winner);
+}
+
 function victoryCard(play) {
   const gs = play.gameState;
   const winner = gs.winner || 'Victory';
+  const won = humanWon(play);
   const title = winner === 'Allies' ? 'Allied Victory!'
     : winner === 'Axis' ? 'Axis Victory!'
       : `${winner} Wins!`;
   return {
-    kicker: 'Victory',
+    kicker: won ? 'Victory' : 'Defeat',
     title,
     body: `${gs.winCondition || 'Match over'} · Round ${gs.round || 1}`,
+    dice: [],
+  };
+}
+
+function incomeCard(play) {
+  const income = play.income || incomePreview(play);
+  return {
+    kicker: 'Income',
+    title: income.blocked ? 'Capital captured' : `+${income.amount} IPC`,
+    body: income.blocked
+      ? 'No collect this turn · Confirm to hand off'
+      : 'Production + continent bonus · Confirm to collect and hand off',
     dice: [],
   };
 }
@@ -1684,6 +1814,7 @@ function techCard(play) {
 
 export function battleCard(play) {
   if (isGameOver(play)) return victoryCard(play);
+  if (play.income) return incomeCard(play);
   if (play.gameState?.turnPhase === TURN_PHASES.DEVELOP_TECH && isHumanTurn(play)) {
     return techCard(play);
   }
@@ -1802,7 +1933,7 @@ export function chromeModel(play, territories = []) {
   if (phase === TURN_PHASES.PURCHASE && isHumanTurn(play) && !isGameOver(play)) {
     const ipc = play.gameState.getIPCs(player.id);
     const shop = shopCapacity(play);
-    steppers = BUY_TYPES.map((type) => {
+    steppers = purchasableTypes(play).map((type) => {
       const cost = unitCost(play, type);
       const pending = pendingQty(play, type);
       const can = cost > 0 ? Math.floor(ipc / cost) : 0;
@@ -1811,13 +1942,19 @@ export function chromeModel(play, territories = []) {
         have: pending + Math.min(can, shop.left),
         picked: pending,
         owner: player.id,
-        short: `${({
-          infantry: 'INF', artillery: 'ART', armour: 'TNK',
-          fighter: 'FTR', bomber: 'BMB', aaGun: 'AA', factory: 'FAC',
-          submarine: 'SUB', destroyer: 'DD', transport: 'TRN',
-        }[type] || type.slice(0, 3).toUpperCase())} ${cost}`,
+        short: `${BUY_SHORT[type] || type.slice(0, 3).toUpperCase()} ${cost}`,
       };
     });
+    if (play.gameState.canTradeRiskCards?.(player.id)) {
+      const value = play.gameState.getNextRiskCardValue?.(player.id) || 0;
+      steppers.unshift({
+        type: RISK_CARDS,
+        have: 1,
+        picked: 0,
+        owner: player.id,
+        short: `SET +${value}`,
+      });
+    }
   }
   if (phase === TURN_PHASES.DEVELOP_TECH && isHumanTurn(play) && !isGameOver(play)
     && !play.tech?.rolls && !play.tech?.breakthrough) {
@@ -1860,7 +1997,9 @@ export function chromeModel(play, territories = []) {
     : null;
   let route = '';
   if (movePhase && play.destPicked) route = `${origin} → ${play.destPicked}`;
-  else if (play.landing) route = play.landing.dest ? `Confirm land · ${play.landing.dest}` : 'Pick a teal land';
+  else if (play.income) {
+    route = play.income.blocked ? 'No income' : `+${play.income.amount} IPC`;
+  } else if (play.landing) route = play.landing.dest ? `Confirm land · ${play.landing.dest}` : 'Pick a teal land';
   else if (phase === TURN_PHASES.PURCHASE) {
     const shop = shopCapacity(play);
     route = `${shop.used}/${shop.max} queued`;
@@ -1872,6 +2011,7 @@ export function chromeModel(play, territories = []) {
     route = `Deploy · ${play.destPicked}`;
   }
   let sheetLand = play.landing ? (land || { name: 'Land aircraft' }) : land;
+  if (play.income) sheetLand = { name: 'Collect Income' };
   if (!sheetLand && phase === TURN_PHASES.PURCHASE) sheetLand = { name: 'Purchase' };
   if (!sheetLand && phase === TURN_PHASES.MOBILIZE) sheetLand = { name: play.destPicked || 'Mobilize' };
   if (!sheetLand && phase === TURN_PHASES.DEVELOP_TECH && !battleCard(play)) {
@@ -1911,7 +2051,7 @@ export function chromeModel(play, territories = []) {
     targetShipId: play.targetShipId || null,
     researchHint: phase === TURN_PHASES.DEVELOP_TECH && !play.tech?.rolls && !play.tech?.breakthrough,
     stage,
-    battleOpen: !!play.battle || stage === PLAY_STAGE.AIR_LAND,
+    battleOpen: !!play.battle || !!play.income || stage === PLAY_STAGE.AIR_LAND,
   };
 }
 
@@ -1971,6 +2111,11 @@ export function inspectPlay(play) {
     techPick: play.tech?.pick || null,
     breakthrough: !!play.tech?.breakthrough,
     unlocked: [...(gs.playerTechs?.[gs.currentPlayer?.id]?.unlockedTechs || [])],
+    income: play.income ? { ...play.income } : null,
+    lastIncome: gs.lastIncome ? { ...gs.lastIncome } : null,
+    buyTypes: purchasableTypes(play),
+    canTradeCards: !!gs.canTradeRiskCards?.(gs.currentPlayer?.id),
+    humanWon: humanWon(play),
     gameOver: !!gs.gameOver,
     winner: gs.winner || null,
     wantNewGame: !!play._newGame,

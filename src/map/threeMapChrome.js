@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.17';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.18';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -12,7 +12,7 @@ import {
   lobbyCanStart,
   lobbyStartLabel,
   seatOccupantView,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.17';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.18';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -40,6 +40,7 @@ const TYPE_SHORT = {
   factory: 'FAC',
   aaGun: 'AA',
   techDie: 'DIE',
+  riskCards: 'SET',
 };
 
 export function shortType(type) {

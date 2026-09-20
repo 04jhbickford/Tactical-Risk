@@ -6,7 +6,7 @@ import { Camera, MAP_WIDTH } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome, applyLiveStamp, liveGameVersion } from './threeMapChrome.js?v=V2.81.56-ux-solo.17';
+import { injectThreeChrome, applyLiveStamp, liveGameVersion } from './threeMapChrome.js?v=V2.81.56-ux-solo.18';
 import {
   preloadUnitImages,
   renderPreviewStacks,
@@ -18,7 +18,7 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.17';
+import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.18';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -40,7 +40,7 @@ import {
   lobbyCanStart,
   lobbyStartOptions,
   lobbyInspect,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.17';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.18';
 import {
   shouldShowSetupTutorial,
   dismissTutorial,
@@ -59,7 +59,7 @@ import {
   pickShip,
   applyCargoSeed,
   LAND_TEAL,
-} from './threeSoloPlay.js?v=V2.81.56-ux-solo.17';
+} from './threeSoloPlay.js?v=V2.81.56-ux-solo.18';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -226,7 +226,7 @@ export async function bootThreeSolo() {
     const current = gameState.currentPlayer;
     const you = gameState.players.find((p) => !p.isAI) || current;
     chrome.setPhase(gameState.gameOver
-      ? (gameState.winner === 'Allies' ? 'Allied Victory' : gameState.winner === 'Axis' ? 'Axis Victory' : 'Victory')
+      ? (gameState.winner === 'Allies' ? 'Allied Victory' : gameState.winner === 'Axis' ? 'Axis Victory' : (gameState.winner || 'Victory'))
       : gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
         ? 'Place Capital'
         : gameState.phase === GAME_PHASES.UNIT_PLACEMENT

@@ -1,8 +1,8 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** Harden `.17` — seat cards Human / AI / Empty; keep `.15` lobby touch-pan + `.16` combat stages + stamp SoT. Hold merge. Quiet James. Tesla/Viz off.  
+**Status:** Harden `.18` — full playthrough holes (income gate, full shop, tech dice, win/lose); keep `.15` lobby touch-pan + `.16` combat stages + `.17` seats. Hold merge. Quiet James. Tesla/Viz off.  
 **Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.56-ux-solo.17` · SCHEMA 11  
+**Tip:** `V2.81.56-ux-solo.18` · SCHEMA 11  
 **Lookpass note:** `briefs/2026-09-19-hybrid-solo-ai/LOOKPASS.md`  
 **Checklist SoT:** `briefs/2026-09-20-main-art-three-ux/ADAPTIVE-LOBBY-CHECKLIST.md`  
 **Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  

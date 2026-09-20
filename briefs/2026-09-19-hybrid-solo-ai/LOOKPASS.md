@@ -1,10 +1,11 @@
-# Lookpass — V2.81.56-ux-solo.17
+# Lookpass — V2.81.56-ux-solo.18
 
-**Hold merge.** Quiet James. Tesla off. Seat cards Human / AI / Empty + keep `.15` lobby touch-pan + `.16` combat stages + stamp SoT.
-Fail-closed **A1 / occupant chrome / Start gate / T1**. Do not merge.
+**Hold merge.** Quiet James. Tesla off. Playthrough holes + keep `.15` lobby touch-pan + `.16` combat stages + `.17` seats + stamp SoT.
+Fail-closed **A1 / playthrough smoke**. Lobby CSS unchanged — do not re-READY CDP. Do not merge.
 
 Tip: https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
-Hard reload @390×844: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.17`. `/` is `Cache-Control: no-store`.
+Hard reload @390×844: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.18`. `/` is `Cache-Control: no-store`.
+Playthrough SoT: `briefs/2026-09-19-hybrid-solo-ai/PLAYTHROUGH.md`
 
 ## Steal vs invent
 

@@ -2,6 +2,19 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.18 playthrough holes (preview only)
+
+James SUPERSEDES: three tip-only full playthrough. Catalog-first
+(SANDBOX-RECS §A + GAPS P1 #7 phase gates). Fill lobby → setup → deploy
+→ all MAIN phases → win/lose vs AI. Collect Income is an explicit
+Confirm gate (`bgio-moves-phases-stages`). Shop is the full unit catalog
++ Risk card trade. Combat dice steal CombatUI tech + artillery.
+`AIController` stops on `gameOver`. Defeat chrome when the human side
+loses. Keep `.15` touch-pan, `.16` combat stages, `.17` seats. Lobby CSS
+untouched (no CDP re-prove). Casualty YOU Viz deferred. Hold merge.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.17 seat cards Human / AI / Empty (preview only)
 
 James SUPERSEDES: three tip-only playthrough. Catalog-first seat cards

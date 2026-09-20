@@ -100,7 +100,12 @@ confirm(shell);
 assert(shell.gameState.turnPhase === TURN_PHASES.NON_COMBAT_MOVE, 'empty combat skipped');
 assert(ncmAirRemaining(shell) === 0, 'no leftover air on skip');
 confirm(shell);
-assert(shell.gameState.currentPlayer.id === 'Germans', 'income auto nextTurn');
+assert(!!shell.income, 'income gate before nextTurn');
+assert(shell.gameState.currentPlayer.id === 'Russians', 'still human on income gate');
+assert(confirmLabel(shell).includes('Collect'), 'collect CTA');
+assert(chromeModel(shell).battle?.kicker === 'Income', 'income card');
+confirm(shell);
+assert(shell.gameState.currentPlayer.id === 'Germans', 'income confirm nextTurn');
 assert(shell.gameState.currentPlayer.isAI === true, 'Germans are AI');
 assert(shell.gameState.turnPhase === TURN_PHASES.DEVELOP_TECH, 'AI opens develop tech');
 assert(confirmEnabled(shell) === false, 'human Confirm off on AI seat');
@@ -239,7 +244,9 @@ confirm(move);
 assert(qty(move, LAND, 'infantry', 'Russians') >= 1, 'NCM infantry arrived');
 assert(canEndPhase(move) === true, 'NCM Done when remaining air = 0');
 confirm(move);
-assert(move.gameState.currentPlayer.id === 'Germans', 'NCM End Phase collects + nextTurn');
+assert(!!move.income, 'NCM End Phase opens income gate');
+confirm(move);
+assert(move.gameState.currentPlayer.id === 'Germans', 'income confirm collects + nextTurn');
 
 // --- S4 chrome notify must not wipe the battle sheet ---
 const notify = fresh();
