@@ -551,8 +551,8 @@ export async function bootThreeSolo() {
       return inspectSolo(gameState);
     },
     chrome,
-    gameState,
-    play,
+    get gameState() { return gameState; },
+    get play() { return play; },
   };
 
   return window.__threeSolo;
