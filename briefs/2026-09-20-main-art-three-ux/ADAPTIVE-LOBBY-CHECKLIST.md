@@ -1,4 +1,4 @@
-# Adaptive lobby MUST-PASS — V2.81.56-ux-solo.13
+# Adaptive lobby MUST-PASS — V2.81.56-ux-solo.14
 
 **Hold merge.** Quiet James. Tesla off. Fail-closed on **A1 / A3 / A4 / A5**.
 Do not ship / do not ping until stills @390 prove every row.
@@ -15,7 +15,7 @@ Map: header `.three-lobby-setup-head` `flex:none` · MAIN `.three-lobby-main` sc
 
 | # | Gate | Fail-closed | Proof @390 |
 |---|---|---|---|
-| **A1** | Stamp `V2.81.56-ux-solo.13` after hard reload (L0 + lobby) | yes | still: L0 chip |
+| **A1** | Stamp `V2.81.56-ux-solo.14` after hard reload (L0 + lobby) | yes | still: L0 chip |
 | **A2** | Canonical shell: header `flex:none` / MAIN scroll / footer `flex:none` sibling | no | computed style |
 | **A3** | Seats scroll with finger / trackpad (MAIN receives touch + wheel) | yes | still: scroll mid; `scrollTop` moved |
 | **A4** | Last seat (Japanese / Americans) fully above Teams+Start | yes | still: scroll end |

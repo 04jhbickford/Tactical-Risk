@@ -2,6 +2,20 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.14 stamp lag after hard reload (preview only)
+
+Viz ABORT A1 on claimed tip `.13`: hard reload @390 still painted
+`V2.81.56-ux-solo.12` on L0/in-chrome while `src/version.js` listed `.13`.
+Same class as `.9→.7`: cached `/` document (vercel `no-store` was only
+on `/index.html`) pinned `window.__TR_GAME_VERSION`, and/or a one-time
+HTML bake from a stale ESM. `.14` paints `.three-l0-ver` / `.three-lobby-ver`
+from `liveGameVersion()` on every inject (HTML SoT, later tip wins if
+HTML and module disagree), cache-busts the boot graph, `no-store`s `/`,
+and drops Service Worker / Cache Storage on tip boot. Keep `.13` scroll
+shell. Hold merge. Quiet James.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.13 adaptive lobby scrollport (preview only)
 
 James REJECTED `.12`: New Local Game does not scroll on device —

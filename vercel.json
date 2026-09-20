@@ -1,9 +1,17 @@
 {
   "headers": [
     {
+      "source": "/",
+      "headers": [
+        { "key": "x-vercel-skip-toolbar", "value": "1" },
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
-        { "key": "x-vercel-skip-toolbar", "value": "1" }
+        { "key": "x-vercel-skip-toolbar", "value": "1" },
+        { "key": "Cache-Control", "value": "no-store" }
       ]
     },
     {

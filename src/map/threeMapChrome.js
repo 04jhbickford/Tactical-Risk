@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.13';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.14';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.13';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.14';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -225,14 +225,31 @@ function printIpc(land) {
   return Number.isFinite(n) ? n : 0;
 }
 
+function uxSoloPatch(v) {
+  const m = /ux-solo\.(\d+)/.exec(String(v || ''));
+  return m ? Number(m[1]) : NaN;
+}
+
 export function liveGameVersion() {
-  return (typeof window !== 'undefined' && window.__TR_GAME_VERSION) || GAME_VERSION;
+  const html = (typeof window !== 'undefined' && window.__TR_GAME_VERSION)
+    ? String(window.__TR_GAME_VERSION)
+    : '';
+  if (!html) return GAME_VERSION;
+  if (!GAME_VERSION || html === GAME_VERSION) return html;
+  const htmlN = uxSoloPatch(html);
+  const modN = uxSoloPatch(GAME_VERSION);
+  if (Number.isFinite(htmlN) && Number.isFinite(modN) && htmlN !== modN) {
+    return htmlN > modN ? html : GAME_VERSION;
+  }
+  return html;
 }
 
 export function applyLiveStamp() {
   const v = liveGameVersion();
+  if (typeof window !== 'undefined') window.__TR_GAME_VERSION = v;
   if (typeof document === 'undefined') return v;
   document.documentElement.dataset.gameVersion = v;
+  document.documentElement.setAttribute('data-game-version', v);
   document.querySelectorAll('.three-l0-ver, .three-lobby-ver').forEach((el) => {
     el.textContent = v;
   });
@@ -1062,9 +1079,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     </span>
     <span class="three-l0-chip three-l0-ipc" id="three-ipc">IPC ${ipc}</span>
     <button type="button" class="three-l0-help" id="three-help-btn" aria-label="How to start">?</button>
-    <span class="three-l0-ver">${liveGameVersion()}</span>
+    <span class="three-l0-ver"></span>
   `;
   document.body.appendChild(l0);
+  applyLiveStamp();
 
   const strip = document.createElement('div');
   strip.id = 'three-phase-strip';
@@ -1266,7 +1284,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
             <div class="three-lobby-brand">
               <h1 class="three-lobby-logo">Tactical Risk</h1>
               <p class="three-lobby-tag">World War II Grand Strategy</p>
-              <span class="three-lobby-ver">${liveGameVersion()}</span>
+              <span class="three-lobby-ver"></span>
             </div>
             <p class="three-lobby-path">Start here</p>
             <div class="three-lobby-actions">
@@ -1696,6 +1714,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           ? `Confirm inspect · ${land.name}`
           : `Confirm: ${land.name}`);
       }
+      applyLiveStamp();
     },
   };
 
