@@ -31,10 +31,22 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A #2, GA
 | **C5** | Open sheet / battleOpen: map tap does not change stage | yes | unit + chrome-hit |
 | **T1** | Lobby still pans (do not regress `.15`) | yes | source + smoke |
 
-## QC
+## QC @390 tip + local (PASS)
 
-Unit: `node tools/test-three-solo-play.mjs`, `node tools/test-three-solo-lobby.mjs`, `node tools/test-ux-preview-chrome-hit.mjs`.
+Tip `?three=1&solo=1` after hard reload. `/` is `Cache-Control: no-store`. Live HTML + L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.16`.
 
-@390 stills after hard reload + combat-move CDP: see SCORE-solo-16 and `/opt/cursor/artifacts/screenshots/lookpass16_*`.
+| # | Ask | QC @390 |
+|---|---|---|
+| **A1** | Stamp `.16` after hard reload | **PASS** — tip L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.16` |
+| **C1** | IDLE pulses legal origins; no combat Got it coach | **PASS** — gold origins; Confirm `End Phase · Combat Movement` |
+| **C2** | ORIGIN → UNITS → DEST → CONFIRM no soft-lock | **PASS** — `Tap units` (disabled) → `Tap destination` (disabled) → `Confirm: Attack Finland Norway` (gold) |
+| **C3** | Confirm only when origin+units+dest legal | **PASS** — unit + chrome |
+| **C4** | YOU steppers; Confirm after assign | **PASS** — `Assign casualties` then `Confirm: Take hits` |
+| **C5** | battleOpen / sheet blocks map | **PASS** — Russia tap stays on Finland; chrome-hit unit |
+| **T1** | Lobby MAIN still pans | **PASS** — `overflow-y:auto; touch-action:pan-y`; footer sibling; setup `scrollTop` moved |
+
+Unit: `test-three-solo-play`, `test-three-solo-lobby`, `test-ux-preview-chrome-hit`, `test-three-solo`, `test-three-solo-econ`.
+
+Stills: `/opt/cursor/artifacts/screenshots/lookpass16_a1_tip_stamp_hard_reload_390.png`, `lookpass16_c2_origin_karelia_390.png`, `lookpass16_c2_units_tap_destination_390.png`, `lookpass16_c4_casualty_assign_390.png`, `lookpass16_c4_casualty_confirm_ready_390.png`, `lookpass16_t1_tip_setup_390.png`. Walkthrough: `/opt/cursor/artifacts/combat_nested_stages_390.mp4`.
 
 Do not merge.

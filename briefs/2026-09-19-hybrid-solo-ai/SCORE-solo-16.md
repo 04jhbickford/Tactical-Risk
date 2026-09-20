@@ -35,5 +35,16 @@ Nothing invented for the machine itself. Only glue: `playStage()` as the single 
 - `battleOpen` blocks all map hits while battle/casualty sheet is up
 - `#three-battle` / `#three-peek` added to chrome hit closest()
 
-## QC (unit + @390)
-See `LOOKPASS.md`. Hold merge.
+## QC @390 tip + local (PASS)
+
+Tip after hard reload: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.16`. `/` `no-store`.
+
+- Combat-move @390: IDLE → ORIGIN `Tap units` → UNITS `Tap destination` → CONFIRM `Confirm: Attack Finland Norway` (no soft-lock, no Try)
+- COMBAT_READY odds preview `33% to take Finland Norway` ≠ commit
+- Casualty: YOU steppers; Confirm enables after assign (`Confirm: Take hits`)
+- Map tap during battle stays on dest
+- Lobby MAIN still `overflow-y:auto; touch-action:pan-y`; footer sibling; setup scroll moved
+
+Unit S1–S9 + chrome-hit + lobby stamp graph PASS.
+
+Stills + walkthrough under `/opt/cursor/artifacts/`. Hold merge.
