@@ -281,6 +281,11 @@ export class CombatUI {
       const name = this.gameState.combatQueue[0];
       const units = this.gameState.getUnitsAt?.(name) || this.gameState.units?.[name] || [];
       if (!territoryCombatAlreadyResolved(units, playerId, areAllies)) break;
+      // V2.81.54 dequeued a won hex without flipping owner. Capture first.
+      this.gameState.captureOccupiedTerritory?.(name, {
+        unitDefs: this.unitDefs || {},
+        notify: false,
+      });
       this.gameState.combatQueue.shift();
       skipped.push(name);
     }
@@ -1408,6 +1413,9 @@ export class CombatUI {
           unitDefs: this.unitDefs,
         });
       }
+      this.gameState.captureOccupiedTerritory?.(origin, {
+        unitDefs: this.unitDefs || {},
+      });
       return;
     }
 
@@ -1596,6 +1604,15 @@ export class CombatUI {
 
     // Update gameState and trigger re-render
     this.gameState.units[this.currentTerritory] = units;
+    // Persist the owner flip with the casualty write so a later finalize
+    // hiccup cannot reload "defenders gone, still German."
+    if (this.combatState.winner === 'attacker'
+      || (this.combatState.defenders || []).every((u) => !(u.quantity > 0))) {
+      this.gameState.captureOccupiedTerritory?.(this.currentTerritory, {
+        unitDefs: this.unitDefs || {},
+        notify: false,
+      });
+    }
     this.gameState._notify();
   }
 
@@ -1674,33 +1691,19 @@ export class CombatUI {
       defenderSurvivors: this._getTotalUnits(this.combatState.defenders),
     });
 
-    // Update territory ownership if attacker won AND has land units
-    // Air units cannot capture territory - only land units can
+    // Shared GameState capture — land units only. Missing territoryState
+    // must not throw (that aborted notify and looked like a hiccup).
     if (this.combatState.winner === 'attacker') {
-      const hasLandUnit = this.combatState.attackers.some(u => {
-        const def = this.unitDefs[u.type];
-        return def && def.isLand && u.quantity > 0;
-      });
-
-      if (hasLandUnit) {
-        this.gameState.territoryState[this.currentTerritory].owner = player.id;
-
-        // Award Risk card for conquering (one per turn per Risk rules)
-        if (!this.gameState.conqueredThisTurn[player.id]) {
-          this.gameState.conqueredThisTurn[player.id] = true;
-          const cardType = this.gameState.awardRiskCard(player.id);
-          this.cardAwarded = cardType;
-          // Log the card earned
-          if (this.actionLog && cardType) {
-            this.actionLog.logCardEarned(player, cardType);
-          }
+      const occupied = this.gameState.captureOccupiedTerritory?.(this.currentTerritory, {
+        unitDefs: this.unitDefs || {},
+        notify: false,
+      }) || { captured: false };
+      if (occupied.captured && occupied.cardAwarded) {
+        this.cardAwarded = occupied.cardAwarded;
+        if (this.actionLog && occupied.cardAwarded) {
+          this.actionLog.logCardEarned(player, occupied.cardAwarded);
         }
-
-        // Handle capital capture (IPC transfer, victory check)
-        this.gameState.handleCapitalCapture(this.currentTerritory, player.id, previousOwner);
-      } else {
-        // Air units killed defenders but cannot capture - territory remains with original owner
-        // Air units will need to land elsewhere
+      } else if (!occupied.captured) {
         console.log('Air units cannot capture territory - territory remains contested');
       }
     }

@@ -2,6 +2,11 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.4 conquer owner flip (preview)
+
+Cherry-pick of main V2.81.56 onto PR76 hybrid tip. Shared GameState
+capture + stripUndefined. Hold merge.
+
 ## 9.20.26 — V2.81.55-ux-solo.3 S7–S9 (preview only)
 
 Purchase + mobilize tiles, tech dice / breakthrough pick, victory

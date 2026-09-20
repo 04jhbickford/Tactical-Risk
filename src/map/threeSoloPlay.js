@@ -624,12 +624,10 @@ function applyHits(play) {
     const t = gs.territoryByName[dest];
     const hasLand = friends.some((u) => defOf(play, u.type).isLand);
     if (hasLand && !t?.isWater) {
-      const prev = gs.getOwner(dest);
-      gs.territoryState[dest].owner = player.id;
-      for (const unit of stacks) {
-        if (unit.type === 'factory' || unit.type === 'aaGun') unit.owner = player.id;
-      }
-      gs.handleCapitalCapture?.(dest, player.id, prev);
+      gs.captureOccupiedTerritory?.(dest, {
+        unitDefs: play.unitDefs || {},
+        notify: false,
+      });
     }
     gs.combatQueue = (gs.combatQueue || []).filter((n) => n !== dest);
     battle.step = BATTLE_STEP.WON;
