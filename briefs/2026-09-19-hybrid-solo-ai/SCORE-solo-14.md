@@ -16,5 +16,12 @@ Hard reload `?three=1&solo=1` @390 paints L0 + lobby `V2.81.56-ux-solo.14` (not 
 - `/` + catch-all `Cache-Control: no-store`
 - Tip boot unregisters Service Worker and deletes Cache Storage
 
-## QC
-See `LOOKPASS.md`. Fail-closed A1 + keep A3–A5 stills.
+## QC @390 hard reload (PASS)
+- L0 `textContent` = `V2.81.56-ux-solo.14`
+- lobby `.three-lobby-ver` = `V2.81.56-ux-solo.14`
+- `window.__TR_GAME_VERSION` = `V2.81.56-ux-solo.14`
+- no `.12` / `.13` in painted chrome
+- `/` response `Cache-Control: no-store`
+- A3–A5 keep: MAIN scrolls; last seat 94px above Teams+Start; footer outside MAIN
+
+Stills under `/opt/cursor/artifacts/screenshots/lookpass14_*.png`.
