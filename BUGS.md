@@ -2,12 +2,12 @@
 
 ---
 
-## 9.20.26 — Cherry-pick PR82 persist combat capture onto tip
+## 9.20.26 — V2.81.55-ux-solo.4 lobby + P0 persist (preview only)
 
-Main P0 `2f6fe8d` (`cursor/territory-flip-combat-a714`): `logCombat`
-undefined losses poisoned Firestore pushes (hiccup → capture rollback).
-`omitUndefinedDeep` + `persistableUnit` + purchase `owner`. Tip version
-stays the hybrid stamp. Do not merge.
+Cherry-picked main P0 `2f6fe8d` (PR82 persist combat capture). Local
+Three lobby (faction / AI / Classic or Risk) → capital+deploy on Risk
+→ full classic loop. Navy dests + unload. `?max=1` pocket kept.
+Do not merge.
 
 ---
 

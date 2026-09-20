@@ -510,6 +510,48 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:600 15px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
     }
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
+    #three-lobby {
+      display:none; position:absolute; inset:0; z-index:50;
+      padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      background:rgba(30,36,32,0.88);
+      -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
+      color:#E8E2D4; overflow-y:auto; pointer-events:auto;
+    }
+    #three-lobby.is-open { display:block; }
+    #three-lobby h2 {
+      margin:8px 0 6px; font:600 12px/1 -apple-system,sans-serif;
+      letter-spacing:0.10em; text-transform:uppercase; color:#C4A35A;
+    }
+    #three-lobby .three-lobby-title {
+      margin:12px 0 4px; font:700 22px/1.1 -apple-system,"SF Pro Display",sans-serif;
+    }
+    #three-lobby .three-lobby-sub { margin:0 0 16px; font:400 13px/1.3 -apple-system,sans-serif; color:#c8c0b0; }
+    #three-lobby .three-lobby-row { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+    #three-lobby button.three-lobby-tile {
+      min-height:44px; padding:0 12px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.05); color:#f4ead4;
+      font:600 14px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+    }
+    #three-lobby button.three-lobby-tile.is-on {
+      border-color:#C4A35A; background:rgba(196,163,90,0.18); color:#F4E8C4;
+    }
+    #three-lobby .three-lobby-ai {
+      display:flex; align-items:center; gap:10px; min-height:44px;
+      font:700 16px/1 -apple-system,sans-serif;
+    }
+    #three-lobby .three-lobby-ai button {
+      width:44px; height:44px; border-radius:12px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(30,36,32,0.55); color:#F4E8C4;
+      font:700 20px/1 -apple-system,sans-serif; cursor:pointer;
+    }
+    #three-lobby .three-lobby-start {
+      display:block; width:100%; min-height:56px; margin-top:8px;
+      border:0; border-radius:16px; background:#C4A35A; color:#1E2420;
+      font:700 16px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+    }
+    #three-lobby .three-lobby-start:disabled { opacity:0.4; cursor:default; }
     @media (max-width:430px) {
       #three-l0 .three-l0-ver { display:none; }
       #three-peek .three-peek-unit { width:60px; height:70px; }
@@ -574,6 +616,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   `;
   document.body.appendChild(sheet);
 
+  const lobby = document.createElement('div');
+  lobby.id = 'three-lobby';
+  lobby.innerHTML = '<h1 class="three-lobby-title">New Game vs AI</h1>';
+  document.body.appendChild(lobby);
+
   const stackToggle = bottom.querySelector('#three-stack-toggle');
 
   const api = {
@@ -581,6 +628,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     zoom,
     bottom,
     sheet,
+    lobby,
     peek: bottom.querySelector('#three-peek'),
     guideEl: bottom.querySelector('#three-guide'),
     stripEl: strip,
@@ -602,6 +650,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     onLossStep: null,
     onGuideDismiss: null,
     onNewGameVsAI: null,
+    onLobbyChange: null,
+    onLobbyStart: null,
     hitRects() {
       return chromeHitRectsFrom(api);
     },
@@ -639,6 +689,56 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     isSheetOpen() {
       return sheet.classList.contains('is-open');
+    },
+    isLobbyOpen() {
+      return lobby.classList.contains('is-open');
+    },
+    setLobbyOpen(open) {
+      lobby.classList.toggle('is-open', !!open);
+      document.documentElement.classList.toggle('has-lobby', !!open);
+      if (open) {
+        api.setSheetOpen(false);
+        api.zoom.hidden = true;
+      }
+      api.syncLayers();
+    },
+    paintLobby(model = {}) {
+      const factions = model.factions || [];
+      const mode = model.mode || 'classic';
+      const seat = model.humanSeat;
+      const diff = model.difficulty || 'medium';
+      const ai = Number(model.aiCount) || 4;
+      const classic = mode === 'classic';
+      lobby.innerHTML = `
+        <p class="three-lobby-title">New Game vs AI</p>
+        <p class="three-lobby-sub">Local only · no lobby server · SCHEMA ${SCHEMA_VERSION}</p>
+        <h2>Mode</h2>
+        <div class="three-lobby-row">
+          <button type="button" class="three-lobby-tile${classic ? ' is-on' : ''}" data-lobby="mode" data-value="classic">Classic 1942</button>
+          <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk deploy</button>
+        </div>
+        <h2>Your seat</h2>
+        <div class="three-lobby-row">
+          ${factions.map((f) => `
+            <button type="button" class="three-lobby-tile${f.id === seat ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}" style="box-shadow:inset 0 0 0 2px ${f.color || '#888'}">${f.name || f.id}</button>
+          `).join('')}
+        </div>
+        <h2>AI opponents</h2>
+        <div class="three-lobby-ai">
+          <button type="button" data-lobby="ai" data-value="-1" ${classic ? 'disabled' : ''} aria-label="Fewer AI">−</button>
+          <b>${ai}</b>
+          <button type="button" data-lobby="ai" data-value="1" ${classic ? 'disabled' : ''} aria-label="More AI">+</button>
+          <span>${classic ? 'all other powers' : 'Risk seats'}</span>
+        </div>
+        <h2>Difficulty</h2>
+        <div class="three-lobby-row">
+          ${['easy', 'medium', 'hard'].map((id) => `
+            <button type="button" class="three-lobby-tile${diff === id ? ' is-on' : ''}" data-lobby="diff" data-value="${id}">${id[0].toUpperCase()}${id.slice(1)}</button>
+          `).join('')}
+        </div>
+        <button type="button" class="three-lobby-start" data-lobby="start">Start match</button>
+      `;
+      api.setLobbyOpen(true);
     },
     setConfirmIdle(label = 'Select units') {
       api.confirm.disabled = true;
@@ -904,7 +1004,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
   };
 
-  for (const el of [api.l0, api.bottom, api.sheet, api.zoom, api.peek, api.battleEl, api.confirm, api.menuBtn, stackToggle]) {
+  for (const el of [api.l0, api.bottom, api.sheet, api.lobby, api.zoom, api.peek, api.battleEl, api.confirm, api.menuBtn, stackToggle]) {
     sealChromeControl(el);
   }
   bindSealedActivate(api.menuBtn, null, () => {
@@ -916,8 +1016,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       return;
     }
     if (row.dataset.sheet === 'solo') {
+      api.setSheetOpen(false);
       if (typeof api.onNewGameVsAI === 'function') {
-        api.setSheetOpen(false);
         api.onNewGameVsAI();
         return;
       }
@@ -938,6 +1038,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bindSealedActivate(api.bottom, 'button.three-peek-unit[data-unit-type]', (e, chip) => {
     if (api.peek?.dataset?.airLand === '1') return;
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
+  });
+  bindSealedActivate(lobby, '[data-lobby]', (e, btn) => {
+    const kind = btn.dataset.lobby;
+    if (kind === 'start') {
+      if (typeof api.onLobbyStart === 'function') api.onLobbyStart();
+      return;
+    }
+    if (typeof api.onLobbyChange === 'function') {
+      api.onLobbyChange(kind, btn.dataset.value);
+    }
   });
   bindSealedActivate(api.guideEl, '[data-guide="dismiss"]', () => {
     api.setGuide('', false);

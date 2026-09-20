@@ -242,6 +242,8 @@ export class GameState {
     this.cardTradeCount = {};
     // Track if player has conquered a territory this turn (for Risk card award - one per turn)
     this.conqueredThisTurn = {};
+    // Lands taken this turn — NCM ground can enter even if a stale owner write lagged.
+    this.capturedThisTurn = new Set();
 
     // Territories with amphibious assault this turn (for shore bombardment - only bombard with amphibious units)
     this.amphibiousTerritories = new Set();
@@ -580,6 +582,12 @@ export class GameState {
 
   getOwner(territoryName) {
     return this.territoryState[territoryName]?.owner || null;
+  }
+
+  isNcmFriendly(territoryName, playerId) {
+    const owner = this.getOwner(territoryName);
+    if (owner === playerId || this.areAllies(playerId, owner)) return true;
+    return this.capturedThisTurn instanceof Set && this.capturedThisTurn.has(territoryName);
   }
 
   isCapital(territoryName) {
@@ -2201,6 +2209,7 @@ export class GameState {
     if (player) {
       this.conqueredThisTurn[player.id] = false;
     }
+    this.capturedThisTurn = new Set();
     this._clearMovedFlags();
     this._notify();
     this.autoSave(); // Auto-save after each turn
@@ -2399,8 +2408,9 @@ export class GameState {
 
     // Non-combat move rules
     if (isNonCombatMove) {
-      // Cannot enter enemy territory
-      if (isEnemy) {
+      // Cannot enter enemy territory. Just-conquered lands are friendly
+      // even if a stale owner write lagged (P0 territory-flip / NCM).
+      if (isEnemy && !this.isNcmFriendly(toTerritory, player.id)) {
         return { success: false, error: 'Cannot enter enemy territory in non-combat move' };
       }
       // Can freely pass through allied territories
@@ -5379,6 +5389,7 @@ export class GameState {
         originTerritory: entry.originTerritory,
         units: (entry.units || []).map((unit) => ({ ...unit })),
       })),
+      capturedThisTurn: Array.from(this.capturedThisTurn || []),
     });
   }
 
@@ -5477,6 +5488,7 @@ export class GameState {
     this.amphibiousAssaultDetails = {};
     this.moveHistory = [];
     this.conqueredThisTurn = {};
+    this.capturedThisTurn = new Set(data.capturedThisTurn || []);
 
     this._notify();
   }

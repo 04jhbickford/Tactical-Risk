@@ -26,13 +26,23 @@ import {
   shouldIgnoreMapHit,
 } from './threeChromeEvents.js';
 import { AIController } from '../ai/aiController.js';
-import { TURN_PHASE_NAMES } from '../state/gameState.js';
+import { GAME_PHASES, TURN_PHASE_NAMES } from '../state/gameState.js';
 import {
   startClassicSolo,
+  startSoloMatch,
   placementsFromState,
   inspectSolo,
   DEFAULT_HUMAN_SEAT,
 } from './threeSoloMatch.js';
+import {
+  createSoloLobby,
+  setLobbyMode,
+  setLobbySeat,
+  setLobbyAiCount,
+  setLobbyDifficulty,
+  lobbyStartOptions,
+  lobbyInspect,
+} from './threeSoloLobby.js';
 import {
   createSoloPlay,
   tapLand,
@@ -127,6 +137,7 @@ export async function bootThreeSolo() {
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
 
+  const lobby = createSoloLobby(setup, typeof location !== 'undefined' ? location.search : '');
   let gameState = startClassicSolo(setup, territories, continents);
   gameState.unitDefs = unitDefs;
   territoryRenderer.setGameState(gameState);
@@ -155,7 +166,7 @@ export async function bootThreeSolo() {
     aiController.setGameState(gameState);
     return aiController;
   }
-  wireAI();
+  if (!lobby.open) wireAI();
 
   reportStartupStatus('Loading main tiles and unit chits…', 52);
   const { images, ready: imagesReady } = preloadUnitImages(
@@ -205,9 +216,13 @@ export async function bootThreeSolo() {
     const you = gameState.players.find((p) => !p.isAI) || current;
     chrome.setPhase(gameState.gameOver
       ? (gameState.winner === 'Allies' ? 'Allied Victory' : gameState.winner === 'Axis' ? 'Axis Victory' : 'Victory')
-      : (TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY'));
+      : gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
+        ? 'Place Capital'
+        : gameState.phase === GAME_PHASES.UNIT_PLACEMENT
+          ? 'Deploy'
+          : (TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY'));
     chrome.setSeat(current?.name || you?.name || '—', current?.color || you?.color);
-    chrome.setIpc(gameState.getIPCs(you?.id) || 0);
+    chrome.setIpc(gameState.getIPCs(current?.id || you?.id) || 0);
     const model = chromeModel(play, territories);
     selected = landByName(play.selected) || selected;
     chrome.paintPlay({
@@ -248,16 +263,35 @@ export async function bootThreeSolo() {
     camera.dirty = true;
   };
   chrome.onNewGameVsAI = () => {
-    startMatch();
+    openLobby();
+  };
+  chrome.onLobbyChange = (kind, value) => {
+    if (kind === 'mode') setLobbyMode(lobby, value);
+    if (kind === 'seat') setLobbySeat(lobby, value);
+    if (kind === 'ai') setLobbyAiCount(lobby, value);
+    if (kind === 'diff') setLobbyDifficulty(lobby, value);
+    chrome.paintLobby(lobby);
+  };
+  chrome.onLobbyStart = () => {
+    lobby.open = false;
+    chrome.setLobbyOpen(false);
+    startMatch(lobbyStartOptions(lobby));
   };
 
-  function startMatch() {
-    bindState(startClassicSolo(setup, territories, continents));
+  function openLobby() {
+    lobby.open = true;
+    chrome.paintLobby(lobby);
+  }
+
+  function startMatch(options = lobbyStartOptions(lobby)) {
+    bindState(startSoloMatch(setup, territories, continents, options));
     if (aiController) aiController.setGameState(gameState);
     else wireAI();
     play = createSoloPlay(gameState, unitDefs);
     play.aiStatus = null;
     selected = null;
+    lobby.open = false;
+    chrome.setLobbyOpen(false);
     gameState.autoSave();
     paintChrome();
     fitEurope();
@@ -278,13 +312,14 @@ export async function bootThreeSolo() {
   function eventFromChrome(e) {
     const node = eventElement(e);
     if (!node || typeof node.closest !== 'function') return false;
-    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-phase-strip');
+    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-lobby, #three-phase-strip');
   }
 
   function ignoreMapHit(e) {
     const pt = clientPointOf(e);
     return shouldIgnoreMapHit({
       sheetOpen: chrome.isSheetOpen(),
+      lobbyOpen: chrome.isLobbyOpen(),
       targetInChrome: eventFromChrome(e),
       clientX: pt?.x,
       clientY: pt?.y,
@@ -401,7 +436,7 @@ export async function bootThreeSolo() {
     confirmPlay(play);
     if (play._newGame) {
       play._newGame = false;
-      startMatch();
+      openLobby();
       return;
     }
     selected = landByName(play.selected);
@@ -501,14 +536,15 @@ export async function bootThreeSolo() {
 
   fitEurope();
   paintChrome();
-  gameState.autoSave();
+  if (lobby.open) openLobby();
+  else gameState.autoSave();
   paint();
   requestAnimationFrame(loop);
   dismissStartupLoader();
 
   window.__threeSolo = {
     version: GAME_VERSION,
-    inspect: () => ({ ...inspectSolo(gameState), play: inspectPlay(play) }),
+    inspect: () => ({ ...inspectSolo(gameState), play: inspectPlay(play), lobby: lobbyInspect(lobby) }),
     playInspect: () => inspectPlay(play),
     selectLand: (name) => {
       const t = landByName(name);
@@ -538,7 +574,7 @@ export async function bootThreeSolo() {
       confirmPlay(play);
       if (play._newGame) {
         play._newGame = false;
-        startMatch();
+        openLobby();
         return inspectPlay(play);
       }
       selected = landByName(play.selected);
@@ -547,10 +583,16 @@ export async function bootThreeSolo() {
       return inspectPlay(play);
     },
     newGame: () => {
-      startMatch();
+      openLobby();
+      return lobbyInspect(lobby);
+    },
+    startFromLobby: (options) => {
+      startMatch(options || lobbyStartOptions(lobby));
       return inspectSolo(gameState);
     },
+    openLobby,
     chrome,
+    lobby,
     get gameState() { return gameState; },
     get play() { return play; },
   };

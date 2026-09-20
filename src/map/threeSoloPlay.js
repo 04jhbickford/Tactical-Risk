@@ -96,6 +96,51 @@ export function isPlaying(play) {
   return play?.gameState?.phase === GAME_PHASES.PLAYING;
 }
 
+export function isSetup(play) {
+  const phase = play?.gameState?.phase;
+  return phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
+export function capitalDests(play) {
+  const gs = play?.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!id || gs.phase !== GAME_PHASES.CAPITAL_PLACEMENT) return [];
+  return Object.entries(gs.territoryState || {})
+    .filter(([name, state]) => state?.owner === id && !gs.territoryByName[name]?.isWater)
+    .map(([name]) => name);
+}
+
+export function deployPool(play) {
+  const gs = play?.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!id || gs.phase !== GAME_PHASES.UNIT_PLACEMENT) return [];
+  return gs.getKnownUnitsToPlace?.(id, play.unitDefs) || gs.getUnitsToPlace?.(id) || [];
+}
+
+export function deployDests(play) {
+  const gs = play?.gameState;
+  const player = gs?.currentPlayer;
+  if (!player || gs.phase !== GAME_PHASES.UNIT_PLACEMENT) return [];
+  const types = Object.entries(play.selectedUnits || {})
+    .filter(([, n]) => Number(n) > 0)
+    .map(([type]) => type);
+  const poolTypes = types.length ? types : deployPool(play).map((p) => p.type);
+  const dests = new Set();
+  for (const type of poolTypes) {
+    const def = play.unitDefs[type] || {};
+    if (def.isSea) {
+      for (const zone of gs._getValidNavalPlacementZones?.(player.id) || []) dests.add(zone);
+    } else {
+      for (const [name, state] of Object.entries(gs.territoryState || {})) {
+        if (state.owner !== player.id) continue;
+        if (gs.territoryByName[name]?.isWater) continue;
+        dests.add(name);
+      }
+    }
+  }
+  return [...dests];
+}
+
 export function pickedCount(selectedUnits) {
   return Object.values(selectedUnits || {}).reduce((n, q) => n + (Number(q) || 0), 0);
 }
@@ -131,13 +176,22 @@ function stackQty(stacks, type, owner = null) {
 function movableStacks(play, name) {
   const player = play.gameState.currentPlayer;
   if (!player || !name) return [];
-  return (play.gameState.units[name] || []).filter((u) => (
+  const onHex = (play.gameState.units[name] || []).filter((u) => (
     u.owner === player.id
     && (Number(u.quantity) || 0) > 0
     && !u.moved
     && u.type !== 'factory'
     && u.type !== 'aaGun'
   ));
+  const cargo = cargoStacks(play, name);
+  if (!cargo.length) return onHex;
+  const merged = [...onHex];
+  for (const stack of cargo) {
+    const hit = merged.find((u) => u.type === stack.type);
+    if (hit) hit.quantity = (Number(hit.quantity) || 0) + stack.quantity;
+    else merged.push({ ...stack });
+  }
+  return merged;
 }
 
 export function combatOrigins(play) {
@@ -154,10 +208,51 @@ function isEnemyLand(play, name) {
 }
 
 function isFriendlyLand(play, name) {
-  const owner = play.gameState.getOwner(name);
+  const gs = play.gameState;
+  const player = gs.currentPlayer;
+  if (!player || !name) return false;
+  if (typeof gs.isNcmFriendly === 'function') return gs.isNcmFriendly(name, player.id);
+  const owner = gs.getOwner(name);
+  if (owner === player.id || gs.areAllies(player.id, owner)) return true;
+  return gs.capturedThisTurn instanceof Set && gs.capturedThisTurn.has(name);
+}
+
+function hasEnemyShips(play, name) {
+  const gs = play.gameState;
+  const player = gs.currentPlayer;
+  if (!player) return false;
+  return (gs.units[name] || []).some((u) => (
+    u.owner !== player.id
+    && !gs.areAllies(player.id, u.owner)
+    && (Number(u.quantity) || 0) > 0
+    && u.type !== 'factory'
+  ));
+}
+
+function hasFriendlyTransport(play, name) {
   const player = play.gameState.currentPlayer;
-  if (!player || !owner) return false;
-  return owner === player.id || play.gameState.areAllies(player.id, owner);
+  if (!player) return false;
+  return (play.gameState.units[name] || []).some((u) => (
+    u.type === 'transport' && u.owner === player.id && (Number(u.quantity) || 0) > 0
+  ));
+}
+
+function cargoStacks(play, name) {
+  const player = play.gameState.currentPlayer;
+  if (!player || !name) return [];
+  const qty = {};
+  for (const ship of play.gameState.units[name] || []) {
+    if (ship.type !== 'transport' || ship.owner !== player.id) continue;
+    for (const item of ship.cargo || []) {
+      qty[item.type] = (qty[item.type] || 0) + (Number(item.quantity) || 1);
+    }
+  }
+  return Object.entries(qty).map(([type, quantity]) => ({
+    type,
+    quantity,
+    owner: player.id,
+    cargo: true,
+  }));
 }
 
 export function legalDests(play) {
@@ -173,14 +268,17 @@ export function legalDests(play) {
   const ground = hasGround(picked, play.unitDefs);
   const air = hasAir(picked, play.unitDefs);
   const sea = hasSea(picked, play.unitDefs);
+  const fromT = gs.territoryByName[from];
   const adj = gs.getConnections(from) || [];
 
   if (combat) {
     for (const to of adj) {
       const t = gs.territoryByName[to];
       if (ground && !t?.isWater && isEnemyLand(play, to)) dests.add(to);
-      if (sea && !ground && t?.isWater && isEnemyLand(play, to)) dests.add(to);
+      if (sea && t?.isWater && hasEnemyShips(play, to)) dests.add(to);
       if (air && !ground && !sea && isEnemyLand(play, to)) dests.add(to);
+      if (ground && fromT?.isWater && !t?.isWater && isEnemyLand(play, to)) dests.add(to);
+      if (ground && t?.isWater && hasFriendlyTransport(play, to)) dests.add(to);
     }
     if (air && !ground && !sea) {
       let range = 1;
@@ -200,8 +298,10 @@ export function legalDests(play) {
     for (const to of adj) {
       const t = gs.territoryByName[to];
       if (ground && !t?.isWater && isFriendlyLand(play, to)) dests.add(to);
-      if (sea && !ground && t?.isWater && isFriendlyLand(play, to)) dests.add(to);
+      if (sea && t?.isWater && !isEnemyLand(play, to)) dests.add(to);
       if (air && !ground && !sea && isFriendlyLand(play, to)) dests.add(to);
+      if (ground && fromT?.isWater && !t?.isWater && isFriendlyLand(play, to)) dests.add(to);
+      if (ground && t?.isWater && hasFriendlyTransport(play, to)) dests.add(to);
     }
     if (air && !ground && !sea) {
       let range = 1;
@@ -222,6 +322,10 @@ export function legalDests(play) {
 }
 
 export function phaseStrip(play) {
+  if (isSetup(play)) {
+    const capital = play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT;
+    return { steps: ['Capital', 'Deploy'], current: capital ? 1 : 2 };
+  }
   const current = TURN_PHASE_ORDER.indexOf(play.gameState?.turnPhase);
   return {
     steps: TURN_PHASE_ORDER.map((p) => STRIP_SHORT[p] || TURN_PHASE_NAMES[p]),
@@ -306,6 +410,12 @@ export function legalPlaceDests(play) {
 
 export function canEndPhase(play) {
   if (isGameOver(play)) return false;
+  if (isSetup(play)) {
+    if (!isHumanTurn(play)) return false;
+    const gs = play.gameState;
+    if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+    return !!gs.canFinishPlacementRound?.(gs.currentPlayer.id, play.unitDefs, { allowNavalSkip: true });
+  }
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
   if (play.landing) return remainingAirCount(play) <= 0;
   if (play.battle) return play.battle.step === BATTLE_STEP.WON && !play.landing;
@@ -616,6 +726,8 @@ function applyHits(play) {
     stacks = removeQty(stacks, type, battle.defOwner, qty);
   }
   gs.units[dest] = stacks;
+  const attLosses = assignedCount(battle.pendingAtt);
+  const defLosses = assignedCount(battle.pendingDef);
   battle.pendingAtt = {};
   battle.pendingDef = {};
   const friends = getFriendlyCombatUnits(stacks, player.id);
@@ -629,8 +741,23 @@ function applyHits(play) {
       for (const unit of stacks) {
         if (unit.type === 'factory' || unit.type === 'aaGun') unit.owner = player.id;
       }
+      if (!gs.capturedThisTurn) gs.capturedThisTurn = new Set();
+      if (gs.capturedThisTurn instanceof Set) gs.capturedThisTurn.add(dest);
+      if (!gs.conqueredThisTurn) gs.conqueredThisTurn = {};
+      if (!gs.conqueredThisTurn[player.id]) {
+        gs.conqueredThisTurn[player.id] = true;
+        gs.awardRiskCard?.(player.id);
+      }
       gs.handleCapitalCapture?.(dest, player.id, prev);
     }
+    gs.logCombat?.({
+      territory: dest,
+      attacker: player.name,
+      defender: battle.defOwner,
+      winner: 'attacker',
+      attackerLosses: attLosses,
+      defenderLosses: defLosses,
+    });
     gs.combatQueue = (gs.combatQueue || []).filter((n) => n !== dest);
     battle.step = BATTLE_STEP.WON;
     battle.failed = false;
@@ -763,6 +890,24 @@ export function tapLand(play, name) {
     return play;
   }
   const phase = play.gameState.turnPhase;
+  if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    if (capitalDests(play).includes(name)) {
+      play.destPicked = name;
+      play.selected = name;
+    } else {
+      play.selected = name;
+    }
+    return play;
+  }
+  if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    if (deployDests(play).includes(name)) {
+      play.destPicked = name;
+      play.selected = name;
+    } else {
+      play.selected = name;
+    }
+    return play;
+  }
   if (phase === TURN_PHASES.MOBILIZE) {
     if (legalPlaceDests(play).includes(name)) {
       play.destPicked = name;
@@ -822,6 +967,16 @@ export function adjustUnit(play, type, delta = 1) {
   if (phase === TURN_PHASES.PURCHASE) {
     if (step > 0) play.gameState.addToPendingPurchases(type, play.unitDefs);
     else play.gameState.removeFromPendingPurchases(type, play.unitDefs);
+    return play;
+  }
+
+  if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    const have = (deployPool(play).find((p) => p.type === type)?.quantity) || 0;
+    if (have <= 0) return play;
+    const cur = Number(play.selectedUnits[type]) || 0;
+    const next = Math.max(0, Math.min(have, cur + step));
+    if (next <= 0) delete play.selectedUnits[type];
+    else play.selectedUnits[type] = next;
     return play;
   }
 
@@ -936,6 +1091,14 @@ function placePending(play) {
 export function confirmEnabled(play) {
   syncPlay(play);
   if (isGameOver(play)) return true;
+  if (isSetup(play)) {
+    if (!isHumanTurn(play)) return false;
+    if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      return capitalDests(play).includes(play.destPicked);
+    }
+    if (play.destPicked && pickedCount(play.selectedUnits)) return true;
+    return canEndPhase(play);
+  }
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
   if (play.landing) {
     return !!play.landing.dest && pickedCount(play.landing.pick) > 0;
@@ -970,6 +1133,16 @@ export function confirmLabel(play) {
   if (isGameOver(play)) return 'New Game vs AI';
   if (!isHumanTurn(play)) {
     return play.aiStatus || `${play.gameState.currentPlayer?.name || 'AI'} thinking…`;
+  }
+  if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    return play.destPicked ? `Confirm: Capital in ${play.destPicked}` : 'Tap your land';
+  }
+  if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    if (play.destPicked && pickedCount(play.selectedUnits)) {
+      return `Confirm: Deploy in ${play.destPicked}`;
+    }
+    if (canEndPhase(play)) return 'Done · Deploy';
+    return pickedCount(play.selectedUnits) ? 'Pick a land' : 'Select units';
   }
   if (play.landing) {
     if (!play.landing.dest) return 'Pick a teal land';
@@ -1028,6 +1201,33 @@ export function confirm(play) {
     play._newGame = true;
     return play;
   }
+  if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    if (play.destPicked) {
+      play.gameState.placeCapital(play.destPicked);
+      resetUi(play);
+    }
+    return play;
+  }
+  if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    if (play.destPicked && pickedCount(play.selectedUnits)) {
+      for (const [type, qty] of Object.entries(play.selectedUnits)) {
+        let left = Number(qty) || 0;
+        while (left > 0) {
+          const result = play.gameState.placeInitialUnit(play.destPicked, type, play.unitDefs);
+          if (result?.success === false) break;
+          left -= 1;
+        }
+      }
+      play.selectedUnits = {};
+      play.destPicked = null;
+      return play;
+    }
+    if (canEndPhase(play)) {
+      resetUi(play);
+      play.gameState.finishPlacementRound(play.unitDefs, { allowNavalSkip: true });
+    }
+    return play;
+  }
   if (play.landing) return applyLanding(play);
   if (play.battle) {
     const step = play.battle.step;
@@ -1060,6 +1260,18 @@ export function confirm(play) {
     const from = combatOrigins(play).includes(play.selected)
       ? play.selected
       : combatOrigins(play)[0];
+    const fromT = play.gameState.territoryByName[from];
+    const destT = play.gameState.territoryByName[play.destPicked];
+    const groundOnly = hasGround(play.selectedUnits, play.unitDefs)
+      && !hasSea(play.selectedUnits, play.unitDefs);
+    if (fromT?.isWater && destT && !destT.isWater && groundOnly) {
+      const result = play.gameState.unloadTransport?.(from, 0, play.destPicked);
+      if (result?.success !== false) {
+        play.selectedUnits = {};
+        play.destPicked = null;
+      }
+      return play;
+    }
     const result = play.gameState.moveUnits(
       from,
       play.destPicked,
@@ -1096,6 +1308,18 @@ export function highlights(play) {
     out.dest = play.landing.origin;
     out.landable = [...play.landing.landable];
     if (play.landing.dest) out.selected = play.landing.dest;
+    return out;
+  }
+  if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    out.legal = capitalDests(play);
+    if (!play.destPicked) out.pulse.push(...out.legal);
+    if (play.destPicked) out.dest = play.destPicked;
+    return out;
+  }
+  if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    out.legal = deployDests(play);
+    if (!play.destPicked) out.pulse.push(...out.legal);
+    if (play.destPicked) out.dest = play.destPicked;
     return out;
   }
   if (play.gameState.turnPhase === TURN_PHASES.MOBILIZE) {
@@ -1304,6 +1528,14 @@ export function chromeModel(play, territories = []) {
       owner: player.id,
     }));
   }
+  if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT && isHumanTurn(play)) {
+    steppers = deployPool(play).map((p) => ({
+      type: p.type,
+      have: p.quantity,
+      picked: Number(play.selectedUnits?.[p.type]) || 0,
+      owner: player.id,
+    }));
+  }
   const planeSteppers = play.landing
     ? Object.entries(play.landing.airLeft || {})
       .filter(([, n]) => Number(n) > 0)
@@ -1320,14 +1552,24 @@ export function chromeModel(play, territories = []) {
   else if (phase === TURN_PHASES.PURCHASE) {
     const shop = shopCapacity(play);
     route = `${shop.used}/${shop.max} queued`;
-  } else if (phase === TURN_PHASES.MOBILIZE && play.destPicked) {
+  }   else if (phase === TURN_PHASES.MOBILIZE && play.destPicked) {
     route = `Place · ${play.destPicked}`;
+  } else if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT && play.destPicked) {
+    route = `Capital · ${play.destPicked}`;
+  } else if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT && play.destPicked) {
+    route = `Deploy · ${play.destPicked}`;
   }
   let sheetLand = play.landing ? (land || { name: 'Land aircraft' }) : land;
   if (!sheetLand && phase === TURN_PHASES.PURCHASE) sheetLand = { name: 'Purchase' };
   if (!sheetLand && phase === TURN_PHASES.MOBILIZE) sheetLand = { name: play.destPicked || 'Mobilize' };
   if (!sheetLand && phase === TURN_PHASES.DEVELOP_TECH && !battleCard(play)) {
     sheetLand = { name: 'Research' };
+  }
+  if (!sheetLand && play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    sheetLand = { name: play.destPicked || 'Place capital' };
+  }
+  if (!sheetLand && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    sheetLand = { name: play.destPicked || 'Deploy' };
   }
   return {
     land: sheetLand,
@@ -1378,5 +1620,9 @@ export function inspectPlay(play) {
     winner: gs.winner || null,
     wantNewGame: !!play._newGame,
     placeDests: legalPlaceDests(play),
+    setupPhase: gs.phase || null,
+    capitalDests: capitalDests(play),
+    deployDests: deployDests(play),
+    deployLeft: deployPool(play).reduce((n, p) => n + (Number(p.quantity) || 0), 0),
   };
 }

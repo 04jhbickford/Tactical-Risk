@@ -4,6 +4,7 @@ import { GameState, GAME_PHASES, TURN_PHASE_NAMES } from '../state/gameState.js'
 import {
   CLASSIC_CAPITALS,
   prepareClassicSoloState,
+  seedClassicPlayerTechs,
 } from '../state/classicCapitals.js';
 
 export const DEFAULT_HUMAN_SEAT = 'Russians';
@@ -28,6 +29,32 @@ export function buildClassicSoloPlayers(setup, {
   return [human, ...players.filter((p) => p !== human)];
 }
 
+export function buildSoloPlayers(setup, {
+  mode = 'classic',
+  humanSeat = DEFAULT_HUMAN_SEAT,
+  aiCount = 4,
+  aiDifficulty = DEFAULT_AI_DIFFICULTY,
+} = {}) {
+  if (mode !== 'risk') {
+    return buildClassicSoloPlayers(setup, { humanSeat, aiDifficulty });
+  }
+  const factions = setup?.classic?.factions || setup?.factions || [];
+  const humanId = humanSeat || DEFAULT_HUMAN_SEAT;
+  const human = factions.find((f) => f.id === humanId) || factions[0];
+  if (!human) return [];
+  const others = factions.filter((f) => f.id !== human.id);
+  const n = Math.max(1, Math.min(others.length, Number(aiCount) || 3));
+  const seated = [human, ...others.slice(0, n)];
+  return seated.map((faction) => {
+    const isHuman = faction.id === human.id;
+    return {
+      ...faction,
+      isAI: !isHuman,
+      aiDifficulty: isHuman ? 'human' : (aiDifficulty || DEFAULT_AI_DIFFICULTY),
+    };
+  });
+}
+
 export function startClassicSolo(setup, territories, continents, options = {}) {
   const players = options.players || buildClassicSoloPlayers(setup, options);
   const gameState = new GameState(setup, territories, continents);
@@ -35,6 +62,20 @@ export function startClassicSolo(setup, territories, continents, options = {}) {
   gameState.initGame('classic', players, { alliancesEnabled: true });
   prepareClassicSoloState(gameState);
   return gameState;
+}
+
+export function startSoloMatch(setup, territories, continents, options = {}) {
+  if (options.mode === 'risk') {
+    const players = options.players || buildSoloPlayers(setup, options);
+    const gameState = new GameState(setup, territories, continents);
+    gameState.isMultiplayer = false;
+    gameState.initGame('risk', players, {
+      startingIPCs: options.startingIPCs || 80,
+    });
+    seedClassicPlayerTechs(gameState);
+    return gameState;
+  }
+  return startClassicSolo(setup, territories, continents, options);
 }
 
 export function placementsFromState(gameState) {
@@ -82,5 +123,7 @@ export function inspectSolo(gameState) {
     stamped: Object.values(CLASSIC_CAPITALS).every((name) => (
       gameState?.territoryState?.[name]?.isCapital === true
     )),
+    gameMode: gameState?.gameMode || null,
+    setupPhase: gameState?.phase || null,
   };
 }

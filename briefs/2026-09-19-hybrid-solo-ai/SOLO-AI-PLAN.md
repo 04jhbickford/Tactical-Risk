@@ -1,12 +1,15 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** S0–S9 landed. Hold merge. Full classic solo vs AI on the tip.  
+**Status:** S0–S10 + local lobby landed. Hold merge. Lobby → setup → deploy → classic vs AI.  
 **Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.55-ux-solo.3` · SCHEMA 11  
+**Tip:** `V2.81.55-ux-solo.4` · SCHEMA 11  
 **Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
-**Solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
+**Lobby / solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
+**Skip lobby:** `?three=1&solo=1&go=1`  
 **Live main:** https://tactical-risk20.vercel.app/ · `V2.81.55` · SCHEMA 11  
 **Tesla / Viz:** off. Side / hybrid only. **Keep off `main` until a separate yes.**
+
+**Cherry-picked from main P0 (not merged):** [PR82](https://github.com/04jhbickford/Tactical-Risk/pull/82) `2f6fe8d` — persist combat capture (`omitUndefinedDeep`, `persistableUnit`, `logCombat` losses 0 not undefined, purchase `owner`). Root cause of territory-not-flip / fighters-vanish / hiccup / NCM-into-still-enemy. Tip stamp kept.
 
 ## S0 / S1 landed (2026-09-19)
 
@@ -34,11 +37,22 @@ Adapter is `src/map/threeSoloPlay.js` (GameState + AIController + autosave behin
 | **S8** | Develop Tech die stepper (5 IPC). Confirm Roll. Breakthrough → pick a tech → Unlock. Skip still End Phase at 0 dice. |
 | **S9** | Victory sheet + gold **New Game vs AI** (does not reload `/`). Cold start `?three=1&solo=1` can play a full turn loop and end the match. |
 
-**Residual stubs:** navy/amphib Three UX (naval still auto-resolves). Risk capital+deploy (S10). Three diagnostics log (S11). Retreat / bombard tiles. Tech tiles reuse casualty picker chrome (no unit art).
+## S10 + lobby (2026-09-20)
 
-**How far a human can play:** Research (or skip) → Buy (or skip) → Combat Move → Combat → Air Land → NCM → Place bought units → income / AI. Win on alliance capitals → New Game vs AI. Pocket `?three=1&max=1` unchanged.
+| Slice | Landed |
+|---|---|
+| **P0 sync** | Cherry-pick PR82 `2f6fe8d`. `capturedThisTurn` + `isNcmFriendly` so NCM can enter just-taken lands. Three `applyHits` logs numeric losses. |
+| **Lobby** | `?three=1&solo=1` opens local **New Game vs AI** (no Firebase): Classic 1942 / Risk, faction seat, AI count (Risk), difficulty. Start match. Menu / victory **New Game vs AI** returns here. |
+| **S10 Risk deploy** | Capital tiles (tap owned land → Confirm). Deploy tiles from `unitsToPlace`; Done when `canFinishPlacementRound`. AI seats use `AIController`. Classic still skips to PLAYING. |
+| **Navy / amphib** | Combat-move dests include enemy sea + load onto friendly TRN + unload from sea to adj land (`unloadTransport`). Naval battles still auto-resolve. |
 
-This brief tells Arc how to port a **real solo match vs AI** onto the tip `.11` Three UX without rewriting the rules engine and without touching lobby / multiplayer / `main`.
+**Residual stubs:** retreat / bombard tiles. Three diagnostics sheet (S11). Tech tiles reuse casualty picker chrome. Risk leftover navy uses Confirm Done (`allowNavalSkip`).
+
+**How to start from lobby:** open `?three=1&solo=1` → Classic 1942 (or Risk) → tap your seat → Start match. Classic lands on Develop Tech. Risk lands on Place Capital then Deploy. Pocket `?three=1&max=1` unchanged. Skip lobby with `&go=1`.
+
+**How far a human can play:** Lobby → (Risk capital + deploy) → Research → Buy → Combat Move (land / sea / amphib) → Combat → Air Land → NCM into conquered → Place → income / AI → victory → lobby.
+
+This brief tells Arc how to port a **real solo match vs AI** onto the tip `.11` Three UX without rewriting the rules engine and without touching Firebase multiplayer / `main`.
 
 ---
 
