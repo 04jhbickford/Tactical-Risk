@@ -17,6 +17,8 @@ import {
   unappliedLandingPlan,
   upsertPendingAirLanding,
 } from './airLanding.js';
+import { emitGameEvent, summarizeUnits } from '../multiplayer/gameEventLog.js';
+import { omitUndefinedDeep } from './persistState.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -223,9 +225,14 @@ export class GameState {
     this.gameOver = false;
     this.winner = null; // 'Allies', 'Axis', or player name
     this.winCondition = null;
+    this.lastIncome = null;
 
     // Combat log for current round
     this.combatLog = [];
+
+    // Persisted combat dice + force snapshots (additive, SCHEMA 11).
+    // Bounded so Firestore docs stay small. Used to audit AA/combat soft-locks.
+    this.combatTelemetry = [];
 
     // Tech research state: { playerId: { techTokens: n, unlockedTechs: [] } }
     this.playerTechs = {};
@@ -236,6 +243,8 @@ export class GameState {
     this.cardTradeCount = {};
     // Track if player has conquered a territory this turn (for Risk card award - one per turn)
     this.conqueredThisTurn = {};
+    // Lands taken this turn — NCM ground can enter even if a stale owner write lagged.
+    this.capturedThisTurn = new Set();
 
     // Territories with amphibious assault this turn (for shore bombardment - only bombard with amphibious units)
     this.amphibiousTerritories = new Set();
@@ -574,6 +583,12 @@ export class GameState {
 
   getOwner(territoryName) {
     return this.territoryState[territoryName]?.owner || null;
+  }
+
+  isNcmFriendly(territoryName, playerId) {
+    const owner = this.getOwner(territoryName);
+    if (owner === playerId || this.areAllies(playerId, owner)) return true;
+    return this.capturedThisTurn instanceof Set && this.capturedThisTurn.has(territoryName);
   }
 
   isCapital(territoryName) {
@@ -1642,7 +1657,7 @@ export class GameState {
     this.turnPhase = this.phase === GAME_PHASES.PLAYING
       ? this.turnPhase
       : SETUP_TURN_PHASE;
-    this.placementHistory = []; // Clear undo history for this round
+    this.placementHistory = []; // Pass / end of wave only — keep history while 1–6 sit on the map
 
     // Check if all players have finished placing - either no units left OR no placeable units
     const anyPlayerCanPlace = this.players.some(p => {
@@ -1745,6 +1760,15 @@ export class GameState {
     }
 
     this._notify();
+    emitGameEvent('purchase', {
+      gameState: this,
+      payload: {
+        unitType,
+        quantity: 1,
+        ipcDelta: -cost,
+        territory: territory || null,
+      },
+    });
     return { success: true };
   }
 
@@ -2186,9 +2210,14 @@ export class GameState {
     if (player) {
       this.conqueredThisTurn[player.id] = false;
     }
+    this.capturedThisTurn = new Set();
     this._clearMovedFlags();
     this._notify();
     this.autoSave(); // Auto-save after each turn
+    emitGameEvent('phase', {
+      gameState: this,
+      payload: { action: 'turnStart', round: this.round },
+    });
   }
 
   // Helper: populate friendly territories at turn start (for air landing validation)
@@ -2304,6 +2333,10 @@ export class GameState {
 
     this._notify();
     this.autoSave(); // Auto-save after each phase change
+    emitGameEvent('phase', {
+      gameState: this,
+      payload: { action: 'nextPhase', turnPhase: this.turnPhase },
+    });
   }
 
   // Get current turn phase name
@@ -2326,15 +2359,25 @@ export class GameState {
 
     this.playerState[player.id].ipcs -= totalCost;
 
-    // Add to pending purchases
-    const existing = this.pendingPurchases.find(p => p.type === unitType);
+    // Add to pending purchases — owner is required so getPendingPurchases
+    // (filters by current player) still sees fighters / air after buy.
+    const existing = this.pendingPurchases.find(p => p.type === unitType && p.owner === player.id);
     if (existing) {
       existing.quantity += quantity;
     } else {
-      this.pendingPurchases.push({ type: unitType, quantity });
+      this.pendingPurchases.push({ type: unitType, quantity, owner: player.id });
     }
 
     this._notify();
+    emitGameEvent('purchase', {
+      gameState: this,
+      payload: {
+        unitType,
+        quantity,
+        ipcDelta: -totalCost,
+        via: 'purchaseForMobilization',
+      },
+    });
     return true;
   }
 
@@ -2366,8 +2409,9 @@ export class GameState {
 
     // Non-combat move rules
     if (isNonCombatMove) {
-      // Cannot enter enemy territory
-      if (isEnemy) {
+      // Cannot enter enemy territory. Just-conquered lands are friendly
+      // even if a stale owner write lagged (P0 territory-flip / NCM).
+      if (isEnemy && !this.isNcmFriendly(toTerritory, player.id)) {
         return { success: false, error: 'Cannot enter enemy territory in non-combat move' };
       }
       // Can freely pass through allied territories
@@ -2917,6 +2961,19 @@ export class GameState {
     }
 
     this._notify();
+    const isAttack = isCombatMove && isEnemy && !captured;
+    emitGameEvent(isAttack ? 'attack' : 'move', {
+      gameState: this,
+      territory: toTerritory,
+      payload: {
+        from: fromTerritory,
+        to: toTerritory,
+        units: summarizeUnits(unitsToMove),
+        combatMove: isCombatMove,
+        captured,
+        cardAwarded: cardAwarded || null,
+      },
+    });
     return {
       success: true,
       from: fromTerritory,
@@ -2925,7 +2982,7 @@ export class GameState {
       shipIds: movedShipIds.length > 0 ? movedShipIds : undefined,
       captured,
       cardAwarded,
-      isAttack: isCombatMove && isEnemy && !captured,
+      isAttack,
       blitzedCaptures: blitzedCaptures.length > 0 ? blitzedCaptures : undefined,
     };
   }
@@ -3269,6 +3326,14 @@ export class GameState {
     this.units[destination] = destUnits;
 
     this._notify();
+    emitGameEvent('retreat', {
+      gameState: this,
+      territory: combatTerritory,
+      payload: {
+        destination,
+        units: summarizeUnits(unitsToRetreat),
+      },
+    });
     return { success: true };
   }
 
@@ -3578,6 +3643,18 @@ export class GameState {
       result.resolved = false;
     }
 
+    this.recordCombatTelemetry({
+      kind: 'combat',
+      territory,
+      hits: { attack: totalAttackHits, defense: defenseHits },
+      attackRolls: attackRolls.map((r) => r.roll),
+      defenseRolls: defenseRolls.map((r) => r.roll),
+      attackForce: attackers,
+      defenseForce: combatDefenders,
+      survivors: remainingAttackers,
+      wiped: remainingAttackers.length === 0,
+    });
+
     this._notify();
     return result;
   }
@@ -3600,6 +3677,60 @@ export class GameState {
   // Snapshot of recent die rolls for auditing (Bug 4 investigation aid).
   getRollLog() {
     return this._rollLog ? this._rollLog.slice() : [];
+  }
+
+  // Persist a compact combat-round snapshot (AA or regular dice) on the
+  // game doc so a reload / other client can still see what was rolled.
+  // In-memory _rollLog is not enough — it never survived Firestore.
+  recordCombatTelemetry(entry = {}) {
+    if (!this.combatTelemetry) this.combatTelemetry = [];
+    const capRolls = (rolls) => {
+      const list = Array.isArray(rolls) ? rolls.slice(0, 24) : [];
+      return list.map((n) => Number(n) || 0);
+    };
+    const capForce = (force) => (Array.isArray(force) ? force.slice(0, 16).map((u) => ({
+      type: u?.type || 'unit',
+      quantity: Number(u?.quantity) || 0,
+    })) : []);
+    this.combatTelemetry.push({
+      t: Date.now(),
+      round: this.round,
+      kind: entry.kind || 'combat',
+      territory: entry.territory || null,
+      hits: entry.hits ?? 0,
+      rolls: capRolls(entry.rolls),
+      attackRolls: capRolls(entry.attackRolls),
+      defenseRolls: capRolls(entry.defenseRolls),
+      attackForce: capForce(entry.attackForce),
+      defenseForce: capForce(entry.defenseForce),
+      survivors: capForce(entry.survivors),
+      wiped: !!entry.wiped,
+    });
+    if (this.combatTelemetry.length > 40) {
+      this.combatTelemetry = this.combatTelemetry.slice(-40);
+    }
+    const kind = entry.kind === 'aa' ? 'aa' : 'combat';
+    emitGameEvent(kind, {
+      gameState: this,
+      territory: entry.territory || null,
+      payload: {
+        hits: entry.hits ?? 0,
+        rolls: capRolls(entry.rolls),
+        attackRolls: capRolls(entry.attackRolls),
+        defenseRolls: capRolls(entry.defenseRolls),
+        forcesBefore: {
+          attack: capForce(entry.attackForce),
+          defense: capForce(entry.defenseForce),
+        },
+        forcesAfter: { attack: capForce(entry.survivors) },
+        wiped: !!entry.wiped,
+        via: 'combatTelemetry',
+      },
+    });
+  }
+
+  getCombatTelemetry() {
+    return this.combatTelemetry ? this.combatTelemetry.slice() : [];
   }
 
   _rollCombatWithRolls(units, type, unitDefs) {
@@ -3831,6 +3962,32 @@ export class GameState {
     this.pendingPurchases = this.pendingPurchases.filter(p => p.owner !== player.id);
   }
 
+  // Preview collect-income IPCs (capital 10 + production + continent bonus).
+  getCollectIncomeAmount(playerId = this.currentPlayer?.id) {
+    if (!playerId) return 0;
+    if (!this.canCollectIncome(playerId)) return 0;
+
+    let income = 0;
+    const capitalTerritory = this.playerState[playerId]?.capitalTerritory;
+
+    for (const [territory, state] of Object.entries(this.territoryState)) {
+      if (state.owner !== playerId) continue;
+      if (territory === capitalTerritory) {
+        income += 10;
+        continue;
+      }
+      const t = this.territoryByName[territory];
+      if (t && t.production) income += t.production;
+    }
+
+    for (const continent of this.continents || []) {
+      if (this.controlsContinent(playerId, continent.name)) {
+        income += continent.bonus;
+      }
+    }
+    return income;
+  }
+
   // Collect income from territories
   _collectIncome() {
     const player = this.currentPlayer;
@@ -3839,36 +3996,21 @@ export class GameState {
     // Repair damaged battleships at turn end (A&A Anniversary rule)
     this._repairPlayerBattleships(player.id);
 
-    // Cannot collect income if capital is captured
-    if (!this.canCollectIncome(player.id)) {
-      return;
+    const blocked = !this.canCollectIncome(player.id);
+    const income = this.getCollectIncomeAmount(player.id);
+    if (!blocked) {
+      this.playerState[player.id].ipcs += income;
     }
-
-    let income = 0;
-    const capitalTerritory = this.playerState[player.id]?.capitalTerritory;
-
-    for (const [territory, state] of Object.entries(this.territoryState)) {
-      if (state.owner === player.id) {
-        // Capitals always produce 10 IPCs
-        if (territory === capitalTerritory) {
-          income += 10;
-        } else {
-          const t = this.territoryByName[territory];
-          if (t && t.production) {
-            income += t.production;
-          }
-        }
-      }
-    }
-
-    // Add continent bonuses
-    for (const continent of this.continents) {
-      if (this.controlsContinent(player.id, continent.name)) {
-        income += continent.bonus;
-      }
-    }
-
-    this.playerState[player.id].ipcs += income;
+    this.lastIncome = {
+      playerId: player.id,
+      amount: income,
+      blocked,
+      round: this.round,
+    };
+    emitGameEvent('ui', {
+      gameState: this,
+      payload: { action: 'collectIncome', ipcDelta: income },
+    });
   }
 
   _clearMovedFlags() {
@@ -4154,23 +4296,29 @@ export class GameState {
 
   // Add a combat result to the log
   logCombat(result) {
+    const attackerLosses = result.attackerLosses ?? 0;
+    const defenderLosses = result.defenderLosses ?? 0;
     this.combatLog.push({
       round: this.round,
       timestamp: Date.now(),
-      ...result
+      ...result,
+      attackerLosses,
+      defenderLosses,
     });
 
-    // Also add to turnEvents for turn summary modal (multiplayer)
+    // Also add to turnEvents for turn summary modal (multiplayer).
+    // Do not write undefined — Firestore rejects the whole game-doc push
+    // (hiccup → exhaust → capture rolls back).
     this.turnEvents.push({
       type: 'combat',
-      playerId: this.currentPlayer?.id,
+      playerId: this.currentPlayer?.id ?? null,
       timestamp: Date.now(),
-      territory: result.territory,
-      attacker: result.attacker,
-      defender: result.defender,
-      outcome: result.winner === result.attacker ? 'attacker' : 'defender',
-      attackerLosses: result.attackerLosses,
-      defenderLosses: result.defenderLosses
+      territory: result.territory ?? null,
+      attacker: result.attacker ?? null,
+      defender: result.defender ?? null,
+      outcome: result.winner === 'attacker' ? 'attacker' : 'defender',
+      attackerLosses,
+      defenderLosses,
     });
   }
 
@@ -5204,7 +5352,7 @@ export class GameState {
   }
 
   toJSON() {
-    return {
+    return omitUndefinedDeep({
       version: 11, // v11: Added turn events for turn summary modal
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
@@ -5230,6 +5378,8 @@ export class GameState {
       placementRound: this.placementRound,
       // Additive (no schema bump): mid-wave rejoin must restore the 6-unit cap.
       unitsPlacedThisRound: this.unitsPlacedThisRound || 0,
+      // Additive: keep deploy Undo until Pass. Do not drop this on autosave.
+      placementHistory: (this.placementHistory || []).map((entry) => ({ ...entry })),
       // v8: Save air unit origin tracking for proper landing calculation after load
       airUnitOrigins: this.airUnitOrigins,
       friendlyTerritoriesAtTurnStart: Array.from(this.friendlyTerritoriesAtTurnStart || []),
@@ -5237,6 +5387,8 @@ export class GameState {
       factoriesAtTurnStart: Array.from(this.factoriesAtTurnStart || []),
       // v11: Turn events for turn summary modal (multiplayer)
       turnEvents: this.turnEvents,
+      // Additive (no schema bump): last ~40 AA/combat dice + force snapshots.
+      combatTelemetry: (this.combatTelemetry || []).map((entry) => ({ ...entry })),
       // Additive config (no schema bump): AI-when-unattended policy (Bug 2).
       // Default false = AI pauses when no human is present. Old clients ignore
       // the extra field; a missing field loads as false. See aiPolicy.js.
@@ -5247,7 +5399,8 @@ export class GameState {
         originTerritory: entry.originTerritory,
         units: (entry.units || []).map((unit) => ({ ...unit })),
       })),
-    };
+      capturedThisTurn: Array.from(this.capturedThisTurn || []),
+    });
   }
 
   loadFromJSON(data) {
@@ -5302,6 +5455,9 @@ export class GameState {
         ? this.unitsPlacedThisRoundOwnerId
         : nextPlayerId || null)
       : null;
+    this.placementHistory = Array.isArray(data.placementHistory)
+      ? data.placementHistory.map((entry) => ({ ...entry }))
+      : (this.placementHistory || []);
     this.ensureInitialDeployPools();
 
     // v8: Restore air unit tracking for proper landing calculation
@@ -5325,6 +5481,9 @@ export class GameState {
 
     // v11: Restore turn events for turn summary modal
     this.turnEvents = data.turnEvents || [];
+    this.combatTelemetry = Array.isArray(data.combatTelemetry)
+      ? data.combatTelemetry.map((entry) => ({ ...entry }))
+      : [];
 
     // AI-when-unattended policy (Bug 2). Default false: pause AI when no human
     // is present. Older docs without the field load as the safe default.
@@ -5342,6 +5501,7 @@ export class GameState {
     this.amphibiousAssaultDetails = {};
     this.moveHistory = [];
     this.conqueredThisTurn = {};
+    this.capturedThisTurn = new Set(data.capturedThisTurn || []);
 
     this._notify();
   }

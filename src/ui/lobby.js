@@ -27,16 +27,16 @@ export function shouldSeatFactionOnPointerDown({ mobile } = {}) {
   return !!mobile;
 }
 
-// AI Difficulty levels
-const AI_DIFFICULTIES = [
+// Shared with Three hybrid lobby (`threeSoloLobby.js`) so option labels
+// and ordering stay one source of truth with the live Canvas lobby.
+export const AI_DIFFICULTIES = [
   { id: 'human', name: 'Human', desc: 'Local player' },
   { id: 'easy', name: 'Easy AI', desc: 'Basic strategy' },
   { id: 'medium', name: 'Medium AI', desc: 'Balanced play' },
   { id: 'hard', name: 'Hard AI', desc: 'Expert strategy' },
 ];
 
-// Available colors for faction selection
-const FACTION_COLORS = [
+export const FACTION_COLORS = [
   { id: 'red', color: '#B22222', light: '#DC143C', name: 'Crimson' },
   { id: 'blue', color: '#1E90FF', light: '#4169E1', name: 'Blue' },
   { id: 'green', color: '#228B22', light: '#32CD32', name: 'Green' },
@@ -49,11 +49,19 @@ const FACTION_COLORS = [
   { id: 'pink', color: '#C71585', light: '#FF69B4', name: 'Pink' },
 ];
 
-// Team colors
-const TEAM_COLORS = {
+export const TEAM_COLORS = {
   1: { color: '#1E90FF', name: 'Team 1 (Blue)' },
   2: { color: '#DC143C', name: 'Team 2 (Red)' },
 };
+
+export const STARTING_IPC_OPTIONS = [40, 60, 80, 100, 120, 150];
+export const DEFAULT_STARTING_IPCS = 80;
+
+function startingIpcOptionsHtml(selected) {
+  return STARTING_IPC_OPTIONS.map((n) => (
+    `<option value="${n}" ${Number(selected) === n ? 'selected' : ''}>${n}</option>`
+  )).join('');
+}
 
 export class Lobby {
   constructor(setup, onStart, onPlayOnline) {
@@ -68,7 +76,7 @@ export class Lobby {
     this.playerAI = {};
     this.playerTeams = {};
     this.teamsEnabled = false;
-    this.startingIPCs = 80;
+    this.startingIPCs = DEFAULT_STARTING_IPCS;
     this.el = null;
     this._ignoreCardToggleUntil = 0;
     this._ignoreCardTogglePlayer = null;
@@ -215,12 +223,7 @@ export class Lobby {
           <label class="lobby-phone-option">
             <span>Starting IPCs</span>
             <select id="starting-ipcs" class="modern-select compact">
-              <option value="40" ${this.startingIPCs === 40 ? 'selected' : ''}>40</option>
-              <option value="60" ${this.startingIPCs === 60 ? 'selected' : ''}>60</option>
-              <option value="80" ${this.startingIPCs === 80 ? 'selected' : ''}>80</option>
-              <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100</option>
-              <option value="120" ${this.startingIPCs === 120 ? 'selected' : ''}>120</option>
-              <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150</option>
+              ${startingIpcOptionsHtml(this.startingIPCs)}
             </select>
           </label>
           <label class="lobby-phone-option lobby-phone-teams">
@@ -387,12 +390,7 @@ export class Lobby {
             <label class="select-option inline">
               <span class="select-label">Starting IPCs</span>
               <select id="starting-ipcs" class="modern-select compact">
-                <option value="40" ${this.startingIPCs === 40 ? 'selected' : ''}>40</option>
-                <option value="60" ${this.startingIPCs === 60 ? 'selected' : ''}>60</option>
-                <option value="80" ${this.startingIPCs === 80 ? 'selected' : ''}>80</option>
-                <option value="100" ${this.startingIPCs === 100 ? 'selected' : ''}>100</option>
-                <option value="120" ${this.startingIPCs === 120 ? 'selected' : ''}>120</option>
-                <option value="150" ${this.startingIPCs === 150 ? 'selected' : ''}>150</option>
+                ${startingIpcOptionsHtml(this.startingIPCs)}
               </select>
             </label>
           </div>

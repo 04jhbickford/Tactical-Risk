@@ -10,6 +10,7 @@ import {
   createScenario,
   tapLand,
   pickUnit,
+  adjustUnit,
   pickLoss,
   confirm,
   confirmLabel,
@@ -18,6 +19,8 @@ import {
   highlights,
   battleCard,
   inspectPlay,
+  airLandRoster,
+  adjustLanding,
   driveCombatMove,
   driveBattleMid,
   driveAirChoice,
@@ -53,6 +56,23 @@ tapLand(move, SCENARIO.origin);
 assert(move.selected === SCENARIO.origin, 'origin selected');
 assert(confirmLabel(move) === 'Select units', 'select units after origin');
 assert(!highlights(move).pulse.includes(SCENARIO.origin), 'origin pulse stops after tap');
+
+const stepped = createScenario();
+tapLand(stepped, SCENARIO.origin);
+assert((stepped.selectedUnits.infantry || 0) === 0, 'INF starts 0/3');
+adjustUnit(stepped, 'infantry', 1);
+assert(stepped.selectedUnits.infantry === 1, 'INF + → 1/3');
+adjustUnit(stepped, 'infantry', 1);
+adjustUnit(stepped, 'infantry', 1);
+assert(stepped.selectedUnits.infantry === 3, 'INF + + + → 3/3');
+adjustUnit(stepped, 'infantry', 1);
+assert(stepped.selectedUnits.infantry === 3, 'INF + at max stays 3');
+adjustUnit(stepped, 'infantry', -1);
+assert(stepped.selectedUnits.infantry === 2, 'INF − → 2/3');
+adjustUnit(stepped, 'fighter', 1);
+assert(stepped.selectedUnits.fighter === 1, 'FTR + → 1/1');
+adjustUnit(stepped, 'fighter', 1);
+assert(stepped.selectedUnits.fighter === 1, 'FTR + at max stays 1');
 
 tapLand(move, 'Ukraine S.S.R.');
 assert(move.destPicked == null, 'ukraine dest ignored until units');
@@ -120,12 +140,20 @@ assert(stackQty(move.placements[SCENARIO.dest], 'infantry', 'Russians') === 2, '
 confirm(move);
 assert(move.phase === PHASE.AIR_LAND, 'air land');
 assert(confirmGold(move) === false, 'air idle not gold');
+assert(confirmLabel(move) === 'Confirm land', 'planes-only Confirm land');
 assert(highlights(move).landable.includes('Russia'), 'russia landable');
+const planes = airLandRoster(move);
+assert(planes.length === 1 && planes[0].type === 'fighter', 'air roster is planes only');
+assert(!planes.some((p) => p.type === 'infantry'), 'dest INF not in air sheet');
 
 tapLand(move, 'Germany');
 assert(move.landingDest == null, 'illegal land ignored');
 tapLand(move, 'Russia');
+assert(confirmLabel(move) === 'Select planes', 'need plane pick');
+assert(confirmEnabled(move) === false, 'dest alone is not enough');
+adjustLanding(move, 'fighter', 1);
 assert(confirmLabel(move) === 'Confirm: Land in Russia', 'named land confirm');
+assert(confirmEnabled(move) === true, 'planes + dest');
 confirm(move);
 assert(move.phase === PHASE.DONE, 'done');
 assert(stackQty(move.placements.Russia, 'fighter', 'Russians') === 1, 'fighter in Russia');

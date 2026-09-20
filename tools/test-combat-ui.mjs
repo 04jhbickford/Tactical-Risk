@@ -57,6 +57,9 @@ const {
   AA_RESULT_AUTO_PAUSE_MS,
   territoryHasEnemyCombatUnits,
   getEnemyCombatUnits,
+  getFriendlyCombatUnits,
+  countLivingUnits,
+  territoryCombatAlreadyResolved,
   summarizeCombatForce,
   formatCombatForceLine,
   resolveCombatNextLine,
@@ -106,6 +109,10 @@ function makeGame({
     getOwner() { return 'p2'; },
     hasAmphibiousAssault() { return false; },
     territoryByName: { [territory]: { isWater: false, connections: [] } },
+    combatTelemetry: [],
+    combatLog: [],
+    recordCombatTelemetry(entry) { this.combatTelemetry.push({ ...entry }); },
+    logCombat(result) { this.combatLog.push(result); },
     _notify() { this.notified += 1; },
   };
 }
@@ -120,7 +127,7 @@ function makeUI(game) {
 }
 
 console.log('=== Version stamps ===');
-check('GAME_VERSION is V2.81.53', GAME_VERSION === 'V2.81.53');
+check('GAME_VERSION is V2.81.55', String(GAME_VERSION).startsWith('V2.81.'));
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 check('AA result auto-pause is readable (not a 150ms blip)', AA_RESULT_AUTO_PAUSE_MS >= 400);
 
@@ -418,6 +425,124 @@ console.log('=== V2.81.45 phone combat sheet (odds / select / resolve) ===');
     && /End Combat Phase/.test(resolveHtml));
   if (prevHeight === undefined) delete globalThis.window.innerHeight;
   else globalThis.window.innerHeight = prevHeight;
+  document.documentElement.classList.remove('mobile-shell');
+}
+
+console.log('=== V2.81.55 AA wipe fail-close + telemetry ===');
+{
+  check('countLivingUnits ignores qty 0 and excluded AA',
+    countLivingUnits([{ type: 'fighter', quantity: 2 }, { type: 'aaGun', quantity: 1 }]) === 3
+    && countLivingUnits([{ type: 'fighter', quantity: 2 }, { type: 'aaGun', quantity: 1 }], { excludeTypes: ['aaGun'] }) === 2
+    && countLivingUnits([]) === 0);
+  check('friendly combat units exclude factory',
+    getFriendlyCombatUnits([
+      { type: 'fighter', owner: 'p1', quantity: 1 },
+      { type: 'factory', owner: 'p1', quantity: 1 },
+    ], 'p1').every((u) => u.type !== 'factory'));
+  check('0-attacker leftover is already resolved',
+    territoryCombatAlreadyResolved([
+      { type: 'infantry', owner: 'p2', quantity: 1 },
+      { type: 'aaGun', owner: 'p2', quantity: 1 },
+    ], 'p1') === true);
+  check('live air vs AA is not resolved',
+    territoryCombatAlreadyResolved([
+      { type: 'fighter', owner: 'p1', quantity: 2 },
+      { type: 'aaGun', owner: 'p2', quantity: 1 },
+    ], 'p1') === false);
+}
+
+{
+  const game = makeGame({
+    attackers: [
+      { type: 'fighter', owner: 'p1', quantity: 2 },
+      { type: 'fighter', owner: 'p1', quantity: 1 },
+    ],
+    defenders: [{ type: 'aaGun', owner: 'p2', quantity: 1 }, { type: 'infantry', owner: 'p2', quantity: 1 }],
+  });
+  const ui = makeUI(game);
+  ui.showNextCombat();
+  const origRandom = Math.random;
+  Math.random = () => 0; // every AA die is a 1
+  ui._rollAAFire();
+  Math.random = origRandom;
+
+  check('AA wipe removes every aircraft stack (same type does not overwrite)',
+    ui.combatState.selectedAACasualties.fighter === 3
+    && countLivingUnits(ui.combatState.attackers) === 0);
+  check('AA wipe stays on aaResults so the dice are readable',
+    ui.combatState.phase === AA_RESULT_PHASE
+    && ui.combatState.aaResults.hits === 3);
+  check('AA wipe syncs dead air onto the board immediately',
+    (game.units['Anglo-Sudan Egypt'] || []).every((u) => u.owner !== 'p1'));
+  check('AA wipe records persisted telemetry (rolls + forces + wiped)',
+    game.combatTelemetry.length === 1
+    && game.combatTelemetry[0].kind === 'aa'
+    && game.combatTelemetry[0].hits === 3
+    && game.combatTelemetry[0].wiped === true
+    && game.combatTelemetry[0].rolls.length === 3);
+
+  ui._confirmAAResults();
+  check('Continue after AA wipe resolves as defender — no Roll Dice',
+    ui.combatState.phase === 'resolved'
+    && ui.combatState.winner === 'defender'
+    && !/data-action="roll"/.test(ui.el.innerHTML)
+    && /End Combat Phase|Next Battle/.test(ui.el.innerHTML));
+  check('Continue after AA wipe finalizes so reload cannot reopen the fight',
+    ui.combatState._finalized === true
+    && game.combatQueue.length === 0
+    && game.combatLog.length === 1
+    && game.combatLog[0].winner === 'defender');
+}
+
+{
+  const territory = 'Anglo-Sudan Egypt';
+  const game = makeGame({
+    territory,
+    attackers: [],
+    defenders: [{ type: 'infantry', owner: 'p2', quantity: 2 }, { type: 'aaGun', owner: 'p2', quantity: 1 }],
+    combatQueue: [territory],
+  });
+  const ui = makeUI(game);
+  const result = ui.showNextCombat();
+  check('0-attacker leftover is not shown (no sticky dice rematch)', result.shown === false);
+  check('0-attacker queue head is dequeued', game.combatQueue.length === 0);
+  check('popup stays hidden after AA-wipe rematch skip', ui.el.classList.contains('hidden'));
+}
+
+{
+  const game = makeGame({
+    attackers: [],
+    defenders: [{ type: 'infantry', owner: 'p2', quantity: 1 }],
+  });
+  game.combatQueue = ['Anglo-Sudan Egypt'];
+  const ui = makeUI(game);
+  ui.currentTerritory = 'Anglo-Sudan Egypt';
+  ui._initCombatState();
+  check('init with 0 attackers is resolved, not ready/rolling',
+    ui.combatState.phase === 'resolved' && ui.combatState.winner === 'defender');
+  ui.combatState.phase = 'ready';
+  ui.combatState.attackers = [];
+  const rolled = await ui._animateDiceRoll();
+  check('Roll with 0 attackers fail-closes instead of sticky rolling',
+    ui.combatState.phase === 'resolved'
+    && ui.combatState.winner === 'defender'
+    && rolled.attackHits === 0);
+}
+
+{
+  const game = makeGame({
+    attackers: [{ type: 'fighter', owner: 'p1', quantity: 1 }],
+    defenders: [{ type: 'infantry', owner: 'p2', quantity: 1 }],
+  });
+  document.documentElement.classList.add('mobile-shell');
+  const ui = makeUI(game);
+  ui.showNextCombat();
+  ui.combatState.phase = 'rolling';
+  ui.combatState.attackers = [];
+  ui._render();
+  check('phone rolling with 0 attackers offers End Battle (not an empty CTA)',
+    /data-action="end-empty-attack"/.test(ui.el.innerHTML)
+    && /End Battle/.test(ui.el.innerHTML));
   document.documentElement.classList.remove('mobile-shell');
 }
 

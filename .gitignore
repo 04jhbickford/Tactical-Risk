@@ -4,3 +4,4 @@ node_modules/
 .claude/
 nul
 .firebase/
+.playwright-mcp/

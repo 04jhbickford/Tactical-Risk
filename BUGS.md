@@ -2,6 +2,283 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.19 Confirm Attack CTA (preview only)
+
+James SUPERSEDES / Viz PARTIAL ~76% on `.18` @390: Combat Move reached
+ORIGIN→UNITS→DEST but gold **Confirm Attack** was not reachable (casualty
+YOU NOT-REACHED because Confirm path broken). Lobby/deploy/income PASS.
+`.19` docks Confirm above safe-area, scrolls peek/battle in
+`#three-sheet-stack`, and does not let `#three-bottom` steal dest taps.
+Confirm enables only at `playStage===CONFIRM`; disabled hints stay
+Tap units / Tap destination. No Try combat-move coach. Keep `.15` touch,
+`.17` seats, income gate. Hold merge. Quiet James.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.18 playthrough holes (preview only)
+
+James SUPERSEDES: three tip-only full playthrough. Catalog-first
+(SANDBOX-RECS §A + GAPS P1 #7 phase gates). Fill lobby → setup → deploy
+→ all MAIN phases → win/lose vs AI. Collect Income is an explicit
+Confirm gate (`bgio-moves-phases-stages`). Shop is the full unit catalog
++ Risk card trade. Combat dice steal CombatUI tech + artillery.
+`AIController` stops on `gameOver`. Defeat chrome when the human side
+loses. Keep `.15` touch-pan, `.16` combat stages, `.17` seats. Lobby CSS
+untouched (no CDP re-prove). P1 casualty YOU steppers **REACHED**: YOU
+tiles tap-assign, THEY inert, Confirm gold Take hits. Hold merge.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.17 seat cards Human / AI / Empty (preview only)
+
+James SUPERSEDES: three tip-only playthrough. Catalog-first seat cards
+(SANDBOX-RECS §A #3, GAPS P0 #4). Each faction seat shows occupant
+Human · AI · Empty; Easy/Med/Hard stay AI tiers under AI; Empty clears.
+START GAME stays disabled until legal local config (≥2 seats and at
+least one Human). Steal: aa-1942-seat-combatants, bgio-lobby-seat-picker /
+bgio-local-pass-and-play, root-digital-lobby-hud. Keep `.15` touch-pan
+shell and `.16` combat stages. Grow-to-fit, no overflow:hidden clip.
+Viz SCORE `.16` touch hold was PARTIAL (overflow visible only) — `.17`
+re-proves CDP T1–T5 after seat CSS (MAIN.scrollTop moves, body scrollY 0).
+Do not READY on CSS inspection. Casualty YOU steppers out of this tip.
+Hold merge.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.16 combat nested stages (preview only)
+
+James SUPERSEDES: three tip-only playthrough. Combat-move + battle was
+ad-hoc flags (`selected` / `selectedUnits` / `destPicked` / `battle.step`).
+`.16` makes it an explicit nested stage machine: IDLE → ORIGIN → UNITS →
+DEST → CONFIRM → (AA / combatReady odds-preview / casualty YOU steppers /
+air land) → done. Confirm disabled until origin+units+dest legal; battle
+sheet blocks map hits; no Try combat-move; keep `.15` lobby touch-pan +
+stamp SoT. Steal: xstate/bgio stages + aa-combat-dice-calc. Hold merge.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.15 touch-pan on New Local Game (preview only)
+
+James REJECTED `.14`: real touchscreen cannot finger-pan scroll New Local
+Game below-fold. Viz A3 `scrollTop` / wheel PASS was not a finger-pan.
+Class: touch scroll broken. Root: non-passive lobby `touchstart`,
+`bindSealedActivate` firing on `pointerdown` (re-paints chips mid-gesture),
+peek/chip `ontouchstart = activate` + `preventDefault`, and canvas
+`touch-action:none` able to steal if events leak. `.15` is click-only +
+passive on lobby, never `preventDefault` on lobby `touchstart`/`touchmove`,
+`touch-action:pan-y` on MAIN/seats/chips, canvas `pointer-events:none`
+while lobby is open. Keep `.14` stamp SoT (`no-store` `/`, drop SW).
+Hold merge. Quiet James.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.14 stamp lag after hard reload (preview only)
+
+Viz ABORT A1 on claimed tip `.13`: hard reload @390 still painted
+`V2.81.56-ux-solo.12` on L0/in-chrome while `src/version.js` listed `.13`.
+Same class as `.9→.7`: cached `/` document (vercel `no-store` was only
+on `/index.html`) pinned `window.__TR_GAME_VERSION`, and/or a one-time
+HTML bake from a stale ESM. `.14` paints `.three-l0-ver` / `.three-lobby-ver`
+from `liveGameVersion()` on every inject (HTML SoT, later tip wins if
+HTML and module disagree), cache-busts the boot graph, `no-store`s `/`,
+and drops Service Worker / Cache Storage on tip boot. Keep `.13` scroll
+shell. Hold merge. Quiet James.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.13 adaptive lobby scrollport (preview only)
+
+James REJECTED `.12`: New Local Game does not scroll on device —
+below-fold seats unreachable. Root cause: `sealChromeControl(lobby)` +
+`bindSealedActivate` `preventDefault` on `touchstart`/`pointerdown`
+killed iOS/Chrome-mobile native pan even though MAIN had
+`overflow-y:auto`. `.13` maps the canonical app-shell (header
+`flex:none` / MAIN scroll / footer `flex:none` sibling), keeps
+`prevent:false` on lobby/tutorial, and does not `preventDefault` canvas
+`touchstart` while the lobby is open. Fail-closed A1/A3/A4/A5 @390.
+Hold merge. Quiet James. Tesla off. No READY until stills pass.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.12 setup scroll shell (preview only)
+
+James REJECTED `.11`: sticky Teams + Start covered Japanese colors
+@390. Setup is now header / MAIN-only scroll / footer outside the
+scroll (`100dvh`/`100svh`). Seat wraps stay overflow:visible. Keep
+live stamp. Hold merge. No READY ping until 390+desktop stills pass.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.11 seat wrap overflow (preview only)
+
+James REJECTED `.10`: `#three-lobby-seat-wrap { overflow:hidden }` plus
+flex-shrink clipped occupant chips to their tops @390. Removed that
+overflow clip. Cards grow (`flex:0 0 auto; overflow:visible`) so
+Human/Easy/Med/Hard is fully visible. Keep `.10` live-stamp/cache-bust.
+Hold merge. No Arc/Viz ping until the 390 still is clean.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.10 stamp + seat collapse (preview only)
+
+L0 was stuck on `.7` because chrome baked `GAME_VERSION` once and
+ESM cache kept the old module. Live stamp now overwrites L0/lobby
+chips from `window.__TR_GAME_VERSION || GAME_VERSION` every paint;
+chrome/solo/boot imports cache-bust `?v=.10`. Lobby seats: 4-col
+Human/Easy/Med/Hard on all 5 factions; colors on a separate row.
+Hold merge. Do not ping Arc/Viz until L0 `.10` stills exist.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.9 Viz killers (preview only)
+
+Stamp `.9` on L0+lobby (cache-bust). Undo visible at deploy 6/6
+(history until Pass). Breakthrough (i) tiles not JE/RO steppers.
+`?cargo=1` Load TRN seed. Hold merge. Viz re-gate.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.8 James P0 batch (preview only)
+
+Setup seats-only scroll @390. Deploy/casualty stepper budget.
+After 6: Undo or Pass. Global Undo except battle/tech dice.
+Eligible land/sea sheet. Compact research + dense breakthrough (i).
+Combat-move TRN load + per-ship cargo. Hold merge.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.7 research DIE SVG (preview only)
+
+DIE-only: inline SVG pip die; `isDieType` aliases; never `<img>`
+for research die. Lobby/deploy unchanged. Hold merge.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.6 lookpass (preview only)
+
+James @390 Deploy: 6+5 tile grid (no TRN orphan), steppers
+uncipped, map chit borders inset + pad under sheet. Lobby
+restyled to main phone cards. Research pip cubes. Hold merge.
+
+---
+
+## 9.20.26 — V2.81.56-ux-solo.5 lookpass (preview only)
+
+Three lobby now uses main option sources (`AI_DIFFICULTIES`,
+IPC ladder, 2–5 seats, Start Game (N)). Setup tutorial + deploy
+6-then-Pass. Persist P0 kept. Pocket `?max=1` kept. Do not merge.
+
+---
+
+## 9.20.26 — V2.81.55-ux-solo.4 lobby + P0 persist (preview only)
+
+Cherry-picked main P0 `2f6fe8d` (PR82 persist combat capture). Local
+Three lobby (faction / AI / Classic or Risk) → capital+deploy on Risk
+→ full classic loop. Navy dests + unload. `?max=1` pocket kept.
+Do not merge.
+
+---
+
+## 9.20.26 — V2.81.55-ux-solo.3 S7–S9 (preview only)
+
+Purchase + mobilize tiles, tech dice / breakthrough pick, victory
+sheet + New Game vs AI on `?three=1&solo=1`. Pocket `?max=1` kept.
+Do not merge.
+
+---
+
+## 9.19.26 — V2.81.55-ux-solo.2 S2–S6 (preview only)
+
+Phase shell + combat-move + combat/casualties + air land + NCM on
+`?three=1&solo=1` via `threeSoloPlay.js` (real GameState). Tech/Buy
+are End Phase skips. Purchase/mobilize/tech/win still stubbed.
+Pocket `?three=1&max=1` kept. Do not merge. STOP before S7–S9.
+
+---
+
+## 9.19.26 — V2.81.55-ux-solo.1 S0+S1 (preview only)
+
+S0: main V2.81.54 AA-wipe + V2.81.55 game-log brought onto PR76.  
+S1: `?three=1&solo=1` / New Game vs AI boots classic GameState (1 human +
+4 medium AI, historical capitals stamped). Phases still thin. Pocket
+`?three=1&max=1` kept. Do not merge. STOP before S2.
+
+---
+
+## 9.19.26 — V2.81.53-ux-preview.11 tiles + split air land
+
+James: air land must pick WHICH planes land WHERE (partial by type
++ dest), not dump all air on one hex. Pickers go horizontal icon
+tiles with in-tile +/− (combat-move, casualty, air-land). Keep .10
+fit / YOU-confirm / zoom hide / ATK-DEF IA. Preview only. Do not merge.
+
+---
+
+## 9.19.26 — V2.81.53-ux-preview.10 battle sheet fit + steppers
+
+James ROUND 2 still: THEY TAKE 2 clipped under Assign casualties.
+Battle sheet now pins YOU + THEY + Confirm below a scrollable IA
+body (100svh − L0 − safe-area). Casualty rows use the same icon +
++/− steppers as combat-move. THEY stays read-only cheapest but fully
+visible. Preview only. Do not merge.
+
+---
+
+## 9.19.26 — V2.81.53-ux-preview.9 P0.2 YOU-confirm
+
+Viz FAIL on tip .8: ART−1 selected but Confirm stayed Assign/disabled.
+Cause: THEY also had an ART chip; a tap registered as THEY and YOU
+never filled. Solo now: only YOU chips are tappable; THEY is a
+read-only cheapest line. Same-type re-tap is sticky (no toggle-off).
+YOU assign → gold Confirm: Take hits. Preview only. Do not merge.
+
+---
+
+## 9.19.26 — V2.81.53-ux-preview.8 max-tip he-correct
+
+James from Karelia combat-move + ROUND 1 stills on PR76 `?three=1&max=1`.
+
+1. Zoom +/−/Fit sat on INF/ART/TNK steppers. Hide zoom while sheet / battle is open.
+2. YOU ART−1 left Confirm grey because Confirm waited on THEY too. Solo: YOU assigns enable Confirm; THEY is cheapest-auto and still tappable.
+3. Shrink unit sheet — denser bottom rows, more map.
+4. Combat IA: split ATK (you attack / gold) vs DEF (they defend / steel); show hits and who absorbs what.
+
+Keep max seed, steppers, Congo eat, planes-only land, no Try. Preview only. Do not merge.
+
+---
+
+## 9.19.26 — V2.81.53-ux-preview.7-max fat Karelia→Ukraine
+
+James wanted a bigger battle sim on the preview.7 / PR76 tip.
+`?three=1&max=1` (aliases `?stress=1`, `?demo=max`) seeds MAX stacks
+on **Karelia S.S.R.** (RUS) vs **Ukraine S.S.R.** (GER). Default
+`?three=1` stays the small Finland pocket. Preview only. Do not merge.
+
+Attacker (Karelia): INF×10 ART×6 TNK×6 FTR×4 BMB×3 — steppers, not
+auto-all. Defender (Ukraine): INF×8 ART×4 TNK×4 FTR×3 AA×3 — mixed
+casualty picks. First (and later demo) rounds script 2 ATK / 1 DEF
+hits + AA miss so planes land. Keep preview.7: steppers, Congo eat,
+planes-only Confirm land, no Try, casualty pick.
+
+---
+
+## 9.19.26 — V2.81.53-ux-preview.7 unit sheet click-through
+
+James he-correct on preview.6, folded here. Three bars:
+
+1. Partial-select: INF/FTR `[-] n/max [+]` steppers (not all-or-nothing
+   chips). Send 1 of 3 INF.
+2. Congo click-through P0: sheet +/− eat all touches (bubble-phase
+   stopPropagation / preventDefault + canvas ignores the sheet rect).
+   Map must not select Congo / FEA under INF +.
+3. Air landing: do not open the dest unit sheet. Planes-only peek +
+   Confirm land.
+
+Keep: manual FROM→units→TO→Confirm, no Try, casualty picker, preview.6
+chip mouseup fix. Tesla / Viz off. Preview only. Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.53-ux-preview.6 chip taps reach pickers
 
 Window mouseup was treating HUD chip taps as map taps and rebuilding
@@ -56,6 +333,75 @@ chits / continent washes + the Three preview HUD. Keep off main.
 
 `?three=1` or `?ux=1` boots Canvas `MapRenderer` + Three L0/L1/L2 chrome.
 No Imagine world plate. Live `/` unchanged. Do not merge.
+---
+
+## 9.19.26 — V2.81.55 cloud game-log + diagnostics (SCHEMA 11)
+
+James want: screenshot → Arc pulls cloud events for that game/moment →
+verify where in play it happened → diagnose/fix.
+
+Delivered: append-only `games/{id}/events` (fail-closed). Kinds
+phase/move/attack/aa/combat/purchase/retreat/error/ui. Dice faces via
+shared `_rollDie` land in aa/combat payloads. Existing
+`combatTelemetry` (last 40 on the game doc) kept; AI `resolveCombat`
+now records it too. Lookup: `tools/query-game-events.mjs` +
+`DIAGNOSTICS.md` + `window.__TR_DIAG__`. Rules: seated/startedBy
+append; admin-only read; no update/delete. SCORE.md. GAME_VERSION
+V2.81.55. Draft only — not production. No admin keys invented.
+
+### Smoke (this PR)
+
+- [ ] Multiplayer fight: `games/{id}/events` grows after phase, move,
+      AA/combat, purchase. A thrown write does not freeze the board.
+- [ ] Admin can list events; a seated non-admin cannot.
+- [ ] `node tools/query-game-events.mjs --print-query --lobby boysenberry --around "10:34 PT 19 Sep"`
+      prints lobby → gameId → client-side window.
+- [ ] `state.combatTelemetry` still present after a fight (SCHEMA 11).
+
+---
+
+## 9.19.26 — V2.81.54 AA wipe soft-lock (SCHEMA 11)
+
+Sean Benson, game code/name `boysenberry`, ~10:34 PT 19 Sep. After AA
+shot down all of Sean's aircraft: combat continued with 0 attackers,
+stuck on the dice/rolling overlay (no Retreat, no progress). Reload
+did not clear it (queue + board still looked like a live fight). Sean
+resigned. Also reported 94 IPC lost to Rob's 12.
+
+Cause: AA casualties lived only in the overlay (`combatState`). They
+were not written to `gameState.units` until Next → `_finalizeCombat`.
+`combatQueue` stayed populated. Reload / resync called `showNextCombat`,
+which only skipped 0-*defender* leftovers, so a 0-*attacker* leftover
+reopened as `ready` / Roll Dice. Phone `rolling` has no CTA, so a 0-unit
+roll could not exit. Same-type air stacks could under-apply AA hits
+(`selected[type] = take` overwrote). Dice never reached Firestore:
+`actionLog` / `_rollLog` / `combatLog` are in-memory; combat UI rolled
+`Math.random()` directly and skipped `_rollDie`.
+
+Fix: sync AA losses immediately; Continue after an attacker wipe
+finalizes (idempotent). Dequeue 0-attacker queue heads. Never open or
+roll combat with 0 attackers — fail-close to defender holds + End
+Battle. Persist last 40 AA/combat snapshots on the game doc
+(`combatTelemetry`, additive SCHEMA 11). Route combat dice through
+`_rollDie`. GAME_VERSION V2.81.54. Do not merge without James.
+
+Boysenberry dice dump: not recoverable from this environment (Firestore
+reads require auth; no service account; no persisted roll history on
+the live schema). 94-vs-12 luck vs bug cannot be proven from logs. AA
+hits only on 1; wiping a ~94 IPC air force in one volley is not
+plausible luck if N is more than a couple of aircraft.
+
+### Smoke (this PR)
+
+- [ ] Air-only attack into AA: every aircraft dies to AA → Continue
+      shows defender holds / End Combat Phase. No Roll Dice.
+- [ ] Reload on that screen (or after Continue) does not reopen the
+      fight. Combat phase can end.
+- [ ] If the overlay is already on Rolling with 0 attackers, End Battle
+      dismisses it.
+- [ ] After the next live fight, `gameState.getCombatTelemetry()` (or
+      the game doc `state.combatTelemetry`) has AA/combat rolls + unit
+      counts.
 
 ---
 

@@ -5,7 +5,7 @@ import { Camera, MAP_WIDTH, MAP_HEIGHT } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome } from './threeMapChrome.js';
+import { injectThreeChrome } from './threeMapChrome.js?v=V2.81.56-ux-solo.19';
 import {
   lodBandFromZoom,
   preloadUnitImages,
@@ -22,15 +22,26 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.19';
+import { isMaxBattleRequested } from './uxPreviewFlag.js';
+import {
+  bindSealedActivate,
+  clientPointOf,
+  eventElement,
+  shouldIgnoreMapHit,
+} from './threeChromeEvents.js';
 import {
   PHASE,
   SELECT_GOLD,
   LAND_TEAL,
+  MAX_ATTACK,
+  MAX_DEFEND,
   createScenario,
   applyScenarioPocket,
   tapLand,
   pickUnit,
+  adjustUnit,
+  pickedCount,
   confirm as confirmPlay,
   confirmLabel,
   confirmGold,
@@ -40,6 +51,8 @@ import {
   inspectPlay,
   dismissGuide,
   pickLoss,
+  adjustLoss,
+  adjustLanding,
   LABEL_LANDS,
   driveCombatMove,
   driveBattleMid,
@@ -140,26 +153,19 @@ export async function bootUxPreview() {
   const territoryMap = new TerritoryMap(territories);
   const classicPlacements = { ...(setup.classic?.unitPlacements || {}) };
   const classicOwners = setup.classic?.territoryOwners || {};
-  const pocket = applyScenarioPocket(classicPlacements, classicOwners);
+  const maxBattle = isMaxBattleRequested();
+  const pocket = applyScenarioPocket(classicPlacements, classicOwners, { max: maxBattle });
   const placements = pocket.placements;
   const owners = pocket.owners;
-  let play = createScenario({ placements, owners });
-  const stressOn = (() => {
-    const params = new URLSearchParams(location.search);
-    const v = String(params.get('stress') || '').toLowerCase();
-    return v === '1' || v === 'true' || v === 'yes';
-  })();
-  if (stressOn) {
-    placements.Japan = stressStacks('Japanese', STRESS_LAND_TYPES);
-    placements.Germany = stressStacks('Germans', STRESS_LAND_TYPES);
-  }
+  let play = createScenario({ placements, owners, maxBattle });
+  const stressOn = maxBattle;
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
   const russians = factions.find((f) => f.id === 'Russians');
 
   const chrome = injectThreeChrome({
     seat: 'Russians',
-    ipc: russians?.startingPUs || 24,
+    ipc: play.ipc || russians?.startingPUs || 24,
     phase: PHASE.COMBAT_MOVE,
   });
   chrome.setSeat('Russians', russians?.color || '#B22222');
@@ -202,23 +208,49 @@ export async function bootUxPreview() {
     if (play.phase === PHASE.COMBAT_MOVE && (play.selected === play.origin || play.destPicked || Object.keys(play.selectedUnits || {}).length)) {
       focusName = play.origin;
     }
-    if (play.phase === PHASE.AIR_LAND && !play.landingDest) {
-      focusName = play.dest;
-    }
-    const land = landByName(focusName);
+    const airLand = play.phase === PHASE.AIR_LAND;
+    const land = airLand
+      ? (play.landingDest ? landByName(play.landingDest) : null)
+      : landByName(focusName);
     const picked = Object.keys(play.selectedUnits || {}).filter((t) => play.selectedUnits[t]);
+    const showSteppers = play.phase === PHASE.COMBAT_MOVE
+      && land
+      && land.name === play.origin
+      && (play.selected === play.origin || pickedCount(play.selectedUnits) || play.destPicked);
+    const steppers = showSteppers
+      ? (placements[land.name] || [])
+        .filter((s) => s.type !== 'factory' && s.type !== 'aaGun' && (s.quantity || 0) > 0)
+        .map((s) => ({
+          type: s.type,
+          have: s.quantity,
+          picked: Number(play.selectedUnits?.[s.type]) || 0,
+          owner: s.owner,
+        }))
+      : null;
+    const planeSteppers = airLand
+      ? Object.entries(play.airLeft || play.selectedUnits || {})
+        .filter(([, n]) => Number(n) > 0)
+        .map(([type, have]) => ({
+          type,
+          have: Number(have) || 0,
+          picked: Number(play.landingPick?.[type]) || 0,
+          owner: 'Russians',
+        }))
+      : null;
     let route = '';
     if (play.phase === PHASE.COMBAT_MOVE && play.destPicked) {
       route = `${play.origin} → ${play.destPicked}`;
-    } else if (play.phase === PHASE.AIR_LAND) {
-      route = play.landingDest ? `Land in ${play.landingDest}` : 'Pick teal land';
+    } else if (airLand) {
+      route = play.landingDest ? `Confirm land · ${play.landingDest}` : 'Pick a teal land';
     } else if (play.phase === PHASE.DONE && play.landingDest) {
       route = `Landed · ${play.landingDest}`;
     }
     chrome.paintPlay({
-      land,
-      stacks: land ? (placements[land.name] || []) : [],
+      land: airLand ? (land || { name: 'Land aircraft' }) : land,
+      stacks: airLand ? [] : (land ? (placements[land.name] || []) : []),
       unitTypes: picked,
+      steppers: airLand ? planeSteppers : steppers,
+      airLand,
       label: confirmLabel(play),
       gold: confirmGold(play),
       enabled: confirmEnabled(play),
@@ -241,8 +273,20 @@ export async function bootUxPreview() {
     paintChrome();
     camera.dirty = true;
   };
+  chrome.onUnitStep = (type, delta) => {
+    if (play.phase === PHASE.AIR_LAND) adjustLanding(play, type, delta);
+    else adjustUnit(play, type, delta);
+    syncSelectionFromPlay();
+    paintChrome();
+    camera.dirty = true;
+  };
   chrome.onLossPick = (side, type) => {
     pickLoss(play, side, type);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onLossStep = (side, type, delta) => {
+    adjustLoss(play, side, type, delta);
     paintChrome();
     camera.dirty = true;
   };
@@ -324,15 +368,34 @@ export async function bootUxPreview() {
   }
 
   function eventFromChrome(e) {
-    const node = e?.target;
+    const node = eventElement(e);
     if (!node || typeof node.closest !== 'function') return false;
     return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-phase-strip');
   }
 
-  canvas.addEventListener('mousedown', (e) => camera.onMouseDown(e));
+  function ignoreMapHit(e) {
+    const pt = clientPointOf(e);
+    return shouldIgnoreMapHit({
+      sheetOpen: chrome.isSheetOpen(),
+      targetInChrome: eventFromChrome(e),
+      clientX: pt?.x,
+      clientY: pt?.y,
+      rects: chrome.hitRects(),
+    });
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (ignoreMapHit(e)) return;
+    camera.onMouseDown(e);
+  });
   canvas.addEventListener('mousemove', (e) => {
     if (camera.onMouseMove(e)) {
       canvas.classList.add('is-panning');
+      return;
+    }
+    if (ignoreMapHit(e)) {
+      hover = null;
+      canvas.classList.remove('is-hovering');
       return;
     }
     const hit = pickAt(e.clientX, e.clientY);
@@ -344,17 +407,19 @@ export async function bootUxPreview() {
     const wasDrag = camera.onMouseUp();
     canvas.classList.remove('is-panning');
     if (wasDrag) return;
-    if (chrome.isSheetOpen()) return;
-    // Peek / loss chips live in the HUD. A window mouseup used to
-    // rebuild that HUD before the chip click, so unit and casualty
-    // taps never registered.
-    if (eventFromChrome(e)) return;
+    // Peek / steppers / zoom live in the HUD. A window mouseup used
+    // to select the land under INF + (Congo / FEA at 390).
+    if (ignoreMapHit(e)) return;
     selectLand(pickAt(e.clientX, e.clientY));
   });
   canvas.addEventListener('wheel', (e) => camera.onWheel(e), { passive: false });
 
   let pinch = null;
   canvas.addEventListener('touchstart', (e) => {
+    if (ignoreMapHit(e)) {
+      e.preventDefault();
+      return;
+    }
     if (e.touches.length === 2) {
       e.preventDefault();
       const [a, b] = e.touches;
@@ -390,21 +455,17 @@ export async function bootUxPreview() {
     if (e.touches.length === 0) {
       const wasDrag = camera.onMouseUp();
       canvas.classList.remove('is-panning');
-      if (wasDrag || chrome.isSheetOpen() || eventFromChrome(e)) return;
+      if (wasDrag || ignoreMapHit(e)) return;
       const t = e.changedTouches[0];
       if (t) selectLand(pickAt(t.clientX, t.clientY));
     }
   });
 
-  chrome.zoom.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-zoom]');
-    if (!btn) return;
-    e.stopPropagation();
+  bindSealedActivate(chrome.zoom, '[data-zoom]', (e, btn) => {
     if (btn.dataset.zoom === 'fit') fitPocket();
     else camera.zoomBy(btn.dataset.zoom);
   });
-  chrome.confirm.addEventListener('click', (e) => {
-    e.stopPropagation();
+  bindSealedActivate(chrome.confirm, null, () => {
     if (chrome.confirm.disabled) return;
     const before = play.phase;
     confirmPlay(play);
@@ -606,6 +667,11 @@ export async function bootUxPreview() {
       continents: continents.length,
       idleConfirm: 'Select units',
       tryCombatMove: false,
+      maxBattle,
+      maxQuery: '?three=1&max=1',
+      maxAliases: ['?three=1&max=1', '?three=1&stress=1', '?three=1&demo=max'],
+      maxAttack: maxBattle ? { ...MAX_ATTACK } : null,
+      maxDefend: maxBattle ? { ...MAX_DEFEND } : null,
       mapLabels: LABEL_LANDS,
       pulse: highlights(play).pulse,
       pocket: {
@@ -636,6 +702,21 @@ export async function bootUxPreview() {
       camera.dirty = true;
       return { ...(play.selectedUnits || {}) };
     },
+    adjustUnit: (type, delta = 1) => {
+      adjustUnit(play, type, delta);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return { ...(play.selectedUnits || {}) };
+    },
+    adjustLanding: (type, delta = 1) => {
+      adjustLanding(play, type, delta);
+      syncSelectionFromPlay();
+      paintChrome();
+      camera.dirty = true;
+      return { ...(play.landingPick || {}) };
+    },
+    blocksMapAt: (x, y) => chrome.blocksMapAt(x, y),
     pickLoss: (side, type) => {
       pickLoss(play, side, type);
       paintChrome();

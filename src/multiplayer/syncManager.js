@@ -19,6 +19,7 @@ import {
   shouldResumeSnapshots,
 } from './presencePolicy.js';
 import { applyLiveHostHandoff } from './hostHandoff.js';
+import { omitUndefinedDeep } from '../state/persistState.js';
 
 export class SyncManager {
   constructor(gameId, gameState) {
@@ -498,7 +499,9 @@ export class SyncManager {
   // transaction error propagates to the retry loop.
   async _pushOnce() {
     const gameRef = doc(this.db, 'games', this.gameId);
-    const state = this.gameState.toJSON();
+    // Belt-and-suspenders: Firestore throws on undefined. A failed combat
+    // push rolls the capture back (hiccup → exhaust).
+    const state = omitUndefinedDeep(this.gameState.toJSON());
     const currentPlayer = this.gameState.currentPlayer;
     const currentPlayerId = currentPlayer?.oderId || null;
 
