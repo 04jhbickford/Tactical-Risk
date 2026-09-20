@@ -50,7 +50,7 @@ import {
 import { GAME_PHASES, TURN_PHASES } from '../src/state/gameState.js';
 import { findUndefinedPaths } from '../src/state/persistState.js';
 import { GAME_VERSION } from '../src/version.js';
-import { cubeDieHtml } from '../src/map/threeMapChrome.js';
+import { cubeDieHtml, isDieType, unitArtHtml } from '../src/map/threeMapChrome.js';
 import { getUnitIconPath } from '../src/utils/unitIcons.js';
 
 const setup = JSON.parse(readFileSync(new URL('../data/setup.json', import.meta.url)));
@@ -66,10 +66,13 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.6', 'tip stamp ux-solo.6');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.7', 'tip stamp ux-solo.7');
 assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');
+assert(isDieType('techDie') && isDieType('DIE') && isDieType('die') && isDieType('x', 'DIE 5'), 'die aliases');
 const die = cubeDieHtml(5, { size: 'lg' });
-assert(die.includes('three-cube') && die.includes('data-pips="5"') && !die.includes('<img'), 'research die is pip cube, not img');
+assert(die.includes('<svg') && die.includes('data-die-art="svg"') && die.includes('<circle') && !die.includes('<img'), 'research die is SVG pips, not img');
+const aliases = ['techDie', 'DIE', 'die', 'tech_die'].map((t) => unitArtHtml(t, 'Russians', 'DIE 5', { dieSize: 'lg' }));
+assert(aliases.every((html) => html.includes('<svg') && !html.includes('<img')), 'unitArtHtml never imgs a die');
 assert(AI_DIFFICULTIES.map((d) => d.id).join(',') === 'human,easy,medium,hard', 'main occupant labels');
 assert(STARTING_IPC_OPTIONS.join(',') === '40,60,80,100,120,150', 'main IPC ladder');
 

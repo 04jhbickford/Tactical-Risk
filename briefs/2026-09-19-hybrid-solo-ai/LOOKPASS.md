@@ -1,4 +1,4 @@
-# Lookpass — V2.81.56-ux-solo.6
+# Lookpass — V2.81.56-ux-solo.7
 
 **Hold merge.** Off main. Tesla / Viz off. SoT = [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76).
 
@@ -10,7 +10,7 @@
 
 1. **Lobby chrome** — same Local Play / How to Play / New Local Game / Classic·Risk / seats / AI / IPC / Teams / Start Game N. Restyled to main phone lobby structure: brand + version chip, icon cards (kicker / title / desc), setup head + segmented mode, tight seat cards, options band, gold Start CTA.
 2. **Deploy @390** — 6-col `is-wave` grid so 11 types wrap **6+5** (TRN not orphaned). Smaller steppers/icons + `box-sizing` so +/− sit inside tiles. Map chits: inset stroke (full border) + chrome-height `padBottom` so chips are not cropped under the sheet.
-3. **Research DIE** — root cause: `getUnitIconPath('techDie')` is `null` (no `units/{faction}/…` mapping), so the sheet painted `<img src="">` (broken-image icon). No die PNG on main; main uses CSS `.die.die-3d`. Three now paints an ivory pip cube (`cubeDieHtml`) and never emits an empty `<img>`.
+3. **Research DIE (.7)** — Viz still saw a broken `<img>` on `.6` (type alias miss or leftover img path). `isDieType` now treats `techDie` / `DIE` / `die` / short `DIE*`. Art is an **inline SVG pip die** (`data-die-art="svg"`). Never `getUnitIconPath` / never `<img>` for die tiles.
 
 ## Pulled from main
 

@@ -45,6 +45,16 @@ export function shortType(type) {
   return TYPE_SHORT[type] || String(type || '?').slice(0, 3).toUpperCase();
 }
 
+export function isDieType(type, short = '') {
+  const raw = String(type ?? '').trim();
+  const label = String(short || '').trim();
+  const key = raw.toLowerCase().replace(/[\s_-]+/g, '');
+  if (['techdie', 'die', 'dice', 'techdice', 'researchdie'].includes(key)) return true;
+  if (raw && shortType(raw) === 'DIE') return true;
+  if (label.toUpperCase().split(/[\s/]/)[0] === 'DIE') return true;
+  return false;
+}
+
 export function stackSummary(stacks) {
   if (!stacks?.length) return '';
   return stacks
@@ -52,8 +62,40 @@ export function stackSummary(stacks) {
     .join(' ');
 }
 
-function unitArtHtml(type, owner, short, { dieSize = '' } = {}) {
-  if (type === 'techDie') return cubeDieHtml(5, { size: dieSize });
+const DIE_PIPS = {
+  1: [[50, 50]],
+  2: [[28, 28], [72, 72]],
+  3: [[28, 28], [50, 50], [72, 72]],
+  4: [[28, 28], [72, 28], [28, 72], [72, 72]],
+  5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
+  6: [[30, 24], [30, 50], [30, 76], [70, 24], [70, 50], [70, 76]],
+};
+
+export function cubeDieHtml(face, { hit = false, side = '', size = '' } = {}) {
+  const n = Math.max(1, Math.min(6, Number(face) || 1));
+  const px = size === 'lg' ? 44 : size === 'sm' ? 22 : 36;
+  const faceFill = hit
+    ? (side === 'def' ? '#5B8CA8' : '#C4A35A')
+    : '#F4EFE4';
+  const faceHi = hit
+    ? (side === 'def' ? '#8EB8C8' : '#E6C57A')
+    : '#FFF8EE';
+  const pip = hit && side === 'def' ? '#F4EFE4' : '#1A1610';
+  const cls = [
+    'three-cube',
+    hit ? 'is-hit' : '',
+    side === 'def' ? 'is-def' : '',
+    size === 'lg' ? 'is-lg' : '',
+    size === 'sm' ? 'is-sm' : '',
+  ].filter(Boolean).join(' ');
+  const pips = (DIE_PIPS[n] || DIE_PIPS[1]).map(([x, y]) => (
+    `<circle cx="${x}" cy="${y}" r="8" fill="${pip}"/>`
+  )).join('');
+  return `<svg class="${cls}" data-pips="${n}" data-die-art="svg" viewBox="0 0 100 100" width="${px}" height="${px}" aria-label="Die ${n}" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="90" height="90" rx="18" fill="${faceHi}" stroke="rgba(20,16,10,0.4)" stroke-width="3"/><rect x="10" y="12" width="80" height="76" rx="14" fill="${faceFill}"/><g>${pips}</g></svg>`;
+}
+
+export function unitArtHtml(type, owner, short, { dieSize = '' } = {}) {
+  if (isDieType(type, short)) return cubeDieHtml(5, { size: dieSize });
   const src = getUnitIconPath(type, owner);
   if (!src) return `<span class="three-tile-fallback" aria-hidden="true">${String(short || '?').slice(0, 2)}</span>`;
   return `<img src="${src}" alt="${short}" width="36" height="36">`;
@@ -69,18 +111,6 @@ function iconRowHtml(stacks) {
       <b>${s.quantity}</b>
     </button>`;
   }).join('')}</div>`;
-}
-
-export function cubeDieHtml(face, { hit = false, side = '', size = '' } = {}) {
-  const n = Math.max(1, Math.min(6, Number(face) || 1));
-  const cls = [
-    'three-cube',
-    hit ? 'is-hit' : '',
-    side === 'def' ? 'is-def' : '',
-    size === 'lg' ? 'is-lg' : '',
-    size === 'sm' ? 'is-sm' : '',
-  ].filter(Boolean).join(' ');
-  return `<span class="${cls}" data-pips="${n}" aria-label="Die ${n}">${'<i></i>'.repeat(n)}</span>`;
 }
 
 const LOBBY_MARK_LOCAL = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
@@ -118,7 +148,7 @@ function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) 
     const plus = loss
       ? `data-loss-step="1" data-loss-side="${side || s.side || ''}" data-loss-type="${s.type}"`
       : `data-step="1" data-unit-type="${s.type}"`;
-    const dieTile = s.type === 'techDie';
+    const dieTile = isDieType(s.type, short);
     const art = unitArtHtml(s.type, s.owner, short, { dieSize: dieTile && !wave ? 'lg' : '' });
     return `<div class="three-tile${picked > 0 ? ' is-on' : ''}${dieTile ? ' is-die' : ''}" data-unit-type="${s.type}">
       ${art}
@@ -543,6 +573,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:600 10px/1 -apple-system,"SF Pro Text",sans-serif;
       color:rgba(232,226,212,0.62); letter-spacing:0.02em;
     }
+    svg.three-cube { display:block; overflow:visible; }
     .three-cube {
       --s:36px; --pip:calc(var(--s) * 0.16);
       position:relative; display:inline-block;

@@ -2,6 +2,13 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.7 research DIE SVG (preview only)
+
+DIE-only: inline SVG pip die; `isDieType` aliases; never `<img>`
+for research die. Lobby/deploy unchanged. Hold merge.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.6 lookpass (preview only)
 
 James @390 Deploy: 6+5 tile grid (no TRN orphan), steppers
