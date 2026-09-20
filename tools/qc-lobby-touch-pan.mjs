@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const STAMP = 'V2.81.56-ux-solo.16';
+const STAMP = 'V2.81.56-ux-solo.17';
 const URL = process.argv[2] || 'http://127.0.0.1:4173/?three=1&solo=1';
 const OUT = process.argv[3] || '/opt/cursor/artifacts/screenshots';
 mkdirSync(OUT, { recursive: true });
@@ -65,7 +65,7 @@ async function main() {
   if (!a1.ok) {
     throw new Error(`A1 FAIL stamp ${JSON.stringify(a1)} want ${STAMP}`);
   }
-  await page.screenshot({ path: shot('lookpass15_a1_stamp_hard_reload_390.png'), fullPage: false });
+  await page.screenshot({ path: shot('lookpass17_a1_stamp_hard_reload_390.png'), fullPage: false });
   await page.evaluate(() => {
     const lobby = document.getElementById('three-lobby');
     const l0 = document.getElementById('three-l0');
@@ -74,7 +74,7 @@ async function main() {
   });
   // .three-l0-ver hangs below the bar (position:absolute; top:100%+4px).
   await page.screenshot({
-    path: shot('lookpass15_a1_l0_bar_hard_reload_390.png'),
+    path: shot('lookpass17_a1_l0_bar_hard_reload_390.png'),
     clip: { x: 0, y: 0, width: 390, height: 100 },
   });
   await page.evaluate(() => {
@@ -90,25 +90,87 @@ async function main() {
     await page.waitForTimeout(250);
   }
 
+  const chrome = await page.evaluate(() => {
+    const wraps = [...document.querySelectorAll('.three-lobby-seat-wrap')];
+    const start = document.querySelector('.three-lobby-start');
+    return {
+      seats: wraps.map((el) => {
+        const kinds = [...el.querySelectorAll('.three-lobby-occupants .three-lobby-tile')].map((b) => b.textContent.trim());
+        const tiers = [...el.querySelectorAll('.three-lobby-ai-tiers .three-lobby-tile')].map((b) => b.textContent.trim());
+        const r = el.getBoundingClientRect();
+        const chips = [...el.querySelectorAll('.three-lobby-occupants .three-lobby-tile, .three-lobby-ai-tiers .three-lobby-tile')];
+        return {
+          name: el.querySelector('.three-lobby-seat-name')?.textContent?.trim() || '',
+          kind: el.getAttribute('data-occupant-kind') || '',
+          kinds,
+          tiers,
+          height: Math.round(r.height),
+          overflow: getComputedStyle(el).overflow,
+          clipped: chips.some((c) => c.getBoundingClientRect().bottom > r.bottom + 1),
+        };
+      }),
+      startDisabled: !!start?.disabled,
+      startLabel: start?.textContent?.trim() || '',
+    };
+  });
+  if (chrome.seats.length !== 5) throw new Error(`need 5 seats, got ${chrome.seats.length}`);
+  for (const seat of chrome.seats) {
+    if (seat.kinds.join('|') !== 'Human|AI|Empty') {
+      throw new Error(`occupant chrome ${seat.name}: ${seat.kinds.join('|')}`);
+    }
+    if (seat.tiers.join('|') !== 'Easy|Med|Hard') {
+      throw new Error(`AI tiers ${seat.name}: ${seat.tiers.join('|')}`);
+    }
+    if (seat.clipped) throw new Error(`clipped occupant chrome ${seat.name}`);
+    if (seat.overflow === 'hidden') throw new Error(`overflow:hidden clip ${seat.name}`);
+    if (seat.height < 96) throw new Error(`collapsed ${seat.name} height ${seat.height}`);
+  }
+  if (!chrome.startDisabled || !/Select at least 2 players/i.test(chrome.startLabel)) {
+    throw new Error(`Start should be dead at 0 seats: ${JSON.stringify(chrome.startLabel)}`);
+  }
+  await page.screenshot({ path: shot('lookpass17_seats_empty_start_dead_390.png'), fullPage: false });
+
+  const firstAi = page.locator('.three-lobby-seat-wrap').nth(0).locator('.three-lobby-occupants .three-lobby-tile', { hasText: /^AI$/ });
+  const secondAi = page.locator('.three-lobby-seat-wrap').nth(1).locator('.three-lobby-occupants .three-lobby-tile', { hasText: /^AI$/ });
+  await firstAi.click();
+  await page.waitForTimeout(280);
+  await secondAi.click();
+  await page.waitForTimeout(280);
+  const allAi = await page.evaluate(() => {
+    const start = document.querySelector('.three-lobby-start');
+    const kinds = [...document.querySelectorAll('.three-lobby-seat-wrap')].map((el) => el.getAttribute('data-occupant-kind'));
+    return { disabled: !!start?.disabled, label: start?.textContent?.trim() || '', kinds };
+  });
+  if (!allAi.disabled || !/Need at least one Human/i.test(allAi.label)) {
+    throw new Error(`Start should stay dead for all-AI: ${JSON.stringify(allAi)}`);
+  }
+  await page.locator('.three-lobby-seat-wrap').nth(0).locator('.three-lobby-occupants .three-lobby-tile', { hasText: /^Empty$/ }).click();
+  await page.waitForTimeout(220);
+  await page.locator('.three-lobby-seat-wrap').nth(1).locator('.three-lobby-occupants .three-lobby-tile', { hasText: /^Empty$/ }).click();
+  await page.waitForTimeout(220);
+
   const wraps = page.locator('.three-lobby-seat-wrap');
   const n = await wraps.count();
   for (let i = 0; i < Math.min(n, 3); i += 1) {
     const wrap = wraps.nth(i);
-    if (!(await wrap.evaluate((el) => el.classList.contains('is-on')))) {
-      await wrap.locator('.three-lobby-seat').click();
-      await page.waitForTimeout(320);
-    }
-    const human = wrap.locator('.three-lobby-occupants .three-lobby-tile', { hasText: 'Human' });
+    const human = wrap.locator('.three-lobby-occupants .three-lobby-tile', { hasText: /^Human$/ });
     if (!(await human.evaluate((el) => el.classList.contains('is-on')))) {
       await human.click();
       await page.waitForTimeout(320);
     }
   }
   const humans = await page.locator('.three-lobby-occupants .three-lobby-tile.is-on').evaluateAll(
-    (els) => els.filter((el) => /human/i.test(el.textContent || '')).length,
+    (els) => els.filter((el) => /^human$/i.test(el.textContent || '')).length,
   );
   if (humans < 3) {
     throw new Error(`T1 FAIL need ≥3 Humans, got ${humans}`);
+  }
+  const startOn = await page.evaluate(() => {
+    const start = document.querySelector('.three-lobby-start');
+    return { disabled: !!start?.disabled, label: start?.textContent?.trim() || '' };
+  });
+  if (startOn.disabled || !/Start Game \(3 Players\)/i.test(startOn.label)) {
+    throw new Error(`Start gate FAIL after 3 Humans: ${JSON.stringify(startOn)}`);
   }
 
   const t2 = await page.evaluate(() => {
@@ -141,7 +203,7 @@ async function main() {
   }
   if (!t2.footerOutside) throw new Error('T5 FAIL footer is inside MAIN');
 
-  await page.screenshot({ path: shot('lookpass15_t1_setup_top_390.png'), fullPage: false });
+  await page.screenshot({ path: shot('lookpass17_t1_setup_top_390.png'), fullPage: false });
 
   await page.evaluate(() => {
     window.__trLobbyTouchPrevented = false;
@@ -188,7 +250,7 @@ async function main() {
   }
   const t1 = await page.evaluate(() => !!window.__trLobbyTouchPrevented);
   if (t1) throw new Error('T1 FAIL touchstart/touchmove defaultPrevented during lobby pan');
-  await page.screenshot({ path: shot('lookpass15_t4_mid_pan_390.png'), fullPage: false });
+  await page.screenshot({ path: shot('lookpass17_t4_mid_pan_390.png'), fullPage: false });
 
   const lastChip = await page.evaluate(() => {
     const wraps = [...document.querySelectorAll('.three-lobby-seat-wrap')];
@@ -215,7 +277,7 @@ async function main() {
       gap: footR.top - lastR.bottom,
       name,
       footerOutside: !main.contains(footer),
-      chips: [...last.querySelectorAll('.three-lobby-occupants .three-lobby-tile')].map((el) => ({
+      chips: [...last.querySelectorAll('.three-lobby-occupants .three-lobby-tile, .three-lobby-ai-tiers .three-lobby-tile')].map((el) => ({
         text: el.textContent.trim(),
         bottom: el.getBoundingClientRect().bottom,
         clipped: el.getBoundingClientRect().bottom > lastR.bottom + 1,
@@ -230,7 +292,7 @@ async function main() {
   }
   if (end.gap < 8) throw new Error(`T5 FAIL gap ${end.gap}px`);
   if (end.chips.some((c) => c.clipped)) throw new Error(`T4 FAIL chips clipped ${JSON.stringify(end.chips)}`);
-  await page.screenshot({ path: shot('lookpass15_t5_scroll_end_last_seat_390.png'), fullPage: false });
+  await page.screenshot({ path: shot('lookpass17_t5_scroll_end_last_seat_390.png'), fullPage: false });
 
   await browser.close();
   const report = {
@@ -247,12 +309,13 @@ async function main() {
     },
     t4: { startedOn: before.startOn, scrollTopMoved: mid.scrollTop > before.scrollTop },
     t5: end,
+    chrome,
     shots: [
-      'lookpass15_a1_stamp_hard_reload_390.png',
-      'lookpass15_a1_l0_bar_hard_reload_390.png',
-      'lookpass15_t1_setup_top_390.png',
-      'lookpass15_t4_mid_pan_390.png',
-      'lookpass15_t5_scroll_end_last_seat_390.png',
+      'lookpass17_a1_stamp_hard_reload_390.png',
+      'lookpass17_a1_l0_bar_hard_reload_390.png',
+      'lookpass17_t1_setup_top_390.png',
+      'lookpass17_t4_mid_pan_390.png',
+      'lookpass17_t5_scroll_end_last_seat_390.png',
     ],
   };
   console.log(JSON.stringify(report, null, 2));

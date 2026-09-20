@@ -2,6 +2,19 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.17 seat cards Human / AI / Empty (preview only)
+
+James SUPERSEDES: three tip-only playthrough. Catalog-first seat cards
+(SANDBOX-RECS §A #3, GAPS P0 #4). Each faction seat shows occupant
+Human · AI · Empty; Easy/Med/Hard stay AI tiers under AI; Empty clears.
+START GAME stays disabled until legal local config (≥2 seats and at
+least one Human). Steal: aa-1942-seat-combatants, bgio-lobby-seat-picker /
+bgio-local-pass-and-play, root-digital-lobby-hud. Keep `.15` touch-pan
+shell and `.16` combat stages. Grow-to-fit, no overflow:hidden clip.
+Hold merge.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.16 combat nested stages (preview only)
 
 James SUPERSEDES: three tip-only playthrough. Combat-move + battle was

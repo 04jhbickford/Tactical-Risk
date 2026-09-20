@@ -21,10 +21,13 @@ import {
   lobbyStartOptions,
   lobbyCanStart,
   lobbyStartLabel,
+  lobbyHasHuman,
   lobbyBuildPlayers,
   parseSoloLobbySearch,
+  seatOccupantView,
   STARTING_IPC_OPTIONS,
   AI_DIFFICULTIES,
+  LOBBY_OCCUPANT_KINDS,
 } from '../src/map/threeSoloLobby.js';
 import { startSoloMatch, buildSoloPlayers } from '../src/map/threeSoloMatch.js';
 import {
@@ -78,14 +81,14 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.16', 'tip stamp ux-solo.16');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.17', 'tip stamp ux-solo.17');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-assert(indexHtml.includes('V2.81.56-ux-solo.16'), 'index.html cache-busts .16');
-assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.16'"), 'index.html inline stamp .16');
-assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.16'), 'index.html module cache-bust .16');
+assert(indexHtml.includes('V2.81.56-ux-solo.17'), 'index.html cache-busts .17');
+assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.17'"), 'index.html inline stamp .17');
+assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.17'), 'index.html module cache-bust .17');
 assert(indexHtml.includes('serviceWorker') && indexHtml.includes('caches.keys'), 'tip boot drops SW / Cache Storage');
 const bootSrc = String(readFileSync(new URL('../src/map/threeSoloBoot.js', import.meta.url)));
-assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.16'), 'boot cache-busts chrome .16');
+assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.17'), 'boot cache-busts chrome .17');
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
@@ -96,25 +99,29 @@ const vercelJson = readFileSync(new URL('../vercel.json', import.meta.url), 'utf
 assert(vercelJson.includes('"source": "/"') && vercelJson.includes('no-store'), 'root HTML is no-store');
 const prevWin = globalThis.window;
 globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.12' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.16', 'stale HTML loses to newer module');
-globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.16' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.16', 'HTML SoT when current');
+assert(liveGameVersion() === 'V2.81.56-ux-solo.17', 'stale HTML loses to newer module');
+globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.17' };
+assert(liveGameVersion() === 'V2.81.56-ux-solo.17', 'HTML SoT when current');
 const stampEls = [{ textContent: 'V2.81.56-ux-solo.12' }, { textContent: 'stale' }];
 const prevDoc = globalThis.document;
 globalThis.document = {
   documentElement: { dataset: {}, setAttribute() {} },
   querySelectorAll: () => stampEls,
 };
-assert(applyLiveStamp() === 'V2.81.56-ux-solo.16', 'applyLiveStamp returns live .16');
-assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.16'), 'every paint overwrites L0+lobby');
+assert(applyLiveStamp() === 'V2.81.56-ux-solo.17', 'applyLiveStamp returns live .17');
+assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.17'), 'every paint overwrites L0+lobby');
 if (prevWin === undefined) delete globalThis.window;
 else globalThis.window = prevWin;
 if (prevDoc === undefined) delete globalThis.document;
 else globalThis.document = prevDoc;
 assert(chromeSrc.includes('#three-l0 .three-l0-ver') && chromeSrc.includes('position:absolute'), 'L0 stamp hangs on-screen, not flex-clipped');
-assert(chromeSrc.includes('three-lobby-occupants'), 'seat occupants 4-col grid');
+assert(chromeSrc.includes('three-lobby-occupants'), 'seat occupants Human/AI/Empty');
+assert(chromeSrc.includes('three-lobby-ai-tiers'), 'Easy/Med/Hard AI tiers under AI occupant');
+assert(chromeSrc.includes('repeat(3, minmax(0, 1fr))'), 'occupant chrome is 3-col grow-to-fit');
 assert(chromeSrc.includes('three-lobby-colors'), 'seat colors on their own row');
-assert(chromeSrc.includes('occupantChipLabel'), 'Human/Easy/Med/Hard chips');
+assert(chromeSrc.includes('occupantKindLabel') && chromeSrc.includes('occupantChipLabel'), 'Human/AI/Empty + Easy/Med/Hard chips');
+assert(chromeSrc.includes('data-occupant-kind'), 'each seat stamps occupant kind');
+assert(chromeSrc.includes('Need at least one Human') || chromeSrc.includes('lobbyStartLabel'), 'Start gate copy from lobbyStartLabel');
 assert(!/three-lobby-seat-wrap \{[^}]*overflow:\s*hidden/.test(chromeSrc), 'seat wrap does not overflow:hidden');
 assert(chromeSrc.includes('three-lobby-seat-wrap') && chromeSrc.includes('overflow:visible'), 'seat cards grow, overflow visible');
 assert(chromeSrc.includes('three-lobby-main') && chromeSrc.includes('three-lobby-footer'), 'setup header/main/footer shell');
@@ -159,11 +166,44 @@ assert(lobbyStartLabel(lobby) === 'Select at least 2 players', 'main Start copy'
 
 applyLobbyAction(lobby, 'screen', 'setup');
 assert(lobby.screen === 'setup', 'Local Play → setup');
+assert(LOBBY_OCCUPANT_KINDS.join(',') === 'human,ai,empty', 'aa-1942 occupant kinds');
+assert(seatOccupantView(lobby, 'Russians').kind === 'empty', 'unseated is Empty');
+assert(seatOccupantView(lobby, 'Russians').meta === 'Tap to add', 'Empty meta is Tap to add');
 toggleLobbySeat(lobby, 'Russians');
 toggleLobbySeat(lobby, 'Germans');
 setLobbyOccupant(lobby, 'Germans', 'medium');
-assert(lobbyCanStart(lobby), '2 seats can start');
+assert(lobbyHasHuman(lobby), 'local needs a Human');
+assert(lobbyCanStart(lobby), '1 Human + 1 AI can start');
 assert(lobbyStartLabel(lobby) === 'Start Game (2 Players)', 'Start Game (N Players)');
+assert(seatOccupantView(lobby, 'Russians').kind === 'human', 'Russians Human');
+assert(seatOccupantView(lobby, 'Germans').kind === 'ai', 'Germans AI');
+assert(seatOccupantView(lobby, 'Germans').tier === 'medium', 'Germans Med AI tier');
+setLobbyOccupant(lobby, 'Germans', 'ai');
+assert(lobby.playerAI.Germans === 'medium', 'AI chip keeps last Easy/Med/Hard');
+setLobbyOccupant(lobby, 'Germans', 'hard');
+assert(seatOccupantView(lobby, 'Germans').tier === 'hard', 'Hard is an AI tier');
+setLobbyOccupant(lobby, 'British', 'easy');
+assert(lobby.selectedPlayers.includes('British'), 'Easy seats the faction');
+assert(seatOccupantView(lobby, 'British').kind === 'ai', 'Easy implies AI occupant');
+setLobbyOccupant(lobby, 'British', 'empty');
+assert(!lobby.selectedPlayers.includes('British'), 'Empty clears the seat');
+assert(seatOccupantView(lobby, 'British').kind === 'empty', 'cleared seat is Empty');
+setLobbyOccupant(lobby, 'Germans', 'medium');
+assert(seatOccupantView(lobby, 'Germans').tier === 'medium', 'restore Med after Hard');
+const allAi = createSoloLobby(setup, '?three=1&solo=1');
+applyLobbyAction(allAi, 'screen', 'setup');
+setLobbyOccupant(allAi, 'Russians', 'medium');
+setLobbyOccupant(allAi, 'Germans', 'hard');
+assert(allAi.selectedPlayers.length === 2, 'two AI seated');
+assert(!lobbyHasHuman(allAi), 'all-AI has no Human');
+assert(!lobbyCanStart(allAi), 'Start dead until one Human');
+assert(lobbyStartLabel(allAi) === 'Need at least one Human', 'Start copy names the Human gate');
+setLobbyOccupant(allAi, 'Russians', 'human');
+assert(lobbyCanStart(allAi), 'Human + AI is legal');
+const oneHuman = createSoloLobby(setup, '?three=1&solo=1');
+setLobbyOccupant(oneHuman, 'Americans', 'human');
+assert(!lobbyCanStart(oneHuman), 'one Human still needs 2 players');
+assert(lobbyStartLabel(oneHuman) === 'Select at least 2 players', '1-seat copy');
 setLobbyIpc(lobby, 100);
 assert(lobby.startingIPCs === 100, 'IPC 100');
 const players = lobbyBuildPlayers(lobby);

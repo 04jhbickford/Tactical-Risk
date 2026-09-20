@@ -3218,8 +3218,8 @@ function wantsSolo(search = location.search) {
 
 if (wantsUxPreview()) {
   const boot = wantsSolo()
-    ? import('./map/threeSoloBoot.js?v=V2.81.56-ux-solo.16').then((mod) => mod.bootThreeSolo())
-    : import('./map/uxPreview.js?v=V2.81.56-ux-solo.16').then((mod) => mod.bootUxPreview());
+    ? import('./map/threeSoloBoot.js?v=V2.81.56-ux-solo.17').then((mod) => mod.bootThreeSolo())
+    : import('./map/uxPreview.js?v=V2.81.56-ux-solo.17').then((mod) => mod.bootUxPreview());
   boot.catch((err) => {
     console.error('Failed to start UX preview:', err);
     reportStartupError('Could not start the UX preview. Canvas 2D is unchanged at /');

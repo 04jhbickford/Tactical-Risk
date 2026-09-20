@@ -18,12 +18,43 @@ export {
 };
 
 export const LOBBY_DIFFICULTIES = ['easy', 'medium', 'hard'];
+export const LOBBY_OCCUPANT_KINDS = ['human', 'ai', 'empty'];
 export const LOBBY_MODES = ['classic', 'risk'];
 export const LOBBY_SCREENS = ['main', 'setup', 'howto'];
 export const LOBBY_MODE_LABELS = {
   classic: 'Classic 1942',
   risk: 'Risk',
 };
+
+function rememberAi(lobby, seat, occupant) {
+  if (!lobby.lastAi) lobby.lastAi = {};
+  if (LOBBY_DIFFICULTIES.includes(occupant)) lobby.lastAi[seat] = occupant;
+}
+
+export function occupantKindOf(occupant, seated = true) {
+  if (!seated) return 'empty';
+  if (occupant === 'human') return 'human';
+  if (occupant === 'ai' || LOBBY_DIFFICULTIES.includes(occupant)) return 'ai';
+  return 'empty';
+}
+
+export function seatOccupantView(lobby, factionId) {
+  const on = (lobby?.selectedPlayers || []).includes(factionId);
+  const raw = lobby?.playerAI?.[factionId];
+  const kind = occupantKindOf(raw, on);
+  const remembered = lobby?.lastAi?.[factionId];
+  const lastAi = LOBBY_DIFFICULTIES.includes(remembered)
+    ? remembered
+    : (LOBBY_DIFFICULTIES.includes(raw) ? raw : 'medium');
+  const tier = kind === 'ai' && LOBBY_DIFFICULTIES.includes(raw) ? raw : lastAi;
+  let meta = 'Tap to add';
+  if (on && kind === 'human') meta = 'Human';
+  if (on && kind === 'ai') {
+    const named = AI_DIFFICULTIES.find((d) => d.id === (raw || tier));
+    meta = named?.name || 'AI';
+  }
+  return { on, kind, raw: on ? (raw || 'human') : 'empty', tier, meta };
+}
 
 const ON = new Set(['1', 'true', 'yes']);
 
@@ -78,8 +109,10 @@ function seatSkipDefaults(lobby, parsed) {
   const seated = [humanId, ...others.slice(0, n).map((f) => f.id)];
   lobby.selectedPlayers = seated;
   lobby.playerAI = {};
+  if (!lobby.lastAi) lobby.lastAi = {};
   for (const id of seated) {
     lobby.playerAI[id] = id === humanId ? 'human' : parsed.difficulty;
+    rememberAi(lobby, id, lobby.playerAI[id]);
   }
   lobby.humanSeat = humanId;
   return lobby;
@@ -103,10 +136,14 @@ export function createSoloLobby(setup, search = '') {
     teamsEnabled: parsed.teamsEnabled,
     startingIPCs: parsed.startingIPCs,
     factions,
+    lastAi: {},
     showHowTo: false,
     cargo: !!parsed.cargo,
   };
-  for (const f of factions) lobby.playerAI[f.id] = 'human';
+  for (const f of factions) {
+    lobby.playerAI[f.id] = 'human';
+    lobby.lastAi[f.id] = parsed.difficulty;
+  }
   if (parsed.skip) seatSkipDefaults(lobby, parsed);
   return lobby;
 }
@@ -146,11 +183,30 @@ export function toggleLobbySeat(lobby, seat) {
 }
 
 export function setLobbyOccupant(lobby, seat, occupant) {
-  const ids = ['human', ...LOBBY_DIFFICULTIES];
-  if (!ids.includes(occupant)) return lobby;
   if (!(lobby.factions || []).some((f) => f.id === seat)) return lobby;
+  if (occupant === 'empty') {
+    const idx = lobby.selectedPlayers.indexOf(seat);
+    if (idx >= 0) {
+      lobby.selectedPlayers.splice(idx, 1);
+      delete lobby.playerNames[seat];
+    }
+    const human = lobby.selectedPlayers.find((id) => lobby.playerAI[id] === 'human');
+    lobby.humanSeat = human || lobby.selectedPlayers[0] || lobby.humanSeat;
+    return lobby;
+  }
+  let next = occupant;
+  if (occupant === 'ai') {
+    const prev = lobby.playerAI?.[seat];
+    const remembered = lobby.lastAi?.[seat];
+    next = LOBBY_DIFFICULTIES.includes(prev)
+      ? prev
+      : (LOBBY_DIFFICULTIES.includes(remembered) ? remembered : 'medium');
+  }
+  const ids = ['human', ...LOBBY_DIFFICULTIES];
+  if (!ids.includes(next)) return lobby;
   if (!lobby.selectedPlayers.includes(seat)) toggleLobbySeat(lobby, seat);
-  lobby.playerAI[seat] = occupant;
+  lobby.playerAI[seat] = next;
+  rememberAi(lobby, seat, next);
   const human = lobby.selectedPlayers.find((id) => lobby.playerAI[id] === 'human');
   lobby.humanSeat = human || lobby.selectedPlayers[0] || lobby.humanSeat;
   return lobby;
@@ -173,6 +229,7 @@ export function setLobbyAiCount(lobby, delta) {
     else if (lobby.playerAI[id] === 'human' || lobby.playerAI[id] == null) {
       lobby.playerAI[id] = 'medium';
     }
+    rememberAi(lobby, id, lobby.playerAI[id]);
   }
   return lobby;
 }
@@ -180,7 +237,10 @@ export function setLobbyAiCount(lobby, delta) {
 export function setLobbyDifficulty(lobby, difficulty) {
   if (!LOBBY_DIFFICULTIES.includes(difficulty)) return lobby;
   for (const id of lobby.selectedPlayers) {
-    if (lobby.playerAI[id] !== 'human') lobby.playerAI[id] = difficulty;
+    if (lobby.playerAI[id] !== 'human') {
+      lobby.playerAI[id] = difficulty;
+      rememberAi(lobby, id, difficulty);
+    }
   }
   return lobby;
 }
@@ -238,13 +298,19 @@ export function applyLobbyAction(lobby, kind, value) {
   return lobby;
 }
 
+export function lobbyHasHuman(lobby) {
+  return (lobby?.selectedPlayers || []).some((id) => (lobby.playerAI?.[id] || 'human') === 'human');
+}
+
 export function lobbyCanStart(lobby) {
-  return (lobby?.selectedPlayers || []).length >= 2;
+  return (lobby?.selectedPlayers || []).length >= 2 && lobbyHasHuman(lobby);
 }
 
 export function lobbyStartLabel(lobby) {
   const n = (lobby?.selectedPlayers || []).length;
-  return lobbyCanStart(lobby) ? `Start Game (${n} Players)` : 'Select at least 2 players';
+  if (n < 2) return 'Select at least 2 players';
+  if (!lobbyHasHuman(lobby)) return 'Need at least one Human';
+  return `Start Game (${n} Players)`;
 }
 
 export function lobbyBuildPlayers(lobby) {
@@ -286,6 +352,7 @@ export function lobbyInspect(lobby) {
     humanSeat: lobby?.humanSeat || null,
     selected: [...(lobby?.selectedPlayers || [])],
     occupants: { ...(lobby?.playerAI || {}) },
+    kinds: Object.fromEntries((lobby?.factions || []).map((f) => [f.id, seatOccupantView(lobby, f.id).kind])),
     aiCount: (lobby?.selectedPlayers || []).filter((id) => lobby.playerAI?.[id] !== 'human').length,
     difficulty: (lobby?.selectedPlayers || [])
       .map((id) => lobby.playerAI?.[id])

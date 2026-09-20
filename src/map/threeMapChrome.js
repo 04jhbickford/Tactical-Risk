@@ -1,17 +1,18 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.16';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.17';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
 import {
-  AI_DIFFICULTIES,
   FACTION_COLORS,
+  LOBBY_DIFFICULTIES,
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.16';
+  seatOccupantView,
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.17';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -256,11 +257,20 @@ export function applyLiveStamp() {
   return v;
 }
 
+function occupantKindLabel(kind) {
+  if (kind === 'human') return 'Human';
+  if (kind === 'ai') return 'AI';
+  if (kind === 'empty') return 'Empty';
+  return kind || 'Empty';
+}
+
 function occupantChipLabel(diff) {
-  if (diff?.id === 'human') return 'Human';
-  if (diff?.id === 'easy') return 'Easy';
-  if (diff?.id === 'medium') return 'Med';
-  if (diff?.id === 'hard') return 'Hard';
+  if (diff === 'human' || diff?.id === 'human') return 'Human';
+  if (diff === 'easy' || diff?.id === 'easy') return 'Easy';
+  if (diff === 'medium' || diff?.id === 'medium') return 'Med';
+  if (diff === 'hard' || diff?.id === 'hard') return 'Hard';
+  if (diff === 'ai' || diff?.id === 'ai') return 'AI';
+  if (diff === 'empty' || diff?.id === 'empty') return 'Empty';
   return diff?.name || 'Human';
 }
 
@@ -856,6 +866,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-lobby .three-lobby-seat-tools,
     #three-lobby .three-lobby-seat-tools button,
     #three-lobby .three-lobby-occupants,
+    #three-lobby .three-lobby-ai-tiers,
     #three-lobby .three-lobby-swatch { touch-action:pan-y; }
     #three-lobby .three-lobby-brand { text-align:center; padding:18px 8px 4px; }
     #three-lobby .three-lobby-logo {
@@ -984,13 +995,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-lobby .three-lobby-seat-tools {
       display:flex; flex-direction:column; gap:8px; padding:0 12px 12px;
     }
-    #three-lobby .three-lobby-occupants {
-      display:grid; grid-template-columns:repeat(4, minmax(0, 1fr));
-      gap:6px; width:100%;
+    #three-lobby .three-lobby-occupants,
+    #three-lobby .three-lobby-ai-tiers {
+      display:grid; grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:6px; width:100%; overflow:visible;
     }
-    #three-lobby .three-lobby-occupants .three-lobby-tile {
-      min-width:0; width:100%; min-height:36px; padding:0 2px; font-size:12px;
+    #three-lobby .three-lobby-occupants .three-lobby-tile,
+    #three-lobby .three-lobby-ai-tiers .three-lobby-tile {
+      min-width:0; width:100%; min-height:36px; padding:0 4px; font-size:12px;
     }
+    #three-lobby .three-lobby-ai-tiers .three-lobby-tile:not(.is-on) { opacity:0.78; }
     #three-lobby .three-lobby-colors {
       display:flex; flex-wrap:wrap; gap:6px;
     }
@@ -1071,8 +1085,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-lobby .three-lobby-seats { gap:8px; }
       #three-lobby .three-lobby-seat { min-height:0; padding:8px 10px; }
       #three-lobby .three-lobby-seat-tools { padding:0 10px 10px; gap:8px; }
-      #three-lobby .three-lobby-occupants { gap:4px; }
-      #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:36px; font-size:11px; }
+      #three-lobby .three-lobby-occupants,
+      #three-lobby .three-lobby-ai-tiers { gap:4px; }
+      #three-lobby .three-lobby-occupants .three-lobby-tile,
+      #three-lobby .three-lobby-ai-tiers .three-lobby-tile { min-height:36px; font-size:11px; }
       #three-lobby .three-lobby-opts { padding:6px 8px; gap:6px; }
       #three-lobby .three-lobby-foot { display:none; }
       #three-lobby .three-lobby-start { min-height:48px; }
@@ -1327,7 +1343,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       const factions = model.factions || [];
       const mode = model.mode || 'risk';
       const classic = mode === 'classic';
-      const selected = new Set(model.selectedPlayers || []);
       const canStart = lobbyCanStart(model);
       lobby.innerHTML = `
         <div class="three-lobby-setup">
@@ -1335,7 +1350,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
             <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main" aria-label="Back">${LOBBY_BACK_ICON}</button>
             <div>
               <p class="three-lobby-title">New Local Game</p>
-              <p class="three-lobby-sub">Select 2–5 players to begin</p>
+              <p class="three-lobby-sub">Human · AI · Empty · one Human to start</p>
             </div>
           </div>
           <div class="three-lobby-main">
@@ -1350,20 +1365,24 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
               <h2>Players</h2>
               <div class="three-lobby-seats">
                 ${factions.map((f) => {
-                  const on = selected.has(f.id);
-                  const occupant = model.playerAI?.[f.id] || 'human';
-                  const occupantName = (AI_DIFFICULTIES.find((d) => d.id === occupant) || AI_DIFFICULTIES[0]).name;
+                  const view = seatOccupantView(model, f.id);
+                  const on = view.on;
                   const color = model.playerColors?.[f.id]?.color || f.color || '#888';
                   return `
-                    <div class="three-lobby-seat-wrap${on ? ' is-on' : ''}">
+                    <div class="three-lobby-seat-wrap${on ? ' is-on' : ''}" data-seat="${f.id}" data-occupant-kind="${view.kind}">
                       <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}">
                         <div class="three-lobby-seat-name" style="box-shadow:inset 3px 0 0 ${color};padding-left:10px">${f.name || f.id}</div>
-                        <span class="three-lobby-seat-meta">${on ? occupantName : 'Tap to add'}</span>
+                        <span class="three-lobby-seat-meta">${view.meta}</span>
                       </button>
                       <div class="three-lobby-seat-tools">
-                        <div class="three-lobby-occupants">
-                          ${AI_DIFFICULTIES.map((d) => `
-                            <button type="button" class="three-lobby-tile${on && occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${occupantChipLabel(d)}</button>
+                        <div class="three-lobby-occupants" role="group" aria-label="${f.name || f.id} occupant">
+                          ${['human', 'ai', 'empty'].map((kind) => `
+                            <button type="button" class="three-lobby-tile${view.kind === kind ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${kind}">${occupantKindLabel(kind)}</button>
+                          `).join('')}
+                        </div>
+                        <div class="three-lobby-ai-tiers" role="group" aria-label="${f.name || f.id} AI difficulty">
+                          ${LOBBY_DIFFICULTIES.map((id) => `
+                            <button type="button" class="three-lobby-tile${view.kind === 'ai' && view.tier === id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${id}">${occupantChipLabel(id)}</button>
                           `).join('')}
                         </div>
                         ${on && model.teamsEnabled ? `
