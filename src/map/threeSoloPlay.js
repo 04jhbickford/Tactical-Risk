@@ -12,6 +12,8 @@ import {
   getEnemyCombatUnits,
   getFriendlyCombatUnits,
   territoryCombatAlreadyResolved,
+  phoneCombatAttackerWinPercent,
+  formatPhoneCombatHeroOdds,
 } from '../ui/combatUI.js';
 import { remainingAirLandingsToAssign } from '../state/airLanding.js';
 import { placementBudgetCopy } from '../state/placeQueue.js';
@@ -22,6 +24,23 @@ export const BATTLE_STEP = {
   COMBAT_READY: 'combatReady',
   COMBAT_RESULT: 'combatResult',
   WON: 'won',
+};
+
+// Nested stages: steal xstate-game-phases / bgio-moves-phases-stages.
+// Combat-move is origin → units → dest → Confirm; battle/casualty nest after.
+export const PLAY_STAGE = {
+  IDLE: 'idle',
+  ORIGIN: 'origin',
+  UNITS: 'units',
+  DEST: 'dest',
+  CONFIRM: 'confirm',
+  AA_READY: BATTLE_STEP.AA_READY,
+  AA_RESULT: BATTLE_STEP.AA_RESULT,
+  COMBAT_READY: BATTLE_STEP.COMBAT_READY,
+  COMBAT_RESULT: BATTLE_STEP.COMBAT_RESULT,
+  WON: BATTLE_STEP.WON,
+  AIR_LAND: 'airLand',
+  DONE: 'done',
 };
 
 export const STRIP_SHORT = {
@@ -58,6 +77,7 @@ export function createSoloPlay(gameState, unitDefs = {}) {
     selected: null,
     selectedUnits: {},
     destPicked: null,
+    stage: PLAY_STAGE.IDLE,
     targetShipId: null,
     battle: null,
     landing: null,
@@ -83,6 +103,7 @@ export function resetUi(play) {
   play.landing = null;
   play.tech = emptyTech();
   play.targetShipId = null;
+  refreshStage(play);
   return play;
 }
 
@@ -437,6 +458,41 @@ export function legalDests(play) {
   return [...dests];
 }
 
+function moveOriginOk(play) {
+  const origins = combatOrigins(play);
+  return !!(play.selected && origins.includes(play.selected));
+}
+
+function moveUnitsOk(play) {
+  return pickedCount(play.selectedUnits) > 0 && moveOriginOk(play);
+}
+
+function moveDestLegal(play) {
+  if (!play.destPicked || !moveUnitsOk(play)) return false;
+  return legalDests(play).includes(play.destPicked);
+}
+
+export function playStage(play) {
+  if (!play?.gameState) return PLAY_STAGE.IDLE;
+  if (isGameOver(play)) return PLAY_STAGE.DONE;
+  if (play.landing) return PLAY_STAGE.AIR_LAND;
+  if (play.battle?.step) return play.battle.step;
+  const phase = play.gameState.turnPhase;
+  if (phase !== TURN_PHASES.COMBAT_MOVE && phase !== TURN_PHASES.NON_COMBAT_MOVE) {
+    return PLAY_STAGE.IDLE;
+  }
+  if (moveDestLegal(play)) return PLAY_STAGE.CONFIRM;
+  if (play.destPicked && moveUnitsOk(play)) return PLAY_STAGE.DEST;
+  if (moveUnitsOk(play)) return PLAY_STAGE.UNITS;
+  if (moveOriginOk(play)) return PLAY_STAGE.ORIGIN;
+  return PLAY_STAGE.IDLE;
+}
+
+function refreshStage(play) {
+  play.stage = playStage(play);
+  return play.stage;
+}
+
 export function phaseStrip(play) {
   if (isSetup(play)) {
     const capital = play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT;
@@ -637,6 +693,7 @@ export function syncPlay(play) {
   if (phase === TURN_PHASES.COMBAT && isHumanTurn(play) && !play.battle && !play.landing && !isGameOver(play)) {
     enterCombat(play);
   }
+  refreshStage(play);
   return play;
 }
 
@@ -1001,10 +1058,12 @@ export function tapLand(play, name) {
       play.selected = name;
       play.landing.dest = name;
     }
+    refreshStage(play);
     return play;
   }
   if (play.battle) {
     play.selected = play.battle.dest;
+    refreshStage(play);
     return play;
   }
   const phase = play.gameState.turnPhase;
@@ -1037,26 +1096,45 @@ export function tapLand(play, name) {
   }
   if (phase !== TURN_PHASES.COMBAT_MOVE && phase !== TURN_PHASES.NON_COMBAT_MOVE) {
     play.selected = name;
+    refreshStage(play);
     return play;
   }
+  const origins = combatOrigins(play);
+  const unitsOn = pickedCount(play.selectedUnits) > 0;
   const dests = legalDests(play);
-  if (pickedCount(play.selectedUnits) && dests.includes(name)) {
-    play.destPicked = name;
+  const originOk = play.selected && origins.includes(play.selected);
+
+  // bgio nested-stage back: dest → units when origin is re-tapped.
+  if (originOk && name === play.selected && play.destPicked && unitsOn) {
+    play.destPicked = null;
+    refreshStage(play);
     return play;
   }
-  if (movableStacks(play, name).length) {
+  if (unitsOn && dests.includes(name)) {
+    play.destPicked = name;
+    refreshStage(play);
+    return play;
+  }
+  if (origins.includes(name)) {
+    if (play.selected === name && !unitsOn) {
+      play.selected = null;
+      play.selectedUnits = {};
+      play.destPicked = null;
+      refreshStage(play);
+      return play;
+    }
     if (play.selected !== name) {
       play.selectedUnits = {};
       play.destPicked = null;
     }
     play.selected = name;
-    return play;
-  }
-  if (dests.includes(name)) {
-    play.destPicked = name;
+    refreshStage(play);
     return play;
   }
   play.selected = name;
+  play.selectedUnits = {};
+  play.destPicked = null;
+  refreshStage(play);
   return play;
 }
 
@@ -1118,6 +1196,10 @@ export function adjustUnit(play, type, delta = 1) {
   if (next <= 0) delete play.selectedUnits[type];
   else play.selectedUnits[type] = next;
   if (!pickedCount(play.selectedUnits)) play.destPicked = null;
+  else if (play.destPicked && !legalDests(play).includes(play.destPicked)) {
+    play.destPicked = null;
+  }
+  refreshStage(play);
   return play;
 }
 
@@ -1236,8 +1318,10 @@ export function confirmEnabled(play) {
     return canEndPhase(play);
   }
   if (phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE) {
-    if (play.destPicked && pickedCount(play.selectedUnits)) return true;
-    return canEndPhase(play);
+    const stage = playStage(play);
+    if (stage === PLAY_STAGE.CONFIRM) return true;
+    if (stage === PLAY_STAGE.IDLE) return canEndPhase(play);
+    return false;
   }
   return canEndPhase(play);
 }
@@ -1358,7 +1442,7 @@ export function confirmLabel(play) {
     if (shop.used) return `End Phase · Purchase · ${shop.used} queued`;
   }
   if ((phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE)
-    && play.destPicked && pickedCount(play.selectedUnits)) {
+    && playStage(play) === PLAY_STAGE.CONFIRM) {
     const destT = play.gameState.territoryByName[play.destPicked];
     const fromT = play.gameState.territoryByName[play.selected];
     if (!fromT?.isWater && destT?.isWater && hasGround(play.selectedUnits, play.unitDefs)) {
@@ -1375,11 +1459,14 @@ export function confirmLabel(play) {
       ? `Confirm: Attack ${play.destPicked}`
       : `Confirm: Move to ${play.destPicked}`;
   }
+  if (phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE) {
+    const stage = playStage(play);
+    if (stage === PLAY_STAGE.ORIGIN) return 'Tap units';
+    if (stage === PLAY_STAGE.UNITS || stage === PLAY_STAGE.DEST) return 'Tap destination';
+  }
   if (canEndPhase(play)) return `End Phase · ${TURN_PHASE_NAMES[phase] || phase}`;
-  if (phase === TURN_PHASES.COMBAT_MOVE) return pickedCount(play.selectedUnits) ? 'Pick target' : 'Select units';
-  if (phase === TURN_PHASES.NON_COMBAT_MOVE) {
-    if (ncmAirRemaining(play) > 0) return `Land ${ncmAirRemaining(play)} aircraft`;
-    return 'Select units';
+  if (phase === TURN_PHASES.NON_COMBAT_MOVE && ncmAirRemaining(play) > 0) {
+    return `Land ${ncmAirRemaining(play)} aircraft`;
   }
   return TURN_PHASE_NAMES[phase] || 'Confirm';
 }
@@ -1446,7 +1533,7 @@ export function confirm(play) {
     return placePending(play);
   }
   if ((phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE)
-    && play.destPicked && pickedCount(play.selectedUnits)) {
+    && playStage(play) === PLAY_STAGE.CONFIRM) {
     const from = combatOrigins(play).includes(play.selected)
       ? play.selected
       : combatOrigins(play)[0];
@@ -1461,10 +1548,12 @@ export function confirm(play) {
         play.destPicked,
       );
       if (result?.success !== false) {
+        play.selected = null;
         play.selectedUnits = {};
         play.destPicked = null;
         play.targetShipId = null;
       }
+      refreshStage(play);
       return play;
     }
     const result = play.gameState.moveUnits(
@@ -1475,10 +1564,12 @@ export function confirm(play) {
       play.targetShipId ? { targetShipId: play.targetShipId } : {},
     );
     if (result?.success !== false) {
+      play.selected = null;
       play.selectedUnits = {};
       play.destPicked = null;
       play.targetShipId = null;
     }
+    refreshStage(play);
     return play;
   }
   if (canEndPhase(play)) {
@@ -1532,12 +1623,15 @@ export function highlights(play) {
   }
   const phase = play.gameState.turnPhase;
   if (phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE) {
+    const stage = playStage(play);
     const origins = combatOrigins(play);
     if (play.selected && origins.includes(play.selected)) out.origin = play.selected;
-    if (!play.selected || !origins.includes(play.selected)) out.pulse.push(...origins);
-    if (pickedCount(play.selectedUnits)) {
+    if (stage === PLAY_STAGE.IDLE || stage === PLAY_STAGE.ORIGIN) {
+      out.pulse.push(...origins);
+    }
+    if (stage === PLAY_STAGE.UNITS || stage === PLAY_STAGE.DEST || stage === PLAY_STAGE.CONFIRM) {
       out.legal = legalDests(play);
-      if (!play.destPicked) out.pulse.push(...out.legal);
+      if (stage === PLAY_STAGE.UNITS || stage === PLAY_STAGE.DEST) out.pulse.push(...out.legal);
     }
     if (play.destPicked) out.dest = play.destPicked;
   }
@@ -1613,10 +1707,25 @@ export function battleCard(play) {
     };
   }
   if (battle.step === BATTLE_STEP.COMBAT_READY) {
+    const stacks = play.gameState.units[dest] || [];
+    const player = play.gameState.currentPlayer;
+    const attackers = getFriendlyCombatUnits(stacks, player.id);
+    const defenders = getEnemyCombatUnits(stacks, player.id, (a, b) => play.gameState.areAllies(a, b));
+    const pct = phoneCombatAttackerWinPercent({
+      attackers,
+      defenders,
+      unitDefs: play.unitDefs,
+    });
+    const odds = formatPhoneCombatHeroOdds({
+      attackerWinPercent: pct,
+      territoryName: dest,
+      hasAttackers: countLivingUnits(attackers) > 0,
+      hasDefenders: countLivingUnits(defenders) > 0,
+    });
     return {
       kicker: battle.round ? `Round ${battle.round + 1}` : 'Combat',
       title: dest,
-      body: `${play.gameState.currentPlayer?.name || 'You'} attack`,
+      body: `${player?.name || 'You'} attack · ${odds.text} ${odds.label}`,
       dice: [],
     };
   }
@@ -1675,8 +1784,10 @@ export function chromeModel(play, territories = []) {
   const land = territories.find?.((t) => t.name === landName) || (landName ? { name: landName } : null);
   const movePhase = phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE;
   const origin = play.selected;
+  const stage = playStage(play);
   const showSteppers = movePhase && origin && eligibleStacks(play, origin).length
-    && (play.selected === origin || pickedCount(play.selectedUnits) || play.destPicked);
+    && (stage === PLAY_STAGE.ORIGIN || stage === PLAY_STAGE.UNITS
+      || stage === PLAY_STAGE.DEST || stage === PLAY_STAGE.CONFIRM);
   const budget = selectionBudget(play);
   const usedPick = pickedCount(play.selectedUnits);
   let steppers = showSteppers
@@ -1799,6 +1910,8 @@ export function chromeModel(play, territories = []) {
     cargo: cargoName ? cargoManifest(play, cargoName) : [],
     targetShipId: play.targetShipId || null,
     researchHint: phase === TURN_PHASES.DEVELOP_TECH && !play.tech?.rolls && !play.tech?.breakthrough,
+    stage,
+    battleOpen: !!play.battle || stage === PLAY_STAGE.AIR_LAND,
   };
 }
 
@@ -1838,6 +1951,7 @@ export function inspectPlay(play) {
     selected: play.selected,
     dest: play.destPicked,
     selectedUnits: { ...(play.selectedUnits || {}) },
+    stage: playStage(play),
     legalDests: legalDests(play),
     confirmLabel: confirmLabel(play),
     confirmEnabled: confirmEnabled(play),

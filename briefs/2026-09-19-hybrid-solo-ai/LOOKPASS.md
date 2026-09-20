@@ -1,37 +1,40 @@
-# Lookpass — V2.81.56-ux-solo.15
+# Lookpass — V2.81.56-ux-solo.16
 
-**Hold merge.** Quiet James. Tesla off. Touch-pan kill + keep `.13`/`.14` adaptive shell + stamp SoT.
-Fail-closed **A1 / T1–T5**. METHOD mirrored from `briefs/2026-09-20-main-art-three-ux/ADAPTIVE-LOBBY-CHECKLIST.md` (SoT). Do not merge.
+**Hold merge.** Quiet James. Tesla off. Combat nested stages + keep `.15` lobby touch-pan + stamp SoT.
+Fail-closed **A1 / combat stages / T1**. Do not merge.
 
 Tip: https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
-Hard reload @390×844: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.15` (not `.12` / `.13` / `.14`). `/` is `Cache-Control: no-store`.
+Hard reload @390×844: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.16`. `/` is `Cache-Control: no-store`.
 
-## Touch-pan fail-closed (James REJECT .14) — METHOD
+## Steal vs invent
 
-`.14` A3 `scrollTop` / wheel PASS is **not** enough. Class: **touch scroll broken**.
-Real finger-pan on New Local Game below-fold must move MAIN.
+Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A #2, GAPS P0 #2). Not present in this checkout; James tip brief named the steal list.
 
-| # | Gate | Fail-closed | Proof @390 |
+**Stole**
+- `xstate-game-phases` / `bgio-moves-phases-stages` — nested stages `IDLE → ORIGIN → UNITS → DEST → CONFIRM → (battle/casualty) → done`
+- `aa-combat-dice-calc-pattern` — round hits → YOU casualty steppers; COMBAT_READY odds preview ≠ commit (`phoneCombatAttackerWinPercent`)
+- Existing Three locks: manual combat-move (no Try), horizontal icon +/−, YOU-only assign, no map click-through on steppers, plane-by-plane air land
+- `.15` lobby touch-pan + `.14` stamp SoT
+
+**Invented**
+- None of the machine. `playStage()` is glue so chrome reads one derived stage instead of ad-hoc flags.
+
+## Combat stages fail-closed
+
+| # | Gate | Fail-closed | Proof |
 |---|---|---|---|
-| **T1** | No `preventDefault` on `touchstart`/`touchmove` that blocks MAIN pan while lobby is open. Chip/seat `ontouchstart = activate` is gone. Lobby `bindSealedActivate({prevent:false})` is click-only + passive. | yes | source + gesture |
-| **T2** | MAIN has `overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; min-height:0; flex:1`. Seat cards/wraps/buttons are `touch-action:pan-y` (not `none` / not `manipulation`). | yes | computed style |
-| **T3** | Playwright / CDP **touch** finger-pan scrolls MAIN. Not mouse wheel. Not `scrollTop=` assignment in test setup. | yes | `scrollTop` rose after the gesture |
-| **T4** | Vertical drag **starting on a seat card / Human/Easy/Med/Hard chip** still pans MAIN. | yes | mid-pan still |
-| **T5** | Teams+Start footer is a `flex:none` sibling **outside** MAIN. Last seat fully visible above footer with a gap after the touch pan. | yes | scroll-end still |
+| **A1** | Stamp exact `.16` after hard reload (L0 + lobby + `__TR_GAME_VERSION`) | yes | still + CDP |
+| **C1** | Start Combat Move @390: IDLE pulses legal origins; no Got it coach | yes | still + inspect.stage |
+| **C2** | ORIGIN → UNITS → DEST → CONFIRM without soft-lock; disabled CTA is “Tap units” / “Tap destination” | yes | unit + CDP |
+| **C3** | Confirm disabled until origin+units+dest legal | yes | unit |
+| **C4** | Battle with casualty choice: YOU steppers; Confirm enables after assign | yes | unit |
+| **C5** | Open sheet / battleOpen: map tap does not change stage | yes | unit + chrome-hit |
+| **T1** | Lobby still pans (do not regress `.15`) | yes | source + smoke |
 
-Also **A1**: stamp exact `V2.81.56-ux-solo.15` after hard reload (L0 + lobby).
+## QC
 
-## QC @390 tip (PASS)
+Unit: `node tools/test-three-solo-play.mjs`, `node tools/test-three-solo-lobby.mjs`, `node tools/test-ux-preview-chrome-hit.mjs`.
 
-| # | Ask | QC @390 |
-|---|---|---|
-| **A1** | Stamp `.15` after hard reload | **PASS** — L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.15` |
-| **T1** | No preventDefault on lobby touchstart/touchmove | **PASS** — click-only + passive; gesture `defaultPrevented === false` |
-| **T2** | MAIN + seats `touch-action:pan-y` | **PASS** — MAIN `overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; flex-grow:1; min-height:0`; wrap/chip `pan-y` |
-| **T3** | CDP/Playwright **touch** finger-pan moves `scrollTop` | **PASS** — `scrollTop` 0 → 105 → 146 from `Input.dispatchTouchEvent` (not wheel, not `scrollTop=` assignment) |
-| **T4** | Pan starting on a seat card still scrolls | **PASS** — first swipe started on a seat card; `scrollTop` rose |
-| **T5** | Last seat clear of Teams+Start footer sibling | **PASS** — Americans 627.9 / footer 723 / gap 95.1px; footer not a child of MAIN; Human/Easy/Med/Hard unclipped |
-
-Stills: `/opt/cursor/artifacts/screenshots/lookpass15_a1_stamp_hard_reload_390.png`, `lookpass15_a1_l0_bar_hard_reload_390.png`, `lookpass15_t1_setup_top_390.png`, `lookpass15_t4_mid_pan_390.png`, `lookpass15_t5_scroll_end_last_seat_390.png`.
+@390 stills after hard reload + combat-move CDP: see SCORE-solo-16 and `/opt/cursor/artifacts/screenshots/lookpass16_*`.
 
 Do not merge.

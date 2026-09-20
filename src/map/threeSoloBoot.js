@@ -6,7 +6,7 @@ import { Camera, MAP_WIDTH } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome, applyLiveStamp, liveGameVersion } from './threeMapChrome.js?v=V2.81.56-ux-solo.15';
+import { injectThreeChrome, applyLiveStamp, liveGameVersion } from './threeMapChrome.js?v=V2.81.56-ux-solo.16';
 import {
   preloadUnitImages,
   renderPreviewStacks,
@@ -18,7 +18,7 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.15';
+import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.16';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -40,7 +40,7 @@ import {
   lobbyCanStart,
   lobbyStartOptions,
   lobbyInspect,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.15';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.16';
 import {
   shouldShowSetupTutorial,
   dismissTutorial,
@@ -59,7 +59,7 @@ import {
   pickShip,
   applyCargoSeed,
   LAND_TEAL,
-} from './threeSoloPlay.js?v=V2.81.56-ux-solo.15';
+} from './threeSoloPlay.js?v=V2.81.56-ux-solo.16';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -252,6 +252,7 @@ export async function bootThreeSolo() {
       cargo: model.cargo,
       targetShipId: model.targetShipId,
       researchHint: model.researchHint,
+      stage: model.stage,
     });
     maybeRefitForChrome();
   }
@@ -384,7 +385,7 @@ export async function bootThreeSolo() {
   function eventFromChrome(e) {
     const node = eventElement(e);
     if (!node || typeof node.closest !== 'function') return false;
-    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-lobby, #three-tutorial, #three-phase-strip');
+    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-lobby, #three-tutorial, #three-phase-strip, #three-battle, #three-peek');
   }
 
   function ignoreMapHit(e) {
@@ -393,6 +394,7 @@ export async function bootThreeSolo() {
       sheetOpen: chrome.isSheetOpen(),
       lobbyOpen: chrome.isLobbyOpen(),
       tutorialOpen: chrome.isTutorialOpen(),
+      battleOpen: !!play?.battle || chrome.battleEl?.classList?.contains('is-on'),
       targetInChrome: eventFromChrome(e),
       clientX: pt?.x,
       clientY: pt?.y,

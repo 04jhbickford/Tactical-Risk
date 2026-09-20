@@ -92,6 +92,7 @@ export function shouldIgnoreMapHit({
   sheetOpen = false,
   lobbyOpen = false,
   tutorialOpen = false,
+  battleOpen = false,
   targetInChrome = false,
   clientX,
   clientY,
@@ -100,6 +101,7 @@ export function shouldIgnoreMapHit({
   if (lobbyOpen) return true;
   if (tutorialOpen) return true;
   if (sheetOpen) return true;
+  if (battleOpen) return true;
   if (targetInChrome) return true;
   return isPointInAnyRect(clientX, clientY, rects);
 }

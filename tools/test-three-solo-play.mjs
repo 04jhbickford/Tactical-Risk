@@ -29,7 +29,9 @@ import {
   chromeModel,
   inspectPlay,
   highlights,
+  playStage,
   BATTLE_STEP,
+  PLAY_STAGE,
   STRIP_SHORT,
 } from '../src/map/threeSoloPlay.js';
 import { startClassicSolo } from '../src/map/threeSoloMatch.js';
@@ -107,9 +109,17 @@ assert(confirmEnabled(shell) === false, 'human Confirm off on AI seat');
 const move = fresh();
 skipToCombatMove(move);
 assert(combatOrigins(move).includes(ORIGIN), 'Karelia is an origin');
+assert(playStage(move) === PLAY_STAGE.IDLE, 'combat-move opens IDLE');
+assert(highlights(move).pulse.includes(ORIGIN), 'IDLE pulses legal origins');
 tapLand(move, ORIGIN);
 assert(move.selected === ORIGIN, 'origin selected');
-assert(confirmLabel(move).startsWith('End Phase'), 'End Phase until dest');
+assert(playStage(move) === PLAY_STAGE.ORIGIN, 'ORIGIN after tap');
+assert(confirmLabel(move) === 'Tap units', 'ORIGIN CTA tap units');
+assert(confirmEnabled(move) === false, 'cannot Confirm on ORIGIN');
+tapLand(move, ORIGIN);
+assert(playStage(move) === PLAY_STAGE.IDLE, 're-tap origin returns IDLE');
+assert(confirmLabel(move).startsWith('End Phase'), 'IDLE End Phase after cancel');
+tapLand(move, ORIGIN);
 adjustUnit(move, 'infantry', 1);
 adjustUnit(move, 'infantry', 1);
 adjustUnit(move, 'armour', 1);
@@ -117,6 +127,9 @@ adjustUnit(move, 'fighter', 1);
 assert(move.selectedUnits.infantry === 2, 'INF 2');
 assert(move.selectedUnits.armour === 1, 'ARM 1');
 assert(move.selectedUnits.fighter === 1, 'FTR 1');
+assert(playStage(move) === PLAY_STAGE.UNITS, 'UNITS after steppers');
+assert(confirmLabel(move) === 'Tap destination', 'UNITS CTA tap destination');
+assert(confirmEnabled(move) === false, 'cannot Confirm on UNITS');
 const dests = legalDests(move);
 assert(dests.includes(DEST), 'Finland is a legal dest');
 assert(dests.includes('Ukraine S.S.R.'), 'Ukraine is a legal dest');
@@ -124,17 +137,26 @@ assert(dests.includes('East Europe'), 'East Europe is a legal dest');
 assert(!dests.includes(LAND), 'Russia is not a combat dest');
 assert(!dests.includes('Germany'), 'mixed land+air cannot list air-only Germany');
 assert(highlights(move).legal.includes(DEST), 'gold legal highlight');
+assert(highlights(move).pulse.includes(DEST), 'UNITS pulses legal dests');
 tapLand(move, DEST);
 assert(move.destPicked === DEST, 'dest picked');
 assert(move.selected === ORIGIN, 'origin kept after dest tap');
+assert(playStage(move) === PLAY_STAGE.CONFIRM, 'CONFIRM when origin+units+dest legal');
 assert(confirmLabel(move) === `Confirm: Attack ${DEST}`, 'attack label');
 assert(confirmGold(move) === true, 'attack gold');
+assert(confirmEnabled(move) === true, 'Confirm only when legal');
+tapLand(move, ORIGIN);
+assert(playStage(move) === PLAY_STAGE.UNITS, 're-tap origin backs DEST → UNITS');
+assert(move.destPicked == null, 'dest cleared on stage back');
+tapLand(move, DEST);
+assert(playStage(move) === PLAY_STAGE.CONFIRM, 'dest retap returns CONFIRM');
 confirm(move);
 assert(qty(move, DEST, 'infantry', 'Russians') === 2, 'infantry arrived');
 assert(qty(move, DEST, 'armour', 'Russians') === 1, 'armour arrived');
 assert(qty(move, DEST, 'fighter', 'Russians') === 1, 'fighter arrived');
 assert(qty(move, ORIGIN, 'infantry', 'Russians') === 1, 'one infantry left in Karelia');
 assert(move.destPicked == null, 'dest cleared after attack');
+assert(playStage(move) === PLAY_STAGE.IDLE, 'commit returns IDLE so End Phase arms');
 
 // --- S4 combat + YOU casualties + THEY cheapest ---
 assert(canEndPhase(move) === true, 'can end combat-move after attack');
@@ -149,15 +171,21 @@ move.rng = scriptRng([
 confirm(move);
 assert(move.gameState.turnPhase === TURN_PHASES.COMBAT, 'entered combat');
 assert(move.battle?.step === BATTLE_STEP.COMBAT_READY, 'no AA on Finland');
+assert(playStage(move) === PLAY_STAGE.COMBAT_READY, 'nested combatReady stage');
 assert(move.battle.dest === DEST, 'battle dest Finland');
+const readyCard = chromeModel(move).battle;
+assert(/%/.test(readyCard?.body || ''), 'odds preview on COMBAT_READY');
+assert(move.battle.round === 0, 'odds preview does not roll');
 confirm(move);
 assert(move.battle.step === BATTLE_STEP.COMBAT_RESULT, 'rolled combat');
+assert(playStage(move) === PLAY_STAGE.COMBAT_RESULT, 'nested casualty stage');
 assert(move.battle.attackHits === 2, '2 attack hits');
 assert(move.battle.defenseHits === 1, '1 defense hit');
 assert(move.battle.pendingDef.infantry === 2, 'THEY cheapest 2 infantry');
 assert(Object.keys(move.battle.pendingAtt).length === 0, 'YOU unassigned');
 assert(confirmEnabled(move) === false, 'Confirm waits on YOU');
 assert(confirmLabel(move) === 'Assign casualties', 'assign label');
+assert(chromeModel(move).battleOpen === true, 'casualty sheet reports battleOpen');
 adjustLoss(move, 'def', 'fighter', 1);
 assert(move.battle.pendingDef.infantry === 2, 'THEY still cheapest');
 adjustLoss(move, 'att', 'armour', 1);

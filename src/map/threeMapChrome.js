@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.15';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.16';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.15';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.16';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -1417,7 +1417,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.syncLobbyFooterPad();
       applyLiveStamp();
     },
-    setConfirmIdle(label = 'Select units') {
+    setConfirmIdle(label = 'Tap units') {
       api.confirm.disabled = true;
       api.confirm.setAttribute('disabled', '');
       api.confirm.setAttribute('aria-disabled', 'true');
@@ -1643,8 +1643,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       cargo = null,
       targetShipId = null,
       researchHint = false,
+      stage = '',
     } = {}) {
       api.setGuide('', false);
+      if (api.confirm) api.confirm.dataset.stage = stage || '';
       if (phaseStrip !== undefined) api.setPhaseStrip(phaseStrip, phaseStripCurrent);
       api.setBattle(battle);
       if (battle) {
@@ -1693,7 +1695,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       }
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
       else if (enabled || gold) api.setConfirmReady(label || 'Confirm: Take hits');
-      else api.setConfirmIdle(label || 'Select units');
+      else api.setConfirmIdle(label || 'Tap units');
       api.setUndo(!!canUndo);
       api.wirePeekButtons();
       api.syncLayers();

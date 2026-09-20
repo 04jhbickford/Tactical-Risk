@@ -5,7 +5,7 @@ import { Camera, MAP_WIDTH, MAP_HEIGHT } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome } from './threeMapChrome.js?v=V2.81.56-ux-solo.15';
+import { injectThreeChrome } from './threeMapChrome.js?v=V2.81.56-ux-solo.16';
 import {
   lodBandFromZoom,
   preloadUnitImages,
@@ -22,7 +22,7 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.15';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.16';
 import { isMaxBattleRequested } from './uxPreviewFlag.js';
 import {
   bindSealedActivate,

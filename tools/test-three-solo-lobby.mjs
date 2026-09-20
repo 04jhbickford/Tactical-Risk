@@ -78,14 +78,14 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.15', 'tip stamp ux-solo.15');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.16', 'tip stamp ux-solo.16');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-assert(indexHtml.includes('V2.81.56-ux-solo.15'), 'index.html cache-busts .15');
-assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.15'"), 'index.html inline stamp .15');
-assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.15'), 'index.html module cache-bust .15');
+assert(indexHtml.includes('V2.81.56-ux-solo.16'), 'index.html cache-busts .16');
+assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.16'"), 'index.html inline stamp .16');
+assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.16'), 'index.html module cache-bust .16');
 assert(indexHtml.includes('serviceWorker') && indexHtml.includes('caches.keys'), 'tip boot drops SW / Cache Storage');
 const bootSrc = String(readFileSync(new URL('../src/map/threeSoloBoot.js', import.meta.url)));
-assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.15'), 'boot cache-busts chrome .15');
+assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.16'), 'boot cache-busts chrome .16');
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
@@ -96,17 +96,17 @@ const vercelJson = readFileSync(new URL('../vercel.json', import.meta.url), 'utf
 assert(vercelJson.includes('"source": "/"') && vercelJson.includes('no-store'), 'root HTML is no-store');
 const prevWin = globalThis.window;
 globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.12' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.15', 'stale HTML loses to newer module');
-globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.15' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.15', 'HTML SoT when current');
+assert(liveGameVersion() === 'V2.81.56-ux-solo.16', 'stale HTML loses to newer module');
+globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.16' };
+assert(liveGameVersion() === 'V2.81.56-ux-solo.16', 'HTML SoT when current');
 const stampEls = [{ textContent: 'V2.81.56-ux-solo.12' }, { textContent: 'stale' }];
 const prevDoc = globalThis.document;
 globalThis.document = {
   documentElement: { dataset: {}, setAttribute() {} },
   querySelectorAll: () => stampEls,
 };
-assert(applyLiveStamp() === 'V2.81.56-ux-solo.15', 'applyLiveStamp returns live .15');
-assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.15'), 'every paint overwrites L0+lobby');
+assert(applyLiveStamp() === 'V2.81.56-ux-solo.16', 'applyLiveStamp returns live .16');
+assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.16'), 'every paint overwrites L0+lobby');
 if (prevWin === undefined) delete globalThis.window;
 else globalThis.window = prevWin;
 if (prevDoc === undefined) delete globalThis.document;

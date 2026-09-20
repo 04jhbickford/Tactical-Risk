@@ -113,6 +113,14 @@ assert(shouldIgnoreMapHit({
   rects: [],
 }) === true, 'lobby open ignores all map hits');
 
+assert(shouldIgnoreMapHit({
+  battleOpen: true,
+  targetInChrome: false,
+  clientX: 200,
+  clientY: 200,
+  rects: [],
+}) === true, 'battle / casualty sheet blocks all map hits');
+
 const panListeners = [];
 const panEl = {
   dataset: {},

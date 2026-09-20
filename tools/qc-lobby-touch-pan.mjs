@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const STAMP = 'V2.81.56-ux-solo.15';
+const STAMP = 'V2.81.56-ux-solo.16';
 const URL = process.argv[2] || 'http://127.0.0.1:4173/?three=1&solo=1';
 const OUT = process.argv[3] || '/opt/cursor/artifacts/screenshots';
 mkdirSync(OUT, { recursive: true });

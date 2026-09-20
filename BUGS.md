@@ -2,6 +2,18 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.16 combat nested stages (preview only)
+
+James SUPERSEDES: three tip-only playthrough. Combat-move + battle was
+ad-hoc flags (`selected` / `selectedUnits` / `destPicked` / `battle.step`).
+`.16` makes it an explicit nested stage machine: IDLE → ORIGIN → UNITS →
+DEST → CONFIRM → (AA / combatReady odds-preview / casualty YOU steppers /
+air land) → done. Confirm disabled until origin+units+dest legal; battle
+sheet blocks map hits; no Try combat-move; keep `.15` lobby touch-pan +
+stamp SoT. Steal: xstate/bgio stages + aa-combat-dice-calc. Hold merge.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.15 touch-pan on New Local Game (preview only)
 
 James REJECTED `.14`: real touchscreen cannot finger-pan scroll New Local
