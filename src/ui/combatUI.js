@@ -5,6 +5,7 @@ import { formatUnitName } from '../utils/unitNames.js';
 import { isMobileShell, setShellFlag } from './mobileShell.js';
 import { syncBottomSurfaces } from './bottomSurface.js';
 import { remainingAirLandingsToAssign } from '../state/airLanding.js';
+import { persistableUnit } from '../state/persistState.js';
 import { emitGameEvent, getGameEventLog } from '../multiplayer/gameEventLog.js';
 
 // Readable AA result step (UI only). Rules unchanged: 1 die per attacking
@@ -1575,14 +1576,16 @@ export class CombatUI {
     // Add surviving attackers
     for (const unit of this.combatState.attackers) {
       if (unit.quantity > 0) {
-        units.push({ ...unit });
+        const clean = persistableUnit(unit);
+        if (clean) units.push(clean);
       }
     }
 
     // Add surviving defenders
     for (const unit of this.combatState.defenders) {
       if (unit.quantity > 0) {
-        units.push({ ...unit });
+        const clean = persistableUnit(unit);
+        if (clean) units.push(clean);
       }
     }
 
@@ -1610,7 +1613,8 @@ export class CombatUI {
     // Add surviving attackers
     for (const unit of this.combatState.attackers) {
       if (unit.quantity > 0) {
-        units.push({ ...unit, moved: true });
+        const clean = persistableUnit(unit, { moved: true });
+        if (clean) units.push(clean);
       }
     }
 
@@ -1619,7 +1623,8 @@ export class CombatUI {
     if (this.combatState.winner !== 'attacker') {
       for (const unit of this.combatState.defenders) {
         if (unit.quantity > 0) {
-          units.push({ ...unit });
+          const clean = persistableUnit(unit);
+          if (clean) units.push(clean);
         }
       }
     }
@@ -1630,12 +1635,14 @@ export class CombatUI {
       // Capture factories
       const factory = existingUnits.find(u => u.type === 'factory');
       if (factory) {
-        units.push({ ...factory, owner: player.id });
+        const clean = persistableUnit({ ...factory, owner: player.id });
+        if (clean) units.push(clean);
       }
       // Capture AA guns (they have 0 combat value, so they're captured not destroyed)
       const aaGuns = existingUnits.filter(u => u.type === 'aaGun' && u.owner !== player.id);
       for (const aa of aaGuns) {
-        units.push({ ...aa, owner: player.id });
+        const clean = persistableUnit({ ...aa, owner: player.id });
+        if (clean) units.push(clean);
       }
     }
 
@@ -1672,6 +1679,8 @@ export class CombatUI {
       winner: this.combatState.winner,
       attackerSurvivors: this._getTotalUnits(this.combatState.attackers),
       defenderSurvivors: this._getTotalUnits(this.combatState.defenders),
+      attackerLosses: this.combatState.totalAttackerLosses || {},
+      defenderLosses: this.combatState.totalDefenderLosses || {},
     });
 
     // Update territory ownership if attacker won AND has land units

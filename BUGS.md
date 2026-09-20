@@ -2,6 +2,38 @@
 
 ---
 
+## 9.20.26 — V2.81.56 persist combat capture (SCHEMA 11)
+
+P0 live Canvas, Robert Watts + Sean Benson. Combat “wins” but
+territories do not flip; hiccup toast; fighters vanish after buy;
+leftover NCM West US → West Canada blocked; game stalled.
+
+Cause: `logCombat` wrote `undefined` `attackerLosses`/`defenderLosses`
+into `turnEvents`. Firestore 10.7.1 rejects undefined on the game doc.
+`push_failed` → “Connection hiccup” → exhaust reload restores the last
+confirmed owner. Capture, purchases, and later NCM never persist.
+NCM leftover stack is fine; dest was still enemy.
+
+Fix: `logCombat` writes 0 / provided losses; `toJSON` + `_pushOnce`
+`omitUndefinedDeep`; combat overlay writes `persistableUnit`;
+`purchaseForMobilization` stamps `owner`. GAME_VERSION V2.81.56.
+Draft only — do not merge without James. Hybrid PR76 hold (cherry-pick).
+
+Live events: not pulled. CLI is `tools/query-game-events.mjs`. No
+`FIREBASE_ID_TOKEN` / admin / service account in this environment.
+
+### Smoke (this PR)
+
+- [ ] Human land combat win on Canvas MP: territory color + owner flip
+      and stay flipped after a refresh. No hiccup toast.
+- [ ] Buy fighters during purchase: they remain in the queue through
+      the next phase / a refresh.
+- [ ] NCM: move 2 of 3 INF off an origin, then the leftover 1 into a
+      **friendly** second dest.
+- [ ] `node tools/test-territory-flip-persist.mjs` passes.
+
+---
+
 ## 9.19.26 — V2.81.55 cloud game-log + diagnostics (SCHEMA 11)
 
 James want: screenshot → Arc pulls cloud events for that game/moment →
