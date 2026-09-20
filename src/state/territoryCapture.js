@@ -1,6 +1,7 @@
 // Shared land-capture rules. Air cannot hold ground. Factories / AA do
-// not block a win — they transfer with the hex. Used by GameState and
-// combat dequeue so a won fight cannot skip the owner flip.
+// not block a win — they transfer with the hex. Used by GameState,
+// Canvas CombatUI dequeue, and Three hybrid threeSoloPlay.applyHits so
+// a won fight cannot skip the owner flip.
 
 export const LAND_CAPTURE_TYPES = new Set(['infantry', 'armour', 'artillery']);
 
