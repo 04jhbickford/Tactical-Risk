@@ -86,8 +86,9 @@ Historical rhyme: `BUGS.md` V2.75 Anglo-Sudan — `push_failed ×3` then
 4. `purchaseForMobilization` stamps `owner` so fighters stay in
    `getPendingPurchases()`.
 
-Do **not** merge without James / Arc. Hold hybrid PR76 — cherry-pick this
-commit onto the tip after main is accepted.
+Draft PR (do **not** merge): https://github.com/04jhbickford/Tactical-Risk/pull/82
+
+Hold hybrid PR76 — cherry-pick this commit onto the tip after main is accepted.
 
 ## Tip impact
 
