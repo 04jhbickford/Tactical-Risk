@@ -861,24 +861,26 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           const occupant = model.playerAI?.[f.id] || 'human';
           const color = model.playerColors?.[f.id]?.color || f.color || '#888';
           return `
-            <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}" style="box-shadow:inset 0 0 0 2px ${color}">
-              <div class="three-lobby-seat-name">${f.name || f.id}${on ? '' : ' · Tap to add'}</div>
+            <div class="three-lobby-seat-wrap">
+              <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}" style="box-shadow:inset 0 0 0 2px ${color}">
+                <div class="three-lobby-seat-name">${f.name || f.id}${on ? '' : ' · Tap to add'}</div>
+              </button>
               ${on ? `
-                <div class="three-lobby-seat-tools" data-seat-tools="${f.id}">
+                <div class="three-lobby-seat-tools">
                   ${AI_DIFFICULTIES.map((d) => `
-                    <span class="three-lobby-tile${occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${d.name}</span>
+                    <button type="button" class="three-lobby-tile${occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${d.name}</button>
                   `).join('')}
                   ${model.teamsEnabled ? `
-                    <span class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</span>
-                    <span class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</span>
-                    <span class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</span>
+                    <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</button>
+                    <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</button>
+                    <button type="button" class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</button>
                   ` : ''}
                   ${FACTION_COLORS.slice(0, 6).map((c) => `
-                    <span class="three-lobby-tile" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="width:28px;min-height:28px;padding:0;background:${c.color}"></span>
+                    <button type="button" class="three-lobby-tile" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="width:28px;min-height:28px;padding:0;background:${c.color}"></button>
                   `).join('')}
                 </div>
               ` : ''}
-            </button>
+            </div>
           `;
         }).join('')}
         ${classic ? '' : `
