@@ -345,20 +345,20 @@ assert(riskPlay.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE, 'Risk can End P
 const aiCaps = riskPlay.gameState.players
   .filter((p) => p.id !== 'Germans')
   .map((p) => riskPlay.gameState.playerState[p.id].capitalTerritory);
-riskPlay.gameState.units[aiCaps[0]] = [
-  ...(riskPlay.gameState.units[aiCaps[0]] || []),
-  { type: 'infantry', quantity: 1, owner: 'Germans' },
-];
-riskPlay.gameState.units[aiCaps[1]] = [
-  ...(riskPlay.gameState.units[aiCaps[1]] || []),
-  { type: 'infantry', quantity: 1, owner: 'Germans' },
-];
+function occupyForCapture(gs, name, owner) {
+  gs.units[name] = (gs.units[name] || []).filter((u) => (
+    u.type === 'factory' || u.type === 'aaGun'
+  ));
+  gs.units[name].push({ type: 'infantry', quantity: 1, owner });
+}
+occupyForCapture(riskPlay.gameState, aiCaps[0], 'Germans');
+occupyForCapture(riskPlay.gameState, aiCaps[1], 'Germans');
 assert(
-  riskPlay.gameState.captureOccupiedTerritory(aiCaps[0], { unitDefs, force: true }).captured,
+  riskPlay.gameState.captureOccupiedTerritory(aiCaps[0], { unitDefs }).captured,
   'hybrid uses shared capture on Risk capital',
 );
 assert(
-  riskPlay.gameState.captureOccupiedTerritory(aiCaps[1], { unitDefs, force: true }).captured,
+  riskPlay.gameState.captureOccupiedTerritory(aiCaps[1], { unitDefs }).captured,
   'second Risk capital flips',
 );
 riskPlay.gameState._checkVictoryConditions();

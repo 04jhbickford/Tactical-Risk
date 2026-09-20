@@ -879,10 +879,18 @@ export function tapLand(play, name) {
 
 export function adjustUnit(play, type, delta = 1) {
   syncPlay(play);
-  if (isGameOver(play) || !isHumanTurn(play)) return play;
-  const phase = play.gameState.turnPhase;
   const step = Number(delta);
   if (!Number.isFinite(step) || step === 0) return play;
+
+  if (isLobby(play)) {
+    const seats = (play.gameState?.setup?.risk?.factions || play.gameState?.setup?.factions || [])
+      .map((f) => f.id);
+    if (seats.includes(type) && step > 0) play._lobby.seat = type;
+    return play;
+  }
+
+  if (isGameOver(play) || !isHumanTurn(play)) return play;
+  const phase = play.gameState.turnPhase;
 
   if (phase === TURN_PHASES.DEVELOP_TECH) {
     if (play.tech?.rolls || play.tech?.breakthrough) {
@@ -902,13 +910,6 @@ export function adjustUnit(play, type, delta = 1) {
   if (phase === TURN_PHASES.PURCHASE) {
     if (step > 0) play.gameState.addToPendingPurchases(type, play.unitDefs);
     else play.gameState.removeFromPendingPurchases(type, play.unitDefs);
-    return play;
-  }
-
-  if (isLobby(play)) {
-    const seats = (play.gameState?.setup?.risk?.factions || play.gameState?.setup?.factions || [])
-      .map((f) => f.id);
-    if (seats.includes(type) && step > 0) play._lobby.seat = type;
     return play;
   }
 

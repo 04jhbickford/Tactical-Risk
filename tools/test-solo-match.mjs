@@ -56,7 +56,7 @@ assert(risk.currentPlayer.id === 'British', 'human places capital first');
 assert(riskInfo.ownedCount > 0, 'human owns random lands');
 assert(riskInfo.unitsToPlace > 0, 'deploy pool exists');
 assert(risk.isMultiplayer === false, 'solo not multiplayer');
-assert(risk.getIPCs('British') === 18, '5p starting IPCs');
+assert(risk.getIPCs('British') === 80, 'Risk lobby default 80 IPCs');
 
 const capital = firstOwnedLand(risk, 'British');
 assert(!!capital, 'has an owned land for capital');
@@ -78,16 +78,16 @@ risk.currentPlayerIndex = risk.players.findIndex((p) => p.id === 'British');
 const others = risk.players
   .filter((p) => p.id !== 'British')
   .map((p) => risk.playerState[p.id].capitalTerritory);
-risk.units[others[0]] = [
-  ...(risk.units[others[0]] || []),
-  { type: 'infantry', quantity: 1, owner: 'British' },
-];
-risk.units[others[1]] = [
-  ...(risk.units[others[1]] || []),
-  { type: 'infantry', quantity: 1, owner: 'British' },
-];
-const cap0 = risk.captureOccupiedTerritory(others[0], { unitDefs, force: true });
-const cap1 = risk.captureOccupiedTerritory(others[1], { unitDefs, force: true });
+function occupyForCapture(name) {
+  risk.units[name] = (risk.units[name] || []).filter((u) => (
+    u.type === 'factory' || u.type === 'aaGun'
+  ));
+  risk.units[name].push({ type: 'infantry', quantity: 1, owner: 'British' });
+}
+occupyForCapture(others[0]);
+occupyForCapture(others[1]);
+const cap0 = risk.captureOccupiedTerritory(others[0], { unitDefs });
+const cap1 = risk.captureOccupiedTerritory(others[1], { unitDefs });
 assert(cap0.captured === true, 'shared capture flips first AI capital');
 assert(cap1.captured === true, 'shared capture flips second AI capital');
 risk._checkVictoryConditions();
