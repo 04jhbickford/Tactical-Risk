@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const STAMP = 'V2.81.56-ux-solo.18';
+const STAMP = 'V2.81.56-ux-solo.19';
 const URL = process.argv[2] || 'http://127.0.0.1:4173/?three=1&solo=1';
 const OUT = process.argv[3] || '/opt/cursor/artifacts/screenshots';
 mkdirSync(OUT, { recursive: true });
@@ -37,7 +37,7 @@ async function main() {
     return { l0, lobby, html, ok: l0 === want && lobby === want && html === want };
   }, STAMP);
   if (!a1.ok) throw new Error(`A1 FAIL ${JSON.stringify(a1)} want ${STAMP}`);
-  await shot(page, 'lookpass18_a1_stamp_390.png');
+  await shot(page, 'lookpass19_a1_stamp_390.png');
 
   await page.click('[data-lobby="screen"][data-value="setup"]');
   await page.waitForSelector('.three-lobby-setup', { timeout: 10000 });
@@ -57,14 +57,14 @@ async function main() {
   }
   const start = page.locator('.three-lobby-start[data-lobby="start"]');
   if (await start.isDisabled()) throw new Error(`Start button disabled ${JSON.stringify(seated)}`);
-  await shot(page, 'lookpass18_lobby_seated_390.png');
+  await shot(page, 'lookpass19_lobby_seated_390.png');
   await start.click();
 
   await page.waitForFunction(() => !document.getElementById('three-lobby')?.classList.contains('is-open'), { timeout: 15000 });
   const tut = page.locator('[data-tutorial="dismiss"]');
   if (await tut.count()) await tut.click();
   await page.waitForTimeout(400);
-  await shot(page, 'lookpass18_capital_390.png');
+  await shot(page, 'lookpass19_capital_390.png');
 
   const afterSetup = await page.evaluate(async () => {
     const api = window.__threeSolo;
@@ -124,7 +124,7 @@ async function main() {
     return inspect();
   });
   if (afterSetup.error) throw new Error(afterSetup.error);
-  await shot(page, 'lookpass18_after_deploy_390.png');
+  await shot(page, 'lookpass19_after_deploy_390.png');
 
   const playing = await page.evaluate(() => {
     const api = window.__threeSolo;
@@ -185,15 +185,66 @@ async function main() {
     return { ...info, steps, origin, dest };
   });
 
-  await shot(page, 'lookpass18_combat_move_stages_390.png');
+  const cta = await page.evaluate(() => {
+    const btn = document.getElementById('three-confirm');
+    const peek = document.getElementById('three-peek');
+    const battle = document.getElementById('three-battle');
+    const r = btn?.getBoundingClientRect?.();
+    const vh = window.innerHeight || 844;
+    const vw = window.innerWidth || 390;
+    const cx = r ? (r.left + r.right) / 2 : 0;
+    const cy = r ? (r.top + r.bottom) / 2 : 0;
+    const topEl = document.elementFromPoint(cx, cy);
+    return {
+      text: btn?.textContent || '',
+      disabled: !!btn?.disabled,
+      gold: !!btn?.classList.contains('is-ready'),
+      stage: btn?.dataset?.stage || '',
+      cta: btn?.dataset?.cta || '',
+      top: r?.top ?? -1,
+      bottom: r?.bottom ?? -1,
+      height: r?.height ?? 0,
+      inView: !!(r && r.width > 0 && r.height > 0 && r.top >= 0 && r.bottom <= vh + 1 && r.left >= 0 && r.right <= vw + 1),
+      hit: topEl?.id === 'three-confirm' || !!topEl?.closest?.('#three-confirm'),
+      hitId: topEl?.id || topEl?.className || '',
+      peekOn: !!peek?.classList.contains('is-on'),
+      battleOn: !!battle?.classList.contains('is-on'),
+      peekBottom: peek?.getBoundingClientRect?.()?.bottom ?? null,
+    };
+  });
+  await shot(page, 'lookpass19_confirm_attack_390.png');
   if (playing.turnPhase !== 'combat_move' && playing.turnPhase !== 'combat') {
     throw new Error(`expected combat-move after buy, got ${playing.turnPhase} setup=${afterSetup.setupPhase} ${JSON.stringify({ afterSetup, playing }, null, 2)}`);
   }
-  if (playing.stage !== 'confirm' && playing.stage !== 'units' && playing.stage !== 'origin') {
-    console.warn('stage after tap', playing.stage, playing.steps);
+  if (playing.stage !== 'confirm') {
+    throw new Error(`Combat Move Confirm stage not reached (stage=${playing.stage} steps=${playing.steps})`);
   }
-  if (playing.stage === 'confirm' && playing.confirmEnabled !== true) {
+  if (playing.confirmEnabled !== true) {
     throw new Error('CONFIRM stage but Confirm disabled');
+  }
+  if (!/Confirm Attack/i.test(playing.confirmLabel || '') || !/Confirm Attack/i.test(cta.text)) {
+    throw new Error(`expected Confirm Attack CTA, got label=${playing.confirmLabel} btn=${cta.text}`);
+  }
+  if (cta.disabled || !cta.gold || !cta.inView || !cta.hit) {
+    throw new Error(`Confirm Attack not reachable ${JSON.stringify(cta)}`);
+  }
+  if (cta.battleOn) {
+    throw new Error(`battle sheet covering Confirm Attack ${JSON.stringify(cta)}`);
+  }
+  await page.click('#three-confirm');
+  await page.waitForTimeout(200);
+  const afterClick = await page.evaluate(() => {
+    const btn = document.getElementById('three-confirm');
+    return {
+      stage: window.__threeSolo.playInspect().stage,
+      dest: window.__threeSolo.playInspect().dest,
+      battleStep: window.__threeSolo.playInspect().battleStep,
+      label: btn?.textContent || '',
+      disabled: !!btn?.disabled,
+    };
+  });
+  if (afterClick.dest && afterClick.stage === 'confirm') {
+    throw new Error(`Confirm Attack click did not commit ${JSON.stringify(afterClick)}`);
   }
   console.log(JSON.stringify({
     stamp: a1,
@@ -208,11 +259,10 @@ async function main() {
       confirmLabel: playing.confirmLabel,
       confirmEnabled: playing.confirmEnabled,
       steps: playing.steps,
+      cta,
     },
+    afterClick,
   }, null, 2));
-  if (playing.stage !== 'confirm') {
-    throw new Error(`Combat Move Confirm stage not reached (stage=${playing.stage} steps=${playing.steps})`);
-  }
 
   const casualty = await page.evaluate(() => {
     const api = window.__threeSolo;
@@ -250,7 +300,7 @@ async function main() {
       confirmDisabled: !!document.getElementById('three-confirm')?.disabled,
     };
   });
-  await shot(page, 'lookpass18_casualty_you_assign_390.png');
+  await shot(page, 'lookpass19_casualty_you_assign_390.png');
   if (casualty.battleStep !== 'combatResult') {
     throw new Error(`casualty sheet not reached (${casualty.battleStep}) ${JSON.stringify(casualty)}`);
   }
@@ -270,7 +320,7 @@ async function main() {
       gold: document.getElementById('three-confirm')?.classList.contains('is-ready'),
       pending: window.__threeSolo.playInspect().confirmEnabled,
     }));
-    await shot(page, 'lookpass18_casualty_you_confirm_390.png');
+    await shot(page, 'lookpass19_casualty_you_confirm_390.png');
     if (!afterClick.pending || afterClick.disabled) {
       throw new Error(`YOU stepper did not enable Confirm ${JSON.stringify(afterClick)}`);
     }

@@ -1,4 +1,4 @@
-# Catalog lookpass — V2.81.56-ux-solo.18
+# Catalog lookpass — V2.81.56-ux-solo.19
 
 Catalog folder was not in the PR76 checkout (same as `.16`). This note logs **steal vs invent** for the playthrough tip against the patterns James named (SANDBOX-RECS §A + GAPS P1 #7 phase gates).
 

@@ -2,6 +2,19 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.19 Confirm Attack CTA (preview only)
+
+James SUPERSEDES / Viz PARTIAL ~76% on `.18` @390: Combat Move reached
+ORIGIN→UNITS→DEST but gold **Confirm Attack** was not reachable (casualty
+YOU NOT-REACHED because Confirm path broken). Lobby/deploy/income PASS.
+`.19` docks Confirm above safe-area, scrolls peek/battle in
+`#three-sheet-stack`, and does not let `#three-bottom` steal dest taps.
+Confirm enables only at `playStage===CONFIRM`; disabled hints stay
+Tap units / Tap destination. No Try combat-move coach. Keep `.15` touch,
+`.17` seats, income gate. Hold merge. Quiet James.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.18 playthrough holes (preview only)
 
 James SUPERSEDES: three tip-only full playthrough. Catalog-first

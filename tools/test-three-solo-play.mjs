@@ -147,7 +147,7 @@ tapLand(move, DEST);
 assert(move.destPicked === DEST, 'dest picked');
 assert(move.selected === ORIGIN, 'origin kept after dest tap');
 assert(playStage(move) === PLAY_STAGE.CONFIRM, 'CONFIRM when origin+units+dest legal');
-assert(confirmLabel(move) === `Confirm: Attack ${DEST}`, 'attack label');
+assert(confirmLabel(move) === 'Confirm Attack', 'attack label');
 assert(confirmGold(move) === true, 'attack gold');
 assert(confirmEnabled(move) === true, 'Confirm only when legal');
 tapLand(move, ORIGIN);

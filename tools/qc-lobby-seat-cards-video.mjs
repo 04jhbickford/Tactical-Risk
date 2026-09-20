@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const STAMP = 'V2.81.56-ux-solo.18';
+const STAMP = 'V2.81.56-ux-solo.19';
 const URL = process.argv[2] || 'http://127.0.0.1:4173/?three=1&solo=1';
 const OUT = process.argv[3] || '/opt/cursor/artifacts/lookpass17_seat_cards_qc_390.webm';
 mkdirSync(dirname(OUT), { recursive: true });

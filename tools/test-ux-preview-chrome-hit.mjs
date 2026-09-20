@@ -105,6 +105,22 @@ const peekEl = {
 const rectsOpen = chromeHitRectsFrom({ zoom: hiddenZoom, peek: peekEl, confirm: peekEl });
 assert(!rectsOpen.some((r) => r.top === 360 && r.left === 336), 'hidden zoom is not a hit rect');
 
+const bottomEl = {
+  classList: { contains: () => false },
+  getBoundingClientRect() { return { left: 0, right: 390, top: 200, bottom: 844, width: 390, height: 644 }; },
+};
+const confirmEl = {
+  getBoundingClientRect() { return { left: 10, right: 380, top: 772, bottom: 828, width: 370, height: 56 }; },
+};
+const rectsDock = chromeHitRectsFrom({
+  zoom: hiddenZoom,
+  peek: peekEl,
+  confirm: confirmEl,
+  bottom: bottomEl,
+});
+assert(!rectsDock.some((r) => r.top === 200 && r.bottom === 844), 'full bottom dock is not a dest-tap dead zone');
+assert(rectsDock.some((r) => r.top === 772 && r.bottom === 828), 'Confirm Attack stays a hit target');
+
 assert(shouldIgnoreMapHit({
   lobbyOpen: true,
   targetInChrome: false,

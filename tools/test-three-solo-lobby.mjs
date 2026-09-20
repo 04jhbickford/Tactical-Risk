@@ -81,14 +81,14 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.18', 'tip stamp ux-solo.18');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.19', 'tip stamp ux-solo.18');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-assert(indexHtml.includes('V2.81.56-ux-solo.18'), 'index.html cache-busts .17');
-assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.18'"), 'index.html inline stamp .17');
-assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.18'), 'index.html module cache-bust .17');
+assert(indexHtml.includes('V2.81.56-ux-solo.19'), 'index.html cache-busts .17');
+assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.19'"), 'index.html inline stamp .17');
+assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.19'), 'index.html module cache-bust .17');
 assert(indexHtml.includes('serviceWorker') && indexHtml.includes('caches.keys'), 'tip boot drops SW / Cache Storage');
 const bootSrc = String(readFileSync(new URL('../src/map/threeSoloBoot.js', import.meta.url)));
-assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.18'), 'boot cache-busts chrome .17');
+assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.19'), 'boot cache-busts chrome .17');
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
@@ -99,17 +99,17 @@ const vercelJson = readFileSync(new URL('../vercel.json', import.meta.url), 'utf
 assert(vercelJson.includes('"source": "/"') && vercelJson.includes('no-store'), 'root HTML is no-store');
 const prevWin = globalThis.window;
 globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.12' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.18', 'stale HTML loses to newer module');
-globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.18' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.18', 'HTML SoT when current');
+assert(liveGameVersion() === 'V2.81.56-ux-solo.19', 'stale HTML loses to newer module');
+globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.19' };
+assert(liveGameVersion() === 'V2.81.56-ux-solo.19', 'HTML SoT when current');
 const stampEls = [{ textContent: 'V2.81.56-ux-solo.12' }, { textContent: 'stale' }];
 const prevDoc = globalThis.document;
 globalThis.document = {
   documentElement: { dataset: {}, setAttribute() {} },
   querySelectorAll: () => stampEls,
 };
-assert(applyLiveStamp() === 'V2.81.56-ux-solo.18', 'applyLiveStamp returns live .17');
-assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.18'), 'every paint overwrites L0+lobby');
+assert(applyLiveStamp() === 'V2.81.56-ux-solo.19', 'applyLiveStamp returns live .17');
+assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.19'), 'every paint overwrites L0+lobby');
 if (prevWin === undefined) delete globalThis.window;
 else globalThis.window = prevWin;
 if (prevDoc === undefined) delete globalThis.document;
@@ -122,6 +122,9 @@ assert(chromeSrc.includes('three-lobby-colors'), 'seat colors on their own row')
 assert(chromeSrc.includes('occupantKindLabel') && chromeSrc.includes('occupantChipLabel'), 'Human/AI/Empty + Easy/Med/Hard chips');
 assert(chromeSrc.includes('data-loss-pick') && chromeSrc.includes('onLossPick'), 'YOU casualty tiles tap-assign');
 assert(chromeSrc.includes('three-picker[data-readonly="1"]') && chromeSrc.includes('pointer-events:none'), 'THEY casualty row is inert');
+assert(chromeSrc.includes('#three-sheet-stack') && chromeSrc.includes('#three-actions'), 'Confirm dock reserved under peek/battle');
+assert(chromeSrc.includes('dataset.cta') && chromeSrc.includes('confirm-attack'), 'Confirm Attack CTA is marked when gold');
+assert(!/html\.three-spike\.has-l1 #three-bottom[\s\S]{0,180}pointer-events:auto/.test(chromeSrc), 'bottom dock does not steal dest taps');
 assert(chromeSrc.includes('data-occupant-kind'), 'each seat stamps occupant kind');
 assert(chromeSrc.includes('Need at least one Human') || chromeSrc.includes('lobbyStartLabel'), 'Start gate copy from lobbyStartLabel');
 assert(!/three-lobby-seat-wrap \{[^}]*overflow:\s*hidden/.test(chromeSrc), 'seat wrap does not overflow:hidden');
