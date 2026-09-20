@@ -5,6 +5,8 @@ import {
   isPointInAnyRect,
   shouldIgnoreMapHit,
   sealChromeEvent,
+  sealChromeControl,
+  bindSealedActivate,
   clientPointOf,
   eventElement,
   chromeHitRectsFrom,
@@ -102,6 +104,43 @@ const peekEl = {
 };
 const rectsOpen = chromeHitRectsFrom({ zoom: hiddenZoom, peek: peekEl, confirm: peekEl });
 assert(!rectsOpen.some((r) => r.top === 360 && r.left === 336), 'hidden zoom is not a hit rect');
+
+assert(shouldIgnoreMapHit({
+  lobbyOpen: true,
+  targetInChrome: false,
+  clientX: 200,
+  clientY: 200,
+  rects: [],
+}) === true, 'lobby open ignores all map hits');
+
+const panListeners = [];
+const panEl = {
+  dataset: {},
+  addEventListener(type, fn, opts) {
+    panListeners.push({ type, fn, opts });
+  },
+};
+sealChromeControl(panEl, { prevent: false });
+const touchStart = panListeners.find((l) => l.type === 'touchstart');
+assert(!!touchStart && touchStart.opts?.passive === true, 'lobby seal touchstart is passive');
+const touchEv = { n: 0, prevented: 0, stopPropagation() { this.n += 1; }, preventDefault() { this.prevented += 1; } };
+touchStart.fn(touchEv);
+assert(touchEv.n === 1 && touchEv.prevented === 0, 'passive lobby touchstart never preventDefault');
+
+const clickOnly = [];
+let fired = 0;
+const chip = { disabled: false, closest: (sel) => (sel === '[data-lobby]' ? chip : null) };
+const lobbyRoot = {
+  dataset: {},
+  contains() { return true; },
+  addEventListener(type, fn, opts) { clickOnly.push({ type, fn, opts }); },
+};
+bindSealedActivate(lobbyRoot, '[data-lobby]', () => { fired += 1; }, { prevent: false });
+assert(clickOnly.filter((l) => l.type === 'pointerdown').length === 1, 'lobby has seal pointerdown only, not activate');
+assert(clickOnly.some((l) => l.type === 'click'), 'lobby activates on click so a tap still works');
+const clickFire = clickOnly.find((l) => l.type === 'click' && l.opts == null);
+clickFire.fn({ target: chip });
+assert(fired === 1, 'lobby click still selects a chip');
 
 if (failures) {
   console.error(`${failures} ux-preview chrome-hit checks failed`);

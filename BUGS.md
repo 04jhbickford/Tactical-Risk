@@ -2,6 +2,21 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.15 touch-pan on New Local Game (preview only)
+
+James REJECTED `.14`: real touchscreen cannot finger-pan scroll New Local
+Game below-fold. Viz A3 `scrollTop` / wheel PASS was not a finger-pan.
+Class: touch scroll broken. Root: non-passive lobby `touchstart`,
+`bindSealedActivate` firing on `pointerdown` (re-paints chips mid-gesture),
+peek/chip `ontouchstart = activate` + `preventDefault`, and canvas
+`touch-action:none` able to steal if events leak. `.15` is click-only +
+passive on lobby, never `preventDefault` on lobby `touchstart`/`touchmove`,
+`touch-action:pan-y` on MAIN/seats/chips, canvas `pointer-events:none`
+while lobby is open. Keep `.14` stamp SoT (`no-store` `/`, drop SW).
+Hold merge. Quiet James.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.14 stamp lag after hard reload (preview only)
 
 Viz ABORT A1 on claimed tip `.13`: hard reload @390 still painted

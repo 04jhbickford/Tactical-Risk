@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.14';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.15';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.14';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.15';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -280,9 +280,13 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     html.three-spike #hud-clarity,
     html.three-spike #three-spike-hint { display:none !important; }
     html.three-spike #mapCanvas {
-      position:absolute; inset:0; width:100%; height:100%;
+      position:absolute; inset:0; width:100%; height:100%; z-index:0;
       display:block; touch-action:none; cursor:grab;
       -webkit-user-select:none; user-select:none;
+    }
+    html.three-spike.has-lobby #mapCanvas,
+    html.three-spike.has-tutorial #mapCanvas {
+      pointer-events:none !important;
     }
     html.three-spike #mapCanvas.is-panning { cursor:grabbing; }
     html.three-spike #mapCanvas.is-hovering { cursor:pointer; }
@@ -810,7 +814,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
      * header .three-lobby-setup-head { flex:none }
      */
     #three-lobby {
-      display:none; position:absolute; inset:0; z-index:50;
+      display:none; position:absolute; inset:0; z-index:80;
       height:100dvh; height:100svh; max-height:100dvh; max-height:100svh;
       padding:max(12px, env(safe-area-inset-top)) 14px 0;
       background:rgba(22,26,28,0.94);
@@ -835,6 +839,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-lobby .three-lobby-main {
       flex:1; min-height:0; overflow-y:auto;
       -webkit-overflow-scrolling:touch; touch-action:pan-y;
+      overscroll-behavior:contain;
       display:flex; flex-direction:column; gap:10px;
       padding-bottom:12px;
     }
@@ -844,7 +849,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       background:rgba(22,26,28,0.96);
       border-top:1px solid rgba(255,255,255,0.08);
     }
-    #three-lobby button { touch-action:pan-y; }
+    #three-lobby button,
+    #three-lobby .three-lobby-tile,
+    #three-lobby .three-lobby-seat-wrap,
+    #three-lobby .three-lobby-seat,
+    #three-lobby .three-lobby-seat-tools,
+    #three-lobby .three-lobby-seat-tools button,
+    #three-lobby .three-lobby-occupants,
+    #three-lobby .three-lobby-swatch { touch-action:pan-y; }
     #three-lobby .three-lobby-brand { text-align:center; padding:18px 8px 4px; }
     #three-lobby .three-lobby-logo {
       margin:0; font:700 32px/1.05 -apple-system,"SF Pro Display",sans-serif;
@@ -946,6 +958,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       flex:0 0 auto;
     }
     #three-lobby .three-lobby-seat,
+    #three-lobby .three-lobby-seat-wrap,
+    #three-lobby .three-lobby-seat-tools,
     #three-lobby .three-lobby-seat-tools button { touch-action:pan-y; }
     #three-lobby .three-lobby-opts,
     #three-lobby .three-lobby-foot,
@@ -1539,12 +1553,20 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         if (!el || el.dataset.wired === '1') return;
         el.dataset.wired = '1';
       };
+      // Never preventDefault on touchstart/touchmove. That steals vertical
+      // finger-pan if the gesture starts on a chip/button. pointerdown/click
+      // still seal the map hit. Do not bind activate on touch-start.
+      const sealActivate = (e) => {
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        if (e.type === 'touchstart' || e.type === 'touchmove') return;
+        if (e.cancelable && typeof e.preventDefault === 'function') e.preventDefault();
+      };
       api.peek.querySelectorAll('[data-step]').forEach((btn) => {
         stamp(btn);
         let last = 0;
         const activate = (e) => {
-          e.stopPropagation();
-          if (e.cancelable) e.preventDefault();
+          sealActivate(e);
+          if (e.type === 'touchstart' || e.type === 'touchmove') return;
           if (btn.disabled) return;
           const now = Date.now();
           if (now - last < 280) return;
@@ -1554,15 +1576,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           }
         };
         btn.onpointerdown = activate;
-        btn.ontouchstart = activate;
         btn.onclick = activate;
       });
       api.peek.querySelectorAll('button.three-peek-unit[data-unit-type]').forEach((chip) => {
         stamp(chip);
         let last = 0;
         const activate = (e) => {
-          e.stopPropagation();
-          if (e.cancelable) e.preventDefault();
+          sealActivate(e);
+          if (e.type === 'touchstart' || e.type === 'touchmove') return;
           if (api.peek.dataset.airLand === '1') return;
           const now = Date.now();
           if (now - last < 280) return;
@@ -1570,15 +1591,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
         };
         chip.onpointerdown = activate;
-        chip.ontouchstart = activate;
         chip.onclick = activate;
       });
       api.battleEl.querySelectorAll('[data-loss-step]').forEach((btn) => {
         stamp(btn);
         let last = 0;
         const activate = (e) => {
-          e.stopPropagation();
-          if (e.cancelable) e.preventDefault();
+          sealActivate(e);
+          if (e.type === 'touchstart' || e.type === 'touchmove') return;
           if (btn.disabled) return;
           const now = Date.now();
           if (now - last < 280) return;
@@ -1588,18 +1608,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           }
         };
         btn.onpointerdown = activate;
-        btn.ontouchstart = activate;
         btn.onclick = activate;
       });
       api.peek.querySelectorAll('[data-ship]').forEach((btn) => {
         stamp(btn);
         const activate = (e) => {
-          e.stopPropagation();
-          if (e.cancelable) e.preventDefault();
+          sealActivate(e);
+          if (e.type === 'touchstart' || e.type === 'touchmove') return;
           if (typeof api.onShipPick === 'function') api.onShipPick(btn.dataset.ship);
         };
         btn.onpointerdown = activate;
-        btn.ontouchstart = activate;
         btn.onclick = activate;
       });
     },

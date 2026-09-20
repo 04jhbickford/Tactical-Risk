@@ -108,18 +108,26 @@ export function sealChromeControl(el, { prevent = true } = {}) {
   if (!el || el.dataset?.chromeSealed === '1') return el;
   if (el.dataset) el.dataset.chromeSealed = '1';
   for (const type of CHROME_ALL_EVENTS) {
+    const isTouch = type === 'touchstart' || type === 'touchend';
+    const doPrevent = prevent && (type === 'pointerdown' || type === 'touchstart' || type === 'click');
+    // Non-passive touchstart on a scrollport (even without preventDefault)
+    // makes iOS / Chrome-mobile wait and often never start a finger-pan.
     el.addEventListener(type, (e) => {
-      const doPrevent = prevent && (type === 'pointerdown' || type === 'touchstart' || type === 'click');
+      if (!prevent && isTouch) {
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        return;
+      }
       sealChromeEvent(e, { prevent: doPrevent });
-    }, { passive: false });
+    }, { passive: !doPrevent });
   }
   return el;
 }
 
-// Activate on pointerdown (touch-safe). Debounce swallows the
+// Map chrome: activate on pointerdown (touch-safe). Debounce swallows the
 // trailing pointerup/click from the same gesture.
-// Pass { prevent:false } on scrollable surfaces (lobby / tutorial) —
-// preventDefault on touchstart kills iOS/Chrome-mobile native pan.
+// Scrollable surfaces (lobby / tutorial): pass { prevent:false } and
+// activate on click only. pointerdown + preventDefault on touchstart
+// steal vertical finger-pan when the gesture starts on a seat / chip.
 export function bindSealedActivate(root, selector, handler, { prevent = true } = {}) {
   if (!root || typeof handler !== 'function') return;
   let lastAt = 0;
@@ -133,8 +141,10 @@ export function bindSealedActivate(root, selector, handler, { prevent = true } =
     lastAt = now;
     handler(e, hit);
   };
-  root.addEventListener('pointerdown', fire);
-  root.addEventListener('pointerup', fire);
+  if (prevent) {
+    root.addEventListener('pointerdown', fire);
+    root.addEventListener('pointerup', fire);
+  }
   root.addEventListener('click', fire);
   sealChromeControl(root, { prevent });
 }

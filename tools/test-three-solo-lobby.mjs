@@ -78,14 +78,14 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.14', 'tip stamp ux-solo.14');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.15', 'tip stamp ux-solo.15');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-assert(indexHtml.includes('V2.81.56-ux-solo.14'), 'index.html cache-busts .14');
-assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.14'"), 'index.html inline stamp .14');
-assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.14'), 'index.html module cache-bust .14');
+assert(indexHtml.includes('V2.81.56-ux-solo.15'), 'index.html cache-busts .15');
+assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.15'"), 'index.html inline stamp .15');
+assert(indexHtml.includes('src/main.js?v=V2.81.56-ux-solo.15'), 'index.html module cache-bust .15');
 assert(indexHtml.includes('serviceWorker') && indexHtml.includes('caches.keys'), 'tip boot drops SW / Cache Storage');
 const bootSrc = String(readFileSync(new URL('../src/map/threeSoloBoot.js', import.meta.url)));
-assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.14'), 'boot cache-busts chrome .14');
+assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.15'), 'boot cache-busts chrome .15');
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
@@ -96,17 +96,17 @@ const vercelJson = readFileSync(new URL('../vercel.json', import.meta.url), 'utf
 assert(vercelJson.includes('"source": "/"') && vercelJson.includes('no-store'), 'root HTML is no-store');
 const prevWin = globalThis.window;
 globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.12' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.14', 'stale HTML loses to newer module');
-globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.14' };
-assert(liveGameVersion() === 'V2.81.56-ux-solo.14', 'HTML SoT when current');
+assert(liveGameVersion() === 'V2.81.56-ux-solo.15', 'stale HTML loses to newer module');
+globalThis.window = { __TR_GAME_VERSION: 'V2.81.56-ux-solo.15' };
+assert(liveGameVersion() === 'V2.81.56-ux-solo.15', 'HTML SoT when current');
 const stampEls = [{ textContent: 'V2.81.56-ux-solo.12' }, { textContent: 'stale' }];
 const prevDoc = globalThis.document;
 globalThis.document = {
   documentElement: { dataset: {}, setAttribute() {} },
   querySelectorAll: () => stampEls,
 };
-assert(applyLiveStamp() === 'V2.81.56-ux-solo.14', 'applyLiveStamp returns live .14');
-assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.14'), 'every paint overwrites L0+lobby');
+assert(applyLiveStamp() === 'V2.81.56-ux-solo.15', 'applyLiveStamp returns live .15');
+assert(stampEls.every((el) => el.textContent === 'V2.81.56-ux-solo.15'), 'every paint overwrites L0+lobby');
 if (prevWin === undefined) delete globalThis.window;
 else globalThis.window = prevWin;
 if (prevDoc === undefined) delete globalThis.document;
@@ -124,7 +124,15 @@ assert(/#three-lobby \.three-lobby-setup-head \{ flex:none/.test(chromeSrc), 'A2
 assert(/#three-lobby \.three-lobby-main \{[\s\S]*?flex:1[\s\S]*?min-height:0[\s\S]*?overflow-y:auto/.test(chromeSrc), 'A2/A3 main is the only setup scroller');
 assert(/#three-lobby \.three-lobby-footer \{[\s\S]*?flex:none/.test(chromeSrc), 'A7 footer flex:none sibling');
 assert(chromeSrc.includes('bindSealedActivate(lobby,') && chromeSrc.includes('{ prevent: false }'), 'lobby activate does not preventDefault');
+assert(!chromeSrc.includes('ontouchstart = activate'), 'no ontouchstart=activate preventDefault on chips');
+assert(chromeSrc.includes('has-lobby #mapCanvas') && chromeSrc.includes('pointer-events:none'), 'canvas ignores touches while lobby open');
+assert(/#three-lobby \.three-lobby-main \{[\s\S]*?touch-action:pan-y/.test(chromeSrc), 'MAIN touch-action pan-y');
+assert(/#three-lobby \.three-lobby-seat-wrap[\s\S]*?touch-action:pan-y/.test(chromeSrc), 'seat wrap allows vertical pan');
 assert(!/for \(const el of \[[^\]]*lobby/.test(chromeSrc), 'lobby not blanket-sealed with preventDefault');
+const eventsSrc = String(readFileSync(new URL('../src/map/threeChromeEvents.js', import.meta.url)));
+assert(eventsSrc.includes('{ passive: !doPrevent }'), 'lobby touch listeners are passive when prevent:false');
+assert(eventsSrc.includes("if (prevent)") && eventsSrc.includes("root.addEventListener('click', fire)"), 'scroll surfaces activate on click, not pointerdown');
+assert(bootSrc.includes('chrome.isLobbyOpen()') && bootSrc.includes('isTutorialOpen()'), 'canvas touchstart skips preventDefault while lobby open');
 assert(!/three-lobby-main \{[\s\S]*?position:\s*sticky/.test(chromeSrc), 'Teams+Start not sticky inside scroll');
 assert(!/three-lobby-seat-tools button \{[^}]*width:28px/.test(chromeSrc), 'no 28px color tile in occupant flex');
 assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');

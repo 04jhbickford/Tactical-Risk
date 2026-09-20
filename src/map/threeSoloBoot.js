@@ -6,7 +6,7 @@ import { Camera, MAP_WIDTH } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome, applyLiveStamp, liveGameVersion } from './threeMapChrome.js?v=V2.81.56-ux-solo.14';
+import { injectThreeChrome, applyLiveStamp, liveGameVersion } from './threeMapChrome.js?v=V2.81.56-ux-solo.15';
 import {
   preloadUnitImages,
   renderPreviewStacks,
@@ -18,7 +18,7 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.14';
+import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.15';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -40,7 +40,7 @@ import {
   lobbyCanStart,
   lobbyStartOptions,
   lobbyInspect,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.14';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.15';
 import {
   shouldShowSetupTutorial,
   dismissTutorial,
@@ -59,7 +59,7 @@ import {
   pickShip,
   applyCargoSeed,
   LAND_TEAL,
-} from './threeSoloPlay.js?v=V2.81.56-ux-solo.14';
+} from './threeSoloPlay.js?v=V2.81.56-ux-solo.15';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -450,7 +450,9 @@ export async function bootThreeSolo() {
 
   let pinch = null;
   canvas.addEventListener('touchstart', (e) => {
-    if (ignoreMapHit(e)) {
+    // Lobby / tutorial own the finger. Never preventDefault here — that
+    // steals MAIN pan even when the event later ignores the map hit.
+    if (chrome.isLobbyOpen() || chrome.isTutorialOpen() || ignoreMapHit(e)) {
       return;
     }
     if (e.touches.length === 2) {
@@ -474,6 +476,9 @@ export async function bootThreeSolo() {
     }
   }, { passive: false });
   canvas.addEventListener('touchmove', (e) => {
+    if (chrome.isLobbyOpen() || chrome.isTutorialOpen() || ignoreMapHit(e)) {
+      return;
+    }
     if (pinch && e.touches.length === 2) {
       e.preventDefault();
       const [a, b] = e.touches;
@@ -489,6 +494,7 @@ export async function bootThreeSolo() {
     }
   }, { passive: false });
   canvas.addEventListener('touchend', (e) => {
+    if (chrome.isLobbyOpen() || chrome.isTutorialOpen()) return;
     if (e.touches.length < 2) pinch = null;
     if (e.touches.length === 0) {
       const wasDrag = camera.onMouseUp();
