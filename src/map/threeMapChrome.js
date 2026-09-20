@@ -906,9 +906,16 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       cursor:pointer;
     }
     #three-lobby .three-lobby-back svg { width:22px; height:22px; }
+    #three-lobby .three-lobby-sec,
+    #three-lobby .three-lobby-seats-sec,
+    #three-lobby .three-lobby-ipc-opts,
+    #three-lobby .three-lobby-foot {
+      flex:0 0 auto;
+    }
     #three-lobby .three-lobby-seats-sec { display:block; min-height:0; }
     #three-lobby .three-lobby-seats {
       display:flex; flex-direction:column; gap:8px; overflow:visible;
+      flex:0 0 auto;
     }
     #three-lobby .three-lobby-seat,
     #three-lobby .three-lobby-seat-tools button { touch-action:manipulation; }
