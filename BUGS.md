@@ -2,6 +2,15 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.12 setup scroll shell (preview only)
+
+James REJECTED `.11`: sticky Teams + Start covered Japanese colors
+@390. Setup is now header / MAIN-only scroll / footer outside the
+scroll (`100dvh`/`100svh`). Seat wraps stay overflow:visible. Keep
+live stamp. Hold merge. No READY ping until 390+desktop stills pass.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.11 seat wrap overflow (preview only)
 
 James REJECTED `.10`: `#three-lobby-seat-wrap { overflow:hidden }` plus

@@ -78,12 +78,12 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.11', 'tip stamp ux-solo.11');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.12', 'tip stamp ux-solo.12');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-assert(indexHtml.includes('V2.81.56-ux-solo.11'), 'index.html cache-busts .11');
-assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.11'"), 'index.html inline stamp .11');
+assert(indexHtml.includes('V2.81.56-ux-solo.12'), 'index.html cache-busts .12');
+assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.12'"), 'index.html inline stamp .12');
 const bootSrc = String(readFileSync(new URL('../src/map/threeSoloBoot.js', import.meta.url)));
-assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.11'), 'boot cache-busts chrome .11');
+assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.12'), 'boot cache-busts chrome .12');
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
@@ -93,6 +93,10 @@ assert(chromeSrc.includes('three-lobby-colors'), 'seat colors on their own row')
 assert(chromeSrc.includes('occupantChipLabel'), 'Human/Easy/Med/Hard chips');
 assert(!/three-lobby-seat-wrap \{[^}]*overflow:\s*hidden/.test(chromeSrc), 'seat wrap does not overflow:hidden');
 assert(chromeSrc.includes('three-lobby-seat-wrap') && chromeSrc.includes('overflow:visible'), 'seat cards grow, overflow visible');
+assert(chromeSrc.includes('three-lobby-main') && chromeSrc.includes('three-lobby-footer'), 'setup header/main/footer shell');
+assert(chromeSrc.includes('100dvh') && chromeSrc.includes('100svh'), 'lobby shell uses dvh/svh not 100vh-only');
+assert(!/#three-lobby[^{]*\{[^}]*height:\s*100vh/.test(chromeSrc), 'no 100vh-only lobby height');
+assert(/#three-lobby \.three-lobby-main \{[\s\S]*?overflow-y:auto/.test(chromeSrc), 'main is the only setup scroller');
 assert(!/three-lobby-seat-tools button \{[^}]*width:28px/.test(chromeSrc), 'no 28px color tile in occupant flex');
 assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');
 assert(isDieType('techDie') && isDieType('DIE') && isDieType('die') && isDieType('x', 'DIE 5'), 'die aliases');
@@ -334,8 +338,8 @@ assert(!String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.
 assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-research-row'), 'compact research row');
 assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-tech-grid'), 'breakthrough grid');
 assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('data-tech-pick'), 'tech pick not loss steppers');
-assert(chromeSrc.includes('three-lobby-seats-sec'), 'setup seats scroller');
-assert(chromeSrc.includes('touch-action:pan-y'), 'seats-only scroll');
+assert(chromeSrc.includes('three-lobby-seats-sec'), 'setup seats section');
+assert(chromeSrc.includes('three-lobby-main') && chromeSrc.includes('touch-action:pan-y'), 'main-only setup scroll');
 
 const cargoSearch = parseSoloLobbySearch('?three=1&solo=1&cargo=1');
 assert(cargoSearch.cargo === true && cargoSearch.skip === true, 'cargo=1 skips lobby');

@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.11';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.12';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.11';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.12';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -788,18 +788,35 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
     #three-lobby {
       display:none; position:absolute; inset:0; z-index:50;
-      padding:max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
+      height:100dvh; height:100svh; max-height:100dvh; max-height:100svh;
+      padding:max(12px, env(safe-area-inset-top)) 14px 0;
       background:rgba(22,26,28,0.94);
       -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
       color:#E8E2D4; overflow:hidden; pointer-events:auto;
     }
     #three-lobby.is-open { display:flex; flex-direction:column; min-height:0; }
     #three-lobby .three-lobby-home,
-    #three-lobby .three-lobby-setup,
     #three-lobby .three-lobby-howto {
       display:flex; flex-direction:column; gap:10px; flex:1; min-height:0;
+      padding-bottom:max(12px, env(safe-area-inset-bottom));
+      overflow-y:auto;
     }
-    #three-lobby .three-lobby-setup { overflow:hidden; }
+    #three-lobby .three-lobby-setup {
+      display:flex; flex-direction:column; flex:1 1 auto; min-height:0;
+      height:100%; overflow:hidden; gap:0;
+    }
+    #three-lobby .three-lobby-main {
+      flex:1 1 auto; min-height:0; overflow-y:auto;
+      -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y;
+      display:flex; flex-direction:column; gap:10px;
+      padding-bottom:calc(var(--three-lobby-footer-h, 72px) + env(safe-area-inset-bottom, 0px) + 12px);
+    }
+    #three-lobby .three-lobby-footer {
+      flex:0 0 auto; position:sticky; bottom:0;
+      padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
+      background:rgba(22,26,28,0.96);
+      border-top:1px solid rgba(255,255,255,0.08);
+    }
     #three-lobby .three-lobby-brand { text-align:center; padding:18px 8px 4px; }
     #three-lobby .three-lobby-logo {
       margin:0; font:700 32px/1.05 -apple-system,"SF Pro Display",sans-serif;
@@ -879,7 +896,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:400 13px/1.3 -apple-system,sans-serif; color:#cbd5e1;
     }
     #three-lobby .three-lobby-setup-head {
-      display:flex; align-items:center; gap:10px; flex-shrink:0;
+      display:flex; align-items:center; gap:10px; flex:0 0 auto;
+      padding-bottom:10px;
     }
     #three-lobby .three-lobby-back {
       width:44px; height:44px; min-width:44px; margin:0; padding:0;
@@ -888,20 +906,17 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       cursor:pointer;
     }
     #three-lobby .three-lobby-back svg { width:22px; height:22px; }
-    #three-lobby .three-lobby-seats-sec {
-      display:flex; flex-direction:column; flex:1 1 auto; min-height:0;
-    }
+    #three-lobby .three-lobby-seats-sec { display:block; min-height:0; }
     #three-lobby .three-lobby-seats {
-      display:flex; flex-direction:column; gap:6px; flex:1 1 auto; min-height:0;
-      overflow-y:auto; -webkit-overflow-scrolling:touch;
-      overscroll-behavior:contain; touch-action:pan-y;
+      display:flex; flex-direction:column; gap:8px; overflow:visible;
     }
     #three-lobby .three-lobby-seat,
     #three-lobby .three-lobby-seat-tools button { touch-action:manipulation; }
     #three-lobby .three-lobby-opts,
     #three-lobby .three-lobby-foot,
     #three-lobby .three-lobby-start,
-    #three-lobby .three-lobby-setup-head { flex-shrink:0; }
+    #three-lobby .three-lobby-setup-head,
+    #three-lobby .three-lobby-footer { flex-shrink:0; }
     #three-lobby .three-lobby-seat-wrap {
       flex:0 0 auto; height:auto; overflow:visible;
       border-radius:12px; border:1px solid rgba(255,255,255,0.12);
@@ -1002,15 +1017,15 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-lobby .three-lobby-logo { font-size:28px; }
       #three-lobby button.three-lobby-card { min-height:80px; padding:14px; }
       #three-lobby .three-lobby-card-title { font-size:20px; }
-      #three-lobby .three-lobby-setup { gap:6px; }
+      #three-lobby .three-lobby-main { gap:8px; }
       #three-lobby .three-lobby-title { font-size:18px; }
       #three-lobby .three-lobby-sub { font-size:12px; }
       #three-lobby h2 { margin:0 0 4px; }
-      #three-lobby .three-lobby-seats { gap:4px; }
-      #three-lobby .three-lobby-seat { min-height:0; padding:6px 10px; }
-      #three-lobby .three-lobby-seat-tools { padding:0 10px 8px; gap:6px; }
+      #three-lobby .three-lobby-seats { gap:8px; }
+      #three-lobby .three-lobby-seat { min-height:0; padding:8px 10px; }
+      #three-lobby .three-lobby-seat-tools { padding:0 10px 10px; gap:8px; }
       #three-lobby .three-lobby-occupants { gap:4px; }
-      #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:34px; font-size:11px; }
+      #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:36px; font-size:11px; }
       #three-lobby .three-lobby-opts { padding:6px 8px; gap:6px; }
       #three-lobby .three-lobby-foot { display:none; }
       #three-lobby .three-lobby-start { min-height:48px; }
@@ -1174,8 +1189,17 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         api.setSheetOpen(false);
         api.setTutorialOpen(false);
         api.zoom.hidden = true;
+        api.syncLobbyFooterPad();
       }
       api.syncLayers();
+    },
+    syncLobbyFooterPad() {
+      const setup = lobby.querySelector('.three-lobby-setup');
+      const footer = lobby.querySelector('.three-lobby-footer');
+      if (!setup || !footer) return 0;
+      const h = Math.max(56, Math.round(footer.getBoundingClientRect().height));
+      setup.style.setProperty('--three-lobby-footer-h', `${h}px`);
+      return h;
     },
     setTutorialOpen(open) {
       tutorial.classList.toggle('is-open', !!open);
@@ -1266,76 +1290,83 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
               <p class="three-lobby-sub">Select 2–5 players to begin</p>
             </div>
           </div>
-          <div class="three-lobby-sec">
-            <h2>Mode</h2>
-            <div class="three-lobby-seg">
-              <button type="button" class="three-lobby-tile${classic ? ' is-on' : ''}" data-lobby="mode" data-value="classic">Classic 1942</button>
-              <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk</button>
+          <div class="three-lobby-main">
+            <div class="three-lobby-sec">
+              <h2>Mode</h2>
+              <div class="three-lobby-seg">
+                <button type="button" class="three-lobby-tile${classic ? ' is-on' : ''}" data-lobby="mode" data-value="classic">Classic 1942</button>
+                <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk</button>
+              </div>
             </div>
-          </div>
-          <div class="three-lobby-sec three-lobby-seats-sec">
-            <h2>Players</h2>
-            <div class="three-lobby-seats">
-              ${factions.map((f) => {
-                const on = selected.has(f.id);
-                const occupant = model.playerAI?.[f.id] || 'human';
-                const occupantName = (AI_DIFFICULTIES.find((d) => d.id === occupant) || AI_DIFFICULTIES[0]).name;
-                const color = model.playerColors?.[f.id]?.color || f.color || '#888';
-                return `
-                  <div class="three-lobby-seat-wrap${on ? ' is-on' : ''}">
-                    <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}">
-                      <div class="three-lobby-seat-name" style="box-shadow:inset 3px 0 0 ${color};padding-left:10px">${f.name || f.id}</div>
-                      <span class="three-lobby-seat-meta">${on ? occupantName : 'Tap to add'}</span>
-                    </button>
-                    <div class="three-lobby-seat-tools">
-                      <div class="three-lobby-occupants">
-                        ${AI_DIFFICULTIES.map((d) => `
-                          <button type="button" class="three-lobby-tile${on && occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${occupantChipLabel(d)}</button>
-                        `).join('')}
-                      </div>
-                      ${on && model.teamsEnabled ? `
-                        <div class="three-lobby-teams">
-                          <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</button>
-                          <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</button>
-                          <button type="button" class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</button>
-                        </div>
-                      ` : ''}
-                      ${on ? `
-                        <div class="three-lobby-colors">
-                          ${FACTION_COLORS.slice(0, 6).map((c) => `
-                            <button type="button" class="three-lobby-swatch" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="background:${c.color}"></button>
+            <div class="three-lobby-sec three-lobby-seats-sec">
+              <h2>Players</h2>
+              <div class="three-lobby-seats">
+                ${factions.map((f) => {
+                  const on = selected.has(f.id);
+                  const occupant = model.playerAI?.[f.id] || 'human';
+                  const occupantName = (AI_DIFFICULTIES.find((d) => d.id === occupant) || AI_DIFFICULTIES[0]).name;
+                  const color = model.playerColors?.[f.id]?.color || f.color || '#888';
+                  return `
+                    <div class="three-lobby-seat-wrap${on ? ' is-on' : ''}">
+                      <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}">
+                        <div class="three-lobby-seat-name" style="box-shadow:inset 3px 0 0 ${color};padding-left:10px">${f.name || f.id}</div>
+                        <span class="three-lobby-seat-meta">${on ? occupantName : 'Tap to add'}</span>
+                      </button>
+                      <div class="three-lobby-seat-tools">
+                        <div class="three-lobby-occupants">
+                          ${AI_DIFFICULTIES.map((d) => `
+                            <button type="button" class="three-lobby-tile${on && occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${occupantChipLabel(d)}</button>
                           `).join('')}
                         </div>
-                      ` : ''}
+                        ${on && model.teamsEnabled ? `
+                          <div class="three-lobby-teams">
+                            <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</button>
+                            <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</button>
+                            <button type="button" class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</button>
+                          </div>
+                        ` : ''}
+                        ${on ? `
+                          <div class="three-lobby-colors">
+                            ${FACTION_COLORS.slice(0, 6).map((c) => `
+                              <button type="button" class="three-lobby-swatch" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="background:${c.color}"></button>
+                            `).join('')}
+                          </div>
+                        ` : ''}
+                      </div>
                     </div>
-                  </div>
-                `;
-              }).join('')}
-            </div>
-          </div>
-          <div class="three-lobby-opts">
-            <div class="three-lobby-opt">
-              <span>Teams</span>
-              <button type="button" class="three-lobby-tile${model.teamsEnabled ? ' is-on' : ''}" data-lobby="teams" data-value="${model.teamsEnabled ? '0' : '1'}">${model.teamsEnabled ? 'On' : 'Off'}</button>
+                  `;
+                }).join('')}
+              </div>
             </div>
             ${classic ? '' : `
-              <div class="three-lobby-opt" style="flex-wrap:wrap">
-                <span>Starting IPCs</span>
-                <div class="three-lobby-row">
-                  ${STARTING_IPC_OPTIONS.map((n) => `
-                    <button type="button" class="three-lobby-tile${Number(model.startingIPCs) === n ? ' is-on' : ''}" data-lobby="ipc" data-value="${n}">${n}</button>
-                  `).join('')}
+              <div class="three-lobby-opts three-lobby-ipc-opts">
+                <div class="three-lobby-opt" style="flex-wrap:wrap">
+                  <span>Starting IPCs</span>
+                  <div class="three-lobby-row">
+                    ${STARTING_IPC_OPTIONS.map((n) => `
+                      <button type="button" class="three-lobby-tile${Number(model.startingIPCs) === n ? ' is-on' : ''}" data-lobby="ipc" data-value="${n}">${n}</button>
+                    `).join('')}
+                  </div>
                 </div>
               </div>
             `}
+            <p class="three-lobby-foot">${classic
+              ? 'Historical 1942 stacks · skip capital / deploy'
+              : 'Random Territories • Capital Conquest Victory'}</p>
           </div>
-          <p class="three-lobby-foot">${classic
-            ? 'Historical 1942 stacks · skip capital / deploy'
-            : 'Random Territories • Capital Conquest Victory'}</p>
-          <button type="button" class="three-lobby-start" data-lobby="start" ${canStart ? '' : 'disabled'}>${lobbyStartLabel(model)}</button>
+          <div class="three-lobby-footer">
+            <div class="three-lobby-opts">
+              <div class="three-lobby-opt">
+                <span>Teams</span>
+                <button type="button" class="three-lobby-tile${model.teamsEnabled ? ' is-on' : ''}" data-lobby="teams" data-value="${model.teamsEnabled ? '0' : '1'}">${model.teamsEnabled ? 'On' : 'Off'}</button>
+              </div>
+            </div>
+            <button type="button" class="three-lobby-start" data-lobby="start" ${canStart ? '' : 'disabled'}>${lobbyStartLabel(model)}</button>
+          </div>
         </div>
       `;
       api.setLobbyOpen(true);
+      api.syncLobbyFooterPad();
       applyLiveStamp();
     },
     setConfirmIdle(label = 'Select units') {
@@ -1729,5 +1760,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   api.setStacksExpanded(false);
   api.showGuide(false);
   applyLiveStamp();
+  window.addEventListener('resize', () => api.syncLobbyFooterPad());
   return api;
 }
