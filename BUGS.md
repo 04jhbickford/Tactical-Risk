@@ -2,6 +2,15 @@
 
 ---
 
+## 9.20.26 — Cherry-pick PR82 persist combat capture onto tip
+
+Main P0 `2f6fe8d` (`cursor/territory-flip-combat-a714`): `logCombat`
+undefined losses poisoned Firestore pushes (hiccup → capture rollback).
+`omitUndefinedDeep` + `persistableUnit` + purchase `owner`. Tip version
+stays the hybrid stamp. Do not merge.
+
+---
+
 ## 9.20.26 — V2.81.55-ux-solo.3 S7–S9 (preview only)
 
 Purchase + mobilize tiles, tech dice / breakthrough pick, victory
@@ -156,7 +165,6 @@ chits / continent washes + the Three preview HUD. Keep off main.
 
 `?three=1` or `?ux=1` boots Canvas `MapRenderer` + Three L0/L1/L2 chrome.
 No Imagine world plate. Live `/` unchanged. Do not merge.
-
 ---
 
 ## 9.19.26 — V2.81.55 cloud game-log + diagnostics (SCHEMA 11)
