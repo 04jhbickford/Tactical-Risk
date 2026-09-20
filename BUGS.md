@@ -2,6 +2,16 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.11 seat wrap overflow (preview only)
+
+James REJECTED `.10`: `#three-lobby-seat-wrap { overflow:hidden }` plus
+flex-shrink clipped occupant chips to their tops @390. Removed that
+overflow clip. Cards grow (`flex:0 0 auto; overflow:visible`) so
+Human/Easy/Med/Hard is fully visible. Keep `.10` live-stamp/cache-bust.
+Hold merge. No Arc/Viz ping until the 390 still is clean.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.10 stamp + seat collapse (preview only)
 
 L0 was stuck on `.7` because chrome baked `GAME_VERSION` once and

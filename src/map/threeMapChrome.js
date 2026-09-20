@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.10';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.11';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.10';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.11';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -903,8 +903,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-lobby .three-lobby-start,
     #three-lobby .three-lobby-setup-head { flex-shrink:0; }
     #three-lobby .three-lobby-seat-wrap {
+      flex:0 0 auto; height:auto; overflow:visible;
       border-radius:12px; border:1px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.04); overflow:hidden;
+      background:rgba(255,255,255,0.04);
     }
     #three-lobby .three-lobby-seat-wrap.is-on {
       border-color:#C4A35A; background:rgba(196,163,90,0.10);
@@ -926,7 +927,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       gap:6px; width:100%;
     }
     #three-lobby .three-lobby-occupants .three-lobby-tile {
-      min-width:0; width:100%; padding:0 2px; font-size:12px;
+      min-width:0; width:100%; min-height:36px; padding:0 2px; font-size:12px;
     }
     #three-lobby .three-lobby-colors {
       display:flex; flex-wrap:wrap; gap:6px;
@@ -1006,7 +1007,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-lobby .three-lobby-sub { font-size:12px; }
       #three-lobby h2 { margin:0 0 4px; }
       #three-lobby .three-lobby-seats { gap:8px; }
-      #three-lobby .three-lobby-seat { min-height:48px; padding:8px 10px; }
+      #three-lobby .three-lobby-seat { min-height:0; padding:8px 10px; }
       #three-lobby .three-lobby-seat-tools { padding:0 10px 10px; gap:8px; }
       #three-lobby .three-lobby-occupants { gap:4px; }
       #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:36px; font-size:11px; }
