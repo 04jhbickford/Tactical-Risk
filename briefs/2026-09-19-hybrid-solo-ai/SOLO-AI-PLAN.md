@@ -1,8 +1,8 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** S0–S6 landed. **STOP before S7–S9.** Hold merge. Ready for Arc.  
+**Status:** S0–S9 landed. Hold merge. Full classic solo vs AI on the tip.  
 **Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.55-ux-solo.2` · SCHEMA 11  
+**Tip:** `V2.81.55-ux-solo.3` · SCHEMA 11  
 **Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
 **Solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
 **Live main:** https://tactical-risk20.vercel.app/ · `V2.81.55` · SCHEMA 11  
@@ -26,9 +26,17 @@ Adapter is `src/map/threeSoloPlay.js` (GameState + AIController + autosave behin
 | **S5** | Planes-only sheet, partial type/count + dest (`.11` IA), `applyAirLandings`. |
 | **S6** | NCM friendly dests (dest tap wins when units are already picked). Done when `remainingAirLandingsToAssign` = 0. |
 
-**Still stubbed (S7–S9):** purchase / mobilize tiles (Tech + Buy are skip-only End Phase). Tech dice sheet. Win chrome / New Game polish. Human can fight and move vs AI, then sit through AI turns; they cannot buy, research, or place yet.
+## S7–S9 landed (2026-09-20)
 
-**How far a human can play:** Develop Tech skip → Purchase skip → Combat Move → Combat (AA / casualties / take) → Air Land → NCM → (mobilize skip) → income / German AI. Repeat those phases each Russian turn. Pocket `?three=1&max=1` unchanged.
+| Slice | Landed |
+|---|---|
+| **S7** | Purchase tiles (cost, live IPC, factory/capital cap via `addToPendingPurchases`). Mobilize tiles + factory dests; Confirm Place; End Phase only when queue is empty. |
+| **S8** | Develop Tech die stepper (5 IPC). Confirm Roll. Breakthrough → pick a tech → Unlock. Skip still End Phase at 0 dice. |
+| **S9** | Victory sheet + gold **New Game vs AI** (does not reload `/`). Cold start `?three=1&solo=1` can play a full turn loop and end the match. |
+
+**Residual stubs:** navy/amphib Three UX (naval still auto-resolves). Risk capital+deploy (S10). Three diagnostics log (S11). Retreat / bombard tiles. Tech tiles reuse casualty picker chrome (no unit art).
+
+**How far a human can play:** Research (or skip) → Buy (or skip) → Combat Move → Combat → Air Land → NCM → Place bought units → income / AI. Win on alliance capitals → New Game vs AI. Pocket `?three=1&max=1` unchanged.
 
 This brief tells Arc how to port a **real solo match vs AI** onto the tip `.11` Three UX without rewriting the rules engine and without touching lobby / multiplayer / `main`.
 
@@ -288,6 +296,6 @@ A playtester on a **390-wide** viewport, **no lobby**, can:
 
 ## Kickoff note for Phase 2
 
-**S0–S6 DONE. STOP — ready for Arc before S7–S9.**
+**S0–S9 DONE.** Hold PR76 merge. Off `main` until a separate yes.
 
-Do not start S7 (purchase / mobilize), S8 (tech sheet), or S9 (win / New Game polish) until the next yes. Hold PR76 merge.
+S10 (Risk deploy) and S11 (Three diagnostics) stay optional.

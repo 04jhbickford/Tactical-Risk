@@ -27,6 +27,7 @@ const TYPE_SHORT = {
   carrier: 'CV',
   factory: 'FAC',
   aaGun: 'AA',
+  techDie: 'DIE',
 };
 
 export function shortType(type) {
@@ -56,7 +57,7 @@ function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) 
   if (!tiles?.length) return '';
   return `<div class="three-tile-row${readOnly ? ' is-ro' : ''}">${tiles.map((s) => {
     const src = getUnitIconPath(s.type, s.owner) || '';
-    const short = shortType(s.type);
+    const short = s.short || shortType(s.type);
     const have = Number(s.have ?? s.quantity) || 0;
     const picked = Number(s.picked) || 0;
     const name = formatUnitName(s.type);

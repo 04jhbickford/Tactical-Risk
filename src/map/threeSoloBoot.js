@@ -203,7 +203,9 @@ export async function bootThreeSolo() {
   function paintChrome() {
     const current = gameState.currentPlayer;
     const you = gameState.players.find((p) => !p.isAI) || current;
-    chrome.setPhase(TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY');
+    chrome.setPhase(gameState.gameOver
+      ? (gameState.winner === 'Allies' ? 'Allied Victory' : gameState.winner === 'Axis' ? 'Axis Victory' : 'Victory')
+      : (TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY'));
     chrome.setSeat(current?.name || you?.name || '—', current?.color || you?.color);
     chrome.setIpc(gameState.getIPCs(you?.id) || 0);
     const model = chromeModel(play, territories);
@@ -234,12 +236,14 @@ export async function bootThreeSolo() {
     camera.dirty = true;
   };
   chrome.onLossStep = (side, type, delta) => {
-    adjustLoss(play, side, type, delta);
+    if (play.tech?.breakthrough) adjustUnit(play, type, delta);
+    else adjustLoss(play, side, type, delta);
     paintChrome();
     camera.dirty = true;
   };
   chrome.onLossPick = (side, type) => {
-    adjustLoss(play, side, type, 1);
+    if (play.tech?.breakthrough) adjustUnit(play, type, 1);
+    else adjustLoss(play, side, type, 1);
     paintChrome();
     camera.dirty = true;
   };
@@ -395,6 +399,11 @@ export async function bootThreeSolo() {
   bindSealedActivate(chrome.confirm, null, () => {
     if (chrome.confirm.disabled) return;
     confirmPlay(play);
+    if (play._newGame) {
+      play._newGame = false;
+      startMatch();
+      return;
+    }
     selected = landByName(play.selected);
     paintChrome();
     camera.dirty = true;
@@ -527,6 +536,11 @@ export async function bootThreeSolo() {
     },
     confirm: () => {
       confirmPlay(play);
+      if (play._newGame) {
+        play._newGame = false;
+        startMatch();
+        return inspectPlay(play);
+      }
       selected = landByName(play.selected);
       paintChrome();
       camera.dirty = true;

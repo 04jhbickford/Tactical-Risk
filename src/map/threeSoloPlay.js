@@ -5,6 +5,7 @@ import {
   TURN_PHASES,
   TURN_PHASE_ORDER,
   TURN_PHASE_NAMES,
+  TECHNOLOGIES,
 } from '../state/gameState.js';
 import {
   countLivingUnits,
@@ -39,8 +40,15 @@ const COMBAT_ORDER = [
 ];
 
 const AIR_ORDER = ['fighter', 'tacticalBomber', 'bomber'];
+const BUY_TYPES = [
+  'infantry', 'artillery', 'armour',
+  'fighter', 'bomber',
+  'aaGun', 'factory',
+  'submarine', 'destroyer', 'transport',
+];
+const TECH_DIE = 'techDie';
 const LAND_TEAL = '#5BA8A0';
-export { LAND_TEAL };
+export { LAND_TEAL, BUY_TYPES, TECH_DIE };
 
 export function createSoloPlay(gameState, unitDefs = {}) {
   return {
@@ -51,11 +59,17 @@ export function createSoloPlay(gameState, unitDefs = {}) {
     destPicked: null,
     battle: null,
     landing: null,
+    tech: emptyTech(),
     aiStatus: null,
     rng: null,
+    _newGame: false,
     _phase: gameState?.turnPhase || null,
     _player: gameState?.currentPlayer?.id || null,
   };
+}
+
+function emptyTech() {
+  return { dice: 0, rolls: null, breakthrough: false, pick: null };
 }
 
 export function resetUi(play) {
@@ -65,7 +79,12 @@ export function resetUi(play) {
   play.destPicked = null;
   play.battle = null;
   play.landing = null;
+  play.tech = emptyTech();
   return play;
+}
+
+export function isGameOver(play) {
+  return !!play?.gameState?.gameOver;
 }
 
 export function isHumanTurn(play) {
@@ -217,11 +236,88 @@ export function ncmAirRemaining(play) {
   return remainingAirLandingsToAssign(units, {});
 }
 
+export function pendingPurchasesOf(play) {
+  const id = play.gameState?.currentPlayer?.id;
+  return (play.gameState?.pendingPurchases || []).filter((p) => p.owner === id);
+}
+
+export function pendingQty(play, type = null) {
+  return pendingPurchasesOf(play)
+    .filter((p) => !type || p.type === type)
+    .reduce((n, p) => n + (Number(p.quantity) || 0), 0);
+}
+
+export function unitCost(play, type) {
+  let cost = Number(play.unitDefs?.[type]?.cost) || 0;
+  const id = play.gameState?.currentPlayer?.id;
+  if (id && play.gameState.hasTech?.(id, 'industrialTech')) {
+    cost = Math.max(1, cost - 1);
+  }
+  return cost;
+}
+
+export function shopCapacity(play) {
+  const id = play.gameState?.currentPlayer?.id;
+  if (!id) return { used: 0, max: 0, left: 0 };
+  const max = play.gameState.getMobilizationCapacity(id);
+  const used = play.gameState.getPendingPurchaseCount(id);
+  return { used, max, left: Math.max(0, max - used) };
+}
+
+export function factoryDests(play) {
+  const gs = play.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!id) return [];
+  const atStart = gs.factoriesAtTurnStart;
+  if (atStart instanceof Set && atStart.size) return [...atStart];
+  return gs._getFactoryTerritories?.(id) || [];
+}
+
+export function legalPlaceDests(play) {
+  const gs = play.gameState;
+  const player = gs?.currentPlayer;
+  if (!player || gs.turnPhase !== TURN_PHASES.MOBILIZE) return [];
+  const types = Object.entries(play.selectedUnits || {})
+    .filter(([, n]) => Number(n) > 0)
+    .map(([type]) => type);
+  const pendingTypes = types.length
+    ? types
+    : pendingPurchasesOf(play).map((p) => p.type);
+  const dests = new Set();
+  for (const type of pendingTypes) {
+    const def = play.unitDefs[type] || {};
+    if (def.isSea) {
+      for (const zone of gs._getValidNavalPlacementZones?.(player.id) || []) dests.add(zone);
+    } else if (def.isBuilding) {
+      for (const [name, state] of Object.entries(gs.territoryState || {})) {
+        if (state.owner !== player.id) continue;
+        if (gs.territoryByName[name]?.isWater) continue;
+        const friendly = gs.friendlyTerritoriesAtTurnStart;
+        if (friendly instanceof Set && friendly.size && !friendly.has(name)) continue;
+        const hasFac = (gs.units[name] || []).some((u) => u.type === 'factory');
+        if (!hasFac) dests.add(name);
+      }
+    } else {
+      for (const name of factoryDests(play)) dests.add(name);
+    }
+  }
+  return [...dests];
+}
+
 export function canEndPhase(play) {
+  if (isGameOver(play)) return false;
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
   if (play.landing) return remainingAirCount(play) <= 0;
   if (play.battle) return play.battle.step === BATTLE_STEP.WON && !play.landing;
   const phase = play.gameState.turnPhase;
+  if (phase === TURN_PHASES.DEVELOP_TECH) {
+    if (play.tech?.breakthrough) return false;
+    if ((play.tech?.dice || 0) > 0 && !play.tech?.rolls) return false;
+    return true;
+  }
+  if (phase === TURN_PHASES.MOBILIZE) {
+    return pendingQty(play) <= 0 && !pickedCount(play.selectedUnits);
+  }
   if (phase === TURN_PHASES.COMBAT) {
     return (play.gameState.combatQueue || []).length === 0;
   }
@@ -307,9 +403,10 @@ export function syncPlay(play) {
       play.destPicked = null;
       play.battle = null;
       play.landing = null;
+      play.tech = emptyTech();
     }
   }
-  if (phase === TURN_PHASES.COMBAT && isHumanTurn(play) && !play.battle && !play.landing) {
+  if (phase === TURN_PHASES.COMBAT && isHumanTurn(play) && !play.battle && !play.landing && !isGameOver(play)) {
     enterCombat(play);
   }
   return play;
@@ -666,6 +763,15 @@ export function tapLand(play, name) {
     return play;
   }
   const phase = play.gameState.turnPhase;
+  if (phase === TURN_PHASES.MOBILIZE) {
+    if (legalPlaceDests(play).includes(name)) {
+      play.destPicked = name;
+      play.selected = name;
+    } else {
+      play.selected = name;
+    }
+    return play;
+  }
   if (phase !== TURN_PHASES.COMBAT_MOVE && phase !== TURN_PHASES.NON_COMBAT_MOVE) {
     play.selected = name;
     return play;
@@ -693,13 +799,47 @@ export function tapLand(play, name) {
 
 export function adjustUnit(play, type, delta = 1) {
   syncPlay(play);
+  if (isGameOver(play) || !isHumanTurn(play)) return play;
   const phase = play.gameState.turnPhase;
+  const step = Number(delta);
+  if (!Number.isFinite(step) || step === 0) return play;
+
+  if (phase === TURN_PHASES.DEVELOP_TECH) {
+    if (play.tech?.rolls || play.tech?.breakthrough) {
+      if (play.tech.breakthrough && play.gameState.getAvailableTechs(play.gameState.currentPlayer.id).includes(type)) {
+        play.tech.pick = step > 0 ? type : (play.tech.pick === type ? null : play.tech.pick);
+      }
+      return play;
+    }
+    if (type !== TECH_DIE) return play;
+    const ipc = play.gameState.getIPCs(play.gameState.currentPlayer.id);
+    const max = Math.floor(ipc / 5);
+    play.tech = play.tech || emptyTech();
+    play.tech.dice = Math.max(0, Math.min(max, (Number(play.tech.dice) || 0) + step));
+    return play;
+  }
+
+  if (phase === TURN_PHASES.PURCHASE) {
+    if (step > 0) play.gameState.addToPendingPurchases(type, play.unitDefs);
+    else play.gameState.removeFromPendingPurchases(type, play.unitDefs);
+    return play;
+  }
+
+  if (phase === TURN_PHASES.MOBILIZE) {
+    const have = pendingQty(play, type);
+    if (have <= 0) return play;
+    const cur = Number(play.selectedUnits[type]) || 0;
+    const next = Math.max(0, Math.min(have, cur + step));
+    if (next <= 0) delete play.selectedUnits[type];
+    else play.selectedUnits[type] = next;
+    if (!pickedCount(play.selectedUnits)) play.destPicked = play.destPicked;
+    return play;
+  }
+
   if (phase !== TURN_PHASES.COMBAT_MOVE && phase !== TURN_PHASES.NON_COMBAT_MOVE) return play;
   if (play.landing) return play;
   const have = stackQty(movableStacks(play, play.selected), type);
   if (have <= 0) return play;
-  const step = Number(delta);
-  if (!Number.isFinite(step) || step === 0) return play;
   const cur = Number(play.selectedUnits[type]) || 0;
   const next = Math.max(0, Math.min(have, cur + step));
   if (next <= 0) delete play.selectedUnits[type];
@@ -750,8 +890,52 @@ export function adjustLoss(play, side, type, delta = 1) {
   return play;
 }
 
+function rollTech(play) {
+  const player = play.gameState.currentPlayer;
+  const n = Number(play.tech?.dice) || 0;
+  if (n <= 0) return play;
+  if (!play.gameState.purchaseTechDice(player.id, n)) return play;
+  const prevRoll = play.gameState._rollDie?.bind(play.gameState);
+  if (typeof play.rng === 'function' && play.gameState) {
+    play.gameState._rollDie = (ctx) => play.rng(ctx);
+  }
+  const result = play.gameState.rollTechDice(player.id);
+  if (prevRoll) play.gameState._rollDie = prevRoll;
+  play.tech.dice = 0;
+  play.tech.rolls = result.rolls || [];
+  play.tech.breakthrough = !!result.success;
+  play.tech.pick = null;
+  return play;
+}
+
+function unlockPickedTech(play) {
+  const player = play.gameState.currentPlayer;
+  const pick = play.tech?.pick;
+  if (play.tech?.breakthrough && pick) {
+    play.gameState.unlockTech(player.id, pick);
+  }
+  play.tech = emptyTech();
+  return play;
+}
+
+function placePending(play) {
+  if (!play.destPicked || !pickedCount(play.selectedUnits)) return play;
+  for (const [type, qty] of Object.entries(play.selectedUnits)) {
+    let left = Number(qty) || 0;
+    while (left > 0) {
+      const result = play.gameState.mobilizeUnit(type, play.destPicked, play.unitDefs);
+      if (result?.success === false) break;
+      left -= 1;
+    }
+  }
+  play.selectedUnits = {};
+  play.destPicked = null;
+  return play;
+}
+
 export function confirmEnabled(play) {
   syncPlay(play);
+  if (isGameOver(play)) return true;
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
   if (play.landing) {
     return !!play.landing.dest && pickedCount(play.landing.pick) > 0;
@@ -761,6 +945,15 @@ export function confirmEnabled(play) {
     return true;
   }
   const phase = play.gameState.turnPhase;
+  if (phase === TURN_PHASES.DEVELOP_TECH) {
+    if (play.tech?.breakthrough) return !!play.tech.pick;
+    if ((play.tech?.dice || 0) > 0 && !play.tech?.rolls) return true;
+    return canEndPhase(play);
+  }
+  if (phase === TURN_PHASES.MOBILIZE) {
+    if (play.destPicked && pickedCount(play.selectedUnits)) return true;
+    return canEndPhase(play);
+  }
   if (phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE) {
     if (play.destPicked && pickedCount(play.selectedUnits)) return true;
     return canEndPhase(play);
@@ -774,6 +967,7 @@ export function confirmGold(play) {
 
 export function confirmLabel(play) {
   syncPlay(play);
+  if (isGameOver(play)) return 'New Game vs AI';
   if (!isHumanTurn(play)) {
     return play.aiStatus || `${play.gameState.currentPlayer?.name || 'AI'} thinking…`;
   }
@@ -795,6 +989,23 @@ export function confirmLabel(play) {
     }
   }
   const phase = play.gameState.turnPhase;
+  if (phase === TURN_PHASES.DEVELOP_TECH) {
+    if (play.tech?.breakthrough) {
+      return play.tech.pick
+        ? `Confirm: Unlock ${TECHNOLOGIES[play.tech.pick]?.name || play.tech.pick}`
+        : 'Pick a technology';
+    }
+    if ((play.tech?.dice || 0) > 0 && !play.tech?.rolls) {
+      return `Confirm: Roll ${play.tech.dice} tech dice`;
+    }
+  }
+  if (phase === TURN_PHASES.MOBILIZE && play.destPicked && pickedCount(play.selectedUnits)) {
+    return `Confirm: Place in ${play.destPicked}`;
+  }
+  if (phase === TURN_PHASES.PURCHASE) {
+    const shop = shopCapacity(play);
+    if (shop.used) return `End Phase · Purchase · ${shop.used} queued`;
+  }
   if ((phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE)
     && play.destPicked && pickedCount(play.selectedUnits)) {
     return phase === TURN_PHASES.COMBAT_MOVE
@@ -813,6 +1024,10 @@ export function confirmLabel(play) {
 export function confirm(play) {
   syncPlay(play);
   if (!confirmEnabled(play)) return play;
+  if (isGameOver(play)) {
+    play._newGame = true;
+    return play;
+  }
   if (play.landing) return applyLanding(play);
   if (play.battle) {
     const step = play.battle.step;
@@ -827,6 +1042,19 @@ export function confirm(play) {
     if (step === BATTLE_STEP.WON) return startAirLand(play);
   }
   const phase = play.gameState.turnPhase;
+  if (phase === TURN_PHASES.DEVELOP_TECH) {
+    if (play.tech?.breakthrough && play.tech.pick) {
+      unlockPickedTech(play);
+      resetUi(play);
+      play.gameState.nextPhase();
+      syncPlay(play);
+      return play;
+    }
+    if ((play.tech?.dice || 0) > 0 && !play.tech?.rolls) return rollTech(play);
+  }
+  if (phase === TURN_PHASES.MOBILIZE && play.destPicked && pickedCount(play.selectedUnits)) {
+    return placePending(play);
+  }
   if ((phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE)
     && play.destPicked && pickedCount(play.selectedUnits)) {
     const from = combatOrigins(play).includes(play.selected)
@@ -863,10 +1091,17 @@ export function highlights(play) {
     pulse: [],
     teal: LAND_TEAL,
   };
+  if (isGameOver(play)) return out;
   if (play.landing) {
     out.dest = play.landing.origin;
     out.landable = [...play.landing.landable];
     if (play.landing.dest) out.selected = play.landing.dest;
+    return out;
+  }
+  if (play.gameState.turnPhase === TURN_PHASES.MOBILIZE) {
+    out.legal = legalPlaceDests(play);
+    if (!play.destPicked) out.pulse.push(...out.legal);
+    if (play.destPicked) out.dest = play.destPicked;
     return out;
   }
   if (play.battle) {
@@ -888,7 +1123,55 @@ export function highlights(play) {
   return out;
 }
 
+function victoryCard(play) {
+  const gs = play.gameState;
+  const winner = gs.winner || 'Victory';
+  const title = winner === 'Allies' ? 'Allied Victory!'
+    : winner === 'Axis' ? 'Axis Victory!'
+      : `${winner} Wins!`;
+  return {
+    kicker: 'Victory',
+    title,
+    body: `${gs.winCondition || 'Match over'} · Round ${gs.round || 1}`,
+    dice: [],
+  };
+}
+
+function techCard(play) {
+  const tech = play.tech;
+  if (!tech?.rolls && !tech?.breakthrough) return null;
+  if (tech.breakthrough) {
+    const available = play.gameState.getAvailableTechs(play.gameState.currentPlayer.id);
+    const name = tech.pick ? (TECHNOLOGIES[tech.pick]?.name || tech.pick) : 'Choose a technology';
+    return {
+      kicker: 'Breakthrough',
+      title: name,
+      body: tech.pick
+        ? (TECHNOLOGIES[tech.pick]?.description || '')
+        : 'Tap a tech, then Confirm',
+      dice: (tech.rolls || []).map((face) => ({ face, hit: face === 6 })),
+      pickers: available.map((id) => ({
+        side: 'att',
+        label: TECHNOLOGIES[id]?.name || id,
+        need: 1,
+        taken: tech.pick === id ? { [id]: 1 } : {},
+        units: [{ type: id, quantity: 1 }],
+      })),
+    };
+  }
+  return {
+    kicker: 'Research',
+    title: 'No breakthrough',
+    body: 'End Phase when ready',
+    dice: (tech.rolls || []).map((face) => ({ face, hit: face === 6 })),
+  };
+}
+
 export function battleCard(play) {
+  if (isGameOver(play)) return victoryCard(play);
+  if (play.gameState?.turnPhase === TURN_PHASES.DEVELOP_TECH && isHumanTurn(play)) {
+    return techCard(play);
+  }
   const battle = play.battle;
   if (!battle) return null;
   const dest = battle.dest;
@@ -964,15 +1247,16 @@ export function chromeModel(play, territories = []) {
   syncPlay(play);
   const marks = highlights(play);
   const strip = phaseStrip(play);
+  const phase = play.gameState.turnPhase;
+  const player = play.gameState.currentPlayer;
   const landName = play.landing?.dest
     || (play.landing ? null : (play.selected || marks.dest || marks.origin));
   const land = territories.find?.((t) => t.name === landName) || (landName ? { name: landName } : null);
-  const phase = play.gameState.turnPhase;
   const movePhase = phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE;
   const origin = play.selected;
   const showSteppers = movePhase && origin && movableStacks(play, origin).length
     && (play.selected === origin || pickedCount(play.selectedUnits) || play.destPicked);
-  const steppers = showSteppers
+  let steppers = showSteppers
     ? movableStacks(play, origin).map((s) => ({
       type: s.type,
       have: s.quantity,
@@ -980,6 +1264,46 @@ export function chromeModel(play, territories = []) {
       owner: s.owner,
     }))
     : null;
+  if (phase === TURN_PHASES.PURCHASE && isHumanTurn(play) && !isGameOver(play)) {
+    const ipc = play.gameState.getIPCs(player.id);
+    const shop = shopCapacity(play);
+    steppers = BUY_TYPES.map((type) => {
+      const cost = unitCost(play, type);
+      const pending = pendingQty(play, type);
+      const can = cost > 0 ? Math.floor(ipc / cost) : 0;
+      return {
+        type,
+        have: pending + Math.min(can, shop.left),
+        picked: pending,
+        owner: player.id,
+        short: `${({
+          infantry: 'INF', artillery: 'ART', armour: 'TNK',
+          fighter: 'FTR', bomber: 'BMB', aaGun: 'AA', factory: 'FAC',
+          submarine: 'SUB', destroyer: 'DD', transport: 'TRN',
+        }[type] || type.slice(0, 3).toUpperCase())} ${cost}`,
+      };
+    });
+  }
+  if (phase === TURN_PHASES.DEVELOP_TECH && isHumanTurn(play) && !isGameOver(play)
+    && !play.tech?.rolls && !play.tech?.breakthrough) {
+    const ipc = play.gameState.getIPCs(player.id);
+    const max = Math.floor(ipc / 5);
+    steppers = [{
+      type: TECH_DIE,
+      have: Math.max(max, play.tech?.dice || 0),
+      picked: play.tech?.dice || 0,
+      owner: player.id,
+      short: 'DIE 5',
+    }];
+  }
+  if (phase === TURN_PHASES.MOBILIZE && isHumanTurn(play) && !isGameOver(play)) {
+    steppers = pendingPurchasesOf(play).map((p) => ({
+      type: p.type,
+      have: p.quantity,
+      picked: Number(play.selectedUnits?.[p.type]) || 0,
+      owner: player.id,
+    }));
+  }
   const planeSteppers = play.landing
     ? Object.entries(play.landing.airLeft || {})
       .filter(([, n]) => Number(n) > 0)
@@ -993,8 +1317,20 @@ export function chromeModel(play, territories = []) {
   let route = '';
   if (movePhase && play.destPicked) route = `${origin} → ${play.destPicked}`;
   else if (play.landing) route = play.landing.dest ? `Confirm land · ${play.landing.dest}` : 'Pick a teal land';
+  else if (phase === TURN_PHASES.PURCHASE) {
+    const shop = shopCapacity(play);
+    route = `${shop.used}/${shop.max} queued`;
+  } else if (phase === TURN_PHASES.MOBILIZE && play.destPicked) {
+    route = `Place · ${play.destPicked}`;
+  }
+  let sheetLand = play.landing ? (land || { name: 'Land aircraft' }) : land;
+  if (!sheetLand && phase === TURN_PHASES.PURCHASE) sheetLand = { name: 'Purchase' };
+  if (!sheetLand && phase === TURN_PHASES.MOBILIZE) sheetLand = { name: play.destPicked || 'Mobilize' };
+  if (!sheetLand && phase === TURN_PHASES.DEVELOP_TECH && !battleCard(play)) {
+    sheetLand = { name: 'Research' };
+  }
   return {
-    land: play.landing ? (land || { name: 'Land aircraft' }) : land,
+    land: sheetLand,
     stacks: play.landing ? [] : (landName ? (play.gameState.units[landName] || []) : []),
     steppers: play.landing ? planeSteppers : steppers,
     airLand: !!play.landing,
@@ -1030,5 +1366,17 @@ export function inspectPlay(play) {
     airLeft: { ...(play.landing?.airLeft || {}) },
     queue: [...(gs.combatQueue || [])],
     ncmAirRemaining: ncmAirRemaining(play),
+    ipc: gs.getIPCs?.(gs.currentPlayer?.id) ?? 0,
+    pending: pendingQty(play),
+    shop: shopCapacity(play),
+    techDice: play.tech?.dice || 0,
+    techRolls: [...(play.tech?.rolls || [])],
+    techPick: play.tech?.pick || null,
+    breakthrough: !!play.tech?.breakthrough,
+    unlocked: [...(gs.playerTechs?.[gs.currentPlayer?.id]?.unlockedTechs || [])],
+    gameOver: !!gs.gameOver,
+    winner: gs.winner || null,
+    wantNewGame: !!play._newGame,
+    placeDests: legalPlaceDests(play),
   };
 }

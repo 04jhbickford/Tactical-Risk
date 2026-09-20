@@ -2,6 +2,14 @@
 
 ---
 
+## 9.20.26 — V2.81.55-ux-solo.3 S7–S9 (preview only)
+
+Purchase + mobilize tiles, tech dice / breakthrough pick, victory
+sheet + New Game vs AI on `?three=1&solo=1`. Pocket `?max=1` kept.
+Do not merge.
+
+---
+
 ## 9.19.26 — V2.81.55-ux-solo.2 S2–S6 (preview only)
 
 Phase shell + combat-move + combat/casualties + air land + NCM on
