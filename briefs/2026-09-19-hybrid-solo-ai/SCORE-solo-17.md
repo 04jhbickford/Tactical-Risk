@@ -30,13 +30,13 @@ Nothing invented for the occupant grammar. Only glue: `seatOccupantView()` so ch
 - `lobbyCanStart` = ≥2 seated **and** at least one Human
 - Seat wraps stay `flex:0 0 auto; overflow:visible` (no `.10`–`.11` clip)
 
-## QC @390 (fill after fail-closed)
+## QC @390 tip + local (PASS)
 
-Tip after hard reload. `/` `no-store`.
+Tip after hard reload: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.17`. `/` `no-store`.
 
-- A1 stamp `.17` on L0 + lobby + `__TR_GAME_VERSION`
-- All 5 seats full occupant chrome (Human/AI/Empty + Easy/Med/Hard), no clip, Americans not collapsed
-- Start dead at 0 seats and at all-AI; live at 1 Human + AI / 2+ Humans
-- T1 smoke: MAIN `pan-y`, footer sibling, CDP touch moves `scrollTop`
+- All 5 seats Human·AI·Empty + Easy·Med·Hard; height 144; overflow visible; Americans last seat unclipped
+- Start dead at 0 seats (`Select at least 2 players`) and all-AI (`Need at least one Human`); live at 3 Humans
+- CDP touch pan on seat card: `scrollTop` 0 → 118 → 366; `defaultPrevented` false; Americans above footer gap 95px
+- Unit `test-three-solo-lobby` + combat stages still PASS
 
-Hold merge.
+Stills under `/opt/cursor/artifacts/screenshots/lookpass17_*`. Hold merge.

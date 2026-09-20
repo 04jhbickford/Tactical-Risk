@@ -32,8 +32,19 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A #3, GA
 | **S2** | Start disabled at 0 seats and at all-AI; enabled at 1 Human + AI / 2+ Humans | yes | unit + still |
 | **T1** | Lobby still pans (do not regress `.15`) | yes | CDP touch smoke |
 
-## QC @390 tip + local
+## QC @390 tip + local (PASS)
 
-Fill after fail-closed stills. Unit: `test-three-solo-lobby`.
+Tip `?three=1&solo=1` after hard reload. `/` is `Cache-Control: no-store`. Live HTML + L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.17`.
+
+| # | Ask | QC @390 |
+|---|---|---|
+| **A1** | Stamp `.17` after hard reload | **PASS** — tip L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.17` |
+| **S1** | All 5 seats full occupant chrome | **PASS** — Human/AI/Empty + Easy/Med/Hard; height 144; overflow visible; Americans unclipped |
+| **S2** | Start gate | **PASS** — dead at 0 seats and all-AI; `Start Game (3 Players)` after 3 Humans |
+| **T1** | Lobby MAIN still pans | **PASS** — CDP touch `scrollTop` 0 → 118 → 366; footer sibling; Americans gap 95px |
+
+Unit: `test-three-solo-lobby`, `test-three-solo-play`, `test-ux-preview-chrome-hit`.
+
+Stills: `/opt/cursor/artifacts/screenshots/lookpass17_a1_stamp_hard_reload_390.png`, `lookpass17_seats_empty_start_dead_390.png`, `lookpass17_t1_setup_top_390.png`, `lookpass17_t5_scroll_end_last_seat_390.png`.
 
 Do not merge.
