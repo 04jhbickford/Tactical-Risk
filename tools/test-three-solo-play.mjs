@@ -32,9 +32,15 @@ import {
   BATTLE_STEP,
   STRIP_SHORT,
 } from '../src/map/threeSoloPlay.js';
-import { startClassicSolo } from '../src/map/threeSoloMatch.js';
+import {
+  startClassicSolo,
+  startRiskSolo,
+  completeSoloSetup,
+  firstOwnedLand,
+  autoPlaceCurrentCapital,
+} from '../src/map/threeSoloMatch.js';
 import { createScenario } from '../src/map/uxPreviewScenario.js';
-import { TURN_PHASES, TURN_PHASE_ORDER } from '../src/state/gameState.js';
+import { GameState, GAME_PHASES, TURN_PHASES, TURN_PHASE_ORDER } from '../src/state/gameState.js';
 
 const setup = JSON.parse(readFileSync(new URL('../data/setup.json', import.meta.url)));
 const territories = JSON.parse(readFileSync(new URL('../data/territories.json', import.meta.url)));
@@ -276,8 +282,93 @@ const inspect = inspectPlay(fresh());
 assert(inspect.turnPhase === 'develop_tech', 'inspect opens tech');
 assert(inspect.canEndPhase === true, 'inspect can end');
 
+// --- S10 Risk lobby → capital → deploy → PLAYING → win ---
+const lobbyState = new GameState(setup, territories, continents);
+const lobbyPlay = createSoloPlay(lobbyState, unitDefs);
+assert(lobbyPlay._lobby?.seat === 'Russians', 'cold lobby defaults Russians');
+assert(phaseStrip(lobbyPlay).steps.join('|') === 'Seat|Capital|Deploy|Play', 'setup strip');
+assert(phaseStrip(lobbyPlay).current === 1, 'strip on Seat');
+assert(confirmLabel(lobbyPlay).includes('Start as Russians'), 'start as Russians');
+adjustUnit(lobbyPlay, 'Germans', 1);
+assert(lobbyPlay._lobby.seat === 'Germans', 'seat pick Germans');
+assert(confirmLabel(lobbyPlay).includes('Start as Germans'), 'start as Germans');
+assert(confirmEnabled(lobbyPlay) === true, 'lobby confirm on');
+confirm(lobbyPlay);
+assert(lobbyPlay._startMatch?.mode === 'risk', 'confirm starts Risk');
+assert(lobbyPlay._startMatch?.humanSeat === 'Germans', 'confirm keeps seat');
+assert(lobbyPlay._startMatch?.lobby === false, 'confirm leaves lobby');
+
+const riskPlay = createSoloPlay(
+  startRiskSolo(setup, territories, continents, { humanSeat: 'Germans' }),
+  unitDefs,
+);
+assert(riskPlay._lobby == null, 'started Risk is not lobby');
+assert(riskPlay.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT, 'capital phase');
+assert(riskPlay.gameState.currentPlayer.id === 'Germans', 'Germans place first');
+assert(phaseStrip(riskPlay).current === 2, 'strip on Capital');
+assert(inspectPlay(riskPlay).capitalDests.length > 0, 'owned capital dests');
+const capLand = firstOwnedLand(riskPlay.gameState, 'Germans');
+tapLand(riskPlay, capLand);
+assert(riskPlay.selected === capLand, 'capital land selected');
+assert(confirmLabel(riskPlay).includes(capLand), 'named capital Confirm');
+confirm(riskPlay);
+assert(riskPlay.gameState.playerState.Germans.capitalTerritory === capLand, 'capital written');
+assert(riskPlay.gameState.currentPlayer.isAI === true, 'AI seats place next');
+while (
+  riskPlay.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
+  && riskPlay.gameState.currentPlayer?.isAI
+) {
+  assert(autoPlaceCurrentCapital(riskPlay.gameState), 'AI capital');
+}
+assert(riskPlay.gameState.phase === GAME_PHASES.UNIT_PLACEMENT, 'deploy after capitals');
+assert(riskPlay.gameState.currentPlayer.id === 'Germans', 'human deploys first');
+assert(phaseStrip(riskPlay).current === 3, 'strip on Deploy');
+adjustUnit(riskPlay, 'infantry', 1);
+const deployLand = firstOwnedLand(riskPlay.gameState, 'Germans');
+tapLand(riskPlay, deployLand);
+assert(riskPlay.destPicked === deployLand, 'deploy dest');
+assert(confirmLabel(riskPlay).includes('Deploy'), 'deploy Confirm');
+const infBefore = qty(riskPlay, deployLand, 'infantry', 'Germans');
+confirm(riskPlay);
+assert(qty(riskPlay, deployLand, 'infantry', 'Germans') === infBefore + 1, 'deployed infantry');
+
+assert(completeSoloSetup(riskPlay.gameState, unitDefs) === true, 'shared setup driver to PLAYING');
+assert(riskPlay.gameState.phase === GAME_PHASES.PLAYING, 'Risk reached PLAYING');
+riskPlay.gameState.currentPlayerIndex = riskPlay.gameState.players.findIndex((p) => p.id === 'Germans');
+assert(inspectPlay(riskPlay).turnPhase === 'develop_tech', 'Risk opens tech');
+assert(confirmEnabled(riskPlay) === true, 'human Confirm on after setup');
+confirm(riskPlay);
+assert(riskPlay.gameState.turnPhase === TURN_PHASES.PURCHASE, 'Risk can End Phase tech');
+confirm(riskPlay);
+assert(riskPlay.gameState.turnPhase === TURN_PHASES.COMBAT_MOVE, 'Risk can End Phase buy');
+
+const aiCaps = riskPlay.gameState.players
+  .filter((p) => p.id !== 'Germans')
+  .map((p) => riskPlay.gameState.playerState[p.id].capitalTerritory);
+riskPlay.gameState.units[aiCaps[0]] = [
+  ...(riskPlay.gameState.units[aiCaps[0]] || []),
+  { type: 'infantry', quantity: 1, owner: 'Germans' },
+];
+riskPlay.gameState.units[aiCaps[1]] = [
+  ...(riskPlay.gameState.units[aiCaps[1]] || []),
+  { type: 'infantry', quantity: 1, owner: 'Germans' },
+];
+assert(
+  riskPlay.gameState.captureOccupiedTerritory(aiCaps[0], { unitDefs, force: true }).captured,
+  'hybrid uses shared capture on Risk capital',
+);
+assert(
+  riskPlay.gameState.captureOccupiedTerritory(aiCaps[1], { unitDefs, force: true }).captured,
+  'second Risk capital flips',
+);
+riskPlay.gameState._checkVictoryConditions();
+assert(riskPlay.gameState.gameOver === true, 'Risk majority win');
+assert(confirmLabel(riskPlay) === 'New Game vs AI', 'victory Confirm');
+confirm(riskPlay);
+assert(riskPlay._startMatch?.lobby === true, 'win returns to Risk lobby');
+
 if (failures) {
   console.error(`${failures} solo play checks failed`);
   process.exit(1);
 }
-console.log('three solo S2–S6 checks passed');
+console.log('three solo S2–S6 + S10 checks passed');

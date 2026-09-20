@@ -1,6 +1,6 @@
-// Classic 1942 solo vs AI under Three chrome.
-// S2–S6: phase shell, combat-move, combat/casualties, air land, NCM.
-// Preview only. Do not merge to main. Do not grow uxPreviewScenario.js.
+// Solo vs AI under Three chrome. Default ?three=1&solo=1 is Risk
+// lobby→capital→deploy (live Canvas lobby parity). ?classic=1 keeps 1942.
+// Shared engine: src/state/soloMatch.js + GameState capture. Preview only.
 
 import { Camera, MAP_WIDTH } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
@@ -29,10 +29,13 @@ import { AIController } from '../ai/aiController.js';
 import { TURN_PHASE_NAMES } from '../state/gameState.js';
 import {
   startClassicSolo,
+  startRiskSolo,
   placementsFromState,
   inspectSolo,
   DEFAULT_HUMAN_SEAT,
 } from './threeSoloMatch.js';
+import { GameState, GAME_PHASES } from '../state/gameState.js';
+import { isClassicSoloRequested } from './uxPreviewFlag.js';
 import {
   createSoloPlay,
   tapLand,
@@ -86,7 +89,12 @@ function strokeSelectOutline(ctx, territory, territoryRenderer, zoom, {
 }
 
 export async function bootThreeSolo() {
-  reportStartupStatus('Solo vs AI — loading 1942 board…', 28);
+  reportStartupStatus(
+    isClassicSoloRequested()
+      ? 'Solo vs AI — loading 1942 board…'
+      : 'Solo vs AI — Risk lobby…',
+    28,
+  );
 
   let territories;
   let continents;
@@ -127,8 +135,12 @@ export async function bootThreeSolo() {
   const factions = setup.classic?.factions || setup.factions || [];
   const factionColors = new Map(factions.map((f) => [f.id, f.color]));
 
-  let gameState = startClassicSolo(setup, territories, continents);
+  const classicCold = isClassicSoloRequested();
+  let gameState = classicCold
+    ? startClassicSolo(setup, territories, continents)
+    : new GameState(setup, territories, continents);
   gameState.unitDefs = unitDefs;
+  if (!classicCold) gameState.phase = GAME_PHASES.LOBBY;
   territoryRenderer.setGameState(gameState);
 
   const openingHuman = gameState.players.find((p) => !p.isAI) || gameState.players[0];
@@ -205,7 +217,13 @@ export async function bootThreeSolo() {
     const you = gameState.players.find((p) => !p.isAI) || current;
     chrome.setPhase(gameState.gameOver
       ? (gameState.winner === 'Allies' ? 'Allied Victory' : gameState.winner === 'Axis' ? 'Axis Victory' : 'Victory')
-      : (TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY'));
+      : play._lobby
+        ? 'Lobby'
+        : gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT
+          ? 'Place Capital'
+          : gameState.phase === GAME_PHASES.UNIT_PLACEMENT
+            ? 'Deploy'
+            : (TURN_PHASE_NAMES[gameState.turnPhase] || gameState.turnPhase || 'PLAY'));
     chrome.setSeat(current?.name || you?.name || '—', current?.color || you?.color);
     chrome.setIpc(gameState.getIPCs(you?.id) || 0);
     const model = chromeModel(play, territories);
@@ -242,17 +260,32 @@ export async function bootThreeSolo() {
     camera.dirty = true;
   };
   chrome.onLossPick = (side, type) => {
-    if (play.tech?.breakthrough) adjustUnit(play, type, 1);
+    if (play._lobby || play.tech?.breakthrough) adjustUnit(play, type, 1);
     else adjustLoss(play, side, type, 1);
     paintChrome();
     camera.dirty = true;
   };
   chrome.onNewGameVsAI = () => {
-    startMatch();
+    startMatch({ lobby: true });
   };
 
-  function startMatch() {
-    bindState(startClassicSolo(setup, territories, continents));
+  function startMatch({ mode, humanSeat, lobby = false } = {}) {
+    if (lobby) {
+      bindState(new GameState(setup, territories, continents));
+      gameState.phase = GAME_PHASES.LOBBY;
+      play = createSoloPlay(gameState, unitDefs);
+      play._lobby = { seat: humanSeat || DEFAULT_HUMAN_SEAT };
+      play.aiStatus = null;
+      selected = null;
+      paintChrome();
+      camera.dirty = true;
+      return;
+    }
+    const useClassic = mode === 'classic' || (mode == null && classicCold);
+    const next = useClassic
+      ? startClassicSolo(setup, territories, continents, { humanSeat })
+      : startRiskSolo(setup, territories, continents, { humanSeat });
+    bindState(next);
     if (aiController) aiController.setGameState(gameState);
     else wireAI();
     play = createSoloPlay(gameState, unitDefs);
@@ -399,9 +432,16 @@ export async function bootThreeSolo() {
   bindSealedActivate(chrome.confirm, null, () => {
     if (chrome.confirm.disabled) return;
     confirmPlay(play);
+    if (play._startMatch) {
+      const next = play._startMatch;
+      play._startMatch = null;
+      play._newGame = false;
+      startMatch(next);
+      return;
+    }
     if (play._newGame) {
       play._newGame = false;
-      startMatch();
+      startMatch({ lobby: true });
       return;
     }
     selected = landByName(play.selected);
@@ -536,9 +576,16 @@ export async function bootThreeSolo() {
     },
     confirm: () => {
       confirmPlay(play);
+      if (play._startMatch) {
+        const next = play._startMatch;
+        play._startMatch = null;
+        play._newGame = false;
+        startMatch(next);
+        return inspectPlay(play);
+      }
       if (play._newGame) {
         play._newGame = false;
-        startMatch();
+        startMatch({ lobby: true });
         return inspectPlay(play);
       }
       selected = landByName(play.selected);
@@ -547,9 +594,10 @@ export async function bootThreeSolo() {
       return inspectPlay(play);
     },
     newGame: () => {
-      startMatch();
+      startMatch(classicCold ? { mode: 'classic' } : { lobby: true });
       return inspectSolo(gameState);
     },
+    startMatch,
     chrome,
     get gameState() { return gameState; },
     get play() { return play; },

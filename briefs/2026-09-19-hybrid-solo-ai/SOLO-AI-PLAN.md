@@ -1,8 +1,8 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** S0–S9 landed. Hold merge. Full classic solo vs AI on the tip.  
-**Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.55-ux-solo.3` · SCHEMA 11  
+**Status:** S0–S10 landed. Hold merge. Default solo is Risk lobby→setup→deploy→win vs AI. `?classic=1` keeps 1942.  
+**Branch / PR:** `cursor/conquer-hybrid-tip-9fb6` · [PR84](https://github.com/04jhbickford/Tactical-Risk/pull/84) onto PR76 tip (draft · **hold merge**)  
+**Tip:** `V2.81.56-ux-solo.5` · SCHEMA 11  
 **Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
 **Solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
 **Live main:** https://tactical-risk20.vercel.app/ · `V2.81.55` · SCHEMA 11  
@@ -34,9 +34,13 @@ Adapter is `src/map/threeSoloPlay.js` (GameState + AIController + autosave behin
 | **S8** | Develop Tech die stepper (5 IPC). Confirm Roll. Breakthrough → pick a tech → Unlock. Skip still End Phase at 0 dice. |
 | **S9** | Victory sheet + gold **New Game vs AI** (does not reload `/`). Cold start `?three=1&solo=1` can play a full turn loop and end the match. |
 
-**Residual stubs:** navy/amphib Three UX (naval still auto-resolves). Risk capital+deploy (S10). Three diagnostics log (S11). Retreat / bombard tiles. Tech tiles reuse casualty picker chrome (no unit art).
+## S10 landed (2026-09-20) — Risk lobby parity
 
-**How far a human can play:** Research (or skip) → Buy (or skip) → Combat Move → Combat → Air Land → NCM → Place bought units → income / AI. Win on alliance capitals → New Game vs AI. Pocket `?three=1&max=1` unchanged.
+Default `?three=1&solo=1` is live-lobby Risk (seat → capital → deploy → PLAYING). Shared `src/state/soloMatch.js` (`startRiskSolo` / `completeSoloSetup`) so Canvas main can cherry-pick the same boot. `?classic=1` / `?mode=classic` keeps S1–S9 1942. Capture still one GameState write (`threeSoloPlay.applyHits` + Canvas CombatUI).
+
+**Residual stubs:** navy/amphib Three UX (naval still auto-resolves). Three diagnostics log (S11). Retreat / bombard tiles. Tech tiles reuse casualty picker chrome (no unit art).
+
+**How far a human can play:** Cold `?three=1&solo=1` → Risk lobby seat → Place Capital → Deploy (6/round, leftover navy skip) → Research → Buy → Combat Move → Combat (shared `captureOccupiedTerritory`) → Air Land → NCM → Place bought units → income / AI. Win on majority capitals → New Game vs AI (lobby). `?classic=1` skips to 1942 PLAYING. Pocket `?three=1&max=1` unchanged.
 
 This brief tells Arc how to port a **real solo match vs AI** onto the tip `.11` Three UX without rewriting the rules engine and without touching lobby / multiplayer / `main`.
 
@@ -298,4 +302,4 @@ A playtester on a **390-wide** viewport, **no lobby**, can:
 
 **S0–S9 DONE.** Hold PR76 merge. Off `main` until a separate yes.
 
-S10 (Risk deploy) and S11 (Three diagnostics) stay optional.
+S10 (Risk lobby→capital→deploy) landed on `V2.81.56-ux-solo.5`. S11 (Three diagnostics) stays optional.

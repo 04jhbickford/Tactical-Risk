@@ -14,6 +14,7 @@ import {
   isSoloRequested,
   isUxPreviewRequested,
   isMaxBattleRequested,
+  isClassicSoloRequested,
   soloHref,
   stripPreviewParams,
 } from '../src/map/uxPreviewFlag.js';
@@ -35,6 +36,10 @@ assert(isSoloRequested('?three=1&solo=1') === true, 'solo+three');
 assert(isSoloRequested('?ux=1&solo=yes') === true, 'solo+ux');
 assert(isSoloRequested('?solo=1') === false, 'solo alone is not preview');
 assert(isSoloRequested('?three=1') === false, 'three alone is not solo');
+assert(isClassicSoloRequested('?three=1&solo=1') === false, 'default solo is Risk');
+assert(isClassicSoloRequested('?three=1&solo=1&classic=1') === true, 'classic=1 skip-setup');
+assert(isClassicSoloRequested('?three=1&solo=1&mode=classic') === true, 'mode=classic skip-setup');
+assert(!stripPreviewParams('https://ex.test/?three=1&solo=1&classic=1').includes('classic'), 'strip classic');
 assert(isUxPreviewRequested('?three=1&max=1') === true, 'max still preview');
 assert(isMaxBattleRequested('?three=1&max=1') === true, 'max fixture flag');
 assert(isMaxBattleRequested('?three=1&solo=1') === false, 'solo is not max');

@@ -1,86 +1,20 @@
-// Classic 1942 solo-vs-AI match helpers. No DOM. Preview / hybrid only.
+// Three hybrid re-export. Shared engine lives in src/state/soloMatch.js
+// so Canvas main can cherry-pick the same boot.
 
-import { GameState, GAME_PHASES, TURN_PHASE_NAMES } from '../state/gameState.js';
-import {
+export {
+  DEFAULT_HUMAN_SEAT,
+  DEFAULT_AI_DIFFICULTY,
+  buildSoloPlayers,
+  buildSoloPlayers as buildClassicSoloPlayers,
+  startClassicSolo,
+  startRiskSolo,
+  placementsFromState,
+  inspectSolo,
+  ownedLandNames,
+  firstOwnedLand,
+  adjacentOpenSeas,
+  autoPlaceCurrentCapital,
+  autoPlaceCurrentDeployRound,
+  completeSoloSetup,
   CLASSIC_CAPITALS,
-  prepareClassicSoloState,
-} from '../state/classicCapitals.js';
-
-export const DEFAULT_HUMAN_SEAT = 'Russians';
-export const DEFAULT_AI_DIFFICULTY = 'medium';
-
-export function buildClassicSoloPlayers(setup, {
-  humanSeat = DEFAULT_HUMAN_SEAT,
-  aiDifficulty = DEFAULT_AI_DIFFICULTY,
-} = {}) {
-  const factions = setup?.classic?.factions || setup?.factions || [];
-  const humanId = humanSeat || DEFAULT_HUMAN_SEAT;
-  const players = factions.map((faction) => {
-    const human = faction.id === humanId;
-    return {
-      ...faction,
-      isAI: !human,
-      aiDifficulty: human ? 'human' : (aiDifficulty || DEFAULT_AI_DIFFICULTY),
-    };
-  });
-  const human = players.find((p) => !p.isAI);
-  if (!human) return players;
-  return [human, ...players.filter((p) => p !== human)];
-}
-
-export function startClassicSolo(setup, territories, continents, options = {}) {
-  const players = options.players || buildClassicSoloPlayers(setup, options);
-  const gameState = new GameState(setup, territories, continents);
-  gameState.isMultiplayer = false;
-  gameState.initGame('classic', players, { alliancesEnabled: true });
-  prepareClassicSoloState(gameState);
-  return gameState;
-}
-
-export function placementsFromState(gameState) {
-  const out = {};
-  for (const [name, stacks] of Object.entries(gameState?.units || {})) {
-    out[name] = (stacks || []).map((s) => ({
-      type: s.type,
-      quantity: Number(s.quantity) || 0,
-      owner: s.owner,
-    }));
-  }
-  return out;
-}
-
-export function inspectSolo(gameState) {
-  const players = gameState?.players || [];
-  const capitals = {};
-  const ipc = {};
-  for (const player of players) {
-    capitals[player.id] = gameState.playerState?.[player.id]?.capitalTerritory || null;
-    ipc[player.id] = gameState.getIPCs?.(player.id) ?? gameState.playerState?.[player.id]?.ipcs ?? 0;
-  }
-  const human = players.find((p) => !p.isAI) || null;
-  const current = gameState?.currentPlayer || null;
-  return {
-    solo: true,
-    mode: gameState?.gameMode || null,
-    phase: gameState?.phase || null,
-    playing: gameState?.phase === GAME_PHASES.PLAYING,
-    turnPhase: gameState?.turnPhase || null,
-    turnPhaseName: TURN_PHASE_NAMES[gameState?.turnPhase] || gameState?.turnPhase || null,
-    currentPlayer: current ? { id: current.id, name: current.name, isAI: !!current.isAI } : null,
-    human: human ? { id: human.id, name: human.name, isAI: false } : null,
-    ai: players.filter((p) => p.isAI).map((p) => ({
-      id: p.id,
-      name: p.name,
-      isAI: true,
-      aiDifficulty: p.aiDifficulty || DEFAULT_AI_DIFFICULTY,
-    })),
-    capitals,
-    classicCapitals: { ...CLASSIC_CAPITALS },
-    ipc,
-    landCount: Object.keys(gameState?.territoryState || {}).length,
-    unitTerritories: Object.keys(gameState?.units || {}).length,
-    stamped: Object.values(CLASSIC_CAPITALS).every((name) => (
-      gameState?.territoryState?.[name]?.isCapital === true
-    )),
-  };
-}
+} from '../state/soloMatch.js';

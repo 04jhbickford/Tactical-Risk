@@ -3998,8 +3998,9 @@ export class GameState {
     }
   }
 
-  // One owner-flip path for combat UI, resolveCombat, empty-hex moves, and
-  // the V2.81.54 dequeue that used to skip _finalizeCombat.
+  // One owner-flip path for Canvas CombatUI, resolveCombat, empty-hex
+  // moves, the V2.81.54 dequeue that used to skip _finalizeCombat, and
+  // Three hybrid threeSoloPlay.applyHits. Keep this the only write.
   captureOccupiedTerritory(territory, { unitDefs = {}, notify = true, force = false } = {}) {
     const player = this.currentPlayer;
     if (!player || !territory) return { captured: false };

@@ -2,6 +2,13 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.5 Risk lobby→setup→deploy (preview)
+
+Default `?three=1&solo=1` is live-lobby Risk: seat pick → capital →
+deploy → PLAYING vs medium AI. `?classic=1` keeps 1942 skip-setup.
+Shared `src/state/soloMatch.js` + GameState capture (cherry-pick to
+main). Hold merge.
+
 ## 9.20.26 — V2.81.56-ux-solo.4 conquer owner flip (preview)
 
 Cherry-pick of main V2.81.56 onto PR76 hybrid tip. Shared GameState

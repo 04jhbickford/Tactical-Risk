@@ -63,6 +63,10 @@ export function createSoloPlay(gameState, unitDefs = {}) {
     aiStatus: null,
     rng: null,
     _newGame: false,
+    _startMatch: null,
+    _lobby: (!gameState?.gameMode || gameState?.phase === GAME_PHASES.LOBBY)
+      ? { seat: 'Russians' }
+      : null,
     _phase: gameState?.turnPhase || null,
     _player: gameState?.currentPlayer?.id || null,
   };
@@ -94,6 +98,61 @@ export function isHumanTurn(play) {
 
 export function isPlaying(play) {
   return play?.gameState?.phase === GAME_PHASES.PLAYING;
+}
+
+export function isSetup(play) {
+  const phase = play?.gameState?.phase;
+  return phase === GAME_PHASES.CAPITAL_PLACEMENT || phase === GAME_PHASES.UNIT_PLACEMENT;
+}
+
+export function isLobby(play) {
+  return !!play?._lobby;
+}
+
+export function capitalDests(play) {
+  const gs = play?.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!id || gs.phase !== GAME_PHASES.CAPITAL_PLACEMENT) return [];
+  return Object.entries(gs.territoryState || {})
+    .filter(([name, state]) => state.owner === id && !gs.territoryByName?.[name]?.isWater)
+    .map(([name]) => name);
+}
+
+export function deployPool(play) {
+  const gs = play?.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!id) return [];
+  return (gs.getUnitsToPlace?.(id) || []).filter((u) => (Number(u.quantity) || 0) > 0);
+}
+
+export function legalDeployDests(play) {
+  const gs = play?.gameState;
+  const player = gs?.currentPlayer;
+  if (!player || gs.phase !== GAME_PHASES.UNIT_PLACEMENT) return [];
+  const types = Object.entries(play.selectedUnits || {})
+    .filter(([, n]) => Number(n) > 0)
+    .map(([type]) => type);
+  const poolTypes = types.length ? types : deployPool(play).map((u) => u.type);
+  const dests = new Set();
+  const ownedLand = Object.entries(gs.territoryState || {})
+    .filter(([name, state]) => state.owner === player.id && !gs.territoryByName?.[name]?.isWater)
+    .map(([name]) => name);
+  for (const type of poolTypes) {
+    const def = play.unitDefs?.[type] || {};
+    if (def.isSea) {
+      for (const land of ownedLand) {
+        for (const conn of gs.getConnections?.(land) || []) {
+          const t = gs.territoryByName?.[conn];
+          if (!t?.isWater) continue;
+          const enemy = (gs.units[conn] || []).some((u) => u.owner !== player.id && (u.quantity || 0) > 0);
+          if (!enemy) dests.add(conn);
+        }
+      }
+    } else {
+      for (const name of ownedLand) dests.add(name);
+    }
+  }
+  return [...dests];
 }
 
 export function pickedCount(selectedUnits) {
@@ -221,7 +280,13 @@ export function legalDests(play) {
   return [...dests];
 }
 
+const SETUP_STRIP = ['Seat', 'Capital', 'Deploy', 'Play'];
+
 export function phaseStrip(play) {
+  if (isLobby(play)) return { steps: SETUP_STRIP, current: 1 };
+  const phase = play.gameState?.phase;
+  if (phase === GAME_PHASES.CAPITAL_PLACEMENT) return { steps: SETUP_STRIP, current: 2 };
+  if (phase === GAME_PHASES.UNIT_PLACEMENT) return { steps: SETUP_STRIP, current: 3 };
   const current = TURN_PHASE_ORDER.indexOf(play.gameState?.turnPhase);
   return {
     steps: TURN_PHASE_ORDER.map((p) => STRIP_SHORT[p] || TURN_PHASE_NAMES[p]),
@@ -749,6 +814,10 @@ export function tapLand(play, name) {
     play.selected = name;
     return play;
   }
+  if (isLobby(play)) {
+    play.selected = name;
+    return play;
+  }
   if (play.landing) {
     if (play.landing.landable.includes(name)) {
       play.selected = name;
@@ -761,6 +830,19 @@ export function tapLand(play, name) {
     return play;
   }
   const phase = play.gameState.turnPhase;
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    if (capitalDests(play).includes(name)) play.selected = name;
+    return play;
+  }
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    if (legalDeployDests(play).includes(name)) {
+      play.destPicked = name;
+      play.selected = name;
+    } else {
+      play.selected = name;
+    }
+    return play;
+  }
   if (phase === TURN_PHASES.MOBILIZE) {
     if (legalPlaceDests(play).includes(name)) {
       play.destPicked = name;
@@ -820,6 +902,23 @@ export function adjustUnit(play, type, delta = 1) {
   if (phase === TURN_PHASES.PURCHASE) {
     if (step > 0) play.gameState.addToPendingPurchases(type, play.unitDefs);
     else play.gameState.removeFromPendingPurchases(type, play.unitDefs);
+    return play;
+  }
+
+  if (isLobby(play)) {
+    const seats = (play.gameState?.setup?.risk?.factions || play.gameState?.setup?.factions || [])
+      .map((f) => f.id);
+    if (seats.includes(type) && step > 0) play._lobby.seat = type;
+    return play;
+  }
+
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    const have = deployPool(play).find((u) => u.type === type)?.quantity || 0;
+    if (have <= 0) return play;
+    const cur = Number(play.selectedUnits[type]) || 0;
+    const next = Math.max(0, Math.min(have, cur + step));
+    if (next <= 0) delete play.selectedUnits[type];
+    else play.selectedUnits[type] = next;
     return play;
   }
 
@@ -934,6 +1033,18 @@ function placePending(play) {
 export function confirmEnabled(play) {
   syncPlay(play);
   if (isGameOver(play)) return true;
+  if (isLobby(play)) return !!play._lobby.seat;
+  if (isSetup(play)) {
+    if (!isHumanTurn(play)) return false;
+    const gs = play.gameState;
+    if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      return capitalDests(play).includes(play.selected);
+    }
+    if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) {
+      if (play.destPicked && pickedCount(play.selectedUnits)) return true;
+      return gs.canFinishPlacementRound?.(gs.currentPlayer.id, play.unitDefs, { allowNavalSkip: true });
+    }
+  }
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
   if (play.landing) {
     return !!play.landing.dest && pickedCount(play.landing.pick) > 0;
@@ -966,8 +1077,26 @@ export function confirmGold(play) {
 export function confirmLabel(play) {
   syncPlay(play);
   if (isGameOver(play)) return 'New Game vs AI';
+  if (isLobby(play)) {
+    const seat = play._lobby.seat || 'Russians';
+    return `Confirm: Start as ${seat}`;
+  }
   if (!isHumanTurn(play)) {
     return play.aiStatus || `${play.gameState.currentPlayer?.name || 'AI'} thinking…`;
+  }
+  if (isSetup(play)) {
+    if (play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+      return play.selected && capitalDests(play).includes(play.selected)
+        ? `Confirm: Capital in ${play.selected}`
+        : 'Pick your capital';
+    }
+    if (play.destPicked && pickedCount(play.selectedUnits)) {
+      return `Confirm: Deploy in ${play.destPicked}`;
+    }
+    if (play.gameState.canFinishPlacementRound?.(play.gameState.currentPlayer.id, play.unitDefs, { allowNavalSkip: true })) {
+      return 'End Phase · Deploy';
+    }
+    return pickedCount(play.selectedUnits) ? 'Pick a land' : 'Select units to deploy';
   }
   if (play.landing) {
     if (!play.landing.dest) return 'Pick a teal land';
@@ -1024,7 +1153,41 @@ export function confirm(play) {
   if (!confirmEnabled(play)) return play;
   if (isGameOver(play)) {
     play._newGame = true;
+    play._startMatch = { mode: 'risk', lobby: true };
     return play;
+  }
+  if (isLobby(play)) {
+    play._startMatch = { mode: 'risk', humanSeat: play._lobby.seat, lobby: false };
+    play._lobby = null;
+    return play;
+  }
+  if (isSetup(play) && isHumanTurn(play)) {
+    const gs = play.gameState;
+    if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT && play.selected) {
+      gs.placeCapital(play.selected);
+      play.selected = null;
+      return play;
+    }
+    if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) {
+      if (play.destPicked && pickedCount(play.selectedUnits)) {
+        for (const [type, qty] of Object.entries(play.selectedUnits)) {
+          let left = Number(qty) || 0;
+          while (left > 0) {
+            const result = gs.placeInitialUnit(play.destPicked, type, play.unitDefs);
+            if (result?.success === false) break;
+            left -= 1;
+          }
+        }
+        play.selectedUnits = {};
+        play.destPicked = null;
+        return play;
+      }
+      if (gs.canFinishPlacementRound?.(gs.currentPlayer.id, play.unitDefs, { allowNavalSkip: true })) {
+        gs.finishPlacementRound(play.unitDefs, { allowNavalSkip: true });
+        resetUi(play);
+        return play;
+      }
+    }
   }
   if (play.landing) return applyLanding(play);
   if (play.battle) {
@@ -1090,6 +1253,19 @@ export function highlights(play) {
     teal: LAND_TEAL,
   };
   if (isGameOver(play)) return out;
+  if (isLobby(play)) return out;
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    out.legal = capitalDests(play);
+    if (!play.selected) out.pulse.push(...out.legal);
+    if (play.selected) out.selected = play.selected;
+    return out;
+  }
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    out.legal = legalDeployDests(play);
+    if (!play.destPicked) out.pulse.push(...out.legal);
+    if (play.destPicked) out.dest = play.destPicked;
+    return out;
+  }
   if (play.landing) {
     out.dest = play.landing.origin;
     out.landable = [...play.landing.landable];
@@ -1165,8 +1341,46 @@ function techCard(play) {
   };
 }
 
+function lobbyCard(play) {
+  const factions = play.gameState?.setup?.risk?.factions
+    || play.gameState?.setup?.factions
+    || [];
+  const seat = play._lobby?.seat;
+  return {
+    kicker: 'Lobby',
+    title: 'New Game vs AI',
+    body: 'Pick your seat · others are Medium AI · Risk setup',
+    dice: [],
+    pickers: factions.length ? [{
+      side: 'att',
+      label: 'You play',
+      need: 1,
+      taken: seat ? { [seat]: 1 } : {},
+      units: factions.map((f) => ({ type: f.id, quantity: 1 })),
+    }] : [],
+  };
+}
+
 export function battleCard(play) {
   if (isGameOver(play)) return victoryCard(play);
+  if (isLobby(play)) return lobbyCard(play);
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    return {
+      kicker: 'Place Capital',
+      title: play.selected || 'Your lands',
+      body: 'Tap a gold land you own, then Confirm',
+      dice: [],
+    };
+  }
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    const left = deployPool(play).reduce((n, u) => n + (Number(u.quantity) || 0), 0);
+    return {
+      kicker: 'Deploy',
+      title: play.destPicked || 'Your lands',
+      body: `${left} left · tap a gold land, pick units, Confirm`,
+      dice: [],
+    };
+  }
   if (play.gameState?.turnPhase === TURN_PHASES.DEVELOP_TECH && isHumanTurn(play)) {
     return techCard(play);
   }
@@ -1294,6 +1508,15 @@ export function chromeModel(play, territories = []) {
       short: 'DIE 5',
     }];
   }
+  if (isSetup(play) && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT
+    && isHumanTurn(play) && !isGameOver(play)) {
+    steppers = deployPool(play).map((p) => ({
+      type: p.type,
+      have: p.quantity,
+      picked: Number(play.selectedUnits?.[p.type]) || 0,
+      owner: player.id,
+    }));
+  }
   if (phase === TURN_PHASES.MOBILIZE && isHumanTurn(play) && !isGameOver(play)) {
     steppers = pendingPurchasesOf(play).map((p) => ({
       type: p.type,
@@ -1318,10 +1541,21 @@ export function chromeModel(play, territories = []) {
   else if (phase === TURN_PHASES.PURCHASE) {
     const shop = shopCapacity(play);
     route = `${shop.used}/${shop.max} queued`;
-  } else if (phase === TURN_PHASES.MOBILIZE && play.destPicked) {
+  }   else if (phase === TURN_PHASES.MOBILIZE && play.destPicked) {
     route = `Place · ${play.destPicked}`;
+  } else if (isSetup(play) && play.destPicked) {
+    route = `Deploy · ${play.destPicked}`;
+  } else if (isLobby(play)) {
+    route = `Seat · ${play._lobby.seat}`;
   }
   let sheetLand = play.landing ? (land || { name: 'Land aircraft' }) : land;
+  if (!sheetLand && isLobby(play)) sheetLand = { name: 'Lobby' };
+  if (!sheetLand && isSetup(play) && play.gameState.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    sheetLand = { name: play.selected || 'Place Capital' };
+  }
+  if (!sheetLand && isSetup(play) && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    sheetLand = { name: play.destPicked || 'Deploy' };
+  }
   if (!sheetLand && phase === TURN_PHASES.PURCHASE) sheetLand = { name: 'Purchase' };
   if (!sheetLand && phase === TURN_PHASES.MOBILIZE) sheetLand = { name: play.destPicked || 'Mobilize' };
   if (!sheetLand && phase === TURN_PHASES.DEVELOP_TECH && !battleCard(play)) {
@@ -1376,5 +1610,11 @@ export function inspectPlay(play) {
     winner: gs.winner || null,
     wantNewGame: !!play._newGame,
     placeDests: legalPlaceDests(play),
+    lobby: play._lobby ? { ...play._lobby } : null,
+    setupPhase: gs.phase,
+    capitalDests: capitalDests(play),
+    deployDests: legalDeployDests(play),
+    deployLeft: deployPool(play).reduce((n, u) => n + (Number(u.quantity) || 0), 0),
+    wantStartMatch: play._startMatch || null,
   };
 }

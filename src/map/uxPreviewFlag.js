@@ -18,6 +18,15 @@ export function isSoloRequested(search = typeof location !== 'undefined' ? locat
   return ON.has(String(params.get('solo') || '').toLowerCase());
 }
 
+// Classic 1942 skip-setup. Default solo is Risk lobby→capital→deploy.
+export function isClassicSoloRequested(search = typeof location !== 'undefined' ? location.search : '') {
+  if (!isSoloRequested(search)) return false;
+  const params = new URLSearchParams(search);
+  const classic = String(params.get('classic') || '').toLowerCase();
+  const mode = String(params.get('mode') || '').toLowerCase();
+  return ON.has(classic) || mode === 'classic';
+}
+
 export function soloHref(href = typeof location !== 'undefined' ? location.href : 'http://localhost/') {
   const url = new URL(href, 'http://localhost/');
   url.searchParams.set('three', '1');
@@ -46,5 +55,7 @@ export function stripPreviewParams(href = typeof location !== 'undefined' ? loca
   url.searchParams.delete('max');
   url.searchParams.delete('stress');
   url.searchParams.delete('demo');
+  url.searchParams.delete('classic');
+  url.searchParams.delete('mode');
   return url.toString();
 }
