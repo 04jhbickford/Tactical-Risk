@@ -45,6 +45,6 @@ Tip `?three=1&solo=1` after hard reload. `/` is `Cache-Control: no-store`. Live 
 
 Unit: `test-three-solo-lobby`, `test-three-solo-play`, `test-ux-preview-chrome-hit`.
 
-Stills: `/opt/cursor/artifacts/screenshots/lookpass17_a1_stamp_hard_reload_390.png`, `lookpass17_seats_empty_start_dead_390.png`, `lookpass17_t1_setup_top_390.png`, `lookpass17_t5_scroll_end_last_seat_390.png`.
+Stills: `/opt/cursor/artifacts/lookpass17_home_stamp_390.png`, `lookpass17_seats_empty_start_dead_390.png`, `lookpass17_three_humans_start_live_390.png`, `lookpass17_americans_full_chrome_390.png`. Walkthrough: `/opt/cursor/artifacts/lookpass17_seat_cards_qc_390.webm`.
 
 Do not merge.
