@@ -87,6 +87,7 @@ assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.10'), 'boot cache-
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
+assert(chromeSrc.includes('#three-l0 .three-l0-ver') && chromeSrc.includes('position:absolute'), 'L0 stamp hangs on-screen, not flex-clipped');
 assert(chromeSrc.includes('three-lobby-occupants'), 'seat occupants 4-col grid');
 assert(chromeSrc.includes('three-lobby-colors'), 'seat colors on their own row');
 assert(chromeSrc.includes('occupantChipLabel'), 'Human/Easy/Med/Hard chips');
