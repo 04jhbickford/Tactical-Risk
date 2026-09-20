@@ -2,6 +2,14 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.6 lookpass (preview only)
+
+James @390 Deploy: 6+5 tile grid (no TRN orphan), steppers
+uncipped, map chit borders inset + pad under sheet. Lobby
+restyled to main phone cards. Research pip cubes. Hold merge.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.5 lookpass (preview only)
 
 Three lobby now uses main option sources (`AI_DIFFICULTIES`,

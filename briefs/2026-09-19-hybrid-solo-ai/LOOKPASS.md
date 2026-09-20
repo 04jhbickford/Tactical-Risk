@@ -1,10 +1,16 @@
-# Lookpass — V2.81.56-ux-solo.5
+# Lookpass — V2.81.56-ux-solo.6
 
 **Hold merge.** Off main. Tesla / Viz off. SoT = [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76).
 
 **Tip:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
 **Pocket:** `?three=1&max=1` (Karelia fixture, unchanged)  
 **Skip lobby:** `?three=1&solo=1&go=1`
+
+## James he-correct (.6)
+
+1. **Lobby chrome** — same Local Play / How to Play / New Local Game / Classic·Risk / seats / AI / IPC / Teams / Start Game N. Restyled to main phone lobby structure: brand + version chip, icon cards (kicker / title / desc), setup head + segmented mode, tight seat cards, options band, gold Start CTA.
+2. **Deploy @390** — 6-col `is-wave` grid so 11 types wrap **6+5** (TRN not orphaned). Smaller steppers/icons + `box-sizing` so +/− sit inside tiles. Map chits: inset stroke (full border) + chrome-height `padBottom` so chips are not cropped under the sheet.
+3. **Research DIE** — root cause: `getUnitIconPath('techDie')` is `null` (no `units/{faction}/…` mapping), so the sheet painted `<img src="">` (broken-image icon). No die PNG on main; main uses CSS `.die.die-3d`. Three now paints an ivory pip cube (`cubeDieHtml`) and never emits an empty `<img>`.
 
 ## Pulled from main
 

@@ -50,6 +50,8 @@ import {
 import { GAME_PHASES, TURN_PHASES } from '../src/state/gameState.js';
 import { findUndefinedPaths } from '../src/state/persistState.js';
 import { GAME_VERSION } from '../src/version.js';
+import { cubeDieHtml } from '../src/map/threeMapChrome.js';
+import { getUnitIconPath } from '../src/utils/unitIcons.js';
 
 const setup = JSON.parse(readFileSync(new URL('../data/setup.json', import.meta.url)));
 const territories = JSON.parse(readFileSync(new URL('../data/territories.json', import.meta.url)));
@@ -64,7 +66,10 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.5', 'tip stamp ux-solo.5');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.6', 'tip stamp ux-solo.6');
+assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');
+const die = cubeDieHtml(5, { size: 'lg' });
+assert(die.includes('three-cube') && die.includes('data-pips="5"') && !die.includes('<img'), 'research die is pip cube, not img');
 assert(AI_DIFFICULTIES.map((d) => d.id).join(',') === 'human,easy,medium,hard', 'main occupant labels');
 assert(STARTING_IPC_OPTIONS.join(',') === '40,60,80,100,120,150', 'main IPC ladder');
 

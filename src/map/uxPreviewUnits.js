@@ -415,12 +415,21 @@ function drawCountBadge(ctx, x, y, text, piece) {
 
 function drawChit(ctx, img, x, y, size, ownerColor) {
   const pad = size * 0.08;
+  const lw = Math.max(1.1, size * 0.06);
+  const inset = lw / 2;
   ctx.save();
   ctx.fillStyle = ownerColor || '#4A4A4A';
   ctx.strokeStyle = 'rgba(20,16,10,0.88)';
-  ctx.lineWidth = Math.max(1.1, size * 0.06);
+  ctx.lineWidth = lw;
+  ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.roundRect(x - size / 2, y - size / 2, size, size, size * 0.16);
+  ctx.roundRect(
+    x - size / 2 + inset,
+    y - size / 2 + inset,
+    size - inset * 2,
+    size - inset * 2,
+    Math.max(0, size * 0.16 - inset),
+  );
   ctx.fill();
   ctx.stroke();
   if (img?.complete && img.naturalWidth > 0) {
@@ -430,12 +439,21 @@ function drawChit(ctx, img, x, y, size, ownerColor) {
 }
 
 function drawOverflowChip(ctx, x, y, size, text) {
+  const lw = Math.max(1, size * 0.06);
+  const inset = lw / 2;
   ctx.save();
   ctx.fillStyle = '#1A1610';
   ctx.strokeStyle = 'rgba(244,239,228,0.28)';
-  ctx.lineWidth = Math.max(1, size * 0.06);
+  ctx.lineWidth = lw;
+  ctx.lineJoin = 'round';
   ctx.beginPath();
-  ctx.roundRect(x - size / 2, y - size / 2, size, size, size * 0.5);
+  ctx.roundRect(
+    x - size / 2 + inset,
+    y - size / 2 + inset,
+    size - inset * 2,
+    size - inset * 2,
+    Math.max(0, size * 0.5 - inset),
+  );
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = '#F4EFE4';

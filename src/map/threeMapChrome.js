@@ -52,22 +52,60 @@ export function stackSummary(stacks) {
     .join(' ');
 }
 
+function unitArtHtml(type, owner, short, { dieSize = '' } = {}) {
+  if (type === 'techDie') return cubeDieHtml(5, { size: dieSize });
+  const src = getUnitIconPath(type, owner);
+  if (!src) return `<span class="three-tile-fallback" aria-hidden="true">${String(short || '?').slice(0, 2)}</span>`;
+  return `<img src="${src}" alt="${short}" width="36" height="36">`;
+}
+
 function iconRowHtml(stacks) {
   if (!stacks?.length) return '';
   return `<div class="three-peek-row">${stacks.map((s) => {
-    const src = getUnitIconPath(s.type, s.owner) || '';
+    const short = shortType(s.type);
     return `<button type="button" class="three-peek-unit" data-unit-type="${s.type}" title="${formatUnitName(s.type)}">
-      <img src="${src}" alt="${shortType(s.type)}" width="36" height="36">
-      <em>${shortType(s.type)}</em>
+      ${unitArtHtml(s.type, s.owner, short)}
+      <em>${short}</em>
       <b>${s.quantity}</b>
     </button>`;
   }).join('')}</div>`;
 }
 
+export function cubeDieHtml(face, { hit = false, side = '', size = '' } = {}) {
+  const n = Math.max(1, Math.min(6, Number(face) || 1));
+  const cls = [
+    'three-cube',
+    hit ? 'is-hit' : '',
+    side === 'def' ? 'is-def' : '',
+    size === 'lg' ? 'is-lg' : '',
+    size === 'sm' ? 'is-sm' : '',
+  ].filter(Boolean).join(' ');
+  return `<span class="${cls}" data-pips="${n}" aria-label="Die ${n}">${'<i></i>'.repeat(n)}</span>`;
+}
+
+const LOBBY_MARK_LOCAL = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
+const LOBBY_MARK_ONLINE = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>';
+const LOBBY_MARK_HOWTO = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>';
+const LOBBY_BACK_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>';
+
+function lobbyCardHtml({ action, value, kicker, title, desc, mark, off = false }) {
+  const data = off
+    ? 'disabled'
+    : `data-lobby="${action}" data-value="${value}"`;
+  return `<button type="button" class="three-lobby-card${off ? ' is-off' : ''}" ${data}>
+    <span class="three-lobby-card-mark">${mark}</span>
+    <span class="three-lobby-card-copy">
+      <span class="three-lobby-kicker">${kicker}</span>
+      <span class="three-lobby-card-title">${title}</span>
+      <span class="three-lobby-card-desc">${desc}</span>
+    </span>
+  </button>`;
+}
+
 function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) {
   if (!tiles?.length) return '';
-  return `<div class="three-tile-row${readOnly ? ' is-ro' : ''}">${tiles.map((s) => {
-    const src = getUnitIconPath(s.type, s.owner) || '';
+  const wave = tiles.length >= 8;
+  return `<div class="three-tile-row${readOnly ? ' is-ro' : ''}${wave ? ' is-wave' : ''}">${tiles.map((s) => {
     const short = s.short || shortType(s.type);
     const have = Number(s.have ?? s.quantity) || 0;
     const picked = Number(s.picked) || 0;
@@ -80,8 +118,10 @@ function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) 
     const plus = loss
       ? `data-loss-step="1" data-loss-side="${side || s.side || ''}" data-loss-type="${s.type}"`
       : `data-step="1" data-unit-type="${s.type}"`;
-    return `<div class="three-tile${picked > 0 ? ' is-on' : ''}" data-unit-type="${s.type}">
-      <img src="${src}" alt="${short}" width="36" height="36">
+    const dieTile = s.type === 'techDie';
+    const art = unitArtHtml(s.type, s.owner, short, { dieSize: dieTile && !wave ? 'lg' : '' });
+    return `<div class="three-tile${picked > 0 ? ' is-on' : ''}${dieTile ? ' is-die' : ''}" data-unit-type="${s.type}">
+      ${art}
       <em>${short}</em>
       <div class="three-tile-steps">
         <button type="button" class="three-step" ${minus} ${minusOff ? 'disabled' : ''} aria-label="Fewer ${name}">−</button>
@@ -200,9 +240,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-bottom {
       position:absolute; left:0; right:0; bottom:0; z-index:32;
-      padding:0 14px max(12px, calc(10px + env(safe-area-inset-bottom, 0px)));
-      padding-left:max(14px, env(safe-area-inset-left));
-      padding-right:max(14px, env(safe-area-inset-right));
+      padding:0 10px max(12px, calc(10px + env(safe-area-inset-bottom, 0px)));
+      padding-left:max(10px, env(safe-area-inset-left));
+      padding-right:max(10px, env(safe-area-inset-right));
       display:flex; flex-direction:column; gap:8px;
       pointer-events:none;
       background:linear-gradient(0deg, rgba(30,36,32,0.42) 0%, transparent 70%);
@@ -215,8 +255,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-peek {
       display:none; pointer-events:none;
-      min-height:0; padding:6px 10px; border-radius:12px;
-      max-height:min(38dvh, 280px); overflow-y:auto;
+      min-height:0; padding:6px 8px; border-radius:12px;
+      max-height:min(44dvh, 320px); overflow-x:hidden; overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       background:rgba(30,36,32,0.36);
       -webkit-backdrop-filter:saturate(1.35) blur(18px);
@@ -277,42 +317,57 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;
       overflow:visible;
     }
+    #three-peek .three-tile-row.is-wave,
+    #three-battle .three-tile-row.is-wave {
+      display:grid;
+      grid-template-columns:repeat(6, minmax(0, 1fr));
+      gap:3px;
+      width:100%;
+    }
     #three-peek .three-tile,
     #three-battle .three-tile {
       flex:0 0 auto; width:64px;
+      box-sizing:border-box; overflow:visible;
       display:inline-flex; flex-direction:column; align-items:center;
-      padding:5px 3px 4px; border-radius:14px;
+      padding:4px 2px 3px; border-radius:12px;
       background:rgba(240,230,210,0.20);
       border:1.5px solid rgba(255,255,255,0.22);
+    }
+    #three-peek .three-tile-row.is-wave .three-tile,
+    #three-battle .three-tile-row.is-wave .three-tile {
+      width:auto; min-width:0; max-width:100%;
     }
     #three-peek .three-tile.is-on,
     #three-battle .three-tile.is-on {
       border-color:#C4A35A; box-shadow:0 0 0 2px rgba(196,163,90,0.35);
     }
     #three-peek .three-tile img,
-    #three-battle .three-tile img { width:36px; height:36px; display:block; }
+    #three-battle .three-tile img { width:32px; height:32px; display:block; }
+    #three-peek .three-tile-row.is-wave .three-tile img,
+    #three-battle .three-tile-row.is-wave .three-tile img { width:26px; height:26px; }
     #three-peek .three-tile em,
     #three-battle .three-tile em {
       display:block; margin-top:1px;
-      font:700 10px/1 -apple-system,"SF Pro Text",sans-serif;
-      letter-spacing:0.04em; color:#F4E8C4; font-style:normal;
+      font:700 9px/1 -apple-system,"SF Pro Text",sans-serif;
+      letter-spacing:0.03em; color:#F4E8C4; font-style:normal;
     }
     #three-peek .three-tile-steps,
     #three-battle .three-tile-steps {
-      display:flex; align-items:center; justify-content:center; gap:1px; margin-top:3px;
+      display:flex; align-items:center; justify-content:center;
+      gap:0; margin-top:2px; width:100%; min-width:0;
     }
     #three-peek .three-tile-steps b,
     #three-battle .three-tile-steps b {
-      min-width:22px; text-align:center;
-      font:700 9px/1 -apple-system,"SF Pro Text",sans-serif;
+      min-width:16px; text-align:center; flex:1 1 auto;
+      font:700 8px/1 -apple-system,"SF Pro Text",sans-serif;
       font-variant-numeric:tabular-nums; color:#F4EFE4;
     }
     #three-peek .three-step,
     #three-battle .three-step {
-      width:20px; height:20px; border-radius:7px;
+      width:16px; height:16px; flex:0 0 16px; border-radius:6px;
       border:1px solid rgba(255,255,255,0.16);
       background:rgba(30,36,32,0.55); color:#F4E8C4;
-      font:700 14px/1 -apple-system,"SF Pro Text",sans-serif;
+      font:700 12px/1 -apple-system,"SF Pro Text",sans-serif;
       cursor:pointer; -webkit-tap-highlight-color:transparent;
       touch-action:manipulation; padding:0;
     }
@@ -488,6 +543,67 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:600 10px/1 -apple-system,"SF Pro Text",sans-serif;
       color:rgba(232,226,212,0.62); letter-spacing:0.02em;
     }
+    .three-cube {
+      --s:36px; --pip:calc(var(--s) * 0.16);
+      position:relative; display:inline-block;
+      width:var(--s); height:var(--s); flex:0 0 var(--s);
+      border-radius:calc(var(--s) * 0.2);
+      background:linear-gradient(145deg, #fff8ee, #d4ccc0);
+      box-shadow:2px 2px 5px rgba(0,0,0,0.38), inset 1px 1px 2px rgba(255,255,255,0.9);
+      box-sizing:border-box;
+    }
+    .three-cube.is-sm { --s:22px; }
+    .three-cube.is-lg { --s:44px; }
+    .three-cube.is-hit {
+      background:linear-gradient(145deg, #E6C57A, #C4A35A);
+      box-shadow:0 0 10px rgba(196,163,90,0.55), 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .three-cube.is-def.is-hit {
+      background:linear-gradient(145deg, #8EB8C8, #5B8CA8);
+    }
+    .three-cube i {
+      position:absolute; width:var(--pip); height:var(--pip); margin:0;
+      border-radius:50%; background:#1A1610;
+      transform:translate(-50%,-50%);
+    }
+    .three-cube.is-hit i { background:#1E2420; }
+    .three-cube.is-def.is-hit i { background:#F4EFE4; }
+    .three-cube[data-pips="1"] i:nth-child(1) { top:50%; left:50%; }
+    .three-cube[data-pips="2"] i:nth-child(1) { top:28%; left:28%; }
+    .three-cube[data-pips="2"] i:nth-child(2) { top:72%; left:72%; }
+    .three-cube[data-pips="3"] i:nth-child(1) { top:28%; left:28%; }
+    .three-cube[data-pips="3"] i:nth-child(2) { top:50%; left:50%; }
+    .three-cube[data-pips="3"] i:nth-child(3) { top:72%; left:72%; }
+    .three-cube[data-pips="4"] i:nth-child(1) { top:28%; left:28%; }
+    .three-cube[data-pips="4"] i:nth-child(2) { top:28%; left:72%; }
+    .three-cube[data-pips="4"] i:nth-child(3) { top:72%; left:28%; }
+    .three-cube[data-pips="4"] i:nth-child(4) { top:72%; left:72%; }
+    .three-cube[data-pips="5"] i:nth-child(1) { top:28%; left:28%; }
+    .three-cube[data-pips="5"] i:nth-child(2) { top:28%; left:72%; }
+    .three-cube[data-pips="5"] i:nth-child(3) { top:50%; left:50%; }
+    .three-cube[data-pips="5"] i:nth-child(4) { top:72%; left:28%; }
+    .three-cube[data-pips="5"] i:nth-child(5) { top:72%; left:72%; }
+    .three-cube[data-pips="6"] i:nth-child(1) { top:24%; left:30%; }
+    .three-cube[data-pips="6"] i:nth-child(2) { top:50%; left:30%; }
+    .three-cube[data-pips="6"] i:nth-child(3) { top:76%; left:30%; }
+    .three-cube[data-pips="6"] i:nth-child(4) { top:24%; left:70%; }
+    .three-cube[data-pips="6"] i:nth-child(5) { top:50%; left:70%; }
+    .three-cube[data-pips="6"] i:nth-child(6) { top:76%; left:70%; }
+    #three-peek .three-tile-row.is-wave .three-cube { --s:26px; }
+    #three-peek .three-tile.is-die .three-cube { --s:40px; }
+    .three-tile-fallback {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:32px; height:32px; border-radius:8px;
+      background:rgba(240,230,210,0.16); color:#F4E8C4;
+      font:700 11px/1 -apple-system,sans-serif;
+    }
+    .three-dice-hero {
+      display:flex; justify-content:center; align-items:center;
+      gap:10px; margin:8px 0 2px;
+    }
+    #three-battle .three-dice.is-hero {
+      justify-content:center; gap:8px; margin:10px 0 6px;
+    }
     #three-battle .three-pickers {
       flex:0 0 auto; margin-top:6px; display:flex; flex-direction:column; gap:6px;
     }
@@ -524,73 +640,138 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-lobby {
       display:none; position:absolute; inset:0; z-index:50;
       padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-      background:rgba(30,36,32,0.88);
+      background:rgba(22,26,28,0.94);
       -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
       color:#E8E2D4; overflow-y:auto; pointer-events:auto;
     }
-    #three-lobby.is-open { display:block; }
+    #three-lobby.is-open { display:flex; flex-direction:column; }
+    #three-lobby .three-lobby-home,
+    #three-lobby .three-lobby-setup,
+    #three-lobby .three-lobby-howto {
+      display:flex; flex-direction:column; gap:14px; flex:1; min-height:0;
+    }
+    #three-lobby .three-lobby-brand { text-align:center; padding:18px 8px 4px; }
+    #three-lobby .three-lobby-logo {
+      margin:0; font:700 32px/1.05 -apple-system,"SF Pro Display",sans-serif;
+      letter-spacing:0.4px; color:#F4EFE4;
+    }
+    #three-lobby .three-lobby-tag {
+      margin:6px 0 0; font:400 14px/1.3 -apple-system,sans-serif; color:#94a3b8;
+    }
+    #three-lobby .three-lobby-ver {
+      display:inline-block; margin-top:8px; padding:3px 8px; border-radius:999px;
+      border:1px solid rgba(196,163,90,0.35); color:#C4A35A;
+      font:600 11px/1 -apple-system,sans-serif; letter-spacing:0.06em;
+    }
+    #three-lobby .three-lobby-path {
+      margin:0; font:700 11px/1 -apple-system,sans-serif;
+      letter-spacing:0.08em; text-transform:uppercase; color:#93c5fd;
+    }
+    #three-lobby .three-lobby-actions { display:flex; flex-direction:column; gap:8px; }
     #three-lobby h2 {
-      margin:8px 0 6px; font:600 12px/1 -apple-system,sans-serif;
+      margin:0 0 8px; font:600 12px/1 -apple-system,sans-serif;
       letter-spacing:0.10em; text-transform:uppercase; color:#C4A35A;
     }
     #three-lobby .three-lobby-title {
-      margin:12px 0 4px; font:700 22px/1.1 -apple-system,"SF Pro Display",sans-serif;
+      margin:0; font:700 22px/1.1 -apple-system,"SF Pro Display",sans-serif;
     }
-    #three-lobby .three-lobby-sub { margin:0 0 16px; font:400 13px/1.3 -apple-system,sans-serif; color:#c8c0b0; }
-    #three-lobby .three-lobby-row { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
+    #three-lobby .three-lobby-sub { margin:4px 0 0; font:400 13px/1.3 -apple-system,sans-serif; color:#94a3b8; }
+    #three-lobby .three-lobby-row,
+    #three-lobby .three-lobby-seg {
+      display:flex; flex-wrap:wrap; gap:8px; margin:0;
+    }
+    #three-lobby .three-lobby-seg { padding:4px; border-radius:12px; background:rgba(255,255,255,0.04); }
+    #three-lobby .three-lobby-sec { margin:0; }
     #three-lobby button.three-lobby-tile {
-      min-height:44px; padding:0 12px; border-radius:12px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(255,255,255,0.05); color:#f4ead4;
-      font:600 14px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+      min-height:40px; padding:0 12px; border-radius:10px;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05); color:#e2e8f0;
+      font:600 13px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
     }
     #three-lobby button.three-lobby-tile.is-on {
-      border-color:#C4A35A; background:rgba(196,163,90,0.18); color:#F4E8C4;
-    }
-    #three-lobby .three-lobby-ai {
-      display:flex; align-items:center; gap:10px; min-height:44px;
-      font:700 16px/1 -apple-system,sans-serif;
-    }
-    #three-lobby .three-lobby-ai button {
-      width:44px; height:44px; border-radius:12px;
-      border:1px solid rgba(255,255,255,0.14);
-      background:rgba(30,36,32,0.55); color:#F4E8C4;
-      font:700 20px/1 -apple-system,sans-serif; cursor:pointer;
+      border-color:#C4A35A; background:rgba(196,163,90,0.20); color:#F4E8C4;
     }
     #three-lobby .three-lobby-start {
-      display:block; width:100%; min-height:56px; margin-top:8px;
-      border:0; border-radius:16px; background:#C4A35A; color:#1E2420;
-      font:700 16px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+      display:block; width:100%; min-height:56px; margin-top:4px;
+      border:0; border-radius:12px; background:#C4A35A; color:#1E2420;
+      font:700 15px/1 -apple-system,"SF Pro Text",sans-serif;
+      letter-spacing:0.04em; text-transform:uppercase; cursor:pointer;
     }
-    #three-lobby .three-lobby-start:disabled { opacity:0.4; cursor:default; }
-    #three-lobby .three-lobby-card {
-      display:block; width:100%; text-align:left; min-height:72px;
-      margin:0 0 10px; padding:12px 14px; border-radius:14px;
+    #three-lobby .three-lobby-start:disabled {
+      background:#334155; color:#64748b; cursor:default;
+    }
+    #three-lobby button.three-lobby-card {
+      display:flex; flex-direction:row; align-items:center; gap:12px;
+      width:100%; text-align:left; min-height:88px;
+      margin:0; padding:16px; border-radius:14px;
       border:1px solid rgba(255,255,255,0.14);
-      background:rgba(255,255,255,0.05); color:#f4ead4;
-      font:600 16px/1.2 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+      background:rgba(255,255,255,0.05); color:#f1f5f9; cursor:pointer;
     }
-    #three-lobby .three-lobby-card small {
-      display:block; margin-top:4px; font:400 13px/1.3 -apple-system,sans-serif; color:#c8c0b0;
+    #three-lobby button.three-lobby-card.is-off {
+      opacity:0.42; cursor:default; border-color:rgba(255,255,255,0.08);
     }
-    #three-lobby .three-lobby-card.is-off { opacity:0.45; cursor:default; }
+    #three-lobby .three-lobby-card-mark {
+      flex:0 0 44px; width:44px; height:44px;
+      display:flex; align-items:center; justify-content:center; color:#93c5fd;
+    }
+    #three-lobby .three-lobby-card-mark svg { width:28px; height:28px; }
+    #three-lobby .three-lobby-card-copy {
+      display:flex; flex-direction:column; align-items:flex-start; gap:2px; min-width:0;
+    }
+    #three-lobby .three-lobby-kicker {
+      font:700 11px/1 -apple-system,sans-serif;
+      letter-spacing:0.08em; text-transform:uppercase; color:#93c5fd;
+    }
+    #three-lobby .three-lobby-card-title {
+      font:700 22px/1.1 -apple-system,"SF Pro Display",sans-serif; color:#F4EFE4;
+    }
+    #three-lobby .three-lobby-card-desc {
+      font:400 13px/1.3 -apple-system,sans-serif; color:#cbd5e1;
+    }
+    #three-lobby .three-lobby-setup-head {
+      display:flex; align-items:center; gap:10px; flex-shrink:0;
+    }
     #three-lobby .three-lobby-back {
-      min-height:44px; margin:0 0 8px; padding:0 12px;
-      border:0; background:transparent; color:#C4A35A;
-      font:600 14px/1 -apple-system,sans-serif; cursor:pointer;
+      width:44px; height:44px; min-width:44px; margin:0; padding:0;
+      border:0; border-radius:12px; background:rgba(255,255,255,0.06);
+      color:#C4A35A; display:inline-flex; align-items:center; justify-content:center;
+      cursor:pointer;
+    }
+    #three-lobby .three-lobby-back svg { width:22px; height:22px; }
+    #three-lobby .three-lobby-seats {
+      display:flex; flex-direction:column; gap:8px; flex:1; min-height:0;
+    }
+    #three-lobby .three-lobby-seat-wrap {
+      border-radius:12px; border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.04); overflow:hidden;
+    }
+    #three-lobby .three-lobby-seat-wrap.is-on {
+      border-color:#C4A35A; background:rgba(196,163,90,0.10);
     }
     #three-lobby .three-lobby-seat {
-      width:100%; text-align:left; min-height:56px; padding:10px 12px;
-      border-radius:12px; border:1px solid rgba(255,255,255,0.12);
-      background:rgba(255,255,255,0.04); color:#f4ead4; cursor:pointer;
+      width:100%; text-align:left; min-height:52px; padding:12px 14px;
+      border:0; border-radius:0; background:transparent; color:#f1f5f9; cursor:pointer;
     }
-    #three-lobby .three-lobby-seat.is-on {
-      border-color:#C4A35A; background:rgba(196,163,90,0.16);
+    #three-lobby .three-lobby-seat-name { font:700 16px/1.2 -apple-system,sans-serif; }
+    #three-lobby .three-lobby-seat-meta {
+      display:block; margin-top:2px;
+      font:400 12px/1.2 -apple-system,sans-serif; color:#94a3b8;
     }
-    #three-lobby .three-lobby-seat-name { font:700 15px/1.2 -apple-system,sans-serif; }
-    #three-lobby .three-lobby-seat-tools { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    #three-lobby .three-lobby-seat-tools {
+      display:flex; flex-wrap:wrap; gap:6px; padding:0 12px 12px;
+    }
+    #three-lobby .three-lobby-opts {
+      display:flex; flex-direction:column; gap:10px;
+      padding:12px; border-radius:12px; background:rgba(255,255,255,0.03);
+    }
+    #three-lobby .three-lobby-opt {
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    #three-lobby .three-lobby-opt > span {
+      font:600 13px/1 -apple-system,sans-serif; color:#cbd5e1;
+    }
     #three-lobby .three-lobby-foot {
-      margin:8px 0 12px; font:400 12px/1.3 -apple-system,sans-serif; color:#c8c0b0;
+      margin:0; font:400 12px/1.3 -apple-system,sans-serif; color:#94a3b8;
     }
     #three-tutorial {
       display:none; position:absolute; inset:0; z-index:55;
@@ -623,12 +804,23 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-l0 .three-l0-ver { display:none; }
       #three-peek .three-peek-unit { width:60px; height:70px; }
       #three-peek .three-peek-unit img { width:40px; height:40px; }
+      #three-peek { padding:6px 6px; }
+      #three-peek .three-tile-row.is-wave { gap:3px; }
+      #three-peek .three-tile-row.is-wave .three-tile { padding:3px 1px 2px; border-radius:10px; }
+      #three-peek .three-tile-row.is-wave .three-tile img { width:24px; height:24px; }
+      #three-peek .three-tile-row.is-wave .three-cube { --s:24px; }
+      #three-peek .three-tile-row.is-wave .three-tile em { font-size:8px; }
+      #three-peek .three-tile-row.is-wave .three-step { width:15px; height:15px; flex-basis:15px; font-size:11px; }
+      #three-peek .three-tile-row.is-wave .three-tile-steps b { min-width:14px; font-size:8px; }
       #three-phase-strip .three-step { font-size:11px; }
       #three-confirm, #three-confirm.is-idle, #three-confirm:disabled {
         min-height:56px; height:56px; font-size:15px;
       }
       #three-battle strong { font-size:14px; }
       #three-battle .three-die { width:18px; height:18px; }
+      #three-lobby .three-lobby-logo { font-size:28px; }
+      #three-lobby button.three-lobby-card { min-height:80px; padding:14px; }
+      #three-lobby .three-lobby-card-title { font-size:20px; }
     }
   `;
   document.head.appendChild(style);
@@ -794,8 +986,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
     paintTutorial() {
       tutorial.innerHTML = `
-        <p class="three-lobby-sub">How to Play · no sign-in · SCHEMA ${SCHEMA_VERSION}</p>
-        <h2>${SETUP_TUTORIAL_TITLE}</h2>
+        <p class="three-lobby-path">How to Play</p>
+        <p class="three-lobby-title">${SETUP_TUTORIAL_TITLE}</p>
+        <p class="three-lobby-sub">No sign-in · SCHEMA ${SCHEMA_VERSION}</p>
         ${SETUP_TUTORIAL_STEPS.map((step) => `
           <div class="three-tut-step"><b>${step.kicker}</b><p>${step.body}</p></div>
         `).join('')}
@@ -807,33 +1000,49 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       if (screen === 'main' || model.showHowTo) {
         if (model.showHowTo && screen !== 'setup') {
           lobby.innerHTML = `
-            <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main">← Back</button>
-            <p class="three-lobby-title">How to Play</p>
-            <p class="three-lobby-sub">Rules — no sign-in</p>
-            ${SETUP_TUTORIAL_STEPS.map((step) => `
-              <div class="three-tut-step"><b>${step.kicker}</b><p>${step.body}</p></div>
-            `).join('')}
-            <button type="button" class="three-lobby-start" data-lobby="screen" data-value="setup">New Local Game</button>
+            <div class="three-lobby-howto">
+              <div class="three-lobby-setup-head">
+                <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main" aria-label="Back">${LOBBY_BACK_ICON}</button>
+                <div>
+                  <p class="three-lobby-title">How to Play</p>
+                  <p class="three-lobby-sub">Guest · Rules — no sign-in</p>
+                </div>
+              </div>
+              ${SETUP_TUTORIAL_STEPS.map((step) => `
+                <div class="three-tut-step"><b>${step.kicker}</b><p>${step.body}</p></div>
+              `).join('')}
+              <button type="button" class="three-lobby-start" data-lobby="screen" data-value="setup">New Local Game</button>
+            </div>
           `;
           api.setLobbyOpen(true);
           return;
         }
         lobby.innerHTML = `
-          <p class="three-lobby-title">Tactical Risk</p>
-          <p class="three-lobby-sub">World War II Grand Strategy · ${GAME_VERSION}</p>
-          <p class="three-lobby-sub">Start here · Local only · no lobby server</p>
-          <button type="button" class="three-lobby-card" data-lobby="screen" data-value="setup">
-            Local Play
-            <small>This device · Friends or AI on this screen</small>
-          </button>
-          <button type="button" class="three-lobby-card is-off" disabled>
-            Play Online
-            <small>Off this tip · no Firebase</small>
-          </button>
-          <button type="button" class="three-lobby-card" data-lobby="howto" data-value="1">
-            How to Play
-            <small>Guest · Rules — no sign-in</small>
-          </button>
+          <div class="three-lobby-home">
+            <div class="three-lobby-brand">
+              <h1 class="three-lobby-logo">Tactical Risk</h1>
+              <p class="three-lobby-tag">World War II Grand Strategy</p>
+              <span class="three-lobby-ver">${GAME_VERSION}</span>
+            </div>
+            <p class="three-lobby-path">Start here</p>
+            <div class="three-lobby-actions">
+              ${lobbyCardHtml({
+                action: 'screen', value: 'setup', mark: LOBBY_MARK_LOCAL,
+                kicker: 'This device', title: 'Local Play',
+                desc: 'Friends or AI on this screen',
+              })}
+              ${lobbyCardHtml({
+                action: 'online', value: '0', mark: LOBBY_MARK_ONLINE,
+                kicker: 'Multiplayer', title: 'Play Online',
+                desc: 'Off this tip · no Firebase', off: true,
+              })}
+              ${lobbyCardHtml({
+                action: 'howto', value: '1', mark: LOBBY_MARK_HOWTO,
+                kicker: 'Guest', title: 'How to Play',
+                desc: 'Rules · no sign-in',
+              })}
+            </div>
+          </div>
         `;
         api.setLobbyOpen(true);
         return;
@@ -844,57 +1053,76 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       const selected = new Set(model.selectedPlayers || []);
       const canStart = lobbyCanStart(model);
       lobby.innerHTML = `
-        <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main">← Back</button>
-        <p class="three-lobby-title">New Local Game</p>
-        <p class="three-lobby-sub">Select 2-5 players to begin</p>
-        <h2>Mode</h2>
-        <div class="three-lobby-row">
-          <button type="button" class="three-lobby-tile${classic ? ' is-on' : ''}" data-lobby="mode" data-value="classic">Classic 1942</button>
-          <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk</button>
-        </div>
-        <h2>Players</h2>
-        <div class="three-lobby-row">
-          <button type="button" class="three-lobby-tile${model.teamsEnabled ? ' is-on' : ''}" data-lobby="teams" data-value="${model.teamsEnabled ? '0' : '1'}">Teams ${model.teamsEnabled ? 'On' : 'Off'}</button>
-        </div>
-        ${factions.map((f) => {
-          const on = selected.has(f.id);
-          const occupant = model.playerAI?.[f.id] || 'human';
-          const color = model.playerColors?.[f.id]?.color || f.color || '#888';
-          return `
-            <div class="three-lobby-seat-wrap">
-              <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}" style="box-shadow:inset 0 0 0 2px ${color}">
-                <div class="three-lobby-seat-name">${f.name || f.id}${on ? '' : ' · Tap to add'}</div>
-              </button>
-              ${on ? `
-                <div class="three-lobby-seat-tools">
-                  ${AI_DIFFICULTIES.map((d) => `
-                    <button type="button" class="three-lobby-tile${occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${d.name}</button>
-                  `).join('')}
-                  ${model.teamsEnabled ? `
-                    <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</button>
-                    <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</button>
-                    <button type="button" class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</button>
-                  ` : ''}
-                  ${FACTION_COLORS.slice(0, 6).map((c) => `
-                    <button type="button" class="three-lobby-tile" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="width:28px;min-height:28px;padding:0;background:${c.color}"></button>
+        <div class="three-lobby-setup">
+          <div class="three-lobby-setup-head">
+            <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main" aria-label="Back">${LOBBY_BACK_ICON}</button>
+            <div>
+              <p class="three-lobby-title">New Local Game</p>
+              <p class="three-lobby-sub">Select 2–5 players to begin</p>
+            </div>
+          </div>
+          <div class="three-lobby-sec">
+            <h2>Mode</h2>
+            <div class="three-lobby-seg">
+              <button type="button" class="three-lobby-tile${classic ? ' is-on' : ''}" data-lobby="mode" data-value="classic">Classic 1942</button>
+              <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk</button>
+            </div>
+          </div>
+          <div class="three-lobby-sec">
+            <h2>Players</h2>
+            <div class="three-lobby-seats">
+              ${factions.map((f) => {
+                const on = selected.has(f.id);
+                const occupant = model.playerAI?.[f.id] || 'human';
+                const occupantName = (AI_DIFFICULTIES.find((d) => d.id === occupant) || AI_DIFFICULTIES[0]).name;
+                const color = model.playerColors?.[f.id]?.color || f.color || '#888';
+                return `
+                  <div class="three-lobby-seat-wrap${on ? ' is-on' : ''}">
+                    <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}">
+                      <div class="three-lobby-seat-name" style="box-shadow:inset 3px 0 0 ${color};padding-left:10px">${f.name || f.id}</div>
+                      <span class="three-lobby-seat-meta">${on ? occupantName : 'Tap to add'}</span>
+                    </button>
+                    ${on ? `
+                      <div class="three-lobby-seat-tools">
+                        ${AI_DIFFICULTIES.map((d) => `
+                          <button type="button" class="three-lobby-tile${occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${d.name}</button>
+                        `).join('')}
+                        ${model.teamsEnabled ? `
+                          <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</button>
+                          <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</button>
+                          <button type="button" class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</button>
+                        ` : ''}
+                        ${FACTION_COLORS.slice(0, 6).map((c) => `
+                          <button type="button" class="three-lobby-tile" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="width:28px;min-height:28px;padding:0;background:${c.color}"></button>
+                        `).join('')}
+                      </div>
+                    ` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+          <div class="three-lobby-opts">
+            <div class="three-lobby-opt">
+              <span>Teams</span>
+              <button type="button" class="three-lobby-tile${model.teamsEnabled ? ' is-on' : ''}" data-lobby="teams" data-value="${model.teamsEnabled ? '0' : '1'}">${model.teamsEnabled ? 'On' : 'Off'}</button>
+            </div>
+            ${classic ? '' : `
+              <div class="three-lobby-opt" style="flex-wrap:wrap">
+                <span>Starting IPCs</span>
+                <div class="three-lobby-row">
+                  ${STARTING_IPC_OPTIONS.map((n) => `
+                    <button type="button" class="three-lobby-tile${Number(model.startingIPCs) === n ? ' is-on' : ''}" data-lobby="ipc" data-value="${n}">${n}</button>
                   `).join('')}
                 </div>
-              ` : ''}
-            </div>
-          `;
-        }).join('')}
-        ${classic ? '' : `
-          <h2>Starting IPCs</h2>
-          <div class="three-lobby-row">
-            ${STARTING_IPC_OPTIONS.map((n) => `
-              <button type="button" class="three-lobby-tile${Number(model.startingIPCs) === n ? ' is-on' : ''}" data-lobby="ipc" data-value="${n}">${n}</button>
-            `).join('')}
+              </div>
+            `}
           </div>
-        `}
-        <p class="three-lobby-foot">${classic
-          ? 'Historical 1942 stacks · skip capital / deploy'
-          : 'Random Territories • Capital Conquest Victory'}</p>
-        <button type="button" class="three-lobby-start" data-lobby="start" ${canStart ? '' : 'disabled'}>${lobbyStartLabel(model)}</button>
+          <p class="three-lobby-foot">${classic
+            ? 'Historical 1942 stacks · skip capital / deploy'
+            : 'Random Territories • Capital Conquest Victory'}</p>
+          <button type="button" class="three-lobby-start" data-lobby="start" ${canStart ? '' : 'disabled'}>${lobbyStartLabel(model)}</button>
+        </div>
       `;
       api.setLobbyOpen(true);
     },
@@ -955,12 +1183,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         api.syncLayers();
         return;
       }
-      const dieHtml = (d) => {
-        const hit = d.hit ? ' is-hit' : '';
-        const side = d.side === 'def' ? ' is-def' : '';
-        return `<span class="three-die${hit}${side}" title="${d.type || ''}">${d.face}</span>`;
-      };
-      const compactDice = (dice = []) => {
+      const research = card.kicker === 'Research' || card.kicker === 'Breakthrough';
+      const dieHtml = (d) => cubeDieHtml(d.face, {
+        hit: !!d.hit,
+        side: d.side,
+        size: research ? 'lg' : 'sm',
+      });
+      const compactDice = (dice = [], { all = false } = {}) => {
+        if (all) return dice.map(dieHtml).join('');
         const hits = dice.filter((d) => d.hit);
         const miss = dice.length - hits.length;
         const shown = (hits.length ? hits : dice.slice(0, 8)).map(dieHtml).join('');
@@ -978,7 +1208,9 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
             ${dice ? `<div class="three-dice">${dice}</div>` : ''}
           </div>`;
         }).join('')}</div>`
-        : ((card.dice || []).length ? `<div class="three-dice">${compactDice(card.dice)}</div>` : '');
+        : ((card.dice || []).length
+          ? `<div class="three-dice${research ? ' is-hero' : ''}">${compactDice(card.dice, { all: research })}</div>`
+          : '');
       const pickers = (card.pickers || []).map((p) => `
         <div class="three-picker" data-loss-side="${p.side}" data-readonly="${p.readOnly ? '1' : '0'}">
           <div class="three-picker-label">${p.label}</div>
@@ -1107,6 +1339,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
         api.peek.innerHTML = `<div class="three-peek-head"><strong>${land.name}</strong>
           <div class="three-peek-meta">${[owner, ipcLine, route].filter(Boolean).join(' · ')}</div></div>
+          ${land.name === 'Research' ? `<div class="three-dice-hero">${cubeDieHtml(5, { size: 'lg' })}</div>` : ''}
           ${steppers?.length ? stepperRowHtml(steppers) : iconRowHtml(stacks)}`;
         api.peek.dataset.rosterTotal = String(rosterTotal);
         delete api.peek.dataset.airLand;

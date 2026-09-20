@@ -240,6 +240,7 @@ export async function bootThreeSolo() {
       phaseStrip: model.phaseStrip,
       phaseStripCurrent: model.phaseStripCurrent,
     });
+    maybeRefitForChrome();
   }
 
   chrome.onStackToggle = (on) => {
@@ -323,16 +324,31 @@ export async function bootThreeSolo() {
     maybeShowTutorial();
   }
 
-  bindState(gameState);
-
+  let lastFitPad = 0;
+  function chromePadBottom() {
+    if (chrome.isLobbyOpen() || chrome.isTutorialOpen()) return 96;
+    const h = chrome.bottom?.getBoundingClientRect?.()?.height || 0;
+    return Math.max(120, Math.min(280, Math.round(h + 16)));
+  }
   function fitEurope() {
+    const padBottom = chromePadBottom();
+    lastFitPad = padBottom;
     camera.fitBounds(EUROPE_FIT, {
       padding: 12,
       padTop: 56,
-      padBottom: 96,
+      padBottom,
       fillFrame: true,
     });
   }
+  function maybeRefitForChrome() {
+    const phase = gameState.phase;
+    if (phase !== GAME_PHASES.CAPITAL_PLACEMENT && phase !== GAME_PHASES.UNIT_PLACEMENT) return;
+    const pad = chromePadBottom();
+    if (Math.abs(pad - lastFitPad) < 20) return;
+    fitEurope();
+  }
+
+  bindState(gameState);
 
   function eventFromChrome(e) {
     const node = eventElement(e);
