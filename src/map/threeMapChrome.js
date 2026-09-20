@@ -1006,11 +1006,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-lobby .three-lobby-title { font-size:18px; }
       #three-lobby .three-lobby-sub { font-size:12px; }
       #three-lobby h2 { margin:0 0 4px; }
-      #three-lobby .three-lobby-seats { gap:8px; }
-      #three-lobby .three-lobby-seat { min-height:0; padding:8px 10px; }
-      #three-lobby .three-lobby-seat-tools { padding:0 10px 10px; gap:8px; }
+      #three-lobby .three-lobby-seats { gap:4px; }
+      #three-lobby .three-lobby-seat { min-height:0; padding:6px 10px; }
+      #three-lobby .three-lobby-seat-tools { padding:0 10px 8px; gap:6px; }
       #three-lobby .three-lobby-occupants { gap:4px; }
-      #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:36px; font-size:11px; }
+      #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:34px; font-size:11px; }
       #three-lobby .three-lobby-opts { padding:6px 8px; gap:6px; }
       #three-lobby .three-lobby-foot { display:none; }
       #three-lobby .three-lobby-start { min-height:48px; }
