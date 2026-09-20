@@ -2,6 +2,13 @@
 
 ---
 
+## 9.20.26 — V2.81.56 shared soloMatch for hybrid cherry-pick
+
+`src/state/soloMatch.js` + `classicCapitals.js` live on this Canvas PR
+so PR84 Three hybrid can keep one boot (`startRiskSolo` /
+`startClassicSolo`). Capture write is still `captureOccupiedTerritory`
+(hybrid consumer: `threeSoloPlay.applyHits`). Draft only.
+
 ## 9.20.26 — V2.81.56 conquer owner flip + post-combat hiccup (SCHEMA 11)
 
 James / Robert Watts + Sean Benson, live canvas `tactical-risk20.vercel.app`
