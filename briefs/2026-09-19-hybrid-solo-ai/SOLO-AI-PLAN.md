@@ -1,16 +1,17 @@
 # Solo AI on Three hybrid — Phase 1 plan
 
-**Status:** Harden `.12` — setup header/scroll/footer shell. Hold merge. Quiet James. Tesla/Viz off.  
+**Status:** Harden `.13` — adaptive lobby MUST-PASS (MAIN touch+wheel scrollport). Hold merge. Quiet James. Tesla/Viz off.  
 **Branch / PR:** `cursor/unit-sheet-clickthrough-d314` · [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76) (draft · **hold merge**)  
-**Tip:** `V2.81.56-ux-solo.12` · SCHEMA 11  
+**Tip:** `V2.81.56-ux-solo.13` · SCHEMA 11  
 **Lookpass note:** `briefs/2026-09-19-hybrid-solo-ai/LOOKPASS.md`  
+**Checklist SoT:** `briefs/2026-09-20-main-art-three-ux/ADAPTIVE-LOBBY-CHECKLIST.md`  
 **Pocket:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&max=1  
 **Lobby / solo:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
 **Skip lobby:** `?three=1&solo=1&go=1`  
 **Live main:** https://tactical-risk20.vercel.app/ · `V2.81.56` · SCHEMA 11  
 **Tesla / Viz:** off. Side / hybrid only. **Keep off `main` until a separate yes.**
 
-**Cherry-picked from main P0:** PR82 `2f6fe8d` as tip `1bef077` — persist combat capture. Live main is now `V2.81.56`. Tip stamp `ux-solo.12`.
+**Cherry-picked from main P0:** PR82 `2f6fe8d` as tip `1bef077` — persist combat capture. Live main is now `V2.81.56`. Tip stamp `ux-solo.13`.
 
 ## S0 / S1 landed (2026-09-19)
 

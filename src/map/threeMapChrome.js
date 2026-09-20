@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.12';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.13';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.12';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.13';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -786,37 +786,48 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:600 15px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
     }
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
+    /* Canonical shell — map exactly:
+     * .app-shell  → #three-lobby.is-open { height:100dvh; display:flex; flex-direction:column; overflow:hidden }
+     * .shell-scroll → .three-lobby-main { flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch }
+     * .shell-footer → .three-lobby-footer { flex:none }  Teams+Start NOT inside scroll
+     * header .three-lobby-setup-head { flex:none }
+     */
     #three-lobby {
       display:none; position:absolute; inset:0; z-index:50;
       height:100dvh; height:100svh; max-height:100dvh; max-height:100svh;
       padding:max(12px, env(safe-area-inset-top)) 14px 0;
       background:rgba(22,26,28,0.94);
       -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
-      color:#E8E2D4; overflow:hidden; pointer-events:auto;
+      color:#E8E2D4; overflow:hidden; pointer-events:auto; touch-action:pan-y;
     }
-    #three-lobby.is-open { display:flex; flex-direction:column; min-height:0; }
+    #three-lobby.is-open {
+      display:flex; flex-direction:column; overflow:hidden;
+      height:100dvh; height:100svh; min-height:0;
+    }
     #three-lobby .three-lobby-home,
     #three-lobby .three-lobby-howto {
       display:flex; flex-direction:column; gap:10px; flex:1; min-height:0;
       padding-bottom:max(12px, env(safe-area-inset-bottom));
-      overflow-y:auto;
+      overflow-y:auto; -webkit-overflow-scrolling:touch; touch-action:pan-y;
     }
     #three-lobby .three-lobby-setup {
-      display:flex; flex-direction:column; flex:1 1 auto; min-height:0;
-      height:100%; overflow:hidden; gap:0;
+      display:flex; flex-direction:column; flex:1; min-height:0;
+      overflow:hidden; gap:0;
     }
+    #three-lobby .three-lobby-setup-head { flex:none; }
     #three-lobby .three-lobby-main {
-      flex:1 1 auto; min-height:0; overflow-y:auto;
-      -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y;
+      flex:1; min-height:0; overflow-y:auto;
+      -webkit-overflow-scrolling:touch; touch-action:pan-y;
       display:flex; flex-direction:column; gap:10px;
-      padding-bottom:calc(var(--three-lobby-footer-h, 72px) + env(safe-area-inset-bottom, 0px) + 12px);
+      padding-bottom:12px;
     }
     #three-lobby .three-lobby-footer {
-      flex:0 0 auto; position:sticky; bottom:0;
+      flex:none;
       padding:8px 0 calc(8px + env(safe-area-inset-bottom, 0px));
       background:rgba(22,26,28,0.96);
       border-top:1px solid rgba(255,255,255,0.08);
     }
+    #three-lobby button { touch-action:pan-y; }
     #three-lobby .three-lobby-brand { text-align:center; padding:18px 8px 4px; }
     #three-lobby .three-lobby-logo {
       margin:0; font:700 32px/1.05 -apple-system,"SF Pro Display",sans-serif;
@@ -896,7 +907,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:400 13px/1.3 -apple-system,sans-serif; color:#cbd5e1;
     }
     #three-lobby .three-lobby-setup-head {
-      display:flex; align-items:center; gap:10px; flex:0 0 auto;
+      display:flex; align-items:center; gap:10px; flex:none;
       padding-bottom:10px;
     }
     #three-lobby .three-lobby-back {
@@ -918,12 +929,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       flex:0 0 auto;
     }
     #three-lobby .three-lobby-seat,
-    #three-lobby .three-lobby-seat-tools button { touch-action:manipulation; }
+    #three-lobby .three-lobby-seat-tools button { touch-action:pan-y; }
     #three-lobby .three-lobby-opts,
     #three-lobby .three-lobby-foot,
-    #three-lobby .three-lobby-start,
-    #three-lobby .three-lobby-setup-head,
-    #three-lobby .three-lobby-footer { flex-shrink:0; }
+    #three-lobby .three-lobby-start { flex:none; }
     #three-lobby .three-lobby-seat-wrap {
       flex:0 0 auto; height:auto; overflow:visible;
       border-radius:12px; border:1px solid rgba(255,255,255,0.12);
@@ -1690,7 +1699,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
   };
 
-  for (const el of [api.l0, api.bottom, api.sheet, api.lobby, api.tutorial, api.zoom, api.peek, api.battleEl, api.confirm, api.undoBtn, api.menuBtn, api.helpBtn, stackToggle]) {
+  for (const el of [api.l0, api.bottom, api.sheet, api.zoom, api.peek, api.battleEl, api.confirm, api.undoBtn, api.menuBtn, api.helpBtn, stackToggle]) {
     sealChromeControl(el);
   }
   bindSealedActivate(api.menuBtn, null, () => {
@@ -1751,11 +1760,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (typeof api.onLobbyChange === 'function') {
       api.onLobbyChange(kind, btn.dataset.value);
     }
-  });
+  }, { prevent: false });
   bindSealedActivate(tutorial, '[data-tutorial]', () => {
     api.setTutorialOpen(false);
     if (typeof api.onTutorialDismiss === 'function') api.onTutorialDismiss();
-  });
+  }, { prevent: false });
   bindSealedActivate(api.helpBtn, null, () => {
     if (typeof api.onHowTo === 'function') api.onHowTo();
     else api.setTutorialOpen(true);

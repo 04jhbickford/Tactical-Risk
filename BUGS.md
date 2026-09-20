@@ -2,6 +2,20 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.13 adaptive lobby scrollport (preview only)
+
+James REJECTED `.12`: New Local Game does not scroll on device —
+below-fold seats unreachable. Root cause: `sealChromeControl(lobby)` +
+`bindSealedActivate` `preventDefault` on `touchstart`/`pointerdown`
+killed iOS/Chrome-mobile native pan even though MAIN had
+`overflow-y:auto`. `.13` maps the canonical app-shell (header
+`flex:none` / MAIN scroll / footer `flex:none` sibling), keeps
+`prevent:false` on lobby/tutorial, and does not `preventDefault` canvas
+`touchstart` while the lobby is open. Fail-closed A1/A3/A4/A5 @390.
+Hold merge. Quiet James. Tesla off. No READY until stills pass.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.12 setup scroll shell (preview only)
 
 James REJECTED `.11`: sticky Teams + Start covered Japanese colors

@@ -78,12 +78,12 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.12', 'tip stamp ux-solo.12');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.13', 'tip stamp ux-solo.13');
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-assert(indexHtml.includes('V2.81.56-ux-solo.12'), 'index.html cache-busts .12');
-assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.12'"), 'index.html inline stamp .12');
+assert(indexHtml.includes('V2.81.56-ux-solo.13'), 'index.html cache-busts .13');
+assert(indexHtml.includes("window.__TR_GAME_VERSION='V2.81.56-ux-solo.13'"), 'index.html inline stamp .13');
 const bootSrc = String(readFileSync(new URL('../src/map/threeSoloBoot.js', import.meta.url)));
-assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.12'), 'boot cache-busts chrome .12');
+assert(bootSrc.includes('threeMapChrome.js?v=V2.81.56-ux-solo.13'), 'boot cache-busts chrome .13');
 assert(bootSrc.includes('applyLiveStamp'), 'boot overwrites L0/lobby stamp every paint');
 const chromeSrc = String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url)));
 assert(chromeSrc.includes('function applyLiveStamp'), 'chrome applyLiveStamp from live GAME_VERSION');
@@ -96,7 +96,12 @@ assert(chromeSrc.includes('three-lobby-seat-wrap') && chromeSrc.includes('overfl
 assert(chromeSrc.includes('three-lobby-main') && chromeSrc.includes('three-lobby-footer'), 'setup header/main/footer shell');
 assert(chromeSrc.includes('100dvh') && chromeSrc.includes('100svh'), 'lobby shell uses dvh/svh not 100vh-only');
 assert(!/#three-lobby[^{]*\{[^}]*height:\s*100vh/.test(chromeSrc), 'no 100vh-only lobby height');
-assert(/#three-lobby \.three-lobby-main \{[\s\S]*?overflow-y:auto/.test(chromeSrc), 'main is the only setup scroller');
+assert(/#three-lobby \.three-lobby-setup-head \{ flex:none/.test(chromeSrc), 'A2 header flex:none');
+assert(/#three-lobby \.three-lobby-main \{[\s\S]*?flex:1[\s\S]*?min-height:0[\s\S]*?overflow-y:auto/.test(chromeSrc), 'A2/A3 main is the only setup scroller');
+assert(/#three-lobby \.three-lobby-footer \{[\s\S]*?flex:none/.test(chromeSrc), 'A7 footer flex:none sibling');
+assert(chromeSrc.includes('bindSealedActivate(lobby,') && chromeSrc.includes('{ prevent: false }'), 'lobby activate does not preventDefault');
+assert(!/for \(const el of \[[^\]]*lobby/.test(chromeSrc), 'lobby not blanket-sealed with preventDefault');
+assert(!/three-lobby-main \{[\s\S]*?position:\s*sticky/.test(chromeSrc), 'Teams+Start not sticky inside scroll');
 assert(!/three-lobby-seat-tools button \{[^}]*width:28px/.test(chromeSrc), 'no 28px color tile in occupant flex');
 assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');
 assert(isDieType('techDie') && isDieType('DIE') && isDieType('die') && isDieType('x', 'DIE 5'), 'die aliases');

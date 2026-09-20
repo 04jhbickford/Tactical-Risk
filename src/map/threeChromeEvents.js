@@ -104,13 +104,13 @@ export function shouldIgnoreMapHit({
   return isPointInAnyRect(clientX, clientY, rects);
 }
 
-export function sealChromeControl(el) {
+export function sealChromeControl(el, { prevent = true } = {}) {
   if (!el || el.dataset?.chromeSealed === '1') return el;
   if (el.dataset) el.dataset.chromeSealed = '1';
   for (const type of CHROME_ALL_EVENTS) {
     el.addEventListener(type, (e) => {
-      const prevent = type === 'pointerdown' || type === 'touchstart' || type === 'click';
-      sealChromeEvent(e, { prevent });
+      const doPrevent = prevent && (type === 'pointerdown' || type === 'touchstart' || type === 'click');
+      sealChromeEvent(e, { prevent: doPrevent });
     }, { passive: false });
   }
   return el;
@@ -118,7 +118,9 @@ export function sealChromeControl(el) {
 
 // Activate on pointerdown (touch-safe). Debounce swallows the
 // trailing pointerup/click from the same gesture.
-export function bindSealedActivate(root, selector, handler) {
+// Pass { prevent:false } on scrollable surfaces (lobby / tutorial) —
+// preventDefault on touchstart kills iOS/Chrome-mobile native pan.
+export function bindSealedActivate(root, selector, handler, { prevent = true } = {}) {
   if (!root || typeof handler !== 'function') return;
   let lastAt = 0;
   const fire = (e) => {
@@ -134,5 +136,5 @@ export function bindSealedActivate(root, selector, handler) {
   root.addEventListener('pointerdown', fire);
   root.addEventListener('pointerup', fire);
   root.addEventListener('click', fire);
-  sealChromeControl(root);
+  sealChromeControl(root, { prevent });
 }

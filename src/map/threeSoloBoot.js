@@ -6,7 +6,7 @@ import { Camera, MAP_WIDTH } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome, applyLiveStamp } from './threeMapChrome.js?v=V2.81.56-ux-solo.12';
+import { injectThreeChrome, applyLiveStamp } from './threeMapChrome.js?v=V2.81.56-ux-solo.13';
 import {
   preloadUnitImages,
   renderPreviewStacks,
@@ -18,7 +18,7 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.12';
+import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.13';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -40,7 +40,7 @@ import {
   lobbyCanStart,
   lobbyStartOptions,
   lobbyInspect,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.12';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.13';
 import {
   shouldShowSetupTutorial,
   dismissTutorial,
@@ -59,7 +59,7 @@ import {
   pickShip,
   applyCargoSeed,
   LAND_TEAL,
-} from './threeSoloPlay.js?v=V2.81.56-ux-solo.12';
+} from './threeSoloPlay.js?v=V2.81.56-ux-solo.13';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -451,7 +451,6 @@ export async function bootThreeSolo() {
   let pinch = null;
   canvas.addEventListener('touchstart', (e) => {
     if (ignoreMapHit(e)) {
-      e.preventDefault();
       return;
     }
     if (e.touches.length === 2) {

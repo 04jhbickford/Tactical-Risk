@@ -67,6 +67,15 @@ const ev = {
 };
 sealChromeEvent(ev);
 assert(ev.n === 1 && ev.prevented === 1, 'seal stops and prevents');
+const evPan = {
+  n: 0,
+  prevented: 0,
+  cancelable: true,
+  stopPropagation() { this.n += 1; },
+  preventDefault() { this.prevented += 1; },
+};
+sealChromeEvent(evPan, { prevent: false });
+assert(evPan.n === 1 && evPan.prevented === 0, 'lobby seal stops without preventDefault so native pan lives');
 
 const textTarget = { parentElement: { closest: (sel) => (sel === '[data-step]' ? { dataset: { step: '1' } } : null) } };
 assert(eventElement({ target: textTarget }) === textTarget.parentElement, 'text-node tap walks to parent');
