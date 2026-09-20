@@ -22,7 +22,7 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A #3, GA
 
 **Kept**
 - `.15` lobby touch-pan + `.14` stamp SoT — **re-proved by CDP T1–T5 after `.17` seat CSS** (Viz SCORE .16 hold was PARTIAL: overflow visible only)
-- `.16` `playStage()` combat machine (untouched). P1 casualty YOU steppers **NOT-REACHED** — out of this tip.
+- `.16` `playStage()` combat machine. P1 casualty YOU steppers **REACHED** `.18` — YOU tap-assign + 28px +/−; THEY inert; Confirm gold Take hits.
 
 ## Fail-closed
 

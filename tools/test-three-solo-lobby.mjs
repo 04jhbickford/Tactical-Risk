@@ -120,6 +120,8 @@ assert(chromeSrc.includes('three-lobby-ai-tiers'), 'Easy/Med/Hard AI tiers under
 assert(chromeSrc.includes('repeat(3, minmax(0, 1fr))'), 'occupant chrome is 3-col grow-to-fit');
 assert(chromeSrc.includes('three-lobby-colors'), 'seat colors on their own row');
 assert(chromeSrc.includes('occupantKindLabel') && chromeSrc.includes('occupantChipLabel'), 'Human/AI/Empty + Easy/Med/Hard chips');
+assert(chromeSrc.includes('data-loss-pick') && chromeSrc.includes('onLossPick'), 'YOU casualty tiles tap-assign');
+assert(chromeSrc.includes('three-picker[data-readonly="1"]') && chromeSrc.includes('pointer-events:none'), 'THEY casualty row is inert');
 assert(chromeSrc.includes('data-occupant-kind'), 'each seat stamps occupant kind');
 assert(chromeSrc.includes('Need at least one Human') || chromeSrc.includes('lobbyStartLabel'), 'Start gate copy from lobbyStartLabel');
 assert(!/three-lobby-seat-wrap \{[^}]*overflow:\s*hidden/.test(chromeSrc), 'seat wrap does not overflow:hidden');

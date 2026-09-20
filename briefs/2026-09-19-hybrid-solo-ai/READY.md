@@ -23,7 +23,7 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A + GAPS
 | # | Gate | Result |
 |---|---|---|
 | **A1** | Stamp `.18` after hard reload | **PASS** local L0 + lobby + `__TR_GAME_VERSION` |
-| Smoke | 1 Human + AIs → Start → place 6 → Combat Move stages | **PASS** Playwright @390 `Confirm: Attack Columbia` |
+| Smoke | 1 Human + AIs → Start → place 6 → Combat Move stages → YOU casualty | **PASS** Playwright @390 gold `Confirm: Take hits` |
 | Income | NCM/Place End Phase → Income card → handoff | **PASS** unit |
 | Win/Lose | Victory / Defeat + New Game | **PASS** unit |
 | CDP | Lobby CSS **unchanged** — do not re-READY on CSS | `.17` T1–T5 still hold |

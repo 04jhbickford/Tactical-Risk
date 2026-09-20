@@ -128,6 +128,8 @@ async function main() {
 
   const playing = await page.evaluate(() => {
     const api = window.__threeSolo;
+    const gs = api.gameState;
+    const me = gs.currentPlayer.id;
     const steps = [];
     let info = api.playInspect();
     if (info.turnPhase === 'develop_tech' && info.confirmEnabled) {
@@ -141,30 +143,46 @@ async function main() {
       info = api.playInspect();
       steps.push('buy-inf');
     }
-    const origins = (window.__threeSolo.play && info.selected) || null;
-    const lands = Object.keys(api.gameState.units || {}).filter((name) => {
-      const t = api.gameState.territoryByName[name];
+    const pair = Object.keys(gs.territoryState).find((name) => {
+      const t = gs.territoryByName[name];
       if (t?.isWater) return false;
-      return (api.gameState.units[name] || []).some((u) => (
-        u.owner === api.gameState.currentPlayer?.id && u.type === 'infantry' && (u.quantity || 0) > 0
-      ));
+      const enemy = (gs.getConnections(name) || []).find((to) => {
+        const tz = gs.territoryByName[to];
+        if (tz?.isWater) return false;
+        const owner = gs.territoryState[to]?.owner;
+        return owner && owner !== me && !gs.areAllies(me, owner);
+      });
+      if (!enemy) return false;
+      gs.units[name] = [
+        { type: 'infantry', quantity: 2, owner: me },
+        { type: 'armour', quantity: 1, owner: me },
+      ];
+      gs.units[enemy] = [
+        { type: 'infantry', quantity: 5, owner: gs.territoryState[enemy].owner },
+      ];
+      return true;
     });
-    const origin = lands[0];
-    if (origin && info.turnPhase === 'combat_move') {
+    const origin = pair;
+    const dest = origin
+      ? (gs.getConnections(origin) || []).find((to) => {
+        const owner = gs.territoryState[to]?.owner;
+        return owner && owner !== me && !gs.areAllies(me, owner) && !gs.territoryByName[to]?.isWater;
+      })
+      : null;
+    if (origin && dest && info.turnPhase === 'combat_move') {
       api.selectLand(origin);
       info = api.playInspect();
       steps.push(`origin:${info.stage}`);
       api.adjustUnit('infantry', 1);
+      api.adjustUnit('infantry', 1);
+      api.adjustUnit('armour', 1);
       info = api.playInspect();
       steps.push(`units:${info.stage}`);
-      const dest = (info.legalDests || [])[0];
-      if (dest) {
-        api.selectLand(dest);
-        info = api.playInspect();
-        steps.push(`dest:${info.stage}:${info.confirmLabel}`);
-      }
+      api.selectLand(dest);
+      info = api.playInspect();
+      steps.push(`dest:${info.stage}:${info.confirmLabel}`);
     }
-    return { ...info, steps, origin };
+    return { ...info, steps, origin, dest };
   });
 
   await shot(page, 'lookpass18_combat_move_stages_390.png');
@@ -195,6 +213,79 @@ async function main() {
   if (playing.stage !== 'confirm') {
     throw new Error(`Combat Move Confirm stage not reached (stage=${playing.stage} steps=${playing.steps})`);
   }
+
+  const casualty = await page.evaluate(() => {
+    const api = window.__threeSolo;
+    const play = api.play;
+    const faces = [6, 6, 6, 1, 6, 6, 6, 6];
+    let i = 0;
+    play.rng = () => faces[Math.min(i++, faces.length - 1)];
+    api.confirm();
+    let info = api.playInspect();
+    if (info.turnPhase === 'combat_move' && info.canEndPhase) {
+      api.confirm();
+      info = api.playInspect();
+    }
+    if (info.battleStep === 'aaReady') {
+      api.confirm();
+      info = api.playInspect();
+    }
+    if (info.battleStep === 'aaResult') {
+      api.confirm();
+      info = api.playInspect();
+    }
+    if (info.battleStep === 'combatReady') {
+      api.confirm();
+      info = api.playInspect();
+    }
+    const you = [...document.querySelectorAll('#three-battle [data-loss-pick]')];
+    const they = [...document.querySelectorAll('#three-battle .three-picker[data-readonly="1"] [data-loss-step]')];
+    const plus = document.querySelector('#three-battle [data-loss-pick] [data-loss-step="1"]');
+    return {
+      ...info,
+      youTiles: you.length,
+      theySteps: they.length,
+      plusDisabled: plus ? plus.disabled : null,
+      confirmText: document.getElementById('three-confirm')?.textContent || '',
+      confirmDisabled: !!document.getElementById('three-confirm')?.disabled,
+    };
+  });
+  await shot(page, 'lookpass18_casualty_you_assign_390.png');
+  if (casualty.battleStep !== 'combatResult') {
+    throw new Error(`casualty sheet not reached (${casualty.battleStep}) ${JSON.stringify(casualty)}`);
+  }
+  if (casualty.youTiles < 1) {
+    throw new Error(`YOU casualty tiles missing ${JSON.stringify(casualty)}`);
+  }
+  if (casualty.confirmDisabled !== true && casualty.confirmText.includes('Take hits')) {
+    // already assigned (forced) — still photograph
+  } else if (casualty.confirmDisabled) {
+    const plus = page.locator('#three-battle [data-loss-pick] [data-loss-step="1"]').first();
+    if (await plus.count()) await plus.click({ force: true });
+    else await page.locator('#three-battle [data-loss-pick]').first().click({ force: true });
+    await page.waitForTimeout(200);
+    const afterClick = await page.evaluate(() => ({
+      label: document.getElementById('three-confirm')?.textContent || '',
+      disabled: !!document.getElementById('three-confirm')?.disabled,
+      gold: document.getElementById('three-confirm')?.classList.contains('is-ready'),
+      pending: window.__threeSolo.playInspect().confirmEnabled,
+    }));
+    await shot(page, 'lookpass18_casualty_you_confirm_390.png');
+    if (!afterClick.pending || afterClick.disabled) {
+      throw new Error(`YOU stepper did not enable Confirm ${JSON.stringify(afterClick)}`);
+    }
+    if (!/Take hits/i.test(afterClick.label)) {
+      throw new Error(`expected Take hits after YOU assign, got ${afterClick.label}`);
+    }
+    casualty.afterClick = afterClick;
+  }
+  console.log(JSON.stringify({ casualty: {
+    battleStep: casualty.battleStep,
+    youTiles: casualty.youTiles,
+    confirmText: casualty.confirmText,
+    confirmDisabled: casualty.confirmDisabled,
+    afterClick: casualty.afterClick || null,
+  } }, null, 2));
   await browser.close();
   console.log('playthrough smoke PASS');
 }

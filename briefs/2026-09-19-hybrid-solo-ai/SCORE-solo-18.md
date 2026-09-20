@@ -26,6 +26,6 @@ Invented: none of the rules. Adapter glue only (`play.income`, `BUY_TYPES` compl
 
 ## Residual
 
-Retreat / bombard tiles, sub-vs-air split, S11 diagnostics, P1 casualty YOU Viz. Not playthrough blockers.
+Retreat / bombard tiles, sub-vs-air split, S11 diagnostics. Casualty YOU steppers **REACHED** this tip: tap-assign + 28px +/−; THEY inert; Confirm gold Take hits.
 
 Tip after hard reload: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.18`. `/` `no-store`.

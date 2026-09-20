@@ -19,7 +19,7 @@ None of the grammar. Tip glue is `seatOccupantView()` / `setLobbyOccupant(..., '
 ## Keep
 
 - `.15` touch-pan shell (MAIN `pan-y`, footer sibling, click-only lobby activate). Viz SCORE `.16` hold was **PARTIAL** (`overflow:visible` only) — `.17` re-proves CDP T1–T5 (`MAIN.scrollTop` moves, `body.scrollY` 0) after seat CSS. Do not READY on CSS inspection.
-- `.16` combat nested stages (`playStage` ORIGIN→UNITS→DEST→CONFIRM). P1 casualty YOU steppers **NOT-REACHED**.
+- `.16` combat nested stages (`playStage` ORIGIN→UNITS→DEST→CONFIRM). P1 casualty YOU steppers **REACHED** `.18` — YOU tiles tap-assign; THEY `pointer-events:none`; Confirm gold Take hits.
 - `.17` seat cards. Lobby CSS unchanged this tip (no CDP re-prove).
 - Stamp SoT (`__TR_GAME_VERSION`, `no-store` `/`, grow-to-fit `overflow:visible`)
 

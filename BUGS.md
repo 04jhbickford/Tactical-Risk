@@ -11,7 +11,8 @@ Confirm gate (`bgio-moves-phases-stages`). Shop is the full unit catalog
 + Risk card trade. Combat dice steal CombatUI tech + artillery.
 `AIController` stops on `gameOver`. Defeat chrome when the human side
 loses. Keep `.15` touch-pan, `.16` combat stages, `.17` seats. Lobby CSS
-untouched (no CDP re-prove). Casualty YOU Viz deferred. Hold merge.
+untouched (no CDP re-prove). P1 casualty YOU steppers **REACHED**: YOU
+tiles tap-assign, THEY inert, Confirm gold Take hits. Hold merge.
 
 ---
 

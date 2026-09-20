@@ -30,7 +30,7 @@ Engine: real `GameState` + `AIController` behind Three chrome (`threeSoloPlay` /
 | Risk card trade | **DONE** `.18` | `SET +N` tile when `canTradeRiskCards` | main `tradeRiskCards` |
 | Combat Move stages | **DONE** `.16` | origin → units → dest → Confirm; Confirm dead until legal | `bgio-moves-phases-stages` / `xstate-game-phases` |
 | TRN cargo load/unload | **DONE** (partly `.9`) | Load friendly TRN; unload via `unloadTransport`; pick ship | main navy |
-| Combat / AA / YOU | **DONE** `.16` | Nested AA → roll → YOU assign / THEY cheapest; AA wipe fail-close | `aa-combat-dice-calc-pattern` |
+| Combat / AA / YOU | **DONE** `.16` + `.18` | Nested AA → roll → YOU assign / THEY cheapest; AA wipe fail-close. YOU tiles tap + 28px +/− unlock Confirm | `aa-combat-dice-calc-pattern` + `.11` YOU-only |
 | Combat dice (tech + ART) | **DONE** `.18` | Jets / superSubs / heavyBombers + ART 1:1 support | steal `combatUI` calc, not toy `unitDefs` raw |
 | Air land | **DONE** | Planes-only sheet; `applyAirLandings`; crash if no dest | main `airLanding.js` |
 | NCM | **DONE** | Same stage machine; friendly dests; leftover air blocks Done | V2.81.53 Done-when-0 |
@@ -47,7 +47,7 @@ Engine: real `GameState` + `AIController` behind Three chrome (`threeSoloPlay` /
 |---|---|---|
 | Retreat / bombard tiles | **STUB** | Combat still resolves; no dedicated Three tiles |
 | Sub-only-hits-sea / first strike | **STUB** | Adapter does not split sub vs air the way CombatUI does |
-| Casualty YOU steppers | **DEFERRED** | P1 Viz; Confirm still waits on YOU assign |
+| Casualty YOU steppers | **DONE** `.18` | Smoke **REACHED** COMBAT_RESULT; YOU INF/TNK +/−; Confirm → gold Take hits. THEY inert |
 | Three diagnostics sheet (S11) | **STUB** | Last-40 dice persist on state; no Three menu log |
 | Play Online / My Games / Firebase | **OUT** | Tip-only; no live rewrite |
 | Pocket `?three=1` toy path | **KEEP** | Not the James solo eval |
@@ -57,7 +57,7 @@ Engine: real `GameState` + `AIController` behind Three chrome (`threeSoloPlay` /
 | # | Gate | Proof |
 |---|---|---|
 | **A1** | Stamp `.18` after hard reload | **PASS** local — L0 + lobby + `__TR_GAME_VERSION` = `.18` |
-| Smoke | New Local Game ≥1 Human + AIs → Start → place 6 → Pass → Combat Move Confirm using stages | **PASS** — `test-three-solo-playthrough` + Playwright `qc-playthrough-smoke` @390: origin→units→dest→`Confirm: Attack Columbia` |
+| Smoke | New Local Game ≥1 Human + AIs → Start → place 6 → Pass → Combat Move Confirm using stages → casualty YOU | **PASS** — origin→units→dest→`Confirm: Attack West Canada` → COMBAT_RESULT YOU tiles → gold `Confirm: Take hits` |
 | Income | End Phase on NCM / Place opens Income card; second Confirm hands off | **PASS** unit |
 | Win/Lose | Victory / Defeat + New Game vs AI | **PASS** unit |
 | CDP | Lobby CSS **unchanged** this tip | `.17` T1–T5 still hold — not re-run |

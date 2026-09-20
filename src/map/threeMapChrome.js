@@ -163,7 +163,10 @@ function tileRowHtml(tiles, { loss = false, readOnly = false, side = '', dieSize
     const art = unitArtHtml(s.type, s.owner, short, {
       dieSize: dieSize || (dieTile && !wave ? 'lg' : ''),
     });
-    return `<div class="three-tile${picked > 0 ? ' is-on' : ''}${dieTile ? ' is-die' : ''}" data-unit-type="${s.type}">
+    const pick = loss && !readOnly
+      ? ` data-loss-pick="1" data-loss-side="${side || s.side || ''}" data-loss-type="${s.type}"`
+      : '';
+    return `<div class="three-tile${picked > 0 ? ' is-on' : ''}${dieTile ? ' is-die' : ''}" data-unit-type="${s.type}"${pick}>
       ${art}
       <em>${short}</em>
       <div class="three-tile-steps">
@@ -590,7 +593,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-battle {
       display:none; pointer-events:none;
       padding:8px 10px; border-radius:12px;
-      overflow:hidden;
+      overflow:visible;
       min-height:0; flex:1 1 auto;
       background:rgba(30,36,32,0.55);
       -webkit-backdrop-filter:saturate(1.35) blur(18px);
@@ -787,6 +790,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-battle .three-pickers {
       flex:0 0 auto; margin-top:6px; display:flex; flex-direction:column; gap:6px;
+      overflow:visible; pointer-events:auto;
+    }
+    #three-battle .three-picker[data-readonly="1"] { pointer-events:none; }
+    #three-battle .three-tile[data-loss-pick] { cursor:pointer; min-height:44px; }
+    #three-battle .three-picker:not([data-readonly="1"]) .three-step {
+      width:28px; height:28px; flex-basis:28px; font-size:16px;
     }
     #three-battle .three-picker-label {
       font:600 10px/1.2 -apple-system,sans-serif; letter-spacing:0.03em;
@@ -1629,6 +1638,30 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         };
         btn.onpointerdown = activate;
         btn.onclick = activate;
+      });
+      // YOU tiles are the assign control (P0: THEY must not steal taps).
+      api.battleEl.querySelectorAll('[data-loss-pick]').forEach((tile) => {
+        stamp(tile);
+        let last = 0;
+        const activate = (e) => {
+          if (e.target?.closest?.('[data-loss-step]')) return;
+          const picker = tile.closest?.('.three-picker');
+          if (picker?.dataset?.readonly === '1') return;
+          sealActivate(e);
+          if (e.type === 'touchstart' || e.type === 'touchmove') return;
+          const now = Date.now();
+          if (now - last < 280) return;
+          last = now;
+          const side = tile.dataset.lossSide || picker?.dataset?.lossSide || 'att';
+          if (side === 'def') return;
+          if (typeof api.onLossPick === 'function') {
+            api.onLossPick(side, tile.dataset.lossType || tile.dataset.unitType);
+          } else if (typeof api.onLossStep === 'function') {
+            api.onLossStep(side, tile.dataset.lossType || tile.dataset.unitType, 1);
+          }
+        };
+        tile.onpointerdown = activate;
+        tile.onclick = activate;
       });
       api.peek.querySelectorAll('[data-ship]').forEach((btn) => {
         stamp(btn);

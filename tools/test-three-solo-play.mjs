@@ -191,6 +191,8 @@ assert(Object.keys(move.battle.pendingAtt).length === 0, 'YOU unassigned');
 assert(confirmEnabled(move) === false, 'Confirm waits on YOU');
 assert(confirmLabel(move) === 'Assign casualties', 'assign label');
 assert(chromeModel(move).battleOpen === true, 'casualty sheet reports battleOpen');
+assert(chromeModel(move).battle.pickers.some((p) => p.side === 'att' && !p.readOnly), 'YOU picker writable');
+assert(chromeModel(move).battle.pickers.some((p) => p.side === 'def' && p.readOnly), 'THEY picker read-only');
 adjustLoss(move, 'def', 'fighter', 1);
 assert(move.battle.pendingDef.infantry === 2, 'THEY still cheapest');
 adjustLoss(move, 'att', 'armour', 1);
