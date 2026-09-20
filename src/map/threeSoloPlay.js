@@ -14,6 +14,7 @@ import {
   territoryCombatAlreadyResolved,
 } from '../ui/combatUI.js';
 import { remainingAirLandingsToAssign } from '../state/airLanding.js';
+import { placementBudgetCopy } from '../state/placeQueue.js';
 
 export const BATTLE_STEP = {
   AA_READY: 'aaReady',
@@ -115,6 +116,34 @@ export function deployPool(play) {
   const id = gs?.currentPlayer?.id;
   if (!id || gs.phase !== GAME_PHASES.UNIT_PLACEMENT) return [];
   return gs.getKnownUnitsToPlace?.(id, play.unitDefs) || gs.getUnitsToPlace?.(id) || [];
+}
+
+export function deployWave(play) {
+  const gs = play?.gameState;
+  const limit = gs?.getUnitsPerRoundLimit?.() || 6;
+  const placed = Number(gs?.unitsPlacedThisRound) || 0;
+  const pool = deployPool(play).reduce((n, p) => n + (Number(p.quantity) || 0), 0);
+  const copy = placementBudgetCopy({
+    deployedThisRound: placed,
+    limit,
+    poolRemaining: pool,
+  });
+  const canPass = !!gs?.canFinishPlacementRound?.(
+    gs.currentPlayer?.id,
+    play.unitDefs,
+    { allowNavalSkip: true },
+  );
+  return {
+    limit,
+    placed,
+    pool,
+    canPass,
+    copy,
+    meter: `${copy.deployedLabel} ${copy.deployedText} · ${copy.remainingLabel} ${copy.remainingText}`,
+    passLabel: canPass
+      ? (placed >= limit ? `Pass · ${placed} of ${limit}` : `Pass · leftover`)
+      : `Deploy ${placed} of ${limit}`,
+  };
 }
 
 export function deployDests(play) {
@@ -1138,11 +1167,13 @@ export function confirmLabel(play) {
     return play.destPicked ? `Confirm: Capital in ${play.destPicked}` : 'Tap your land';
   }
   if (play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    const wave = deployWave(play);
     if (play.destPicked && pickedCount(play.selectedUnits)) {
       return `Confirm: Deploy in ${play.destPicked}`;
     }
-    if (canEndPhase(play)) return 'Done · Deploy';
-    return pickedCount(play.selectedUnits) ? 'Pick a land' : 'Select units';
+    if (canEndPhase(play)) return wave.passLabel;
+    if (pickedCount(play.selectedUnits)) return `Pick a land · ${wave.placed} of ${wave.limit}`;
+    return wave.passLabel;
   }
   if (play.landing) {
     if (!play.landing.dest) return 'Pick a teal land';
@@ -1571,6 +1602,8 @@ export function chromeModel(play, territories = []) {
   if (!sheetLand && play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT) {
     sheetLand = { name: play.destPicked || 'Deploy' };
   }
+  const wave = play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT ? deployWave(play) : null;
+  if (wave && !route) route = wave.meter;
   return {
     land: sheetLand,
     stacks: play.landing ? [] : (landName ? (play.gameState.units[landName] || []) : []),
@@ -1624,5 +1657,6 @@ export function inspectPlay(play) {
     capitalDests: capitalDests(play),
     deployDests: deployDests(play),
     deployLeft: deployPool(play).reduce((n, p) => n + (Number(p.quantity) || 0), 0),
+    deployWave: deployWave(play),
   };
 }

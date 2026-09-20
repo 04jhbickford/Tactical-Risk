@@ -34,11 +34,16 @@ export function buildSoloPlayers(setup, {
   humanSeat = DEFAULT_HUMAN_SEAT,
   aiCount = 4,
   aiDifficulty = DEFAULT_AI_DIFFICULTY,
+  players = null,
 } = {}) {
+  if (Array.isArray(players) && players.length >= 2) {
+    const human = players.find((p) => !p.isAI) || players[0];
+    return [human, ...players.filter((p) => p !== human)];
+  }
   if (mode !== 'risk') {
     return buildClassicSoloPlayers(setup, { humanSeat, aiDifficulty });
   }
-  const factions = setup?.classic?.factions || setup?.factions || [];
+  const factions = setup?.risk?.factions || setup?.classic?.factions || setup?.factions || [];
   const humanId = humanSeat || DEFAULT_HUMAN_SEAT;
   const human = factions.find((f) => f.id === humanId) || factions[0];
   if (!human) return [];
@@ -71,11 +76,16 @@ export function startSoloMatch(setup, territories, continents, options = {}) {
     gameState.isMultiplayer = false;
     gameState.initGame('risk', players, {
       startingIPCs: options.startingIPCs || 80,
+      teamsEnabled: !!options.teamsEnabled,
+      alliancesEnabled: options.alliancesEnabled === true,
     });
     seedClassicPlayerTechs(gameState);
     return gameState;
   }
-  return startClassicSolo(setup, territories, continents, options);
+  return startClassicSolo(setup, territories, continents, {
+    ...options,
+    players: options.players || buildSoloPlayers(setup, { ...options, mode: 'classic' }),
+  });
 }
 
 export function placementsFromState(gameState) {

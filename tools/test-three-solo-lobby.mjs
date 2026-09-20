@@ -1,4 +1,4 @@
-// Lobby → setup → deploy → classic match. Run: node tools/test-three-solo-lobby.mjs
+// Lobby → setup → deploy-6 → classic match. Run: node tools/test-three-solo-lobby.mjs
 
 import { readFileSync } from 'node:fs';
 
@@ -13,14 +13,20 @@ if (typeof globalThis.localStorage === 'undefined') {
 
 import {
   createSoloLobby,
+  applyLobbyAction,
   setLobbyMode,
-  setLobbySeat,
-  setLobbyAiCount,
+  toggleLobbySeat,
+  setLobbyOccupant,
+  setLobbyIpc,
   lobbyStartOptions,
   lobbyCanStart,
+  lobbyStartLabel,
+  lobbyBuildPlayers,
   parseSoloLobbySearch,
+  STARTING_IPC_OPTIONS,
+  AI_DIFFICULTIES,
 } from '../src/map/threeSoloLobby.js';
-import { startSoloMatch, buildSoloPlayers, inspectSolo } from '../src/map/threeSoloMatch.js';
+import { startSoloMatch, buildSoloPlayers } from '../src/map/threeSoloMatch.js';
 import {
   createSoloPlay,
   tapLand,
@@ -31,11 +37,19 @@ import {
   capitalDests,
   deployPool,
   deployDests,
+  deployWave,
   inspectPlay,
   legalDests,
 } from '../src/map/threeSoloPlay.js';
+import {
+  SETUP_TUTORIAL_STEPS,
+  shouldShowSetupTutorial,
+  dismissTutorial,
+  tutorialWasDismissed,
+} from '../src/map/threeSetupTutorial.js';
 import { GAME_PHASES, TURN_PHASES } from '../src/state/gameState.js';
 import { findUndefinedPaths } from '../src/state/persistState.js';
+import { GAME_VERSION } from '../src/version.js';
 
 const setup = JSON.parse(readFileSync(new URL('../data/setup.json', import.meta.url)));
 const territories = JSON.parse(readFileSync(new URL('../data/territories.json', import.meta.url)));
@@ -50,23 +64,46 @@ function assert(cond, msg) {
   }
 }
 
+assert(GAME_VERSION === 'V2.81.56-ux-solo.5', 'tip stamp ux-solo.5');
+assert(AI_DIFFICULTIES.map((d) => d.id).join(',') === 'human,easy,medium,hard', 'main occupant labels');
+assert(STARTING_IPC_OPTIONS.join(',') === '40,60,80,100,120,150', 'main IPC ladder');
+
 const parsed = parseSoloLobbySearch('?three=1&solo=1');
-assert(parsed.mode === 'classic', 'default classic');
+assert(parsed.mode === 'risk', 'default Risk like main local');
 assert(parsed.skip === false, 'lobby open by default');
 assert(parseSoloLobbySearch('?solo=1&go=1').skip === true, 'go=1 skips lobby');
+assert(parseSoloLobbySearch('?mode=classic').mode === 'classic', 'mode=classic');
 
 const lobby = createSoloLobby(setup, '?three=1&solo=1');
 assert(lobby.open === true, 'lobby starts open');
-assert(lobby.humanSeat === 'Russians', 'default Russians');
-assert(lobbyCanStart(lobby), 'can start');
-setLobbySeat(lobby, 'Germans');
-assert(lobby.humanSeat === 'Germans', 'seat Germans');
-setLobbyMode(lobby, 'risk');
-assert(lobby.mode === 'risk', 'risk mode');
-setLobbyAiCount(lobby, -1);
-assert(lobby.aiCount === 3, 'risk AI 3 after minus from 4');
-const opts = lobbyStartOptions(lobby);
-assert(opts.mode === 'risk' && opts.humanSeat === 'Germans', 'start options');
+assert(lobby.screen === 'main', 'main menu first');
+assert(lobby.mode === 'risk', 'risk default');
+assert(!lobbyCanStart(lobby), 'cannot start with 0 seats');
+assert(lobbyStartLabel(lobby) === 'Select at least 2 players', 'main Start copy');
+
+applyLobbyAction(lobby, 'screen', 'setup');
+assert(lobby.screen === 'setup', 'Local Play → setup');
+toggleLobbySeat(lobby, 'Russians');
+toggleLobbySeat(lobby, 'Germans');
+setLobbyOccupant(lobby, 'Germans', 'medium');
+assert(lobbyCanStart(lobby), '2 seats can start');
+assert(lobbyStartLabel(lobby) === 'Start Game (2 Players)', 'Start Game (N Players)');
+setLobbyIpc(lobby, 100);
+assert(lobby.startingIPCs === 100, 'IPC 100');
+const players = lobbyBuildPlayers(lobby);
+assert(players.length === 2, '2 players');
+assert(players.find((p) => p.id === 'Russians')?.isAI === false, 'Russians human');
+assert(players.find((p) => p.id === 'Germans')?.isAI === true, 'Germans AI');
+assert(players.find((p) => p.id === 'Germans')?.aiDifficulty === 'medium', 'Easy/Med/Hard per seat');
+
+const skip = createSoloLobby(setup, '?three=1&solo=1&go=1&seat=British&ai=2&diff=easy');
+assert(skip.open === false, 'go=1 closed');
+assert(skip.selectedPlayers[0] === 'British', 'skip human British');
+assert(skip.selectedPlayers.length === 3, '1 + 2 AI');
+assert(skip.playerAI.British === 'human', 'human occupant');
+
+setLobbyMode(lobby, 'classic');
+assert(lobby.mode === 'classic', 'classic mode tile');
 
 const classicPlayers = buildSoloPlayers(setup, { mode: 'classic', humanSeat: 'British' });
 assert(classicPlayers[0].id === 'British' && !classicPlayers[0].isAI, 'human first');
@@ -83,17 +120,17 @@ assert(classic.territoryState.Russia?.isCapital === true, 'capitals stamped');
 const classicPlay = createSoloPlay(classic, unitDefs);
 assert(inspectPlay(classicPlay).setupPhase === GAME_PHASES.PLAYING, 'playing inspect');
 
-const risk = startSoloMatch(setup, territories, continents, {
-  mode: 'risk',
-  humanSeat: 'Russians',
-  aiCount: 2,
-  aiDifficulty: 'easy',
-});
+const risk = startSoloMatch(setup, territories, continents, lobbyStartOptions(createSoloLobby(setup, '?go=1&mode=risk&seat=Russians&ai=2&diff=easy')));
 risk.unitDefs = unitDefs;
 assert(risk.gameMode === 'risk', 'risk mode');
 assert(risk.phase === GAME_PHASES.CAPITAL_PLACEMENT, 'opens on capital');
 assert(risk.players.length === 3, '1 human + 2 AI');
 assert(risk.currentPlayer.id === 'Russians' && !risk.currentPlayer.isAI, 'human places first');
+assert(shouldShowSetupTutorial(risk), 'tutorial on first setup');
+dismissTutorial();
+assert(tutorialWasDismissed(), 'tutorial dismiss persisted');
+assert(!shouldShowSetupTutorial(risk), 'dismissed stays closed');
+assert(SETUP_TUTORIAL_STEPS.length === 3, 'tutorial has 3 steps');
 
 const play = createSoloPlay(risk, unitDefs);
 const caps = capitalDests(play);
@@ -118,6 +155,13 @@ while (risk.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
 assert(risk.phase === GAME_PHASES.UNIT_PLACEMENT, 'all capitals → deploy');
 assert(risk.currentPlayer.id === 'Russians', 'human deploys first');
 
+const wave0 = deployWave(play);
+assert(wave0.limit === 6, 'wave cap 6');
+assert(wave0.placed === 0, '0 placed');
+assert(!confirmEnabled(play), 'Pass disabled at 0 of 6');
+assert(confirmLabel(play).includes('0 of 6'), 'Deploy 0 of 6 copy');
+assert(wave0.meter.includes('0/6'), 'budget meter');
+
 const pool = deployPool(play);
 assert(pool.some((p) => p.type === 'infantry' && p.quantity > 0), 'deploy infantry');
 adjustUnit(play, 'infantry', 1);
@@ -128,6 +172,20 @@ assert(confirmLabel(play).includes('Deploy'), 'deploy label');
 confirm(play);
 const inf = (risk.units[pick] || []).find((u) => u.type === 'infantry' && u.owner === 'Russians');
 assert((inf?.quantity || 0) >= 2, 'starting INF + deploy');
+assert(risk.unitsPlacedThisRound === 1, '1 of 6 placed');
+assert(!confirmEnabled(play), 'Pass still locked after 1');
+
+while (risk.unitsPlacedThisRound < 6) {
+  adjustUnit(play, 'infantry', 1);
+  tapLand(play, pick);
+  if (!confirmEnabled(play)) break;
+  confirm(play);
+}
+assert(risk.unitsPlacedThisRound === 6, 'placed 6');
+assert(confirmEnabled(play), 'Pass enabled at 6 of 6');
+assert(confirmLabel(play).startsWith('Pass'), 'Pass CTA');
+confirm(play);
+assert(risk.currentPlayer.isAI, 'Pass advances seat');
 
 const json = risk.toJSON();
 assert(findUndefinedPaths(json).length === 0, 'risk toJSON has no undefined');

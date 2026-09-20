@@ -76,6 +76,9 @@ export function chromeHitRectsFrom(api = {}) {
   if (api.isLobbyOpen?.() || api.lobby?.classList?.contains('is-open')) {
     push(api.lobby);
   }
+  if (api.isTutorialOpen?.() || api.tutorial?.classList?.contains('is-open')) {
+    push(api.tutorial);
+  }
   const peekOn = api.peek?.classList?.contains('is-on');
   const battleOn = api.battleEl?.classList?.contains('is-on');
   if (peekOn) push(api.peek);
@@ -88,12 +91,14 @@ export function chromeHitRectsFrom(api = {}) {
 export function shouldIgnoreMapHit({
   sheetOpen = false,
   lobbyOpen = false,
+  tutorialOpen = false,
   targetInChrome = false,
   clientX,
   clientY,
   rects = [],
 } = {}) {
   if (lobbyOpen) return true;
+  if (tutorialOpen) return true;
   if (sheetOpen) return true;
   if (targetInChrome) return true;
   return isPointInAnyRect(clientX, clientY, rects);

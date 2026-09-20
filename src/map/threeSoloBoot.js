@@ -36,13 +36,15 @@ import {
 } from './threeSoloMatch.js';
 import {
   createSoloLobby,
-  setLobbyMode,
-  setLobbySeat,
-  setLobbyAiCount,
-  setLobbyDifficulty,
+  applyLobbyAction,
+  lobbyCanStart,
   lobbyStartOptions,
   lobbyInspect,
 } from './threeSoloLobby.js';
+import {
+  shouldShowSetupTutorial,
+  dismissTutorial,
+} from './threeSetupTutorial.js';
 import {
   createSoloPlay,
   tapLand,
@@ -266,21 +268,43 @@ export async function bootThreeSolo() {
     openLobby();
   };
   chrome.onLobbyChange = (kind, value) => {
-    if (kind === 'mode') setLobbyMode(lobby, value);
-    if (kind === 'seat') setLobbySeat(lobby, value);
-    if (kind === 'ai') setLobbyAiCount(lobby, value);
-    if (kind === 'diff') setLobbyDifficulty(lobby, value);
+    applyLobbyAction(lobby, kind, value);
     chrome.paintLobby(lobby);
   };
   chrome.onLobbyStart = () => {
+    if (!lobbyCanStart(lobby)) {
+      chrome.paintLobby(lobby);
+      return;
+    }
     lobby.open = false;
     chrome.setLobbyOpen(false);
     startMatch(lobbyStartOptions(lobby));
   };
+  chrome.onTutorialDismiss = () => {
+    dismissTutorial();
+    chrome.setTutorialOpen(false);
+  };
+  chrome.onHowTo = () => {
+    if (lobby.open) {
+      applyLobbyAction(lobby, 'howto', '1');
+      chrome.paintLobby(lobby);
+      return;
+    }
+    chrome.setTutorialOpen(true);
+  };
 
   function openLobby() {
     lobby.open = true;
+    lobby.screen = 'main';
+    lobby.showHowTo = false;
+    chrome.setTutorialOpen(false);
     chrome.paintLobby(lobby);
+  }
+
+  function maybeShowTutorial() {
+    if (shouldShowSetupTutorial(gameState)) {
+      chrome.setTutorialOpen(true);
+    }
   }
 
   function startMatch(options = lobbyStartOptions(lobby)) {
@@ -296,6 +320,7 @@ export async function bootThreeSolo() {
     paintChrome();
     fitEurope();
     camera.dirty = true;
+    maybeShowTutorial();
   }
 
   bindState(gameState);
@@ -312,7 +337,7 @@ export async function bootThreeSolo() {
   function eventFromChrome(e) {
     const node = eventElement(e);
     if (!node || typeof node.closest !== 'function') return false;
-    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-lobby, #three-phase-strip');
+    return !!node.closest('#three-bottom, #three-l0, #three-zoom, #three-sheet, #three-lobby, #three-tutorial, #three-phase-strip');
   }
 
   function ignoreMapHit(e) {
@@ -320,6 +345,7 @@ export async function bootThreeSolo() {
     return shouldIgnoreMapHit({
       sheetOpen: chrome.isSheetOpen(),
       lobbyOpen: chrome.isLobbyOpen(),
+      tutorialOpen: chrome.isTutorialOpen(),
       targetInChrome: eventFromChrome(e),
       clientX: pt?.x,
       clientY: pt?.y,

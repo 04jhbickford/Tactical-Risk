@@ -6,6 +6,17 @@ import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
 import {
+  AI_DIFFICULTIES,
+  FACTION_COLORS,
+  STARTING_IPC_OPTIONS,
+  lobbyCanStart,
+  lobbyStartLabel,
+} from './threeSoloLobby.js';
+import {
+  SETUP_TUTORIAL_STEPS,
+  SETUP_TUTORIAL_TITLE,
+} from './threeSetupTutorial.js';
+import {
   bindSealedActivate,
   chromeHitRectsFrom,
   isPointInAnyRect,
@@ -552,6 +563,62 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:700 16px/1 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
     }
     #three-lobby .three-lobby-start:disabled { opacity:0.4; cursor:default; }
+    #three-lobby .three-lobby-card {
+      display:block; width:100%; text-align:left; min-height:72px;
+      margin:0 0 10px; padding:12px 14px; border-radius:14px;
+      border:1px solid rgba(255,255,255,0.14);
+      background:rgba(255,255,255,0.05); color:#f4ead4;
+      font:600 16px/1.2 -apple-system,"SF Pro Text",sans-serif; cursor:pointer;
+    }
+    #three-lobby .three-lobby-card small {
+      display:block; margin-top:4px; font:400 13px/1.3 -apple-system,sans-serif; color:#c8c0b0;
+    }
+    #three-lobby .three-lobby-card.is-off { opacity:0.45; cursor:default; }
+    #three-lobby .three-lobby-back {
+      min-height:44px; margin:0 0 8px; padding:0 12px;
+      border:0; background:transparent; color:#C4A35A;
+      font:600 14px/1 -apple-system,sans-serif; cursor:pointer;
+    }
+    #three-lobby .three-lobby-seat {
+      width:100%; text-align:left; min-height:56px; padding:10px 12px;
+      border-radius:12px; border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.04); color:#f4ead4; cursor:pointer;
+    }
+    #three-lobby .three-lobby-seat.is-on {
+      border-color:#C4A35A; background:rgba(196,163,90,0.16);
+    }
+    #three-lobby .three-lobby-seat-name { font:700 15px/1.2 -apple-system,sans-serif; }
+    #three-lobby .three-lobby-seat-tools { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    #three-lobby .three-lobby-foot {
+      margin:8px 0 12px; font:400 12px/1.3 -apple-system,sans-serif; color:#c8c0b0;
+    }
+    #three-tutorial {
+      display:none; position:absolute; inset:0; z-index:55;
+      padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      background:rgba(20,24,22,0.92);
+      -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
+      color:#E8E2D4; overflow-y:auto; pointer-events:auto;
+    }
+    #three-tutorial.is-open { display:block; }
+    #three-tutorial h2 {
+      margin:12px 0 8px; font:700 22px/1.1 -apple-system,"SF Pro Display",sans-serif;
+    }
+    #three-tutorial .three-tut-step { margin:0 0 14px; }
+    #three-tutorial .three-tut-step b {
+      display:block; color:#C4A35A; font:600 12px/1 -apple-system,sans-serif;
+      letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;
+    }
+    #three-tutorial .three-tut-step p { margin:0; font:400 15px/1.35 -apple-system,sans-serif; }
+    #three-tutorial .three-tut-go {
+      display:block; width:100%; min-height:56px; margin-top:16px;
+      border:0; border-radius:16px; background:#C4A35A; color:#1E2420;
+      font:700 16px/1 -apple-system,sans-serif; cursor:pointer;
+    }
+    #three-l0 .three-l0-help {
+      width:36px; height:36px; border-radius:10px; border:0;
+      background:rgba(30,36,32,0.55); color:#F4E8C4;
+      font:700 16px/1 -apple-system,sans-serif; cursor:pointer;
+    }
     @media (max-width:430px) {
       #three-l0 .three-l0-ver { display:none; }
       #three-peek .three-peek-unit { width:60px; height:70px; }
@@ -576,6 +643,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       <span id="three-seat">${seat}</span>
     </span>
     <span class="three-l0-chip three-l0-ipc" id="three-ipc">IPC ${ipc}</span>
+    <button type="button" class="three-l0-help" id="three-help-btn" aria-label="How to start">?</button>
     <span class="three-l0-ver">${GAME_VERSION}</span>
   `;
   document.body.appendChild(l0);
@@ -618,8 +686,12 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
 
   const lobby = document.createElement('div');
   lobby.id = 'three-lobby';
-  lobby.innerHTML = '<h1 class="three-lobby-title">New Game vs AI</h1>';
+  lobby.innerHTML = '<h1 class="three-lobby-title">Tactical Risk</h1>';
   document.body.appendChild(lobby);
+
+  const tutorial = document.createElement('div');
+  tutorial.id = 'three-tutorial';
+  document.body.appendChild(tutorial);
 
   const stackToggle = bottom.querySelector('#three-stack-toggle');
 
@@ -629,6 +701,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     bottom,
     sheet,
     lobby,
+    tutorial,
+    helpBtn: l0.querySelector('#three-help-btn'),
     peek: bottom.querySelector('#three-peek'),
     guideEl: bottom.querySelector('#three-guide'),
     stripEl: strip,
@@ -652,6 +726,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     onNewGameVsAI: null,
     onLobbyChange: null,
     onLobbyStart: null,
+    onTutorialDismiss: null,
+    onHowTo: null,
     hitRects() {
       return chromeHitRectsFrom(api);
     },
@@ -677,7 +753,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       document.documentElement.classList.toggle('has-l2', l2);
       document.documentElement.classList.toggle('has-battle', battleOn);
       document.documentElement.classList.toggle('has-stacks', api.stacksExpanded);
-      const hideZoom = l1 || l2 || battleOn;
+      const hideZoom = l1 || l2 || battleOn || api.isLobbyOpen() || api.isTutorialOpen();
       api.zoom.hidden = hideZoom;
       api.zoom.setAttribute('aria-hidden', hideZoom ? 'true' : 'false');
     },
@@ -693,50 +769,130 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     isLobbyOpen() {
       return lobby.classList.contains('is-open');
     },
+    isTutorialOpen() {
+      return tutorial.classList.contains('is-open');
+    },
     setLobbyOpen(open) {
       lobby.classList.toggle('is-open', !!open);
       document.documentElement.classList.toggle('has-lobby', !!open);
       if (open) {
         api.setSheetOpen(false);
+        api.setTutorialOpen(false);
         api.zoom.hidden = true;
       }
       api.syncLayers();
     },
+    setTutorialOpen(open) {
+      tutorial.classList.toggle('is-open', !!open);
+      document.documentElement.classList.toggle('has-tutorial', !!open);
+      if (open) {
+        api.setSheetOpen(false);
+        api.zoom.hidden = true;
+        api.paintTutorial();
+      }
+      api.syncLayers();
+    },
+    paintTutorial() {
+      tutorial.innerHTML = `
+        <p class="three-lobby-sub">How to Play · no sign-in · SCHEMA ${SCHEMA_VERSION}</p>
+        <h2>${SETUP_TUTORIAL_TITLE}</h2>
+        ${SETUP_TUTORIAL_STEPS.map((step) => `
+          <div class="three-tut-step"><b>${step.kicker}</b><p>${step.body}</p></div>
+        `).join('')}
+        <button type="button" class="three-tut-go" data-tutorial="dismiss">Got it</button>
+      `;
+    },
     paintLobby(model = {}) {
+      const screen = model.screen || 'main';
+      if (screen === 'main' || model.showHowTo) {
+        if (model.showHowTo && screen !== 'setup') {
+          lobby.innerHTML = `
+            <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main">← Back</button>
+            <p class="three-lobby-title">How to Play</p>
+            <p class="three-lobby-sub">Rules — no sign-in</p>
+            ${SETUP_TUTORIAL_STEPS.map((step) => `
+              <div class="three-tut-step"><b>${step.kicker}</b><p>${step.body}</p></div>
+            `).join('')}
+            <button type="button" class="three-lobby-start" data-lobby="screen" data-value="setup">New Local Game</button>
+          `;
+          api.setLobbyOpen(true);
+          return;
+        }
+        lobby.innerHTML = `
+          <p class="three-lobby-title">Tactical Risk</p>
+          <p class="three-lobby-sub">World War II Grand Strategy · ${GAME_VERSION}</p>
+          <p class="three-lobby-sub">Start here · Local only · no lobby server</p>
+          <button type="button" class="three-lobby-card" data-lobby="screen" data-value="setup">
+            Local Play
+            <small>This device · Friends or AI on this screen</small>
+          </button>
+          <button type="button" class="three-lobby-card is-off" disabled>
+            Play Online
+            <small>Off this tip · no Firebase</small>
+          </button>
+          <button type="button" class="three-lobby-card" data-lobby="howto" data-value="1">
+            How to Play
+            <small>Guest · Rules — no sign-in</small>
+          </button>
+        `;
+        api.setLobbyOpen(true);
+        return;
+      }
       const factions = model.factions || [];
-      const mode = model.mode || 'classic';
-      const seat = model.humanSeat;
-      const diff = model.difficulty || 'medium';
-      const ai = Number(model.aiCount) || 4;
+      const mode = model.mode || 'risk';
       const classic = mode === 'classic';
+      const selected = new Set(model.selectedPlayers || []);
+      const canStart = lobbyCanStart(model);
       lobby.innerHTML = `
-        <p class="three-lobby-title">New Game vs AI</p>
-        <p class="three-lobby-sub">Local only · no lobby server · SCHEMA ${SCHEMA_VERSION}</p>
+        <button type="button" class="three-lobby-back" data-lobby="screen" data-value="main">← Back</button>
+        <p class="three-lobby-title">New Local Game</p>
+        <p class="three-lobby-sub">Select 2-5 players to begin</p>
         <h2>Mode</h2>
         <div class="three-lobby-row">
           <button type="button" class="three-lobby-tile${classic ? ' is-on' : ''}" data-lobby="mode" data-value="classic">Classic 1942</button>
-          <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk deploy</button>
+          <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk</button>
         </div>
-        <h2>Your seat</h2>
+        <h2>Players</h2>
         <div class="three-lobby-row">
-          ${factions.map((f) => `
-            <button type="button" class="three-lobby-tile${f.id === seat ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}" style="box-shadow:inset 0 0 0 2px ${f.color || '#888'}">${f.name || f.id}</button>
-          `).join('')}
+          <button type="button" class="three-lobby-tile${model.teamsEnabled ? ' is-on' : ''}" data-lobby="teams" data-value="${model.teamsEnabled ? '0' : '1'}">Teams ${model.teamsEnabled ? 'On' : 'Off'}</button>
         </div>
-        <h2>AI opponents</h2>
-        <div class="three-lobby-ai">
-          <button type="button" data-lobby="ai" data-value="-1" ${classic ? 'disabled' : ''} aria-label="Fewer AI">−</button>
-          <b>${ai}</b>
-          <button type="button" data-lobby="ai" data-value="1" ${classic ? 'disabled' : ''} aria-label="More AI">+</button>
-          <span>${classic ? 'all other powers' : 'Risk seats'}</span>
-        </div>
-        <h2>Difficulty</h2>
-        <div class="three-lobby-row">
-          ${['easy', 'medium', 'hard'].map((id) => `
-            <button type="button" class="three-lobby-tile${diff === id ? ' is-on' : ''}" data-lobby="diff" data-value="${id}">${id[0].toUpperCase()}${id.slice(1)}</button>
-          `).join('')}
-        </div>
-        <button type="button" class="three-lobby-start" data-lobby="start">Start match</button>
+        ${factions.map((f) => {
+          const on = selected.has(f.id);
+          const occupant = model.playerAI?.[f.id] || 'human';
+          const color = model.playerColors?.[f.id]?.color || f.color || '#888';
+          return `
+            <button type="button" class="three-lobby-seat${on ? ' is-on' : ''}" data-lobby="seat" data-value="${f.id}" style="box-shadow:inset 0 0 0 2px ${color}">
+              <div class="three-lobby-seat-name">${f.name || f.id}${on ? '' : ' · Tap to add'}</div>
+              ${on ? `
+                <div class="three-lobby-seat-tools" data-seat-tools="${f.id}">
+                  ${AI_DIFFICULTIES.map((d) => `
+                    <span class="three-lobby-tile${occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${d.name}</span>
+                  `).join('')}
+                  ${model.teamsEnabled ? `
+                    <span class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</span>
+                    <span class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</span>
+                    <span class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</span>
+                  ` : ''}
+                  ${FACTION_COLORS.slice(0, 6).map((c) => `
+                    <span class="three-lobby-tile" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="width:28px;min-height:28px;padding:0;background:${c.color}"></span>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </button>
+          `;
+        }).join('')}
+        ${classic ? '' : `
+          <h2>Starting IPCs</h2>
+          <div class="three-lobby-row">
+            ${STARTING_IPC_OPTIONS.map((n) => `
+              <button type="button" class="three-lobby-tile${Number(model.startingIPCs) === n ? ' is-on' : ''}" data-lobby="ipc" data-value="${n}">${n}</button>
+            `).join('')}
+          </div>
+        `}
+        <p class="three-lobby-foot">${classic
+          ? 'Historical 1942 stacks · skip capital / deploy'
+          : 'Random Territories • Capital Conquest Victory'}</p>
+        <button type="button" class="three-lobby-start" data-lobby="start" ${canStart ? '' : 'disabled'}>${lobbyStartLabel(model)}</button>
       `;
       api.setLobbyOpen(true);
     },
@@ -1004,7 +1160,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
   };
 
-  for (const el of [api.l0, api.bottom, api.sheet, api.lobby, api.zoom, api.peek, api.battleEl, api.confirm, api.menuBtn, stackToggle]) {
+  for (const el of [api.l0, api.bottom, api.sheet, api.lobby, api.tutorial, api.zoom, api.peek, api.battleEl, api.confirm, api.menuBtn, api.helpBtn, stackToggle]) {
     sealChromeControl(el);
   }
   bindSealedActivate(api.menuBtn, null, () => {
@@ -1048,6 +1204,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     if (typeof api.onLobbyChange === 'function') {
       api.onLobbyChange(kind, btn.dataset.value);
     }
+  });
+  bindSealedActivate(tutorial, '[data-tutorial]', () => {
+    api.setTutorialOpen(false);
+    if (typeof api.onTutorialDismiss === 'function') api.onTutorialDismiss();
+  });
+  bindSealedActivate(api.helpBtn, null, () => {
+    if (typeof api.onHowTo === 'function') api.onHowTo();
+    else api.setTutorialOpen(true);
   });
   bindSealedActivate(api.guideEl, '[data-guide="dismiss"]', () => {
     api.setGuide('', false);

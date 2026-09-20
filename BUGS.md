@@ -2,6 +2,14 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.5 lookpass (preview only)
+
+Three lobby now uses main option sources (`AI_DIFFICULTIES`,
+IPC ladder, 2–5 seats, Start Game (N)). Setup tutorial + deploy
+6-then-Pass. Persist P0 kept. Pocket `?max=1` kept. Do not merge.
+
+---
+
 ## 9.20.26 — V2.81.55-ux-solo.4 lobby + P0 persist (preview only)
 
 Cherry-picked main P0 `2f6fe8d` (PR82 persist combat capture). Local
