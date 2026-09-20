@@ -16,8 +16,8 @@ Catalog SoT cited by James: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-
 | Explicit 5-seat list; Empty clears; 2+ Humans = pass-and-play | **STEAL** | `bgio-lobby-seat-picker` / `bgio-local-pass-and-play` |
 | Faction card is seat identity; Local / Online on home | **STEAL** | `root-digital-lobby-hud` (Online already off this tip) |
 | Easy / Med / Hard as AI tiers under AI occupant | **STEAL** | same + existing `AI_DIFFICULTIES` / `playerAI` |
-| Touch-pan shell + stamp SoT | **KEEP** | `.15` T1–T5 + `.14` `no-store` `/` |
-| Combat nested stages | **KEEP** | `.16` `playStage()` untouched |
+| Touch-pan shell + stamp SoT | **KEEP** | `.15` T1–T5 re-proved by CDP after `.17` seat CSS (`.16` hold was PARTIAL: overflow visible only) + `.14` `no-store` `/` |
+| Combat nested stages | **KEEP** | `.16` `playStage()` untouched. P1 casualty YOU steppers **NOT-REACHED** |
 
 Nothing invented for the occupant grammar. Only glue: `seatOccupantView()` so chrome and `lobbyCanStart` read one derived occupant.
 
@@ -36,7 +36,7 @@ Tip after hard reload: L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.17`.
 
 - All 5 seats Human·AI·Empty + Easy·Med·Hard; height 144; overflow visible; Americans last seat unclipped
 - Start dead at 0 seats (`Select at least 2 players`) and all-AI (`Need at least one Human`); live at 3 Humans
-- CDP touch pan on seat card: `scrollTop` 0 → 118 → 366; `defaultPrevented` false; Americans above footer gap 95px
-- Unit `test-three-solo-lobby` + combat stages still PASS
+- CDP **T1–T5** after seat CSS (not CSS inspection): `Input.dispatchTouchEvent` on occupant chip → MAIN `scrollTop` moves; `window`/`body` `scrollY` stays 0; footer outside MAIN; `overscroll-behavior:contain`
+- Unit `test-three-solo-lobby` + combat stages still PASS. Casualty YOU steppers out of scope.
 
 Stills under `/opt/cursor/artifacts/screenshots/lookpass17_*`. Hold merge.

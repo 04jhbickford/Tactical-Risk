@@ -16,8 +16,8 @@ None of the grammar. Tip glue is `seatOccupantView()` / `setLobbyOccupant(..., '
 
 ## Keep
 
-- `.15` touch-pan shell (MAIN `pan-y`, footer sibling, click-only lobby activate)
-- `.16` combat nested stages (`playStage` ORIGIN→UNITS→DEST→CONFIRM) untouched
+- `.15` touch-pan shell (MAIN `pan-y`, footer sibling, click-only lobby activate). Viz SCORE `.16` hold was **PARTIAL** (`overflow:visible` only) — `.17` re-proves CDP T1–T5 (`MAIN.scrollTop` moves, `body.scrollY` 0) after seat CSS. Do not READY on CSS inspection.
+- `.16` combat nested stages (`playStage` ORIGIN→UNITS→DEST→CONFIRM) untouched. P1 casualty YOU steppers **NOT-REACHED**.
 - Stamp SoT (`__TR_GAME_VERSION`, `no-store` `/`, grow-to-fit `overflow:visible`)
 
 Full SCORE: `briefs/2026-09-19-hybrid-solo-ai/SCORE-solo-17.md`.

@@ -20,8 +20,8 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A #3, GA
 - None of the grammar. `seatOccupantView()` + `setLobbyOccupant(..., 'empty'|'ai'|tier)` is glue over `selectedPlayers` / `playerAI`.
 
 **Kept**
-- `.15` lobby touch-pan + `.14` stamp SoT
-- `.16` `playStage()` combat machine (untouched)
+- `.15` lobby touch-pan + `.14` stamp SoT — **re-proved by CDP T1–T5 after `.17` seat CSS** (Viz SCORE .16 hold was PARTIAL: overflow visible only)
+- `.16` `playStage()` combat machine (untouched). P1 casualty YOU steppers **NOT-REACHED** — out of this tip.
 
 ## Fail-closed
 
@@ -30,7 +30,7 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A #3, GA
 | **A1** | Stamp exact `.17` after hard reload (L0 + lobby + `__TR_GAME_VERSION`) | yes | still + CDP |
 | **S1** | All 5 seats show Human · AI · Empty + Easy · Med · Hard; grow-to-fit; no clip; Americans not collapsed | yes | still @390 |
 | **S2** | Start disabled at 0 seats and at all-AI; enabled at 1 Human + AI / 2+ Humans | yes | unit + still |
-| **T1** | Lobby still pans (do not regress `.15`) | yes | CDP touch smoke |
+| **T1–T5** | CDP `Input.dispatchTouchEvent` on occupant chip pans MAIN; `body.scrollY` stays 0; footer outside MAIN. Do **not** READY on CSS inspection. | yes | gesture + stills |
 
 ## QC @390 tip + local (PASS)
 
@@ -41,7 +41,7 @@ Tip `?three=1&solo=1` after hard reload. `/` is `Cache-Control: no-store`. Live 
 | **A1** | Stamp `.17` after hard reload | **PASS** — tip L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.17` |
 | **S1** | All 5 seats full occupant chrome | **PASS** — Human/AI/Empty + Easy/Med/Hard; height 144; overflow visible; Americans unclipped |
 | **S2** | Start gate | **PASS** — dead at 0 seats and all-AI; `Start Game (3 Players)` after 3 Humans |
-| **T1** | Lobby MAIN still pans | **PASS** — CDP touch `scrollTop` 0 → 118 → 366; footer sibling; Americans gap 95px |
+| **T1–T5** | CDP pan after seat CSS | **PASS** — occupant-chip `Input.dispatchTouchEvent`; MAIN `scrollTop` 0 → 117 → 366; body/window `scrollY` 0; footer sibling; Americans gap 95px |
 
 Unit: `test-three-solo-lobby`, `test-three-solo-play`, `test-ux-preview-chrome-hit`.
 

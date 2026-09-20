@@ -134,6 +134,8 @@ assert(chromeSrc.includes('bindSealedActivate(lobby,') && chromeSrc.includes('{ 
 assert(!chromeSrc.includes('ontouchstart = activate'), 'no ontouchstart=activate preventDefault on chips');
 assert(chromeSrc.includes('has-lobby #mapCanvas') && chromeSrc.includes('pointer-events:none'), 'canvas ignores touches while lobby open');
 assert(/#three-lobby \.three-lobby-main \{[\s\S]*?touch-action:pan-y/.test(chromeSrc), 'MAIN touch-action pan-y');
+assert(/#three-lobby \.three-lobby-main \{[\s\S]*?overscroll-behavior:\s*contain/.test(chromeSrc), 'MAIN overscroll-behavior contain');
+assert(/html\.three-spike, html\.three-spike body \{[\s\S]*?overflow:hidden/.test(chromeSrc), 'html/body overflow hidden so body scrollY stays 0');
 assert(/#three-lobby \.three-lobby-seat-wrap[\s\S]*?touch-action:pan-y/.test(chromeSrc), 'seat wrap allows vertical pan');
 assert(!/for \(const el of \[[^\]]*lobby/.test(chromeSrc), 'lobby not blanket-sealed with preventDefault');
 const eventsSrc = String(readFileSync(new URL('../src/map/threeChromeEvents.js', import.meta.url)));

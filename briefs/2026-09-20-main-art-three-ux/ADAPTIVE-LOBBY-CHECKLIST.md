@@ -34,8 +34,10 @@ Real finger-pan on New Local Game below-fold must move MAIN.
 |---|---|---|---|
 | **T1** | No `preventDefault` on `touchstart`/`touchmove` that blocks MAIN pan while lobby is open. Chip/seat `ontouchstart = activate` is gone. Lobby `bindSealedActivate({prevent:false})` is click-only + passive. | yes | source + gesture |
 | **T2** | MAIN has `overflow-y:auto; touch-action:pan-y; -webkit-overflow-scrolling:touch; min-height:0; flex:1`. Seat cards/wraps/buttons are `touch-action:pan-y` (not `none` / not `manipulation`). | yes | computed style |
-| **T3** | Playwright / CDP **touch** finger-pan scrolls MAIN. Not mouse wheel. Not `scrollTop=` assignment in test setup. | yes | `scrollTop` rose after the gesture |
-| **T4** | Vertical drag **starting on a seat card / Human/Easy/Med/Hard chip** still pans MAIN. | yes | mid-pan still |
+| **T3** | Playwright / CDP **touch** finger-pan scrolls MAIN. Not mouse wheel. Not `scrollTop=` assignment. `window`/`body` `scrollY` stays **0**. `overflow:visible` alone is **PARTIAL** (Viz SCORE .16) — do **not** READY on CSS inspection. | yes | MAIN `scrollTop` rose; body `scrollY` 0 |
+| **T4** | Vertical drag **starting on a seat card / Human/AI/Empty (or Easy/Med/Hard) chip** still pans MAIN. | yes | mid-pan still |
 | **T5** | Teams+Start footer is a `flex:none` sibling **outside** MAIN. Last seat fully visible above footer with a gap after the touch pan. | yes | scroll-end still |
+
+MAIN also keeps `overscroll-behavior:contain`. After any seat/shell CSS change, re-run CDP T1–T5.
 
 Canvas: `html.three-spike.has-lobby #mapCanvas { pointer-events:none }` and canvas touch handlers return (no `preventDefault`) while lobby/tutorial is open.

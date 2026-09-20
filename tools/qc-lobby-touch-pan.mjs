@@ -5,6 +5,11 @@
 //   node tools/qc-lobby-touch-pan.mjs [url]
 //
 // Default URL is local `http://127.0.0.1:4173/?three=1&solo=1`.
+//
+// Viz SCORE .16: .15 touch hold was PARTIAL (overflow:visible only).
+// After any seat/shell CSS change, T1–T5 must re-prove a real finger-pan:
+// Input.dispatchTouchEvent on a seat/occupant chip → MAIN.scrollTop moves
+// AND window/body scrollY stays 0. CSS inspection is supporting, not READY.
 
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
@@ -178,30 +183,43 @@ async function main() {
     const wrap = document.querySelector('.three-lobby-seat-wrap');
     const chip = document.querySelector('.three-lobby-occupants .three-lobby-tile');
     const footer = document.querySelector('.three-lobby-footer');
+    const setup = document.querySelector('.three-lobby-setup');
     const cs = (el) => (el ? getComputedStyle(el) : null);
     const m = cs(main);
     const w = cs(wrap);
     const c = cs(chip);
+    const html = cs(document.documentElement);
+    const body = cs(document.body);
     const css = [...document.querySelectorAll('style')].map((s) => s.textContent || '').join('\n');
     return {
       mainOverflow: m?.overflowY,
       mainTouch: m?.touchAction,
       mainFlex: m?.flexGrow,
       mainMin: m?.minHeight,
+      mainOverscroll: m?.overscrollBehavior || m?.overscrollBehaviorY,
       mainWebkit: /#three-lobby \.three-lobby-main \{[\s\S]*?-webkit-overflow-scrolling:\s*touch/.test(css),
       wrapTouch: w?.touchAction,
       chipTouch: c?.touchAction,
-      footerOutside: !!(footer && main && !main.contains(footer)),
+      footerOutside: !!(footer && main && !main.contains(footer) && setup?.contains(footer)),
       chipsUnclipped: w?.overflow === 'visible' || w?.overflowY === 'visible',
+      htmlOverflow: html?.overflow,
+      bodyOverflow: body?.overflow,
+      supportingOnly: 'overflow:visible / pan-y CSS is supporting — T3 gesture is fail-closed',
     };
   });
   if (t2.mainOverflow !== 'auto' || !String(t2.mainTouch).includes('pan-y') || !t2.mainWebkit) {
     throw new Error(`T2 FAIL MAIN scroll/touch ${JSON.stringify(t2)}`);
   }
+  if (!String(t2.mainOverscroll || '').includes('contain')) {
+    throw new Error(`T2 FAIL MAIN overscroll-behavior contain ${JSON.stringify(t2.mainOverscroll)}`);
+  }
   if (!String(t2.wrapTouch).includes('pan-y') || !String(t2.chipTouch).includes('pan-y')) {
     throw new Error(`T2 FAIL seat/chip touch-action ${JSON.stringify(t2)}`);
   }
   if (!t2.footerOutside) throw new Error('T5 FAIL footer is inside MAIN');
+  if (t2.htmlOverflow !== 'hidden' || t2.bodyOverflow !== 'hidden') {
+    throw new Error(`T2 FAIL html/body must overflow:hidden so body scrollY stays 0 ${JSON.stringify(t2)}`);
+  }
 
   await page.screenshot({ path: shot('lookpass17_t1_setup_top_390.png'), fullPage: false });
 
@@ -213,18 +231,24 @@ async function main() {
     const main = document.querySelector('.three-lobby-main');
     main?.addEventListener('touchstart', mark, { passive: true });
     main?.addEventListener('touchmove', mark, { passive: true });
+    document.addEventListener('touchstart', mark, { passive: true, capture: true });
+    document.addEventListener('touchmove', mark, { passive: true, capture: true });
   });
   const before = await page.evaluate(() => {
     const main = document.querySelector('.three-lobby-main');
-    const seat = document.querySelector('.three-lobby-seat-wrap.is-on .three-lobby-seat')
+    const chip = document.querySelector('.three-lobby-seat-wrap.is-on .three-lobby-occupants .three-lobby-tile.is-on')
+      || document.querySelector('.three-lobby-seat-wrap.is-on .three-lobby-seat')
       || document.querySelector('.three-lobby-seat');
-    const r = seat.getBoundingClientRect();
+    const r = chip.getBoundingClientRect();
+    const bodyY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
     return {
       scrollTop: main.scrollTop,
       scrollHeight: main.scrollHeight,
       clientHeight: main.clientHeight,
-      startOn: 'seat-card',
-      x: Math.round(r.left + Math.min(48, r.width / 2)),
+      bodyScrollY: bodyY,
+      windowScrollY: window.scrollY,
+      startOn: 'occupant-chip',
+      x: Math.round(r.left + Math.min(24, r.width / 2)),
       y: Math.round(r.top + r.height / 2),
     };
   });
@@ -234,19 +258,31 @@ async function main() {
   if (before.scrollTop !== 0) {
     throw new Error(`T5 FAIL test assigned scrollTop before gesture (${before.scrollTop})`);
   }
+  if (before.bodyScrollY !== 0 || before.windowScrollY !== 0) {
+    throw new Error(`T3 FAIL body/window scrollY already ${before.bodyScrollY}/${before.windowScrollY} before pan`);
+  }
 
   const cdp = await context.newCDPSession(page);
-  // Finger-pan MAIN downward = finger moves up. Short first swipe so
-  // mid-pan still differs from scroll-end.
+  // Finger-pan MAIN downward = finger moves up. Starts on Human/AI/Empty
+  // occupant chip after the .17 seat CSS. Short first swipe so mid-pan
+  // still differs from scroll-end. Never assign MAIN.scrollTop=.
   await dispatchSwipe(cdp, { x: before.x, y: before.y, dy: -120, steps: 14, stepDelay: 18 });
   await page.waitForTimeout(250);
 
   const mid = await page.evaluate(() => {
     const main = document.querySelector('.three-lobby-main');
-    return { scrollTop: main.scrollTop };
+    const bodyY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    return {
+      scrollTop: main.scrollTop,
+      bodyScrollY: bodyY,
+      windowScrollY: window.scrollY,
+    };
   });
   if (!(mid.scrollTop > before.scrollTop)) {
-    throw new Error(`T3 FAIL touch gesture did not move scrollTop (${before.scrollTop} → ${mid.scrollTop})`);
+    throw new Error(`T3 FAIL CDP Input.dispatchTouchEvent did not move MAIN.scrollTop (${before.scrollTop} → ${mid.scrollTop}) — overflow:visible is not enough`);
+  }
+  if (mid.bodyScrollY !== 0 || mid.windowScrollY !== 0) {
+    throw new Error(`T3 FAIL body/window scrolled (${mid.bodyScrollY}/${mid.windowScrollY}); only MAIN may move`);
   }
   const t1 = await page.evaluate(() => !!window.__trLobbyTouchPrevented);
   if (t1) throw new Error('T1 FAIL touchstart/touchmove defaultPrevented during lobby pan');
@@ -270,8 +306,11 @@ async function main() {
     const lastR = last.getBoundingClientRect();
     const footR = footer.getBoundingClientRect();
     const name = last.querySelector('.three-lobby-seat-name')?.textContent?.trim() || '';
+    const bodyY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
     return {
       scrollTop: main.scrollTop,
+      bodyScrollY: bodyY,
+      windowScrollY: window.scrollY,
       lastBottom: lastR.bottom,
       footerTop: footR.top,
       gap: footR.top - lastR.bottom,
@@ -285,7 +324,10 @@ async function main() {
     };
   });
   if (!(end.scrollTop > before.scrollTop)) {
-    throw new Error(`T3 FAIL end scrollTop not from gesture (${before.scrollTop} → ${end.scrollTop})`);
+    throw new Error(`T3 FAIL end MAIN.scrollTop not from CDP gesture (${before.scrollTop} → ${end.scrollTop})`);
+  }
+  if (end.bodyScrollY !== 0 || end.windowScrollY !== 0) {
+    throw new Error(`T3 FAIL body/window scrollY ${end.bodyScrollY}/${end.windowScrollY} after pan (must stay 0)`);
   }
   if (end.lastBottom > end.footerTop - 8) {
     throw new Error(`T3/T5 FAIL last seat ${end.name} bottom ${end.lastBottom} not above footer ${end.footerTop}`);
@@ -305,7 +347,10 @@ async function main() {
       scrollTopBefore: before.scrollTop,
       scrollTopMid: mid.scrollTop,
       scrollTopEnd: end.scrollTop,
-      causedBy: 'CDP Input.dispatchTouchEvent touchStart/touchMove/touchEnd',
+      bodyScrollY: { before: before.bodyScrollY, mid: mid.bodyScrollY, end: end.bodyScrollY },
+      windowScrollY: { before: before.windowScrollY, mid: mid.windowScrollY, end: end.windowScrollY },
+      causedBy: 'CDP Input.dispatchTouchEvent touchStart/touchMove/touchEnd on occupant chip',
+      not: 'CSS overflow:visible inspection / wheel / scrollTop= assignment',
     },
     t4: { startedOn: before.startOn, scrollTopMoved: mid.scrollTop > before.scrollTop },
     t5: end,

@@ -11,6 +11,9 @@ START GAME stays disabled until legal local config (≥2 seats and at
 least one Human). Steal: aa-1942-seat-combatants, bgio-lobby-seat-picker /
 bgio-local-pass-and-play, root-digital-lobby-hud. Keep `.15` touch-pan
 shell and `.16` combat stages. Grow-to-fit, no overflow:hidden clip.
+Viz SCORE `.16` touch hold was PARTIAL (overflow visible only) — `.17`
+re-proves CDP T1–T5 after seat CSS (MAIN.scrollTop moves, body scrollY 0).
+Do not READY on CSS inspection. Casualty YOU steppers out of this tip.
 Hold merge.
 
 ---
