@@ -1373,7 +1373,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           <strong>${card.title || ''}</strong>
           <div class="three-battle-body">${card.kicker === 'Breakthrough' ? 'Tap a tech, then Confirm' : (card.body || '')}</div>
           ${lanes}
-          ${techs ? `<div class="three-tech-grid">${techs}</div>${pop}` : ''}
+          ${techs ? `${pop}<div class="three-tech-grid">${techs}</div>` : ''}
         </div>
         ${pickers ? `<div class="three-pickers">${pickers}</div>` : ''}`;
       api.battleEl.classList.add('is-on');
@@ -1441,21 +1441,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           if (typeof api.onLossStep === 'function') {
             api.onLossStep(btn.dataset.lossSide, btn.dataset.lossType, Number(btn.dataset.lossStep));
           }
-        };
-        btn.onpointerdown = activate;
-        btn.ontouchstart = activate;
-        btn.onclick = activate;
-      });
-      api.battleEl.querySelectorAll('[data-tech-info]').forEach((btn) => {
-        stamp(btn);
-        const activate = (e) => {
-          e.stopPropagation();
-          if (e.cancelable) e.preventDefault();
-          const id = btn.dataset.techInfo;
-          const open = api.battleEl.querySelector(`[data-tech-pop="${id}"]`);
-          const was = open?.classList.contains('is-on');
-          api.battleEl.querySelectorAll('[data-tech-pop]').forEach((pop) => pop.classList.remove('is-on'));
-          if (open && !was) open.classList.add('is-on');
         };
         btn.onpointerdown = activate;
         btn.ontouchstart = activate;

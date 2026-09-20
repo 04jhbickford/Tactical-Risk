@@ -1771,7 +1771,10 @@ export function chromeModel(play, territories = []) {
   }
   const wave = play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT ? deployWave(play) : null;
   if (wave && !route) route = wave.meter;
+  const destName = play.destPicked;
+  const destIsWater = !!(destName && play.gameState.territoryByName?.[destName]?.isWater);
   const seaSelected = !!(landName && play.gameState.territoryByName?.[landName]?.isWater);
+  const cargoName = movePhase && (destIsWater ? destName : (seaSelected ? landName : null));
   return {
     land: sheetLand,
     stacks: play.landing
@@ -1790,7 +1793,7 @@ export function chromeModel(play, territories = []) {
     phaseStripCurrent: strip.current,
     highlights: marks,
     canUndo: canUndo(play),
-    cargo: seaSelected && movePhase ? cargoManifest(play, landName) : [],
+    cargo: cargoName ? cargoManifest(play, cargoName) : [],
     targetShipId: play.targetShipId || null,
     researchHint: phase === TURN_PHASES.DEVELOP_TECH && !play.tech?.rolls && !play.tech?.breakthrough,
   };

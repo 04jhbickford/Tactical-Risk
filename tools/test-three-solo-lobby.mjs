@@ -282,6 +282,10 @@ if (landName) {
     && (classic.units[to] || []).some((u) => u.owner === 'Americans' && u.type === 'transport')
   ));
   assert(loadDests.includes(trnSea), 'combat-move land can load adjacent TRN');
+  tapLand(landPlay, trnSea);
+  const loadModel = chromeModel(landPlay, territories);
+  assert(loadModel.label.includes('Load TRN'), 'Load TRN confirm');
+  assert((loadModel.cargo || []).some((s) => s.type === 'transport'), 'cargo sheet lists dest TRN');
 }
 
 classic.turnPhase = TURN_PHASES.DEVELOP_TECH;
