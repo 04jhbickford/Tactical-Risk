@@ -1656,7 +1656,7 @@ export class GameState {
     this.turnPhase = this.phase === GAME_PHASES.PLAYING
       ? this.turnPhase
       : SETUP_TURN_PHASE;
-    this.placementHistory = []; // Clear undo history for this round
+    this.placementHistory = []; // Pass / end of wave only — keep history while 1–6 sit on the map
 
     // Check if all players have finished placing - either no units left OR no placeable units
     const anyPlayerCanPlace = this.players.some(p => {
@@ -5370,6 +5370,8 @@ export class GameState {
       placementRound: this.placementRound,
       // Additive (no schema bump): mid-wave rejoin must restore the 6-unit cap.
       unitsPlacedThisRound: this.unitsPlacedThisRound || 0,
+      // Additive: keep deploy Undo until Pass. Do not drop this on autosave.
+      placementHistory: (this.placementHistory || []).map((entry) => ({ ...entry })),
       // v8: Save air unit origin tracking for proper landing calculation after load
       airUnitOrigins: this.airUnitOrigins,
       friendlyTerritoriesAtTurnStart: Array.from(this.friendlyTerritoriesAtTurnStart || []),
@@ -5445,6 +5447,9 @@ export class GameState {
         ? this.unitsPlacedThisRoundOwnerId
         : nextPlayerId || null)
       : null;
+    this.placementHistory = Array.isArray(data.placementHistory)
+      ? data.placementHistory.map((entry) => ({ ...entry }))
+      : (this.placementHistory || []);
     this.ensureInitialDeployPools();
 
     // v8: Restore air unit tracking for proper landing calculation

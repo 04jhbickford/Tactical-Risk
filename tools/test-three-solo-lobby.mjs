@@ -49,6 +49,8 @@ import {
   cargoManifest,
   chromeModel,
   pickShip,
+  applyCargoSeed,
+  CARGO_SEED,
   BATTLE_STEP,
 } from '../src/map/threeSoloPlay.js';
 import {
@@ -76,7 +78,8 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.8', 'tip stamp ux-solo.8');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.9', 'tip stamp ux-solo.9');
+assert(readFileSync(new URL('../index.html', import.meta.url), 'utf8').includes('V2.81.56-ux-solo.9'), 'index.html cache-busts .9');
 assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');
 assert(isDieType('techDie') && isDieType('DIE') && isDieType('die') && isDieType('x', 'DIE 5'), 'die aliases');
 const die = cubeDieHtml(5, { size: 'lg' });
@@ -222,7 +225,11 @@ while (risk.unitsPlacedThisRound < 6) {
   confirm(play);
 }
 assert(risk.unitsPlacedThisRound === 6, 're-placed 6 after undo');
+assert((risk.placementHistory || []).length === 6, 'history kept until Pass');
+assert((risk.toJSON().placementHistory || []).length === 6, 'history in toJSON');
+assert(chromeModel(play, territories).canUndo === true, 'chrome canUndo at 6/6');
 confirm(play);
+assert((risk.placementHistory || []).length === 0, 'history clears on Pass');
 assert(risk.currentPlayer.isAI, 'Pass advances seat');
 
 function pickedCountSafe(p) {
@@ -312,7 +319,23 @@ assert(canUndo(fightPlay) === false, 'no undo during battle');
 assert(!String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-dice-hero'), 'no orphan research hero die');
 assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-research-row'), 'compact research row');
 assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-tech-grid'), 'breakthrough grid');
+assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('data-tech-pick'), 'tech pick not loss steppers');
 assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-lobby-seats-sec'), 'setup seats scroller');
+
+const cargoSearch = parseSoloLobbySearch('?three=1&solo=1&cargo=1');
+assert(cargoSearch.cargo === true && cargoSearch.skip === true, 'cargo=1 skips lobby');
+assert(cargoSearch.mode === 'classic' && cargoSearch.humanSeat === 'Americans', 'cargo seed is classic Americans');
+const cargoGs = startSoloMatch(setup, territories, continents, {
+  mode: 'classic',
+  humanSeat: 'Americans',
+});
+cargoGs.unitDefs = unitDefs;
+const cargoPlay = createSoloPlay(cargoGs, unitDefs);
+applyCargoSeed(cargoPlay);
+const seeded = chromeModel(cargoPlay, territories);
+assert(seeded.label.includes('Load TRN'), 'cargo seed Load TRN CTA');
+assert((seeded.cargo || []).some((s) => s.type === 'transport'), 'cargo seed lists TRN');
+assert(cargoPlay.selected === CARGO_SEED.land && cargoPlay.destPicked === CARGO_SEED.sea, 'East US → East US SZ');
 
 console.log(failures ? `${failures} lobby/setup check(s) failed` : 'All lobby/setup checks passed');
 process.exit(failures ? 1 : 0);

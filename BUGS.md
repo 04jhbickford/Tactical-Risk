@@ -2,6 +2,14 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.9 Viz killers (preview only)
+
+Stamp `.9` on L0+lobby (cache-bust). Undo visible at deploy 6/6
+(history until Pass). Breakthrough (i) tiles not JE/RO steppers.
+`?cargo=1` Load TRN seed. Hold merge. Viz re-gate.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.8 James P0 batch (preview only)
 
 Setup seats-only scroll @390. Deploy/casualty stepper budget.

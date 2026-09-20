@@ -1253,7 +1253,10 @@ export function canUndo(play) {
   if (play.tech?.rolls || play.tech?.breakthrough) return false;
   const gs = play.gameState;
   if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) return !!gs.canUndoLastCapital?.();
-  if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) return (gs.placementHistory || []).length > 0;
+  if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    return (gs.placementHistory || []).length > 0
+      || (Number(gs.unitsPlacedThisRound) || 0) > 0;
+  }
   const phase = gs.turnPhase;
   if (phase === TURN_PHASES.PURCHASE) {
     return (gs.pendingPurchases || []).some((p) => p.owner === gs.currentPlayer?.id && (Number(p.quantity) || 0) > 0);
@@ -1801,6 +1804,26 @@ export function chromeModel(play, territories = []) {
 
 export function pickShip(play, shipId) {
   play.targetShipId = shipId || null;
+  return play;
+}
+
+export const CARGO_SEED = {
+  land: 'East US',
+  sea: 'East US Sea Zone',
+  type: 'infantry',
+};
+
+export function applyCargoSeed(play) {
+  const gs = play?.gameState;
+  if (!gs) return play;
+  gs.turnPhase = TURN_PHASES.COMBAT_MOVE;
+  play._phase = TURN_PHASES.COMBAT_MOVE;
+  play._player = gs.currentPlayer?.id || play._player;
+  play.selected = CARGO_SEED.land;
+  play.selectedUnits = { [CARGO_SEED.type]: 1 };
+  play.destPicked = CARGO_SEED.sea;
+  const ships = cargoManifest(play, CARGO_SEED.sea);
+  play.targetShipId = ships[0]?.id || ships[0]?.key || null;
   return play;
 }
 

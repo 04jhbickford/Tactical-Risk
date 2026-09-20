@@ -41,15 +41,18 @@ export function parseSoloLobbySearch(search = '') {
   const seat = params.get('seat') || params.get('faction') || 'Russians';
   const ai = Number(params.get('ai'));
   const ipc = Number(params.get('ipc'));
+  const cargo = ON.has(String(params.get('cargo') || '').toLowerCase());
   return {
-    mode,
-    humanSeat: seat,
+    mode: cargo ? 'classic' : mode,
+    humanSeat: cargo ? 'Americans' : seat,
     aiCount: Number.isFinite(ai) && ai > 0 ? ai : 4,
     difficulty,
     startingIPCs: STARTING_IPC_OPTIONS.includes(ipc) ? ipc : DEFAULT_STARTING_IPCS,
     teamsEnabled: ON.has(String(params.get('teams') || '').toLowerCase()),
-    skip: ON.has(String(params.get('go') || '').toLowerCase())
+    skip: cargo
+      || ON.has(String(params.get('go') || '').toLowerCase())
       || ON.has(String(params.get('autostart') || '').toLowerCase()),
+    cargo,
   };
 }
 
@@ -101,6 +104,7 @@ export function createSoloLobby(setup, search = '') {
     startingIPCs: parsed.startingIPCs,
     factions,
     showHowTo: false,
+    cargo: !!parsed.cargo,
   };
   for (const f of factions) lobby.playerAI[f.id] = 'human';
   if (parsed.skip) seatSkipDefaults(lobby, parsed);

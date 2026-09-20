@@ -62,6 +62,15 @@ export function stackSummary(stacks) {
     .join(' ');
 }
 
+const FALLBACK_TECHS = [
+  { id: 'jets', name: 'Jets', info: 'Fighters +1 attack/defense' },
+  { id: 'rockets', name: 'Rockets', info: 'AA guns can bombard adjacent territories' },
+  { id: 'superSubs', name: 'Super Submarines', info: 'Submarines +1 attack' },
+  { id: 'longRangeAircraft', name: 'Long Range Aircraft', info: 'Aircraft +2 movement' },
+  { id: 'heavyBombers', name: 'Heavy Bombers', info: 'Bombers roll 2 dice in combat' },
+  { id: 'industrialTech', name: 'Industrial Technology', info: 'Units cost -1 IPC (min 1)' },
+];
+
 const DIE_PIPS = {
   1: [[50, 50]],
   2: [[28, 28], [72, 72]],
@@ -218,6 +227,7 @@ function printIpc(land) {
 
 export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE' } = {}) {
   document.documentElement.classList.add('three-spike', 'ux-preview');
+  document.documentElement.dataset.gameVersion = GAME_VERSION;
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
@@ -702,11 +712,14 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     #three-actions { display:flex; gap:8px; flex:0 0 auto; }
     #three-undo {
-      display:none; min-height:56px; min-width:72px; padding:0 12px; border-radius:16px;
-      border:1px solid rgba(255,255,255,0.14); background:rgba(30,36,32,0.72);
-      color:#F4E8C4; font:700 14px/1 -apple-system,sans-serif; cursor:pointer;
+      display:none !important; min-height:56px; min-width:88px; padding:0 14px; border-radius:16px;
+      border:1px solid rgba(255,255,255,0.22); background:rgba(30,36,32,0.88);
+      color:#F4E8C4; font:700 15px/1 -apple-system,sans-serif; cursor:pointer;
     }
-    #three-undo.is-on { display:block; }
+    #three-undo.is-on {
+      display:inline-flex !important; align-items:center; justify-content:center;
+      visibility:visible !important;
+    }
     #three-actions #three-confirm { flex:1; }
     #three-battle .three-dice.is-hero {
       justify-content:center; gap:8px; margin:10px 0 6px;
@@ -920,7 +933,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:700 16px/1 -apple-system,sans-serif; cursor:pointer;
     }
     @media (max-width:430px) {
-      #three-l0 .three-l0-ver { display:none; }
+      #three-l0 .three-l0-ver { display:inline; font-size:9px; opacity:0.8; max-width:88px; }
       #three-peek .three-peek-unit { width:60px; height:70px; }
       #three-peek .three-peek-unit img { width:40px; height:40px; }
       #three-peek { padding:6px 6px; }
@@ -1050,6 +1063,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     onLossPick: null,
     onLossStep: null,
     onUndo: null,
+    onTechPick: null,
     onShipPick: null,
     onGuideDismiss: null,
     onNewGameVsAI: null,
@@ -1286,9 +1300,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     setUndo(on = false) {
       if (!api.undoBtn) return;
       api.undoBtn.classList.toggle('is-on', !!on);
-      api.undoBtn.hidden = !on;
+      api.undoBtn.removeAttribute('hidden');
       api.undoBtn.setAttribute('aria-hidden', on ? 'false' : 'true');
       document.documentElement.classList.toggle('has-undo', !!on);
+      document.documentElement.dataset.gameVersion = GAME_VERSION;
     },
     setConfirmReplay(label) {
       api.confirm.disabled = false;
@@ -1355,17 +1370,21 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         : ((card.dice || []).length
           ? `<div class="three-dice${research ? ' is-hero' : ''}">${compactDice(card.dice, { all: research })}</div>`
           : '');
-      const pickers = (card.pickers || []).map((p) => `
+      const breakthrough = card.kicker === 'Breakthrough';
+      const pickers = breakthrough ? [] : (card.pickers || []).map((p) => `
         <div class="three-picker" data-loss-side="${p.side}" data-readonly="${p.readOnly ? '1' : '0'}">
           <div class="three-picker-label">${p.label}</div>
           ${lossStepperHtml(p)}
         </div>`).join('');
-      const techs = (card.techs || []).map((t) => `
+      const techList = breakthrough
+        ? ((card.techs || []).length ? card.techs : FALLBACK_TECHS)
+        : (card.techs || []);
+      const techs = techList.map((t) => `
         <div class="three-tech-tile${t.on ? ' is-on' : ''}" data-tech="${t.id}">
-          <button type="button" class="three-tech-pick" data-loss-step="1" data-loss-side="att" data-loss-type="${t.id}">${t.name}</button>
+          <button type="button" class="three-tech-pick" data-tech-pick="${t.id}">${t.name}</button>
           <button type="button" class="three-tech-info" data-tech-info="${t.id}" aria-label="About ${t.name}">i</button>
         </div>`).join('');
-      const pop = (card.techs || []).map((t) => `
+      const pop = techList.map((t) => `
         <div class="three-tech-pop" data-tech-pop="${t.id}"><b>${t.name}</b> — ${t.info}</div>`).join('');
       api.battleEl.innerHTML = `
         <div class="three-battle-scroll">
@@ -1611,6 +1630,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   });
   bindSealedActivate(api.bottom, '[data-ship]', (e, btn) => {
     if (typeof api.onShipPick === 'function') api.onShipPick(btn.dataset.ship);
+  });
+  bindSealedActivate(api.battleEl, '[data-tech-pick]', (e, btn) => {
+    if (typeof api.onTechPick === 'function') api.onTechPick(btn.dataset.techPick);
+    else if (typeof api.onLossStep === 'function') api.onLossStep('att', btn.dataset.techPick, 1);
   });
   bindSealedActivate(api.battleEl, '[data-tech-info]', (e, btn) => {
     const id = btn.dataset.techInfo;

@@ -1,29 +1,16 @@
-# Lookpass — V2.81.56-ux-solo.8
+# Lookpass — V2.81.56-ux-solo.9
 
-**Hold merge.** Off main. Tesla / Viz off. SoT = [PR76](https://github.com/04jhbickford/Tactical-Risk/pull/76).
-
-**Tip:** https://tactical-risk20-git-cursor-unit-199216-james-projects-20d8de40.vercel.app/?three=1&solo=1  
-**Pocket:** `?three=1&max=1` (Karelia fixture, unchanged)  
-**Skip lobby:** `?three=1&solo=1&go=1`
-
-## James P0 checklist (.8)
+**Hold merge.** Tip `?three=1&solo=1` · cargo seed `?three=1&solo=1&cargo=1` · Pocket `?max=1`. Viz re-gate: L0+lobby `.9`, Undo@6/6, (i)@breakthrough, Load TRN.
 
 | # | Ask | Result |
 |---|---|---|
-| 1 | Setup menu compact @390; scroll does not steal faction taps | Seats-only scroller (`touch-action:pan-y`); header/opts/start pinned; seats `manipulation` |
-| 2 | Select budget = deploy cap / casualty need | Steppers `plusOff` + `capSelectedToBudget`; casualty `used >= need` |
-| 3 | After initial 6: Undo **or** Pass | `canEndPhase` at 6; gold Pass; Undo via `undoPlacement` |
-| 4 | Global Undo except battle + tech dice | `#three-undo`; false during `play.battle` / `tech.rolls` / breakthrough |
-| 5 | Eligible units by territory | Land → land+air; sea → naval/air/cargo; sheet uses `eligibleStacks` |
-| 6 | Research: info top, compact die + selector | No orphan hero die; `.three-research-row` SVG die + DIE 5 stepper |
-| 7 | Breakthrough dense + (i) | 2-col `.three-tech-grid`; (i) pops; no tall inline copy |
-| 8 | Combat-move load land onto TRN | `legalDests` land→adj sea w/ TRN; `moveUnits(..., { targetShipId })` |
-| 9 | Multi-cargo UI | Per TRN/CV row + chips; tap ship to load/unload independently |
+| Stamp | L0 + lobby `.9` after hard reload | Cache-bust `main.js?v=…9` + `Cache-Control: no-store` on `/src/**` · L0 ver visible @390 |
+| 1 | Setup scroll | Held PASS |
+| 2 | Budget ≤6 | Held PASS |
+| 3 | Undo next to Pass at 6/6 | `placementHistory` kept until Pass + persisted; `#three-undo.is-on` `display:inline-flex !important` (no `[hidden]`) |
+| 4 | Global Undo | `setUndo(canUndo)` every paint; off in battle/tech dice |
+| 6 | Compact research+DIE | Held PASS |
+| 7 | Breakthrough (i) | `three-tech-tile` + `data-tech-pick` + (i); never casualty pickers |
+| 8–9 | Load TRN + cargo | `?cargo=1` seeds East US INF → East US SZ |
 
-## Kept
-
-Lobby polish (.6). Deploy 6+5 @390 (.6). Research SVG die, never `<img>` (.7). Persist P0 `1bef077`. Three UX locks. Pocket `?max=1` unchanged.
-
-## Stubs left
-
-Retreat / bombard tiles. S11 diagnostics sheet. Naval leftover still `allowNavalSkip`. Play Online. My Games list.
+Do not merge.

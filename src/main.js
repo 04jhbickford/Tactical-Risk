@@ -3218,7 +3218,7 @@ function wantsSolo(search = location.search) {
 
 if (wantsUxPreview()) {
   const boot = wantsSolo()
-    ? import('./map/threeSoloBoot.js').then((mod) => mod.bootThreeSolo())
+    ? import('./map/threeSoloBoot.js?v=V2.81.56-ux-solo.9').then((mod) => mod.bootThreeSolo())
     : import('./map/uxPreview.js').then((mod) => mod.bootUxPreview());
   boot.catch((err) => {
     console.error('Failed to start UX preview:', err);

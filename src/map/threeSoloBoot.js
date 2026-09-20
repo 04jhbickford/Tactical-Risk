@@ -57,6 +57,7 @@ import {
   highlights,
   undoLast,
   pickShip,
+  applyCargoSeed,
   LAND_TEAL,
 } from './threeSoloPlay.js';
 
@@ -279,6 +280,11 @@ export async function bootThreeSolo() {
   };
   chrome.onShipPick = (shipId) => {
     pickShip(play, shipId);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onTechPick = (id) => {
+    adjustUnit(play, id, 1);
     paintChrome();
     camera.dirty = true;
   };
@@ -596,7 +602,14 @@ export async function bootThreeSolo() {
   fitEurope();
   paintChrome();
   if (lobby.open) openLobby();
-  else gameState.autoSave();
+  else {
+    startMatch(lobbyStartOptions(lobby));
+    if (lobby.cargo) {
+      applyCargoSeed(play);
+      paintChrome();
+    }
+    gameState.autoSave();
+  }
   paint();
   requestAnimationFrame(loop);
   dismissStartupLoader();
