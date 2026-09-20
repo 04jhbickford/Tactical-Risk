@@ -1,7 +1,7 @@
 // Three / side-project HUD. Preview only.
 // Frosted L0/L1/L2 + exclusive Confirm gold. Board stays main Canvas art.
 
-import { GAME_VERSION, SCHEMA_VERSION } from '../version.js';
+import { GAME_VERSION, SCHEMA_VERSION } from '../version.js?v=V2.81.56-ux-solo.10';
 import { formatUnitName } from '../utils/unitNames.js';
 import { getUnitIconPath } from '../utils/unitIcons.js';
 import { stripPreviewParams, soloHref } from './uxPreviewFlag.js';
@@ -11,7 +11,7 @@ import {
   STARTING_IPC_OPTIONS,
   lobbyCanStart,
   lobbyStartLabel,
-} from './threeSoloLobby.js';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.10';
 import {
   SETUP_TUTORIAL_STEPS,
   SETUP_TUTORIAL_TITLE,
@@ -225,9 +225,31 @@ function printIpc(land) {
   return Number.isFinite(n) ? n : 0;
 }
 
+export function liveGameVersion() {
+  return (typeof window !== 'undefined' && window.__TR_GAME_VERSION) || GAME_VERSION;
+}
+
+export function applyLiveStamp() {
+  const v = liveGameVersion();
+  if (typeof document === 'undefined') return v;
+  document.documentElement.dataset.gameVersion = v;
+  document.querySelectorAll('.three-l0-ver, .three-lobby-ver').forEach((el) => {
+    el.textContent = v;
+  });
+  return v;
+}
+
+function occupantChipLabel(diff) {
+  if (diff?.id === 'human') return 'Human';
+  if (diff?.id === 'easy') return 'Easy';
+  if (diff?.id === 'medium') return 'Med';
+  if (diff?.id === 'hard') return 'Hard';
+  return diff?.name || 'Human';
+}
+
 export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE' } = {}) {
   document.documentElement.classList.add('three-spike', 'ux-preview');
-  document.documentElement.dataset.gameVersion = GAME_VERSION;
+  document.documentElement.dataset.gameVersion = liveGameVersion();
   const style = document.createElement('style');
   style.textContent = `
     html.three-spike, html.three-spike body {
@@ -294,7 +316,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       background:#3F6E38; box-shadow:0 0 0 1px rgba(0,0,0,0.35);
     }
     #three-l0 .three-l0-ver {
-      font-size:11px; font-weight:500; opacity:0.45; letter-spacing:0;
+      font-size:10px; font-weight:600; opacity:0.9; letter-spacing:0;
+      white-space:nowrap; flex-shrink:0;
+      padding:3px 7px; border-radius:8px;
+      background:rgba(30,36,32,0.42);
+      border:1px solid rgba(255,255,255,0.12);
     }
     #three-bottom {
       position:absolute; left:0; right:0; bottom:0; z-index:32;
@@ -890,7 +916,26 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:400 12px/1.2 -apple-system,sans-serif; color:#94a3b8;
     }
     #three-lobby .three-lobby-seat-tools {
-      display:flex; flex-wrap:wrap; gap:6px; padding:0 12px 12px;
+      display:flex; flex-direction:column; gap:8px; padding:0 12px 12px;
+    }
+    #three-lobby .three-lobby-occupants {
+      display:grid; grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:6px; width:100%;
+    }
+    #three-lobby .three-lobby-occupants .three-lobby-tile {
+      min-width:0; width:100%; padding:0 2px; font-size:12px;
+    }
+    #three-lobby .three-lobby-colors {
+      display:flex; flex-wrap:wrap; gap:6px;
+    }
+    #three-lobby .three-lobby-swatch {
+      width:22px; min-width:22px; height:22px; min-height:22px;
+      padding:0; border-radius:999px;
+      border:1px solid rgba(255,255,255,0.28);
+      cursor:pointer;
+    }
+    #three-lobby .three-lobby-teams {
+      display:flex; flex-wrap:wrap; gap:6px;
     }
     #three-lobby .three-lobby-opts {
       display:flex; flex-direction:column; gap:10px;
@@ -933,7 +978,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       font:700 16px/1 -apple-system,sans-serif; cursor:pointer;
     }
     @media (max-width:430px) {
-      #three-l0 .three-l0-ver { display:inline; font-size:9px; opacity:0.8; max-width:88px; }
+      #three-l0 .three-l0-ver { display:inline-block; font-size:9px; opacity:0.95; max-width:none; }
       #three-peek .three-peek-unit { width:60px; height:70px; }
       #three-peek .three-peek-unit img { width:40px; height:40px; }
       #three-peek { padding:6px 6px; }
@@ -957,9 +1002,11 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-lobby .three-lobby-title { font-size:18px; }
       #three-lobby .three-lobby-sub { font-size:12px; }
       #three-lobby h2 { margin:0 0 4px; }
-      #three-lobby .three-lobby-seats { gap:4px; }
-      #three-lobby .three-lobby-seat { min-height:40px; padding:6px 10px; }
-      #three-lobby .three-lobby-seat-tools { padding:0 8px 8px; gap:4px; }
+      #three-lobby .three-lobby-seats { gap:8px; }
+      #three-lobby .three-lobby-seat { min-height:48px; padding:8px 10px; }
+      #three-lobby .three-lobby-seat-tools { padding:0 10px 10px; gap:8px; }
+      #three-lobby .three-lobby-occupants { gap:4px; }
+      #three-lobby .three-lobby-occupants .three-lobby-tile { min-height:36px; font-size:11px; }
       #three-lobby .three-lobby-opts { padding:6px 8px; gap:6px; }
       #three-lobby .three-lobby-foot { display:none; }
       #three-lobby .three-lobby-start { min-height:48px; }
@@ -980,7 +1027,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     </span>
     <span class="three-l0-chip three-l0-ipc" id="three-ipc">IPC ${ipc}</span>
     <button type="button" class="three-l0-help" id="three-help-btn" aria-label="How to start">?</button>
-    <span class="three-l0-ver">${GAME_VERSION}</span>
+    <span class="three-l0-ver">${liveGameVersion()}</span>
   `;
   document.body.appendChild(l0);
 
@@ -1071,6 +1118,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     onLobbyStart: null,
     onTutorialDismiss: null,
     onHowTo: null,
+    applyLiveStamp,
     hitRects() {
       return chromeHitRectsFrom(api);
     },
@@ -1166,6 +1214,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
             </div>
           `;
           api.setLobbyOpen(true);
+          applyLiveStamp();
           return;
         }
         lobby.innerHTML = `
@@ -1173,7 +1222,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
             <div class="three-lobby-brand">
               <h1 class="three-lobby-logo">Tactical Risk</h1>
               <p class="three-lobby-tag">World War II Grand Strategy</p>
-              <span class="three-lobby-ver">${GAME_VERSION}</span>
+              <span class="three-lobby-ver">${liveGameVersion()}</span>
             </div>
             <p class="three-lobby-path">Start here</p>
             <div class="three-lobby-actions">
@@ -1196,6 +1245,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           </div>
         `;
         api.setLobbyOpen(true);
+        applyLiveStamp();
         return;
       }
       const factions = model.factions || [];
@@ -1233,21 +1283,27 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
                       <div class="three-lobby-seat-name" style="box-shadow:inset 3px 0 0 ${color};padding-left:10px">${f.name || f.id}</div>
                       <span class="three-lobby-seat-meta">${on ? occupantName : 'Tap to add'}</span>
                     </button>
-                    ${on ? `
-                      <div class="three-lobby-seat-tools">
+                    <div class="three-lobby-seat-tools">
+                      <div class="three-lobby-occupants">
                         ${AI_DIFFICULTIES.map((d) => `
-                          <button type="button" class="three-lobby-tile${occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${d.name}</button>
+                          <button type="button" class="three-lobby-tile${on && occupant === d.id ? ' is-on' : ''}" data-lobby="occupant" data-value="${f.id}:${d.id}">${occupantChipLabel(d)}</button>
                         `).join('')}
-                        ${model.teamsEnabled ? `
+                      </div>
+                      ${on && model.teamsEnabled ? `
+                        <div class="three-lobby-teams">
                           <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 1 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:1">1</button>
                           <button type="button" class="three-lobby-tile${model.playerTeams?.[f.id] === 2 ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:2">2</button>
                           <button type="button" class="three-lobby-tile${!model.playerTeams?.[f.id] ? ' is-on' : ''}" data-lobby="team" data-value="${f.id}:0">-</button>
-                        ` : ''}
-                        ${FACTION_COLORS.slice(0, 6).map((c) => `
-                          <button type="button" class="three-lobby-tile" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="width:28px;min-height:28px;padding:0;background:${c.color}"></button>
-                        `).join('')}
-                      </div>
-                    ` : ''}
+                        </div>
+                      ` : ''}
+                      ${on ? `
+                        <div class="three-lobby-colors">
+                          ${FACTION_COLORS.slice(0, 6).map((c) => `
+                            <button type="button" class="three-lobby-swatch" data-lobby="color" data-value="${f.id}:${c.id}" title="${c.name}" style="background:${c.color}"></button>
+                          `).join('')}
+                        </div>
+                      ` : ''}
+                    </div>
                   </div>
                 `;
               }).join('')}
@@ -1276,6 +1332,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         </div>
       `;
       api.setLobbyOpen(true);
+      applyLiveStamp();
     },
     setConfirmIdle(label = 'Select units') {
       api.confirm.disabled = true;
@@ -1303,7 +1360,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.undoBtn.removeAttribute('hidden');
       api.undoBtn.setAttribute('aria-hidden', on ? 'false' : 'true');
       document.documentElement.classList.toggle('has-undo', !!on);
-      document.documentElement.dataset.gameVersion = GAME_VERSION;
+      applyLiveStamp();
     },
     setConfirmReplay(label) {
       api.confirm.disabled = false;
@@ -1553,6 +1610,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.setUndo(!!canUndo);
       api.wirePeekButtons();
       api.syncLayers();
+      applyLiveStamp();
     },
     paintSelection({ land = null, stacks = [], unitType = null, confirmed = false } = {}) {
       if (api.isSheetOpen()) {
@@ -1666,5 +1724,6 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   });
   api.setStacksExpanded(false);
   api.showGuide(false);
+  applyLiveStamp();
   return api;
 }

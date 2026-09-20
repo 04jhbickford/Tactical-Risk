@@ -122,7 +122,23 @@
       };
     })();
   </script>
-  <script type="module" src="src/main.js?v=V2.81.56-ux-solo.9a"></script>
+  <script>
+    window.__TR_GAME_VERSION='V2.81.56-ux-solo.10';
+    (function () {
+      function stamp() {
+        var v = window.__TR_GAME_VERSION;
+        if (!v || !document.documentElement) return;
+        document.documentElement.setAttribute('data-game-version', v);
+        document.querySelectorAll('.three-l0-ver,.three-lobby-ver').forEach(function (el) {
+          if (el.textContent !== v) el.textContent = v;
+        });
+      }
+      stamp();
+      document.addEventListener('DOMContentLoaded', stamp);
+      setInterval(stamp, 400);
+    })();
+  </script>
+  <script type="module" src="src/main.js?v=V2.81.56-ux-solo.10"></script>
 </body>
 </html>
 <!-- force redeploy -->

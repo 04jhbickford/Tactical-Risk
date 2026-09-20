@@ -2,6 +2,17 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.10 stamp + seat collapse (preview only)
+
+L0 was stuck on `.7` because chrome baked `GAME_VERSION` once and
+ESM cache kept the old module. Live stamp now overwrites L0/lobby
+chips from `window.__TR_GAME_VERSION || GAME_VERSION` every paint;
+chrome/solo/boot imports cache-bust `?v=.10`. Lobby seats: 4-col
+Human/Easy/Med/Hard on all 5 factions; colors on a separate row.
+Hold merge. Do not ping Arc/Viz until L0 `.10` stills exist.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.9 Viz killers (preview only)
 
 Stamp `.9` on L0+lobby (cache-bust). Undo visible at deploy 6/6

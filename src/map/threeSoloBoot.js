@@ -6,7 +6,7 @@ import { Camera, MAP_WIDTH } from './camera.js';
 import { MapRenderer } from './mapRenderer.js';
 import { TerritoryRenderer } from './territoryRenderer.js';
 import { TerritoryMap } from './territoryMap.js';
-import { injectThreeChrome } from './threeMapChrome.js?v=V2.81.56-ux-solo.9';
+import { injectThreeChrome, applyLiveStamp } from './threeMapChrome.js?v=V2.81.56-ux-solo.10';
 import {
   preloadUnitImages,
   renderPreviewStacks,
@@ -18,7 +18,7 @@ import {
   reportStartupError,
   reportStartupStatus,
 } from '../ui/startupLoader.js';
-import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.9';
+import { GAME_VERSION } from '../version.js?v=V2.81.56-ux-solo.10';
 import {
   bindSealedActivate,
   clientPointOf,
@@ -40,7 +40,7 @@ import {
   lobbyCanStart,
   lobbyStartOptions,
   lobbyInspect,
-} from './threeSoloLobby.js?v=V2.81.56-ux-solo.9';
+} from './threeSoloLobby.js?v=V2.81.56-ux-solo.10';
 import {
   shouldShowSetupTutorial,
   dismissTutorial,
@@ -59,7 +59,7 @@ import {
   pickShip,
   applyCargoSeed,
   LAND_TEAL,
-} from './threeSoloPlay.js?v=V2.81.56-ux-solo.9';
+} from './threeSoloPlay.js?v=V2.81.56-ux-solo.10';
 
 const SELECT_GOLD = '#C4A35A';
 const EUROPE_FIT = { minX: 620, minY: 180, maxX: 1680, maxY: 980 };
@@ -155,6 +155,7 @@ export async function bootThreeSolo() {
     phase: TURN_PHASE_NAMES[gameState.turnPhase] || 'Develop Tech',
   });
   chrome.setSeat(human?.name || DEFAULT_HUMAN_SEAT, human?.color || '#B22222');
+  applyLiveStamp();
 
   let play = createSoloPlay(gameState, unitDefs);
   let aiController = null;
@@ -216,7 +217,12 @@ export async function bootThreeSolo() {
     return placementsFromState(gameState);
   }
 
+  function setStamp() {
+    applyLiveStamp();
+  }
+
   function paintChrome() {
+    setStamp();
     const current = gameState.currentPlayer;
     const you = gameState.players.find((p) => !p.isAI) || current;
     chrome.setPhase(gameState.gameOver
@@ -294,6 +300,7 @@ export async function bootThreeSolo() {
   chrome.onLobbyChange = (kind, value) => {
     applyLobbyAction(lobby, kind, value);
     chrome.paintLobby(lobby);
+    applyLiveStamp();
   };
   chrome.onLobbyStart = () => {
     if (!lobbyCanStart(lobby)) {
@@ -323,6 +330,7 @@ export async function bootThreeSolo() {
     lobby.showHowTo = false;
     chrome.setTutorialOpen(false);
     chrome.paintLobby(lobby);
+    applyLiveStamp();
   }
 
   function maybeShowTutorial() {
@@ -615,7 +623,7 @@ export async function bootThreeSolo() {
   dismissStartupLoader();
 
   window.__threeSolo = {
-    version: GAME_VERSION,
+    version: (typeof window !== 'undefined' && window.__TR_GAME_VERSION) || GAME_VERSION,
     inspect: () => ({ ...inspectSolo(gameState), play: inspectPlay(play), lobby: lobbyInspect(lobby) }),
     playInspect: () => inspectPlay(play),
     selectLand: (name) => {
