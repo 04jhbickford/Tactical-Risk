@@ -2,6 +2,15 @@
 
 ---
 
+## 9.20.26 — V2.81.56-ux-solo.8 James P0 batch (preview only)
+
+Setup seats-only scroll @390. Deploy/casualty stepper budget.
+After 6: Undo or Pass. Global Undo except battle/tech dice.
+Eligible land/sea sheet. Compact research + dense breakthrough (i).
+Combat-move TRN load + per-ship cargo. Hold merge.
+
+---
+
 ## 9.20.26 — V2.81.56-ux-solo.7 research DIE SVG (preview only)
 
 DIE-only: inline SVG pip die; `isDieType` aliases; never `<img>`

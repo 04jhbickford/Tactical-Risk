@@ -55,6 +55,8 @@ import {
   chromeModel,
   inspectPlay,
   highlights,
+  undoLast,
+  pickShip,
   LAND_TEAL,
 } from './threeSoloPlay.js';
 
@@ -239,6 +241,10 @@ export async function bootThreeSolo() {
       route: model.route,
       phaseStrip: model.phaseStrip,
       phaseStripCurrent: model.phaseStripCurrent,
+      canUndo: model.canUndo,
+      cargo: model.cargo,
+      targetShipId: model.targetShipId,
+      researchHint: model.researchHint,
     });
     maybeRefitForChrome();
   }
@@ -262,6 +268,17 @@ export async function bootThreeSolo() {
   chrome.onLossPick = (side, type) => {
     if (play.tech?.breakthrough) adjustUnit(play, type, 1);
     else adjustLoss(play, side, type, 1);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onUndo = () => {
+    undoLast(play);
+    selected = landByName(play.selected);
+    paintChrome();
+    camera.dirty = true;
+  };
+  chrome.onShipPick = (shipId) => {
+    pickShip(play, shipId);
     paintChrome();
     camera.dirty = true;
   };

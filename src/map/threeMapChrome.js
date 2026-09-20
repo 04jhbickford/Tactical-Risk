@@ -132,7 +132,7 @@ function lobbyCardHtml({ action, value, kicker, title, desc, mark, off = false }
   </button>`;
 }
 
-function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) {
+function tileRowHtml(tiles, { loss = false, readOnly = false, side = '', dieSize = '' } = {}) {
   if (!tiles?.length) return '';
   const wave = tiles.length >= 8;
   return `<div class="three-tile-row${readOnly ? ' is-ro' : ''}${wave ? ' is-wave' : ''}">${tiles.map((s) => {
@@ -149,7 +149,9 @@ function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) 
       ? `data-loss-step="1" data-loss-side="${side || s.side || ''}" data-loss-type="${s.type}"`
       : `data-step="1" data-unit-type="${s.type}"`;
     const dieTile = isDieType(s.type, short);
-    const art = unitArtHtml(s.type, s.owner, short, { dieSize: dieTile && !wave ? 'lg' : '' });
+    const art = unitArtHtml(s.type, s.owner, short, {
+      dieSize: dieSize || (dieTile && !wave ? 'lg' : ''),
+    });
     return `<div class="three-tile${picked > 0 ? ' is-on' : ''}${dieTile ? ' is-die' : ''}" data-unit-type="${s.type}">
       ${art}
       <em>${short}</em>
@@ -162,8 +164,24 @@ function tileRowHtml(tiles, { loss = false, readOnly = false, side = '' } = {}) 
   }).join('')}</div>`;
 }
 
-function stepperRowHtml(steppers) {
-  return tileRowHtml(steppers);
+function stepperRowHtml(steppers, opts = {}) {
+  return tileRowHtml(steppers, opts);
+}
+
+function cargoRowHtml(ships = [], targetShipId = null) {
+  if (!ships.length) return '';
+  return `<div class="three-cargo">${ships.map((ship, i) => {
+    const key = ship.id || ship.key || `${ship.type}-${i}`;
+    const load = ship.load || [...(ship.cargo || []), ...(ship.aircraft || [])];
+    const chips = load.length
+      ? load.map((c) => `<span>${shortType(c.type)}×${c.quantity || 1}</span>`).join('')
+      : '<span>empty</span>';
+    const on = targetShipId && (ship.id === targetShipId || ship.key === targetShipId || key === targetShipId);
+    return `<button type="button" class="three-ship${on ? ' is-on' : ''}" data-ship="${key}">
+      <b>${shortType(ship.type)}${ship.id ? '' : ` ${i + 1}`}</b>
+      <span class="three-cargo-chips">${chips}</span>
+    </button>`;
+  }).join('')}</div>`;
 }
 
 function assignedOf(taken) {
@@ -280,7 +298,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     }
     html.three-spike.has-l1 #three-bottom,
     html.three-spike.has-battle #three-bottom,
-    html.three-spike.has-l2 #three-bottom {
+    html.three-spike.has-l2 #three-bottom,
+    html.three-spike.has-undo #three-bottom {
       pointer-events:auto;
     }
     #three-peek {
@@ -628,10 +647,67 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       background:rgba(240,230,210,0.16); color:#F4E8C4;
       font:700 11px/1 -apple-system,sans-serif;
     }
-    .three-dice-hero {
-      display:flex; justify-content:center; align-items:center;
-      gap:10px; margin:8px 0 2px;
+    .three-research-info {
+      margin:4px 0 6px; font:400 12px/1.35 -apple-system,sans-serif; color:#c8c0b0;
     }
+    .three-research-row {
+      display:flex; align-items:center; gap:10px; margin-top:2px;
+    }
+    .three-research-row .three-cube { --s:28px; width:28px; height:28px; }
+    .three-research-row .three-tile-row { margin:0; flex:1; }
+    .three-research-row .three-tile .three-cube,
+    .three-research-row .three-tile img,
+    .three-research-row .three-tile-fallback { display:none; }
+    .three-research-row .three-tile { min-height:44px; padding:4px 6px; }
+    .three-tech-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px;
+    }
+    .three-tech-tile {
+      display:flex; align-items:center; gap:6px; min-height:44px;
+      padding:6px 8px; border-radius:10px; text-align:left;
+      border:1px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05); color:#F4EFE4;
+      font:700 12px/1.15 -apple-system,sans-serif;
+    }
+    .three-tech-tile.is-on { border-color:#C4A35A; background:rgba(196,163,90,0.18); }
+    .three-tech-pick {
+      flex:1; min-height:32px; padding:0; border:0; background:transparent;
+      color:inherit; font:inherit; text-align:left; cursor:pointer;
+    }
+    .three-tech-info {
+      flex:0 0 28px; width:28px; height:28px; border-radius:8px;
+      border:1px solid rgba(255,255,255,0.16); background:rgba(30,36,32,0.55);
+      color:#C4A35A; font:700 13px/1 -apple-system,sans-serif; cursor:pointer;
+    }
+    .three-tech-pop {
+      display:none; margin-top:8px; padding:8px 10px; border-radius:10px;
+      background:rgba(20,24,22,0.88); color:#E8E2D4;
+      font:400 13px/1.35 -apple-system,sans-serif;
+    }
+    .three-tech-pop.is-on { display:block; }
+    .three-cargo {
+      display:flex; flex-direction:column; gap:6px; margin-top:8px;
+    }
+    .three-ship {
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      min-height:40px; padding:6px 8px; border-radius:10px;
+      border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04);
+      color:#E8E2D4; font:600 12px/1 -apple-system,sans-serif; cursor:pointer;
+    }
+    .three-ship.is-on { border-color:#C4A35A; background:rgba(196,163,90,0.16); }
+    .three-cargo-chips { display:flex; flex-wrap:wrap; gap:4px; }
+    .three-cargo-chips span {
+      padding:2px 6px; border-radius:999px; background:rgba(196,163,90,0.2);
+      font:700 10px/1 -apple-system,sans-serif; color:#F4E8C4;
+    }
+    #three-actions { display:flex; gap:8px; flex:0 0 auto; }
+    #three-undo {
+      display:none; min-height:56px; min-width:72px; padding:0 12px; border-radius:16px;
+      border:1px solid rgba(255,255,255,0.14); background:rgba(30,36,32,0.72);
+      color:#F4E8C4; font:700 14px/1 -apple-system,sans-serif; cursor:pointer;
+    }
+    #three-undo.is-on { display:block; }
+    #three-actions #three-confirm { flex:1; }
     #three-battle .three-dice.is-hero {
       justify-content:center; gap:8px; margin:10px 0 6px;
     }
@@ -670,17 +746,18 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     #three-sheet .three-sheet-note { margin:8px 0 0; font-size:13px; color:#9aa3b5; }
     #three-lobby {
       display:none; position:absolute; inset:0; z-index:50;
-      padding:max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+      padding:max(12px, env(safe-area-inset-top)) 14px max(12px, env(safe-area-inset-bottom));
       background:rgba(22,26,28,0.94);
       -webkit-backdrop-filter:blur(22px); backdrop-filter:blur(22px);
-      color:#E8E2D4; overflow-y:auto; pointer-events:auto;
+      color:#E8E2D4; overflow:hidden; pointer-events:auto;
     }
-    #three-lobby.is-open { display:flex; flex-direction:column; }
+    #three-lobby.is-open { display:flex; flex-direction:column; min-height:0; }
     #three-lobby .three-lobby-home,
     #three-lobby .three-lobby-setup,
     #three-lobby .three-lobby-howto {
-      display:flex; flex-direction:column; gap:14px; flex:1; min-height:0;
+      display:flex; flex-direction:column; gap:10px; flex:1; min-height:0;
     }
+    #three-lobby .three-lobby-setup { overflow:hidden; }
     #three-lobby .three-lobby-brand { text-align:center; padding:18px 8px 4px; }
     #three-lobby .three-lobby-logo {
       margin:0; font:700 32px/1.05 -apple-system,"SF Pro Display",sans-serif;
@@ -769,9 +846,20 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       cursor:pointer;
     }
     #three-lobby .three-lobby-back svg { width:22px; height:22px; }
-    #three-lobby .three-lobby-seats {
-      display:flex; flex-direction:column; gap:8px; flex:1; min-height:0;
+    #three-lobby .three-lobby-seats-sec {
+      display:flex; flex-direction:column; flex:1 1 auto; min-height:0;
     }
+    #three-lobby .three-lobby-seats {
+      display:flex; flex-direction:column; gap:6px; flex:1 1 auto; min-height:0;
+      overflow-y:auto; -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain; touch-action:pan-y;
+    }
+    #three-lobby .three-lobby-seat,
+    #three-lobby .three-lobby-seat-tools button { touch-action:manipulation; }
+    #three-lobby .three-lobby-opts,
+    #three-lobby .three-lobby-foot,
+    #three-lobby .three-lobby-start,
+    #three-lobby .three-lobby-setup-head { flex-shrink:0; }
     #three-lobby .three-lobby-seat-wrap {
       border-radius:12px; border:1px solid rgba(255,255,255,0.12);
       background:rgba(255,255,255,0.04); overflow:hidden;
@@ -852,6 +940,18 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       #three-lobby .three-lobby-logo { font-size:28px; }
       #three-lobby button.three-lobby-card { min-height:80px; padding:14px; }
       #three-lobby .three-lobby-card-title { font-size:20px; }
+      #three-lobby .three-lobby-setup { gap:6px; }
+      #three-lobby .three-lobby-title { font-size:18px; }
+      #three-lobby .three-lobby-sub { font-size:12px; }
+      #three-lobby h2 { margin:0 0 4px; }
+      #three-lobby .three-lobby-seats { gap:4px; }
+      #three-lobby .three-lobby-seat { min-height:40px; padding:6px 10px; }
+      #three-lobby .three-lobby-seat-tools { padding:0 8px 8px; gap:4px; }
+      #three-lobby .three-lobby-opts { padding:6px 8px; gap:6px; }
+      #three-lobby .three-lobby-foot { display:none; }
+      #three-lobby .three-lobby-start { min-height:48px; }
+      .three-tech-grid { gap:4px; }
+      .three-tech-tile { min-height:40px; padding:4px 6px; font-size:11px; }
     }
   `;
   document.head.appendChild(style);
@@ -892,7 +992,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     <div id="three-guide" aria-live="polite"></div>
     <div id="three-battle"></div>
     <div id="three-peek"></div>
-    <button type="button" id="three-confirm" class="is-idle" disabled>Select units</button>
+    <div id="three-actions">
+      <button type="button" id="three-undo">Undo</button>
+      <button type="button" id="three-confirm" class="is-idle" disabled>Select units</button>
+    </div>
   `;
   document.body.appendChild(bottom);
 
@@ -931,6 +1034,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     stripEl: strip,
     battleEl: bottom.querySelector('#three-battle'),
     confirm: bottom.querySelector('#three-confirm'),
+    undoBtn: bottom.querySelector('#three-undo'),
     phaseEl: l0.querySelector('#three-phase'),
     seatEl: l0.querySelector('#three-seat'),
     ipcEl: l0.querySelector('#three-ipc'),
@@ -945,6 +1049,8 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     onUnitStep: null,
     onLossPick: null,
     onLossStep: null,
+    onUndo: null,
+    onShipPick: null,
     onGuideDismiss: null,
     onNewGameVsAI: null,
     onLobbyChange: null,
@@ -1099,7 +1205,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
               <button type="button" class="three-lobby-tile${!classic ? ' is-on' : ''}" data-lobby="mode" data-value="risk">Risk</button>
             </div>
           </div>
-          <div class="three-lobby-sec">
+          <div class="three-lobby-sec three-lobby-seats-sec">
             <h2>Players</h2>
             <div class="three-lobby-seats">
               ${factions.map((f) => {
@@ -1177,6 +1283,13 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       api.confirm.classList.add('is-ready');
       api.confirm.textContent = label;
     },
+    setUndo(on = false) {
+      if (!api.undoBtn) return;
+      api.undoBtn.classList.toggle('is-on', !!on);
+      api.undoBtn.hidden = !on;
+      api.undoBtn.setAttribute('aria-hidden', on ? 'false' : 'true');
+      document.documentElement.classList.toggle('has-undo', !!on);
+    },
     setConfirmReplay(label) {
       api.confirm.disabled = false;
       api.confirm.classList.remove('is-ready');
@@ -1218,7 +1331,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       const dieHtml = (d) => cubeDieHtml(d.face, {
         hit: !!d.hit,
         side: d.side,
-        size: research ? 'lg' : 'sm',
+        size: 'sm',
       });
       const compactDice = (dice = [], { all = false } = {}) => {
         if (all) return dice.map(dieHtml).join('');
@@ -1247,12 +1360,20 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
           <div class="three-picker-label">${p.label}</div>
           ${lossStepperHtml(p)}
         </div>`).join('');
+      const techs = (card.techs || []).map((t) => `
+        <div class="three-tech-tile${t.on ? ' is-on' : ''}" data-tech="${t.id}">
+          <button type="button" class="three-tech-pick" data-loss-step="1" data-loss-side="att" data-loss-type="${t.id}">${t.name}</button>
+          <button type="button" class="three-tech-info" data-tech-info="${t.id}" aria-label="About ${t.name}">i</button>
+        </div>`).join('');
+      const pop = (card.techs || []).map((t) => `
+        <div class="three-tech-pop" data-tech-pop="${t.id}"><b>${t.name}</b> — ${t.info}</div>`).join('');
       api.battleEl.innerHTML = `
         <div class="three-battle-scroll">
           <p class="three-battle-kicker">${card.kicker || 'Battle'}</p>
           <strong>${card.title || ''}</strong>
-          <div class="three-battle-body">${card.body || ''}</div>
+          <div class="three-battle-body">${card.kicker === 'Breakthrough' ? 'Tap a tech, then Confirm' : (card.body || '')}</div>
           ${lanes}
+          ${techs ? `<div class="three-tech-grid">${techs}</div>${pop}` : ''}
         </div>
         ${pickers ? `<div class="three-pickers">${pickers}</div>` : ''}`;
       api.battleEl.classList.add('is-on');
@@ -1325,6 +1446,32 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         btn.ontouchstart = activate;
         btn.onclick = activate;
       });
+      api.battleEl.querySelectorAll('[data-tech-info]').forEach((btn) => {
+        stamp(btn);
+        const activate = (e) => {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          const id = btn.dataset.techInfo;
+          const open = api.battleEl.querySelector(`[data-tech-pop="${id}"]`);
+          const was = open?.classList.contains('is-on');
+          api.battleEl.querySelectorAll('[data-tech-pop]').forEach((pop) => pop.classList.remove('is-on'));
+          if (open && !was) open.classList.add('is-on');
+        };
+        btn.onpointerdown = activate;
+        btn.ontouchstart = activate;
+        btn.onclick = activate;
+      });
+      api.peek.querySelectorAll('[data-ship]').forEach((btn) => {
+        stamp(btn);
+        const activate = (e) => {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          if (typeof api.onShipPick === 'function') api.onShipPick(btn.dataset.ship);
+        };
+        btn.onpointerdown = activate;
+        btn.ontouchstart = activate;
+        btn.onclick = activate;
+      });
     },
     paintPlay({
       land = null,
@@ -1344,6 +1491,10 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       route = '',
       phaseStrip = undefined,
       phaseStripCurrent = 1,
+      canUndo = false,
+      cargo = null,
+      targetShipId = null,
+      researchHint = false,
     } = {}) {
       api.setGuide('', false);
       if (phaseStrip !== undefined) api.setPhaseStrip(phaseStrip, phaseStripCurrent);
@@ -1368,10 +1519,18 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
         const owner = stacks[0]?.owner || (!land.isWater ? land.originalOwner : '');
         const ipcLine = !land.isWater ? `${printIpc(land)} IPC` : '';
         const rosterTotal = stacks.reduce((n, s) => n + (s.quantity || 0), 0);
+        const research = researchHint || land.name === 'Research';
+        const researchInfo = research
+          ? '<p class="three-research-info">5 IPC per die. A 6 unlocks a breakthrough.</p>'
+          : '';
+        const body = research && steppers?.length
+          ? `<div class="three-research-row">${cubeDieHtml(5, { size: 'sm' })}${stepperRowHtml(steppers, { dieSize: 'sm' })}</div>`
+          : (steppers?.length ? stepperRowHtml(steppers) : iconRowHtml(stacks));
         api.peek.innerHTML = `<div class="three-peek-head"><strong>${land.name}</strong>
           <div class="three-peek-meta">${[owner, ipcLine, route].filter(Boolean).join(' · ')}</div></div>
-          ${land.name === 'Research' ? `<div class="three-dice-hero">${cubeDieHtml(5, { size: 'lg' })}</div>` : ''}
-          ${steppers?.length ? stepperRowHtml(steppers) : iconRowHtml(stacks)}`;
+          ${researchInfo}
+          ${body}
+          ${cargoRowHtml(cargo || [], targetShipId)}`;
         api.peek.dataset.rosterTotal = String(rosterTotal);
         delete api.peek.dataset.airLand;
         const pickedTypes = [
@@ -1387,6 +1546,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
       if (replay) api.setConfirmReplay(label || 'Replay scenario');
       else if (enabled || gold) api.setConfirmReady(label || 'Confirm: Take hits');
       else api.setConfirmIdle(label || 'Select units');
+      api.setUndo(!!canUndo);
       api.wirePeekButtons();
       api.syncLayers();
     },
@@ -1426,7 +1586,7 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
     },
   };
 
-  for (const el of [api.l0, api.bottom, api.sheet, api.lobby, api.tutorial, api.zoom, api.peek, api.battleEl, api.confirm, api.menuBtn, api.helpBtn, stackToggle]) {
+  for (const el of [api.l0, api.bottom, api.sheet, api.lobby, api.tutorial, api.zoom, api.peek, api.battleEl, api.confirm, api.undoBtn, api.menuBtn, api.helpBtn, stackToggle]) {
     sealChromeControl(el);
   }
   bindSealedActivate(api.menuBtn, null, () => {
@@ -1460,6 +1620,19 @@ export function injectThreeChrome({ seat = 'Russians', ipc = 24, phase = 'PLACE'
   bindSealedActivate(api.bottom, 'button.three-peek-unit[data-unit-type]', (e, chip) => {
     if (api.peek?.dataset?.airLand === '1') return;
     if (typeof api.onUnitPick === 'function') api.onUnitPick(chip.dataset.unitType);
+  });
+  bindSealedActivate(api.undoBtn, null, () => {
+    if (typeof api.onUndo === 'function') api.onUndo();
+  });
+  bindSealedActivate(api.bottom, '[data-ship]', (e, btn) => {
+    if (typeof api.onShipPick === 'function') api.onShipPick(btn.dataset.ship);
+  });
+  bindSealedActivate(api.battleEl, '[data-tech-info]', (e, btn) => {
+    const id = btn.dataset.techInfo;
+    const open = api.battleEl.querySelector(`[data-tech-pop="${id}"]`);
+    const was = open?.classList.contains('is-on');
+    api.battleEl.querySelectorAll('[data-tech-pop]').forEach((pop) => pop.classList.remove('is-on'));
+    if (open && !was) open.classList.add('is-on');
   });
   bindSealedActivate(lobby, '[data-lobby]', (e, btn) => {
     const kind = btn.dataset.lobby;

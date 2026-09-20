@@ -58,6 +58,7 @@ export function createSoloPlay(gameState, unitDefs = {}) {
     selected: null,
     selectedUnits: {},
     destPicked: null,
+    targetShipId: null,
     battle: null,
     landing: null,
     tech: emptyTech(),
@@ -81,6 +82,7 @@ export function resetUi(play) {
   play.battle = null;
   play.landing = null;
   play.tech = emptyTech();
+  play.targetShipId = null;
   return play;
 }
 
@@ -172,6 +174,29 @@ export function deployDests(play) {
 
 export function pickedCount(selectedUnits) {
   return Object.values(selectedUnits || {}).reduce((n, q) => n + (Number(q) || 0), 0);
+}
+
+export function selectionBudget(play) {
+  if (!play?.gameState) return Infinity;
+  const gs = play.gameState;
+  if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    const wave = deployWave(play);
+    return Math.max(0, wave.limit - wave.placed);
+  }
+  if (play.battle?.step === BATTLE_STEP.COMBAT_RESULT) {
+    const dest = gs.units[play.battle.dest] || [];
+    const menu = lossMenu(dest, gs.currentPlayer?.id, play.battle.defenseHits);
+    return Math.max(0, Number(menu.need) || 0);
+  }
+  return Infinity;
+}
+
+export function capSelectedToBudget(play, type, next, have) {
+  const budget = selectionBudget(play);
+  if (!Number.isFinite(budget)) return Math.max(0, Math.min(have, next));
+  const used = pickedCount(play.selectedUnits) - (Number(play.selectedUnits?.[type]) || 0);
+  const room = Math.max(0, budget - used);
+  return Math.max(0, Math.min(have, next, room));
 }
 
 export function hasGround(selectedUnits, unitDefs = {}) {
@@ -266,12 +291,63 @@ function hasFriendlyTransport(play, name) {
   ));
 }
 
+function hasFriendlyCarrier(play, name) {
+  const player = play.gameState.currentPlayer;
+  if (!player) return false;
+  return (play.gameState.units[name] || []).some((u) => (
+    u.type === 'carrier' && u.owner === player.id && (Number(u.quantity) || 0) > 0
+  ));
+}
+
+export function eligibleStacks(play, name) {
+  const stacks = movableStacks(play, name);
+  const t = play.gameState?.territoryByName?.[name];
+  if (!t || !stacks.length) return stacks;
+  if (t.isWater) {
+    return stacks.filter((s) => {
+      const def = defOf(play, s.type);
+      return !!(def.isSea || def.isAir || s.cargo);
+    });
+  }
+  return stacks.filter((s) => {
+    const def = defOf(play, s.type);
+    return !!(def.isLand || def.isAir);
+  });
+}
+
+export function cargoManifest(play, name) {
+  const gs = play?.gameState;
+  const id = gs?.currentPlayer?.id;
+  if (!gs || !id || !name) return [];
+  const raw = typeof gs.getShipsWithCargo === 'function'
+    ? gs.getShipsWithCargo(name, id)
+    : [];
+  return (raw || []).map((ship, index) => {
+    const cargo = [...(ship.cargo || [])];
+    const aircraft = [...(ship.aircraft || [])];
+    return {
+      ...ship,
+      index,
+      key: ship.id || `${ship.type}-${index}`,
+      load: [...cargo, ...aircraft],
+    };
+  });
+}
+
+export function shipMatches(ship, shipId) {
+  if (!ship || !shipId) return false;
+  return ship.id === shipId || ship.key === shipId;
+}
+
 function cargoStacks(play, name) {
   const player = play.gameState.currentPlayer;
   if (!player || !name) return [];
+  const ships = cargoManifest(play, name).filter((s) => s.type === 'transport');
+  const focus = play.targetShipId
+    ? ships.filter((s) => shipMatches(s, play.targetShipId))
+    : ships;
   const qty = {};
-  for (const ship of play.gameState.units[name] || []) {
-    if (ship.type !== 'transport' || ship.owner !== player.id) continue;
+  for (const ship of focus) {
     for (const item of ship.cargo || []) {
       qty[item.type] = (qty[item.type] || 0) + (Number(item.quantity) || 1);
     }
@@ -282,6 +358,15 @@ function cargoStacks(play, name) {
     owner: player.id,
     cargo: true,
   }));
+}
+
+function transportIndexFor(play, name) {
+  const ships = cargoManifest(play, name).filter((s) => s.type === 'transport');
+  if (!ships.length) return 0;
+  const hit = play.targetShipId
+    ? ships.find((s) => shipMatches(s, play.targetShipId))
+    : ships.find((s) => (s.cargo || []).length);
+  return Math.max(0, hit ? ships.indexOf(hit) : 0);
 }
 
 export function legalDests(play) {
@@ -308,6 +393,7 @@ export function legalDests(play) {
       if (air && !ground && !sea && isEnemyLand(play, to)) dests.add(to);
       if (ground && fromT?.isWater && !t?.isWater && isEnemyLand(play, to)) dests.add(to);
       if (ground && t?.isWater && hasFriendlyTransport(play, to)) dests.add(to);
+      if (air && t?.isWater && hasFriendlyCarrier(play, to)) dests.add(to);
     }
     if (air && !ground && !sea) {
       let range = 1;
@@ -331,6 +417,7 @@ export function legalDests(play) {
       if (air && !ground && !sea && isFriendlyLand(play, to)) dests.add(to);
       if (ground && fromT?.isWater && !t?.isWater && isFriendlyLand(play, to)) dests.add(to);
       if (ground && t?.isWater && hasFriendlyTransport(play, to)) dests.add(to);
+      if (air && t?.isWater && hasFriendlyCarrier(play, to)) dests.add(to);
     }
     if (air && !ground && !sea) {
       let range = 1;
@@ -443,6 +530,8 @@ export function canEndPhase(play) {
     if (!isHumanTurn(play)) return false;
     const gs = play.gameState;
     if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) return false;
+    const wave = deployWave(play);
+    if (wave.placed >= wave.limit) return true;
     return !!gs.canFinishPlacementRound?.(gs.currentPlayer.id, play.unitDefs, { allowNavalSkip: true });
   }
   if (!isPlaying(play) || !isHumanTurn(play)) return false;
@@ -1003,7 +1092,7 @@ export function adjustUnit(play, type, delta = 1) {
     const have = (deployPool(play).find((p) => p.type === type)?.quantity) || 0;
     if (have <= 0) return play;
     const cur = Number(play.selectedUnits[type]) || 0;
-    const next = Math.max(0, Math.min(have, cur + step));
+    const next = capSelectedToBudget(play, type, cur + step, have);
     if (next <= 0) delete play.selectedUnits[type];
     else play.selectedUnits[type] = next;
     return play;
@@ -1157,6 +1246,61 @@ export function confirmGold(play) {
   return confirmEnabled(play);
 }
 
+export function canUndo(play) {
+  syncPlay(play);
+  if (!play?.gameState || !isHumanTurn(play) || isGameOver(play)) return false;
+  if (play.battle) return false;
+  if (play.tech?.rolls || play.tech?.breakthrough) return false;
+  const gs = play.gameState;
+  if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) return !!gs.canUndoLastCapital?.();
+  if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) return (gs.placementHistory || []).length > 0;
+  const phase = gs.turnPhase;
+  if (phase === TURN_PHASES.PURCHASE) {
+    return (gs.pendingPurchases || []).some((p) => p.owner === gs.currentPlayer?.id && (Number(p.quantity) || 0) > 0);
+  }
+  if (phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE) {
+    if (play.landing) return false;
+    return (gs.moveHistory || []).length > (gs.undoLockMoveCount || 0);
+  }
+  if (phase === TURN_PHASES.MOBILIZE) return (gs.mobilizationHistory || []).length > 0;
+  return false;
+}
+
+export function undoLast(play) {
+  if (!canUndo(play)) return play;
+  const gs = play.gameState;
+  if (gs.phase === GAME_PHASES.CAPITAL_PLACEMENT) {
+    gs.undoLastCapital?.();
+    resetUi(play);
+    return play;
+  }
+  if (gs.phase === GAME_PHASES.UNIT_PLACEMENT) {
+    gs.undoPlacement?.();
+    play.selectedUnits = {};
+    play.destPicked = null;
+    return play;
+  }
+  const phase = gs.turnPhase;
+  if (phase === TURN_PHASES.PURCHASE) {
+    gs.undoLastPurchase?.(play.unitDefs);
+    return play;
+  }
+  if (phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE) {
+    gs.undoLastMove?.();
+    play.selectedUnits = {};
+    play.destPicked = null;
+    play.targetShipId = null;
+    return play;
+  }
+  if (phase === TURN_PHASES.MOBILIZE) {
+    gs.undoMobilization?.(play.unitDefs);
+    play.selectedUnits = {};
+    play.destPicked = null;
+    return play;
+  }
+  return play;
+}
+
 export function confirmLabel(play) {
   syncPlay(play);
   if (isGameOver(play)) return 'New Game vs AI';
@@ -1212,6 +1356,18 @@ export function confirmLabel(play) {
   }
   if ((phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE)
     && play.destPicked && pickedCount(play.selectedUnits)) {
+    const destT = play.gameState.territoryByName[play.destPicked];
+    const fromT = play.gameState.territoryByName[play.selected];
+    if (!fromT?.isWater && destT?.isWater && hasGround(play.selectedUnits, play.unitDefs)) {
+      return `Confirm: Load TRN · ${play.destPicked}`;
+    }
+    if (!fromT?.isWater && destT?.isWater && hasAir(play.selectedUnits, play.unitDefs)
+      && hasFriendlyCarrier(play, play.destPicked) && !hasEnemyShips(play, play.destPicked)) {
+      return `Confirm: Land CV · ${play.destPicked}`;
+    }
+    if (fromT?.isWater && destT && !destT.isWater && hasGround(play.selectedUnits, play.unitDefs)) {
+      return `Confirm: Unload · ${play.destPicked}`;
+    }
     return phase === TURN_PHASES.COMBAT_MOVE
       ? `Confirm: Attack ${play.destPicked}`
       : `Confirm: Move to ${play.destPicked}`;
@@ -1296,10 +1452,15 @@ export function confirm(play) {
     const groundOnly = hasGround(play.selectedUnits, play.unitDefs)
       && !hasSea(play.selectedUnits, play.unitDefs);
     if (fromT?.isWater && destT && !destT.isWater && groundOnly) {
-      const result = play.gameState.unloadTransport?.(from, 0, play.destPicked);
+      const result = play.gameState.unloadTransport?.(
+        from,
+        transportIndexFor(play, from),
+        play.destPicked,
+      );
       if (result?.success !== false) {
         play.selectedUnits = {};
         play.destPicked = null;
+        play.targetShipId = null;
       }
       return play;
     }
@@ -1308,10 +1469,12 @@ export function confirm(play) {
       play.destPicked,
       unitsToMoveFromPick(play.selectedUnits),
       play.unitDefs,
+      play.targetShipId ? { targetShipId: play.targetShipId } : {},
     );
     if (result?.success !== false) {
       play.selectedUnits = {};
       play.destPicked = null;
+      play.targetShipId = null;
     }
     return play;
   }
@@ -1405,13 +1568,13 @@ function techCard(play) {
         ? (TECHNOLOGIES[tech.pick]?.description || '')
         : 'Tap a tech, then Confirm',
       dice: (tech.rolls || []).map((face) => ({ face, hit: face === 6 })),
-      pickers: available.map((id) => ({
-        side: 'att',
-        label: TECHNOLOGIES[id]?.name || id,
-        need: 1,
-        taken: tech.pick === id ? { [id]: 1 } : {},
-        units: [{ type: id, quantity: 1 }],
+      techs: available.map((id) => ({
+        id,
+        name: TECHNOLOGIES[id]?.name || id,
+        info: TECHNOLOGIES[id]?.description || '',
+        on: tech.pick === id,
       })),
+      pickers: [],
     };
   }
   return {
@@ -1509,14 +1672,17 @@ export function chromeModel(play, territories = []) {
   const land = territories.find?.((t) => t.name === landName) || (landName ? { name: landName } : null);
   const movePhase = phase === TURN_PHASES.COMBAT_MOVE || phase === TURN_PHASES.NON_COMBAT_MOVE;
   const origin = play.selected;
-  const showSteppers = movePhase && origin && movableStacks(play, origin).length
+  const showSteppers = movePhase && origin && eligibleStacks(play, origin).length
     && (play.selected === origin || pickedCount(play.selectedUnits) || play.destPicked);
+  const budget = selectionBudget(play);
+  const usedPick = pickedCount(play.selectedUnits);
   let steppers = showSteppers
-    ? movableStacks(play, origin).map((s) => ({
+    ? eligibleStacks(play, origin).map((s) => ({
       type: s.type,
       have: s.quantity,
       picked: Number(play.selectedUnits?.[s.type]) || 0,
       owner: s.owner,
+      plusOff: Number.isFinite(budget) && usedPick >= budget,
     }))
     : null;
   if (phase === TURN_PHASES.PURCHASE && isHumanTurn(play) && !isGameOver(play)) {
@@ -1565,6 +1731,7 @@ export function chromeModel(play, territories = []) {
       have: p.quantity,
       picked: Number(play.selectedUnits?.[p.type]) || 0,
       owner: player.id,
+      plusOff: Number.isFinite(budget) && usedPick >= budget,
     }));
   }
   const planeSteppers = play.landing
@@ -1604,9 +1771,14 @@ export function chromeModel(play, territories = []) {
   }
   const wave = play.gameState.phase === GAME_PHASES.UNIT_PLACEMENT ? deployWave(play) : null;
   if (wave && !route) route = wave.meter;
+  const seaSelected = !!(landName && play.gameState.territoryByName?.[landName]?.isWater);
   return {
     land: sheetLand,
-    stacks: play.landing ? [] : (landName ? (play.gameState.units[landName] || []) : []),
+    stacks: play.landing
+      ? []
+      : (landName
+        ? (movePhase ? eligibleStacks(play, landName) : (play.gameState.units[landName] || []))
+        : []),
     steppers: play.landing ? planeSteppers : steppers,
     airLand: !!play.landing,
     label: confirmLabel(play),
@@ -1617,7 +1789,16 @@ export function chromeModel(play, territories = []) {
     phaseStrip: strip.steps,
     phaseStripCurrent: strip.current,
     highlights: marks,
+    canUndo: canUndo(play),
+    cargo: seaSelected && movePhase ? cargoManifest(play, landName) : [],
+    targetShipId: play.targetShipId || null,
+    researchHint: phase === TURN_PHASES.DEVELOP_TECH && !play.tech?.rolls && !play.tech?.breakthrough,
   };
+}
+
+export function pickShip(play, shipId) {
+  play.targetShipId = shipId || null;
+  return play;
 }
 
 export function inspectPlay(play) {
@@ -1635,6 +1816,7 @@ export function inspectPlay(play) {
     confirmLabel: confirmLabel(play),
     confirmEnabled: confirmEnabled(play),
     canEndPhase: canEndPhase(play),
+    canUndo: canUndo(play),
     battleStep: play.battle?.step || null,
     battleDest: play.battle?.dest || null,
     landingDest: play.landing?.dest || null,

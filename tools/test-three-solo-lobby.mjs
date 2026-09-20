@@ -40,6 +40,16 @@ import {
   deployWave,
   inspectPlay,
   legalDests,
+  selectionBudget,
+  capSelectedToBudget,
+  canEndPhase,
+  canUndo,
+  undoLast,
+  eligibleStacks,
+  cargoManifest,
+  chromeModel,
+  pickShip,
+  BATTLE_STEP,
 } from '../src/map/threeSoloPlay.js';
 import {
   SETUP_TUTORIAL_STEPS,
@@ -66,7 +76,7 @@ function assert(cond, msg) {
   }
 }
 
-assert(GAME_VERSION === 'V2.81.56-ux-solo.7', 'tip stamp ux-solo.7');
+assert(GAME_VERSION === 'V2.81.56-ux-solo.8', 'tip stamp ux-solo.8');
 assert(getUnitIconPath('techDie', 'Americans') == null, 'techDie has no unit PNG (was empty img 404)');
 assert(isDieType('techDie') && isDieType('DIE') && isDieType('die') && isDieType('x', 'DIE 5'), 'die aliases');
 const die = cubeDieHtml(5, { size: 'lg' });
@@ -181,6 +191,11 @@ confirm(play);
 const inf = (risk.units[pick] || []).find((u) => u.type === 'infantry' && u.owner === 'Russians');
 assert((inf?.quantity || 0) >= 2, 'starting INF + deploy');
 assert(risk.unitsPlacedThisRound === 1, '1 of 6 placed');
+assert(selectionBudget(play) === 5, 'budget remaining 5');
+assert(capSelectedToBudget(play, 'infantry', 20, 20) === 5, 'capSelectedToBudget = remaining');
+adjustUnit(play, 'infantry', 20);
+assert((play.selectedUnits.infantry || 0) <= 5, 'stepper total ≤ remaining budget');
+play.selectedUnits = {};
 assert(!confirmEnabled(play), 'Pass still locked after 1');
 
 while (risk.unitsPlacedThisRound < 6) {
@@ -190,10 +205,29 @@ while (risk.unitsPlacedThisRound < 6) {
   confirm(play);
 }
 assert(risk.unitsPlacedThisRound === 6, 'placed 6');
+assert(selectionBudget(play) === 0, 'budget 0 after 6');
+assert(canEndPhase(play), 'can Pass after 6');
 assert(confirmEnabled(play), 'Pass enabled at 6 of 6');
 assert(confirmLabel(play).startsWith('Pass'), 'Pass CTA');
+assert(canUndo(play), 'Undo after deploy');
+adjustUnit(play, 'infantry', 5);
+assert(pickedCountSafe(play) === 0, 'steppers cannot exceed budget 0');
+const hist = (risk.placementHistory || []).length;
+undoLast(play);
+assert((risk.unitsPlacedThisRound || 0) === 5 || (risk.placementHistory || []).length < hist, 'Undo reverses last deploy');
+while (risk.unitsPlacedThisRound < 6) {
+  adjustUnit(play, 'infantry', 1);
+  tapLand(play, pick);
+  if (!confirmEnabled(play)) break;
+  confirm(play);
+}
+assert(risk.unitsPlacedThisRound === 6, 're-placed 6 after undo');
 confirm(play);
 assert(risk.currentPlayer.isAI, 'Pass advances seat');
+
+function pickedCountSafe(p) {
+  return Object.values(p.selectedUnits || {}).reduce((n, q) => n + (Number(q) || 0), 0);
+}
 
 const json = risk.toJSON();
 assert(findUndefinedPaths(json).length === 0, 'risk toJSON has no undefined');
@@ -207,6 +241,14 @@ const sz = Object.keys(classic.units).find((name) => {
 if (sz) {
   tapLand(seaPlay, sz);
   const ships = (classic.units[sz] || []).filter((u) => u.owner === 'Americans' && u.type !== 'factory');
+  const seaElig = eligibleStacks(seaPlay, sz);
+  assert(seaElig.every((s) => unitDefs[s.type]?.isSea || unitDefs[s.type]?.isAir || s.cargo), 'sea sheet is naval/air/cargo');
+  const manifest = cargoManifest(seaPlay, sz);
+  assert(Array.isArray(manifest), 'cargo manifest');
+  if (manifest.length) {
+    pickShip(seaPlay, manifest[0].key);
+    assert(seaPlay.targetShipId === manifest[0].key, 'pick ship');
+  }
   if (ships.some((u) => u.type === 'battleship' || u.type === 'destroyer' || u.type === 'cruiser')) {
     const type = ships.find((u) => ['battleship', 'destroyer', 'cruiser', 'submarine'].includes(u.type))?.type;
     if (type) {
@@ -216,6 +258,57 @@ if (sz) {
     }
   }
 }
+
+const landName = Object.keys(classic.units).find((name) => {
+  const t = classic.territoryByName[name];
+  if (t?.isWater) return false;
+  const inf = (classic.units[name] || []).some((u) => u.owner === 'Americans' && u.type === 'infantry' && (u.quantity || 0) > 0);
+  if (!inf) return false;
+  return (classic.getConnections(name) || []).some((to) => {
+    const tz = classic.territoryByName[to];
+    return tz?.isWater && (classic.units[to] || []).some((u) => u.owner === 'Americans' && u.type === 'transport');
+  });
+});
+if (landName) {
+  const landPlay = createSoloPlay(classic, unitDefs);
+  tapLand(landPlay, landName);
+  const landElig = eligibleStacks(landPlay, landName);
+  assert(landElig.every((s) => unitDefs[s.type]?.isLand || unitDefs[s.type]?.isAir), 'land sheet is land+air');
+  assert(!landElig.some((s) => unitDefs[s.type]?.isSea), 'land sheet hides navy');
+  adjustUnit(landPlay, 'infantry', 1);
+  const loadDests = legalDests(landPlay);
+  const trnSea = (classic.getConnections(landName) || []).find((to) => (
+    classic.territoryByName[to]?.isWater
+    && (classic.units[to] || []).some((u) => u.owner === 'Americans' && u.type === 'transport')
+  ));
+  assert(loadDests.includes(trnSea), 'combat-move land can load adjacent TRN');
+}
+
+classic.turnPhase = TURN_PHASES.DEVELOP_TECH;
+const techPlay = createSoloPlay(classic, unitDefs);
+const techModel = chromeModel(techPlay, territories);
+assert(techModel.researchHint === true, 'research hint before roll');
+assert(techModel.steppers?.[0]?.type === 'techDie', 'research die stepper');
+assert(canUndo(techPlay) === false, 'no undo before reversible tech action');
+techPlay.tech.rolls = [2, 5];
+assert(canUndo(techPlay) === false, 'no undo during tech dice');
+techPlay.tech.rolls = [6];
+techPlay.tech.breakthrough = true;
+const breakModel = chromeModel(techPlay, territories);
+assert(breakModel.battle?.kicker === 'Breakthrough', 'breakthrough card');
+assert((breakModel.battle?.techs || []).length >= 4, 'dense tech tiles');
+assert((breakModel.battle?.techs || []).every((t) => t.info), 'tech info for (i)');
+assert((breakModel.battle?.pickers || []).length === 0, 'no tall casualty pickers');
+assert(canUndo(techPlay) === false, 'no undo during breakthrough');
+
+const fightPlay = createSoloPlay(classic, unitDefs);
+fightPlay.battle = { step: BATTLE_STEP.COMBAT_READY, dest: 'Karelia S.S.R.' };
+assert(canUndo(fightPlay) === false, 'no undo during battle');
+
+assert(!String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-dice-hero'), 'no orphan research hero die');
+assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-research-row'), 'compact research row');
+assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-tech-grid'), 'breakthrough grid');
+assert(String(readFileSync(new URL('../src/map/threeMapChrome.js', import.meta.url))).includes('three-lobby-seats-sec'), 'setup seats scroller');
 
 console.log(failures ? `${failures} lobby/setup check(s) failed` : 'All lobby/setup checks passed');
 process.exit(failures ? 1 : 0);
