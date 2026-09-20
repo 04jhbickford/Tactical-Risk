@@ -67,7 +67,7 @@ const check = (label, cond) => {
 };
 
 console.log('=== Version + schema ===');
-check('GAME_VERSION is V2.81.55', GAME_VERSION === 'V2.81.55');
+check('GAME_VERSION is V2.81.56', GAME_VERSION === 'V2.81.56');
 check('SCHEMA_VERSION stays 11', SCHEMA_VERSION === 11);
 
 console.log('=== Store / never / turn gate ===');

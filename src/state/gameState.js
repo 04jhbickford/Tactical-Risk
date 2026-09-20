@@ -18,6 +18,7 @@ import {
   upsertPendingAirLanding,
 } from './airLanding.js';
 import { emitGameEvent, summarizeUnits } from '../multiplayer/gameEventLog.js';
+import { omitUndefinedDeep } from './persistState.js';
 
 export const GAME_PHASES = {
   LOBBY: 'lobby',
@@ -2348,12 +2349,13 @@ export class GameState {
 
     this.playerState[player.id].ipcs -= totalCost;
 
-    // Add to pending purchases
-    const existing = this.pendingPurchases.find(p => p.type === unitType);
+    // Add to pending purchases — owner is required so getPendingPurchases
+    // (filters by current player) still sees fighters / air after buy.
+    const existing = this.pendingPurchases.find(p => p.type === unitType && p.owner === player.id);
     if (existing) {
       existing.quantity += quantity;
     } else {
-      this.pendingPurchases.push({ type: unitType, quantity });
+      this.pendingPurchases.push({ type: unitType, quantity, owner: player.id });
     }
 
     this._notify();
@@ -4276,23 +4278,29 @@ export class GameState {
 
   // Add a combat result to the log
   logCombat(result) {
+    const attackerLosses = result.attackerLosses ?? 0;
+    const defenderLosses = result.defenderLosses ?? 0;
     this.combatLog.push({
       round: this.round,
       timestamp: Date.now(),
-      ...result
+      ...result,
+      attackerLosses,
+      defenderLosses,
     });
 
-    // Also add to turnEvents for turn summary modal (multiplayer)
+    // Also add to turnEvents for turn summary modal (multiplayer).
+    // Do not write undefined — Firestore rejects the whole game-doc push
+    // (hiccup → exhaust → capture rolls back).
     this.turnEvents.push({
       type: 'combat',
-      playerId: this.currentPlayer?.id,
+      playerId: this.currentPlayer?.id ?? null,
       timestamp: Date.now(),
-      territory: result.territory,
-      attacker: result.attacker,
-      defender: result.defender,
-      outcome: result.winner === result.attacker ? 'attacker' : 'defender',
-      attackerLosses: result.attackerLosses,
-      defenderLosses: result.defenderLosses
+      territory: result.territory ?? null,
+      attacker: result.attacker ?? null,
+      defender: result.defender ?? null,
+      outcome: result.winner === 'attacker' ? 'attacker' : 'defender',
+      attackerLosses,
+      defenderLosses,
     });
   }
 
@@ -5326,7 +5334,7 @@ export class GameState {
   }
 
   toJSON() {
-    return {
+    return omitUndefinedDeep({
       version: 11, // v11: Added turn events for turn summary modal
       gameMode: this.gameMode,
       alliancesEnabled: this.alliancesEnabled,
@@ -5371,7 +5379,7 @@ export class GameState {
         originTerritory: entry.originTerritory,
         units: (entry.units || []).map((unit) => ({ ...unit })),
       })),
-    };
+    });
   }
 
   loadFromJSON(data) {
