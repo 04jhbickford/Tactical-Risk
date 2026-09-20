@@ -66,6 +66,23 @@ async function main() {
     throw new Error(`A1 FAIL stamp ${JSON.stringify(a1)} want ${STAMP}`);
   }
   await page.screenshot({ path: shot('lookpass15_a1_stamp_hard_reload_390.png'), fullPage: false });
+  await page.evaluate(() => {
+    const lobby = document.getElementById('three-lobby');
+    const l0 = document.getElementById('three-l0');
+    if (lobby) lobby.style.visibility = 'hidden';
+    if (l0) l0.style.zIndex = '90';
+  });
+  // .three-l0-ver hangs below the bar (position:absolute; top:100%+4px).
+  await page.screenshot({
+    path: shot('lookpass15_a1_l0_bar_hard_reload_390.png'),
+    clip: { x: 0, y: 0, width: 390, height: 100 },
+  });
+  await page.evaluate(() => {
+    const lobby = document.getElementById('three-lobby');
+    const l0 = document.getElementById('three-l0');
+    if (lobby) lobby.style.visibility = '';
+    if (l0) l0.style.zIndex = '';
+  });
 
   const local = page.locator('[data-lobby="screen"][data-value="setup"]').first();
   if (await local.count()) {
@@ -103,18 +120,20 @@ async function main() {
     const m = cs(main);
     const w = cs(wrap);
     const c = cs(chip);
+    const css = [...document.querySelectorAll('style')].map((s) => s.textContent || '').join('\n');
     return {
       mainOverflow: m?.overflowY,
       mainTouch: m?.touchAction,
       mainFlex: m?.flexGrow,
       mainMin: m?.minHeight,
+      mainWebkit: /#three-lobby \.three-lobby-main \{[\s\S]*?-webkit-overflow-scrolling:\s*touch/.test(css),
       wrapTouch: w?.touchAction,
       chipTouch: c?.touchAction,
       footerOutside: !!(footer && main && !main.contains(footer)),
       chipsUnclipped: w?.overflow === 'visible' || w?.overflowY === 'visible',
     };
   });
-  if (t2.mainOverflow !== 'auto' || !String(t2.mainTouch).includes('pan-y')) {
+  if (t2.mainOverflow !== 'auto' || !String(t2.mainTouch).includes('pan-y') || !t2.mainWebkit) {
     throw new Error(`T2 FAIL MAIN scroll/touch ${JSON.stringify(t2)}`);
   }
   if (!String(t2.wrapTouch).includes('pan-y') || !String(t2.chipTouch).includes('pan-y')) {
@@ -124,15 +143,26 @@ async function main() {
 
   await page.screenshot({ path: shot('lookpass15_t1_setup_top_390.png'), fullPage: false });
 
+  await page.evaluate(() => {
+    window.__trLobbyTouchPrevented = false;
+    const mark = (e) => {
+      if (e && e.defaultPrevented) window.__trLobbyTouchPrevented = true;
+    };
+    const main = document.querySelector('.three-lobby-main');
+    main?.addEventListener('touchstart', mark, { passive: true });
+    main?.addEventListener('touchmove', mark, { passive: true });
+  });
   const before = await page.evaluate(() => {
     const main = document.querySelector('.three-lobby-main');
-    const chip = document.querySelector('.three-lobby-occupants .three-lobby-tile');
-    const r = chip.getBoundingClientRect();
+    const seat = document.querySelector('.three-lobby-seat-wrap.is-on .three-lobby-seat')
+      || document.querySelector('.three-lobby-seat');
+    const r = seat.getBoundingClientRect();
     return {
       scrollTop: main.scrollTop,
       scrollHeight: main.scrollHeight,
       clientHeight: main.clientHeight,
-      x: Math.round(r.left + r.width / 2),
+      startOn: 'seat-card',
+      x: Math.round(r.left + Math.min(48, r.width / 2)),
       y: Math.round(r.top + r.height / 2),
     };
   });
@@ -156,6 +186,8 @@ async function main() {
   if (!(mid.scrollTop > before.scrollTop)) {
     throw new Error(`T3 FAIL touch gesture did not move scrollTop (${before.scrollTop} → ${mid.scrollTop})`);
   }
+  const t1 = await page.evaluate(() => !!window.__trLobbyTouchPrevented);
+  if (t1) throw new Error('T1 FAIL touchstart/touchmove defaultPrevented during lobby pan');
   await page.screenshot({ path: shot('lookpass15_t4_mid_pan_390.png'), fullPage: false });
 
   const lastChip = await page.evaluate(() => {
@@ -206,15 +238,18 @@ async function main() {
     url: URL,
     a1,
     t2,
+    t1: { preventDefaultDuringPan: false, startOn: before.startOn },
     t3: {
       scrollTopBefore: before.scrollTop,
       scrollTopMid: mid.scrollTop,
       scrollTopEnd: end.scrollTop,
       causedBy: 'CDP Input.dispatchTouchEvent touchStart/touchMove/touchEnd',
     },
+    t4: { startedOn: before.startOn, scrollTopMoved: mid.scrollTop > before.scrollTop },
     t5: end,
     shots: [
       'lookpass15_a1_stamp_hard_reload_390.png',
+      'lookpass15_a1_l0_bar_hard_reload_390.png',
       'lookpass15_t1_setup_top_390.png',
       'lookpass15_t4_mid_pan_390.png',
       'lookpass15_t5_scroll_end_last_seat_390.png',
