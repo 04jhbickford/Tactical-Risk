@@ -73,13 +73,18 @@ async function main() {
     await page.waitForTimeout(250);
   }
 
-  const seats = page.locator('.three-lobby-seat');
-  const n = await seats.count();
+  const wraps = page.locator('.three-lobby-seat-wrap');
+  const n = await wraps.count();
   for (let i = 0; i < Math.min(n, 3); i += 1) {
-    const wrap = page.locator('.three-lobby-seat-wrap').nth(i);
+    const wrap = wraps.nth(i);
     if (!(await wrap.evaluate((el) => el.classList.contains('is-on')))) {
-      await seats.nth(i).click();
-      await page.waitForTimeout(120);
+      await wrap.locator('.three-lobby-seat').click();
+      await page.waitForTimeout(320);
+    }
+    const human = wrap.locator('.three-lobby-occupants .three-lobby-tile', { hasText: 'Human' });
+    if (!(await human.evaluate((el) => el.classList.contains('is-on')))) {
+      await human.click();
+      await page.waitForTimeout(320);
     }
   }
   const humans = await page.locator('.three-lobby-occupants .three-lobby-tile.is-on').evaluateAll(
@@ -139,8 +144,9 @@ async function main() {
   }
 
   const cdp = await context.newCDPSession(page);
-  // Finger-pan MAIN downward = finger moves up.
-  await dispatchSwipe(cdp, { x: before.x, y: before.y, dy: -280, steps: 20, stepDelay: 18 });
+  // Finger-pan MAIN downward = finger moves up. Short first swipe so
+  // mid-pan still differs from scroll-end.
+  await dispatchSwipe(cdp, { x: before.x, y: before.y, dy: -120, steps: 14, stepDelay: 18 });
   await page.waitForTimeout(250);
 
   const mid = await page.evaluate(() => {

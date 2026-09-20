@@ -25,5 +25,15 @@ Hard reload `?three=1&solo=1` @390×844 paints `V2.81.56-ux-solo.15`. Playwright
 - `html.three-spike.has-lobby #mapCanvas { pointer-events:none }`; canvas touch handlers return while lobby is open
 - Footer stays `flex:none` sibling. Shell `100dvh`/`100svh`.
 
-## QC @390 — see LOOKPASS.md
-Stills: stamp `.15`; setup top; mid-pan; scroll-end last seat clear of footer.
+## QC @390 hard reload + Playwright touch (PASS)
+Tip `?three=1&solo=1` after hard reload. CDP `Input.dispatchTouchEvent` (not wheel, not `scrollTop=`).
+
+- L0 + lobby + `__TR_GAME_VERSION` = `V2.81.56-ux-solo.15`
+- `/` response `Cache-Control: no-store`
+- MAIN `overflow-y:auto; touch-action:pan-y`; seats/chips `pan-y`
+- `scrollTop` 0 → 113 (mid, gesture) → 146 (end, gesture)
+- First swipe started on a Human chip
+- Americans last seat bottom 627.9 / footer top 723 / gap 95.1px
+- Footer is a sibling outside MAIN; Human/Easy/Med/Hard unclipped
+
+Stills: `/opt/cursor/artifacts/screenshots/lookpass15_a1_stamp_hard_reload_390.png`, `lookpass15_t1_setup_top_390.png`, `lookpass15_t4_mid_pan_390.png`, `lookpass15_t5_scroll_end_last_seat_390.png`.
