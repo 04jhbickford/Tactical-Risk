@@ -56,10 +56,10 @@ Engine: real `GameState` + `AIController` behind Three chrome (`threeSoloPlay` /
 
 | # | Gate | Proof |
 |---|---|---|
-| **A1** | Stamp `.18` after hard reload | L0 + lobby + `__TR_GAME_VERSION` |
-| Smoke | New Local Game ≥1 Human + AIs → Start → place 6 → Pass → Combat Move Confirm using stages | unit `test-three-solo-playthrough` + browser |
-| Income | End Phase on NCM / Place opens Income card; second Confirm hands off | unit + still |
-| Win/Lose | Victory / Defeat + New Game vs AI | unit |
-| CDP | Only if lobby CSS changes — **not changed this tip** | `.17` T1–T5 still hold |
+| **A1** | Stamp `.18` after hard reload | **PASS** local — L0 + lobby + `__TR_GAME_VERSION` = `.18` |
+| Smoke | New Local Game ≥1 Human + AIs → Start → place 6 → Pass → Combat Move Confirm using stages | **PASS** — `test-three-solo-playthrough` + Playwright `qc-playthrough-smoke` @390: origin→units→dest→`Confirm: Attack Columbia` |
+| Income | End Phase on NCM / Place opens Income card; second Confirm hands off | **PASS** unit |
+| Win/Lose | Victory / Defeat + New Game vs AI | **PASS** unit |
+| CDP | Lobby CSS **unchanged** this tip | `.17` T1–T5 still hold — not re-run |
 
 Do not merge.

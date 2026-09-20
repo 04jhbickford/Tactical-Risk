@@ -22,10 +22,10 @@ Catalog SoT: `briefs/2026-09-20-boardgame-sandbox-ref/` (SANDBOX-RECS §A + GAPS
 
 | # | Gate | Result |
 |---|---|---|
-| **A1** | Stamp `.18` after hard reload | unit + browser |
-| Smoke | 1 Human + AIs → Start → place 6 → Combat Move stages | `test-three-solo-playthrough` |
-| Income | NCM/Place End Phase → Income card → handoff | unit |
-| Win/Lose | Victory / Defeat + New Game | unit |
+| **A1** | Stamp `.18` after hard reload | **PASS** local L0 + lobby + `__TR_GAME_VERSION` |
+| Smoke | 1 Human + AIs → Start → place 6 → Combat Move stages | **PASS** Playwright @390 `Confirm: Attack Columbia` |
+| Income | NCM/Place End Phase → Income card → handoff | **PASS** unit |
+| Win/Lose | Victory / Defeat + New Game | **PASS** unit |
 | CDP | Lobby CSS **unchanged** — do not re-READY on CSS | `.17` T1–T5 still hold |
 
 Unit: `test-three-solo-playthrough`, `test-three-solo-play`, `test-three-solo-econ`, `test-three-solo-lobby`.
