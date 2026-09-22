@@ -45,7 +45,7 @@ Image-gen / paint atlas  →  trim & tile  →  Three materials
 ## 3) Concrete bake list (next pass)
 
 ### Land
-- [x] **P34 painted world albedo** (`assets/three/board/world-land-albedo.png`, 4096×2340) — printed-board plates + polygon clip. Runtime fillStain OFF; bind is fail-closed.
+- [x] **P35 painted world albedo** (`assets/three/board/world-land-albedo.png`, 4096×2340) — plates stay bound; continent wash + feathered joins; blotch kill. Runtime fillStain OFF; bind is fail-closed.
 - [x] Tileable **parchment/paper grain** albedo (`refs/board-parchment-macro-tile.png` or regen) @ 8–14% multiply on `--land-base` `#C4B896`
 - [x] **Continent washes** (Risk-readable, A&A print) from `AA-PALETTE.md`: Europe olive `#6B7A4A`, USSR brown-tan `#8A7355`, Asia sage `#5F7A5A`, Africa ochre `#B08948`, NA soft green `#6A8B6E`, SA teal-green `#5A8A72`, Pacific mauve-grey `#7A6B8A` @ 18–28% — not candy Risk primaries, not one olive planet
 - [x] Soft faction ownership wash on top (15–22%), not solid fills

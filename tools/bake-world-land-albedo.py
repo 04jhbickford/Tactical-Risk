@@ -37,7 +37,7 @@ ATLAS_H = 2340
 # Printed A&A / Risk chroma (AA-PALETTE) — the albedo carries this, not an 8% wash.
 CONT_HEX = {
     'Europe': (0x6B, 0x7A, 0x4A),
-    'Asia': (0x5F, 0x7A, 0x5A),
+    'Asia': (0x8A, 0x73, 0x55),
     'Africa': (0xB0, 0x89, 0x48),
     'Middle East': (0xA0, 0x90, 0x58),
     'North America': (0x6A, 0x8B, 0x6E),
@@ -169,11 +169,38 @@ def land_mask(lands, w, h, names=None, biomes=None, continents=None) -> Image.Im
     return mask
 
 
-def punch(img: Image.Image, color=1.22, contrast=1.18, sharp=1.10) -> Image.Image:
+def punch(img: Image.Image, color=1.08, contrast=1.06, sharp=1.04) -> Image.Image:
     out = ImageEnhance.Color(img).enhance(color)
     out = ImageEnhance.Contrast(out).enhance(contrast)
     out = ImageEnhance.Sharpness(out).enhance(sharp)
     return out
+
+
+def feather_box(w, h, x0, y0, x1, y1, pad=90) -> Image.Image:
+    m = Image.new('L', (w, h), 0)
+    d = ImageDraw.Draw(m)
+    d.rectangle((x0, y0, x1, y1), fill=255)
+    return m.filter(ImageFilter.GaussianBlur(pad))
+
+
+def kill_blotches(img: Image.Image, land: Image.Image, luma_floor=118) -> Image.Image:
+    """Lift crushed darks and clamp stray chroma so gen stamps cannot read as blotches."""
+    try:
+        import numpy as np
+    except ImportError:
+        return img
+    arr = np.asarray(img, dtype=np.float32)
+    mask = np.asarray(land) > 8
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    lift = np.clip((luma_floor - yv) / max(1.0, luma_floor), 0, 1) * 0.72
+    lift = np.where(mask, lift, 0.0)
+    parchment = np.array(PARCHMENT, dtype=np.float32)
+    arr = arr + (parchment - arr) * lift[..., None]
+    yv = arr[:, :, 0] * 0.2126 + arr[:, :, 1] * 0.7152 + arr[:, :, 2] * 0.0722
+    chroma = arr.max(axis=2) - arr.min(axis=2)
+    sat = (chroma > 78) & (yv > 40) & mask
+    arr[sat] = arr[sat] * 0.72 + yv[sat, None] * 0.28
+    return Image.fromarray(np.clip(arr, 0, 255).astype('uint8'), 'RGB')
 
 
 def first_existing(*paths: Path) -> Path | None:
@@ -183,14 +210,14 @@ def first_existing(*paths: Path) -> Path | None:
     return None
 
 
-def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y0, x1, y1, w, h, alpha=0.88):
+def paste_theater(img: Image.Image, plate: Image.Image, mask: Image.Image, x0, y0, x1, y1, w, h, alpha=0.38):
     rx0, ry0 = int(wx(x0, w)), int(wy(y0, h))
     rx1, ry1 = int(wx(x1, w)), int(wy(y1, h))
     box = (rx0, ry0, rx1, ry1)
-    fitted = punch(plate.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS))
+    fitted = punch(plate.resize((rx1 - rx0, ry1 - ry0), Image.Resampling.LANCZOS), 1.04, 1.04, 1.02)
     region = img.crop(box)
     mixed = Image.blend(region, fitted, alpha)
-    local = mask.crop(box)
+    local = ImageChops.multiply(mask.crop(box), feather_box(w, h, rx0, ry0, rx1, ry1, 70).crop(box))
     img.paste(Image.composite(mixed, region, local), box)
     return img
 
@@ -211,23 +238,17 @@ def print_continent(paper: Image.Image, mask: Image.Image, rgb, strength=0.62) -
 
 
 def draw_ridges(img: Image.Image, mountain: Image.Image | None, land: Image.Image, w, h):
-    # Painted range masses — soft, no sausage-stick spines.
+    # P35: quiet painted ranges only — no oval chroma stamps / blotch ellipses.
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(layer)
     for ridge in RIDGES:
         pts = [(wx(x, w), wy(y, h)) for x, y in ridge]
-        for i, (x, y) in enumerate(pts):
-            d.ellipse((x - 48, y - 30, x + 48, y + 30), fill=(118, 98, 68, 70))
-            if i + 1 < len(pts):
-                nx, ny = pts[i + 1]
-                mx, my = (x + nx) / 2, (y + ny) / 2
-                d.ellipse((mx - 54, my - 32, mx + 54, my + 32), fill=(128, 108, 76, 58))
-        d.line(pts, fill=(176, 158, 118, 70), width=max(8, w // 280), joint='curve')
-    mass = layer.filter(ImageFilter.GaussianBlur(7.5))
+        d.line(pts, fill=(150, 132, 96, 48), width=max(6, w // 360), joint='curve')
+    mass = layer.filter(ImageFilter.GaussianBlur(5.5))
     if mountain:
         mt = tile_image(mountain.resize((560, 560), Image.Resampling.LANCZOS), w, h)
         ridge_a = ImageChops.multiply(mass.split()[-1], land)
-        img.paste(ImageChops.multiply(img, mt), (0, 0), ridge_a.point(lambda v: int(v * 0.32)))
+        img.paste(ImageChops.multiply(img, mt), (0, 0), ridge_a.point(lambda v: int(v * 0.14)))
     img.paste(mass.convert('RGB'), (0, 0), ImageChops.multiply(mass.split()[-1], land))
     return img
 
@@ -311,61 +332,68 @@ def build_atlas(lands) -> Image.Image:
         raise SystemExit('P34 fail-closed: missing printed theater plates')
 
     paper = tile_image(parchment.resize((768, 768), Image.Resampling.LANCZOS), w, h) if parchment else Image.new('RGB', (w, h), PARCHMENT)
-    paper = ImageEnhance.Contrast(paper).enhance(1.12)
+    paper = ImageEnhance.Contrast(paper).enhance(1.08)
     img = paper.copy()
     mask_all = land_mask(lands, w, h)
 
-    # Printed continent paper — Europe olive / Africa ochre must split at a glance.
+    # P35: continent wash is the readable identity. Theater plates add paint,
+    # not overwrite. Soft-light stain stack stays OFF (no fillStain hero).
     for key, rgb in CONT_HEX.items():
         cm = land_mask(lands, w, h, continents={key})
-        img = Image.composite(print_continent(paper, cm, rgb, strength=0.70), img, cm)
+        img = Image.composite(print_continent(paper, cm, rgb, strength=0.58), img, cm)
 
-    # Theater paintings are the hero (high alpha). Soft-light stain is OFF.
+    # Painted plates stay bound — lower alpha + feathered joins kill blotch/seams.
+    # Historical p34 used alpha=0.90 / 0.86 (theater-join seams).
     em = land_mask(lands, w, h, continents={'Europe', 'Africa', 'Middle East'})
-    img = paste_theater(img, europe, em, 620, 80, 1680, 1580, w, h, alpha=0.90)
+    img = paste_theater(img, europe, em, 620, 80, 1680, 1580, w, h, alpha=0.36)
     am = land_mask(lands, w, h, continents={'Asia', 'Oceania'})
-    img = paste_theater(img, asia, am, 1400, 140, 2750, 1650, w, h, alpha=0.86)
+    img = paste_theater(img, asia, am, 1400, 140, 2750, 1650, w, h, alpha=0.34)
 
     if world:
         img = paste_geo_crop(
             img, world, land_mask(lands, w, h, continents={'North America'}),
-            (0.04, 0.04, 0.32, 0.48), (2780, 60, 3500, 1020), w, h, alpha=0.78,
+            (0.04, 0.04, 0.32, 0.48), (2780, 60, 3500, 1020), w, h, alpha=0.32,
         )
         img = paste_geo_crop(
             img, world, land_mask(lands, w, h, continents={'South America'}),
-            (0.10, 0.42, 0.30, 0.96), (70, 1080, 500, 1860), w, h, alpha=0.78,
+            (0.10, 0.42, 0.30, 0.96), (70, 1080, 500, 1860), w, h, alpha=0.32,
         )
 
+    # Re-seat continent identity after plates so Europe/Africa/Asia split at 390.
+    for key, rgb in CONT_HEX.items():
+        cm = land_mask(lands, w, h, continents={key})
+        img = Image.composite(print_continent(img, cm, rgb, strength=0.28), img, cm)
+
+    # Quiet biome tooth only — never multiply-crush to black blotches.
     if forest:
         fm = land_mask(lands, w, h, biomes={'forest', 'lush'})
         tiled = tile_image(forest.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        mixed = ImageChops.multiply(img, tiled)
-        img = Image.composite(mixed, img, fm.point(lambda v: int(v * 0.48)))
+        img = Image.composite(Image.blend(img, tiled, 0.10), img, fm)
     if arid:
         dm = land_mask(lands, w, h, biomes={'arid'})
         tiled = tile_image(arid.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, tiled, 0.28), img, dm)
+        img = Image.composite(Image.blend(img, tiled, 0.12), img, dm)
     if snow:
         sm = land_mask(lands, w, h, biomes={'snow'})
         tiled = tile_image(snow.resize((720, 720), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(Image.blend(img, tiled, 0.36), img, sm)
+        img = Image.composite(Image.blend(img, tiled, 0.16), img, sm)
     if mountain:
         mm = land_mask(lands, w, h, biomes={'mountain', 'hills'})
         tiled = tile_image(mountain.resize((640, 640), Image.Resampling.LANCZOS), w, h)
-        img = Image.composite(ImageChops.multiply(img, tiled), img, mm.point(lambda v: int(v * 0.38)))
+        img = Image.composite(Image.blend(img, tiled, 0.10), img, mm)
 
     img = draw_ridges(img, mountain, mask_all, w, h)
-    img = draw_rivers(img, w, h)
     img = draw_coast(img, mask_all, w, h)
+    img = kill_blotches(img, mask_all, 118)
 
-    # Residual paper tooth only — do not flatten the print back to a wash.
     if parchment:
-        img = Image.composite(ImageChops.soft_light(img, paper), img, mask_all.point(lambda v: 16))
+        img = Image.composite(ImageChops.soft_light(img, paper), img, mask_all.point(lambda v: 14))
 
-    img = punch(img, color=1.18, contrast=1.14, sharp=1.08)
-    img = ImageEnhance.Brightness(img).enhance(0.96)
+    img = punch(img, color=1.06, contrast=1.08, sharp=1.03)
     img = Image.composite(img, paper, mask_all)
-    img = draw_badges(img, w, h)
+    # P35 HARD: no IPC / +N baked into the land atlas. 3D continent chips stay.
+    void = draw_badges
+    void = draw_rivers
     return img
 
 

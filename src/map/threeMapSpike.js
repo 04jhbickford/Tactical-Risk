@@ -38,6 +38,7 @@ import {
   makeCoastShelfMeshes,
   addRiverLines,
   addSeaLaneLines,
+  makeSeaWaterMeshes,
 } from './threeMapArt.js';
 import { territoryOutlineRings } from './threeMapOutline.js';
 import {
@@ -46,6 +47,7 @@ import {
   makeLandMaterials,
   makeOceanMesh,
   makeFoamMaterial,
+  makeSeaWaterMaterial,
   loadBoardTextures,
   applyLodTooth,
   factionWash,
@@ -123,7 +125,7 @@ const SEA_ZONE_CENTERS = {
   'Congo Sea Zone': { x: 784, y: 1474 },
   'Black Sea Zone': { x: 1348, y: 648 },
   'Caspian Sea Zone': { x: 1512, y: 626 },
-  'East Mediteranean Sea Zone': { x: 1264, y: 832 },
+  'East Mediteranean Sea Zone': { x: 1262, y: 878 }, // water pin — south of Italy lid
   'Central Mediteranean Sea Zone': { x: 1132, y: 834 },
   'West Mediteranean Sea Zone': { x: 912, y: 760 },
   'North Sea Zone': { x: 668, y: 232 },
@@ -157,6 +159,21 @@ function isCoarsePointer() {
   } catch {
     return window.innerWidth <= 720;
   }
+}
+
+function deckHeightForSea(territory, landHeights, lands) {
+  const c = unitAnchor(territory);
+  let nearby = 2.05;
+  for (const land of lands || []) {
+    const lc = territoryCenter(land);
+    if (!c || !lc) continue;
+    let dx = lc.x - c.x;
+    if (dx > 1750) dx -= 3500;
+    if (dx < -1750) dx += 3500;
+    const d = Math.hypot(dx, lc.y - c.y);
+    if (d < 260) nearby = Math.max(nearby, landHeights.get(land.name) || BASE_LAND);
+  }
+  return nearby + 1.55;
 }
 
 function unitAnchor(territory) {
@@ -245,6 +262,7 @@ export async function bootThreeMapSpike() {
   const territoryMap = new TerritoryMap(territories);
   const landMats = new Map();
   const landHeights = new Map();
+  const seaDecks = new Map();
   const pickables = [];
   const selectInk = [];
   const lineMats = [];
@@ -357,8 +375,18 @@ export async function bootThreeMapSpike() {
         group.add(ao);
       }
     }
+    const seaWaterMat = makeSeaWaterMaterial();
+    for (const water of territories.filter((t) => t.isWater)) {
+      for (const sea of makeSeaWaterMeshes(water, seaWaterMat)) {
+        group.add(sea);
+        pickables.push(sea);
+      }
+    }
     addRiverLines(group, riverMat, 0.28);
     addSeaLaneLines(group, territories.filter((t) => t.isWater), seaLaneMat, 0.05);
+  }
+  for (const water of territories.filter((t) => t.isWater)) {
+    seaDecks.set(water.name, deckHeightForSea(water, landHeights, lands));
   }
 
   for (const group of wrapGroups) {
@@ -368,7 +396,9 @@ export async function bootThreeMapSpike() {
       const center = unitAnchor(t);
       if (!center) continue;
       const { x, z } = worldToScene(center.x, center.y);
-      const height = t.isWater ? 0.4 : (landHeights.get(t.name) || BASE_LAND);
+      const height = t.isWater
+        ? (seaDecks.get(t.name) || deckHeightForSea(t, landHeights, lands))
+        : (landHeights.get(t.name) || BASE_LAND);
       const owner = stackOwner(stacks, t);
       const total = stackTotal(stacks);
       const expanded = [];
@@ -378,14 +408,14 @@ export async function bootThreeMapSpike() {
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
           map: tex,
           transparent: true,
-          depthTest: false,
+          depthTest: !!t.isWater,
           depthWrite: false,
           toneMapped: false,
         }));
         sprite.center.set(0.5, 0.16);
         sprite.scale.set(5.5, 5.5, 1);
-        sprite.position.set(x, height + 0.42, z);
-        sprite.renderOrder = 24;
+        sprite.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
+        sprite.renderOrder = t.isWater ? 32 : 24;
         sprite.userData.territory = t;
         sprite.userData.unitType = stack.type;
         sprite.userData.kind = 'chit';
@@ -398,14 +428,14 @@ export async function bootThreeMapSpike() {
       const pip = new THREE.Sprite(new THREE.SpriteMaterial({
         map: pipTex,
         transparent: true,
-        depthTest: false,
+        depthTest: !!t.isWater,
         depthWrite: false,
         toneMapped: false,
       }));
       pip.center.set(0.5, 0.16);
       pip.scale.set(6.4, 6.4, 1);
-      pip.position.set(x, height + 0.42, z);
-      pip.renderOrder = 25;
+      pip.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
+      pip.renderOrder = t.isWater ? 33 : 25;
       pip.userData.territory = t;
       pip.userData.kind = 'pip';
       pip.visible = false;
@@ -414,14 +444,14 @@ export async function bootThreeMapSpike() {
       const overflow = new THREE.Sprite(new THREE.SpriteMaterial({
         map: overflowTexture(1),
         transparent: true,
-        depthTest: false,
+        depthTest: !!t.isWater,
         depthWrite: false,
         toneMapped: false,
       }));
       overflow.center.set(0.5, 0.16);
       overflow.scale.set(4.2, 4.2, 1);
-      overflow.position.set(x, height + 0.42, z);
-      overflow.renderOrder = 25;
+      overflow.position.set(x, height + (t.isWater ? 0.55 : 0.42), z);
+      overflow.renderOrder = t.isWater ? 33 : 25;
       overflow.userData.territory = t;
       overflow.userData.kind = 'overflow';
       overflow.visible = false;
@@ -439,7 +469,7 @@ export async function bootThreeMapSpike() {
         homeX: x,
         homeZ: z,
         height,
-        footprint: t.isWater ? { w: 220, h: 220, min: 220 } : territoryFootprint(t),
+        footprint: t.isWater ? { w: 96, h: 96, min: 96 } : territoryFootprint(t),
         copy: group.userData.copy,
       });
     }
@@ -711,14 +741,19 @@ export async function bootThreeMapSpike() {
 
   function drawSelectInk(territory) {
     clearSelectInk();
-    if (!territory || territory.isWater) return;
-    const height = landHeights.get(territory.name) || BASE_LAND;
-    const y = height + 0.42;
+    if (!territory) return;
+    const water = !!territory.isWater;
+    const height = water
+      ? (seaDecks.get(territory.name) || deckHeightForSea(territory, landHeights, lands))
+      : (landHeights.get(territory.name) || BASE_LAND);
+    const y = height + (water ? 0.10 : 0.42);
     for (const group of wrapGroups) {
       if (!group.visible) continue;
-      for (const wash of makeSelectWashMeshes(territory, selectWashMat, height)) {
-        group.add(wash);
-        selectInk.push(wash);
+      if (!water) {
+        for (const wash of makeSelectWashMeshes(territory, selectWashMat, height)) {
+          group.add(wash);
+          selectInk.push(wash);
+        }
       }
       for (const poly of territoryOutlineRings(territory)) {
         const ring = simplifyRing(poly, 0.28);
@@ -763,7 +798,7 @@ export async function bootThreeMapSpike() {
         const collapse = !showMinis(band, selected);
         rec.pip.visible = collapse;
         rec.pip.scale.set(pipS, pipS, 1);
-        rec.pip.position.set(rec.homeX, rec.height + 0.38, rec.homeZ);
+        rec.pip.position.set(rec.homeX, rec.height + (rec.territory.isWater ? 0.55 : 0.38), rec.homeZ);
         const shownTypes = new Set((collapse ? [] : plan.shown).map((s) => s.type));
         for (const sprite of rec.expanded) {
           const on = !collapse && shownTypes.has(sprite.userData.unitType);
@@ -794,7 +829,7 @@ export async function bootThreeMapSpike() {
               homeX: rec.homeX,
               homeZ: rec.homeZ,
               maxDrift: small ? Math.max(3.2, pitch * 1.6) : 14,
-              y: rec.height + 0.42,
+              y: rec.height + (rec.territory.isWater ? 0.55 : 0.42),
               minSep,
             });
           });
@@ -839,8 +874,9 @@ export async function bootThreeMapSpike() {
       : overshoot + (1 - overshoot) * easedSettle;
     const dist = camera.position.distanceTo(controls.target);
     const h = renderer.domElement.clientHeight || window.innerHeight || 844;
+    const water = unitRecords.some((r) => r.territory.name === selectedName && r.territory.isWater);
     const lift = worldSizeFromScreen(SELECT_LIFT_PX, dist, camera.fov, h, {
-      minPx: 2, maxPx: 4, maxWorld: 1.15, minWorld: 0.16,
+      minPx: water ? 4 : 2, maxPx: water ? 7 : 4, maxWorld: water ? 1.85 : 1.15, minWorld: water ? 0.35 : 0.16,
     }) * amp;
     for (const rec of unitRecords) {
       if (rec.territory.name !== selectedName) continue;
@@ -865,12 +901,12 @@ export async function bootThreeMapSpike() {
     if (selectedName) setLandEmissive(selectedName, 0x000000);
     selectedName = next ? next.name : null;
     if (next && !next.isWater) setLandEmissive(next.name, 0xC4A35A);
-    selectedUnitType = unitType && next && !next.isWater ? unitType : (next && selectedUnitType && selectedName === next.name ? selectedUnitType : unitType);
+    selectedUnitType = unitType && next ? unitType : (next && selectedUnitType && selectedName === next.name ? selectedUnitType : unitType);
     if (next && unitType) selectedUnitType = unitType;
     if (!next) selectedUnitType = null;
     confirmed = false;
     selectLiftStarted = performance.now();
-    drawSelectInk(next && !next.isWater ? next : null);
+    drawSelectInk(next);
     syncDensity();
     chrome.paintSelection({
       land: next,
@@ -1116,6 +1152,29 @@ export async function bootThreeMapSpike() {
       syncDensity();
       return currentBand() === 'mid';
     },
+    frameEastMed(opts = {}) {
+      const sea = territories.find((t) => t.name === 'East Mediteranean Sea Zone');
+      const pin = SEA_ZONE_CENTERS['East Mediteranean Sea Zone'];
+      const c = pin || (sea && territoryCenter(sea));
+      if (!c) return false;
+      const p = worldToScene(c.x, c.y);
+      const lift = opts.lift ?? 72;
+      camera.position.set(p.x, lift, p.z - (opts.south ?? 10));
+      controls.target.set(p.x, 1.2, p.z);
+      applyZoomCap();
+      controls.update();
+      window.__threeSpike.selectLand('East Mediteranean Sea Zone');
+      syncDensity();
+      const rec = unitRecords.find((r) => r.territory.name === 'East Mediteranean Sea Zone');
+      const italyH = landHeights.get('South Europe') || 0;
+      return {
+        band: currentBand(),
+        deck: rec?.height ?? null,
+        italyHeight: italyH,
+        shipsAboveItaly: !!(rec && rec.height > italyH + 0.4),
+        pin: c,
+      };
+    },
     frameChina(opts = {}) {
       const land = lands.find((t) => t.name === 'China');
       const c = land && territoryCenter(land);
@@ -1217,6 +1276,10 @@ export async function bootThreeMapSpike() {
         dissolveSelect: true,
         noMapLabels: true,
         noBakedIpc: true,
+        continentPunch: 0.22,
+        seaDeckClear: true,
+        eastMedPinSouth: true,
+        noBlotchAtlas: true,
       };
     },
   };

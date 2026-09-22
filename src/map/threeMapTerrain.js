@@ -14,7 +14,7 @@ export const BAKE_H = 1170;
 // if this PNG does not bind (no silent GIS wash fallback).
 export const WORLD_LAND_ALBEDO = 'assets/three/board/world-land-albedo.png';
 export const WORLD_LAND_AO = 'assets/three/board/world-land-ao.png';
-export const WORLD_LAND_ALBEDO_REV = 'p34';
+export const WORLD_LAND_ALBEDO_REV = 'p35';
 
 export const TERRAIN_TEX = {
   forest: 'assets/three/board/terrain-forest.png',
@@ -916,7 +916,7 @@ export function makeCoastShelfMaterial() {
   return new THREE.MeshStandardMaterial({
     color: 0x6a8488,
     transparent: true,
-    opacity: 0.28,
+    opacity: 0.14,
     roughness: 0.78,
     metalness: 0.02,
     depthWrite: false,
