@@ -40,6 +40,7 @@ import {
   makeOceanMesh,
   makeFoamMaterial,
   loadBoardTextures,
+  applyLodTooth,
   factionWash,
   regionWashFor,
   plasticColor,
@@ -779,6 +780,7 @@ export async function bootThreeMapSpike() {
     const band = currentBand();
     lodMode = band;
     lastSelectForLod = selectedName;
+    applyLodTooth(landMats, band);
     relayoutUnits(band);
   }
 
@@ -1090,6 +1092,8 @@ export async function bootThreeMapSpike() {
         moldedOutline: '≥2.5px',
         keyFill: 'warm-key-cool-fill',
         parchmentTooth: true,
+        lodTooth: lodMode === 'near' ? 'clean' : 'loud',
+        quietZoom: true,
         plasticSpec: 'tight-lobe',
       };
     },

@@ -1,0 +1,123 @@
+{
+  "idle": {
+    "version": "V2.81.51-three-polish.26",
+    "lod": "mid",
+    "idleCta": true,
+    "confirmCopy": "Select a territory",
+    "confirmBg": "rgba(30, 36, 32, 0.88)",
+    "confirmColor": "rgba(232, 226, 212, 0.42)",
+    "confirmClass": "is-idle",
+    "phaseText": "PLACE",
+    "phaseBg": "rgba(30, 36, 32, 0.42)",
+    "phaseColor": "rgb(232, 226, 212)",
+    "l0Bg": "linear-gradient(rgba(30, 36, 32, 0.12) 0%, rgba(30, 36, 32, 0) 100%)",
+    "zoom": [
+      {
+        "text": "+",
+        "bg": "rgba(30, 36, 32, 0.62)",
+        "color": "rgb(232, 226, 212)",
+        "border": "rgba(255, 255, 255, 0.12)"
+      },
+      {
+        "text": "−",
+        "bg": "rgba(30, 36, 32, 0.62)",
+        "color": "rgb(232, 226, 212)",
+        "border": "rgba(255, 255, 255, 0.12)"
+      },
+      {
+        "text": "Fit",
+        "bg": "rgba(30, 36, 32, 0.62)",
+        "color": "rgb(232, 226, 212)",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    ],
+    "roster": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 2,
+          "owner": "Germans"
+        },
+        {
+          "type": "infantry",
+          "quantity": 4,
+          "owner": "Germans"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Germans"
+        }
+      ],
+      "total": 10,
+      "peekTotal": 0
+    }
+  },
+  "near": {
+    "lod": "near",
+    "lodTooth": "clean",
+    "idleCta": false,
+    "confirmCopy": "Confirm: Germany",
+    "confirmBg": "rgb(196, 163, 90)",
+    "confirmClass": "is-ready",
+    "zoom": [
+      "rgba(30, 36, 32, 0.62)",
+      "rgba(30, 36, 32, 0.62)",
+      "rgba(30, 36, 32, 0.62)"
+    ],
+    "phase": "rgba(30, 36, 32, 0.42)",
+    "roster": {
+      "stacks": [
+        {
+          "type": "armour",
+          "quantity": 2,
+          "owner": "Germans"
+        },
+        {
+          "type": "infantry",
+          "quantity": 4,
+          "owner": "Germans"
+        },
+        {
+          "type": "fighter",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "bomber",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "factory",
+          "quantity": 1,
+          "owner": "Germans"
+        },
+        {
+          "type": "aaGun",
+          "quantity": 1,
+          "owner": "Germans"
+        }
+      ],
+      "total": 10,
+      "peekTotal": 10
+    },
+    "peekTotal": "10"
+  },
+  "fail": []
+}

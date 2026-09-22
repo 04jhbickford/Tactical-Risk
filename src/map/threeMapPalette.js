@@ -115,6 +115,11 @@ export const GRAIN_STRENGTH = GRAIN_MULTIPLY;
 export const OCEAN_GRAIN = 0.50;
 export const OCEAN_OPEN_DARKEN = 0.58;
 export const TOOTH_STRENGTH = 0.42;
+// P26: loud mid tooth / clean near — LOD scales the normal, not the bake.
+export const TOOTH_NORMAL_MID = 2.05;
+export const TOOTH_NORMAL_NEAR = 1.08;
+export const TOOTH_ROUGH_MID = 0.76;
+export const TOOTH_ROUGH_NEAR = 0.86;
 
 export const BOARD_TEX = {
   parchment: 'assets/three/board/board-parchment-tile.png',
@@ -443,7 +448,7 @@ export function makeLandMaterials(regionHex, ownerHex, territory) {
     emissive: 0x000000,
     emissiveIntensity: 0,
   });
-  if (top.normalMap) top.normalScale.set(2.05, 2.05);
+  if (top.normalMap) top.normalScale.set(TOOTH_NORMAL_MID, TOOTH_NORMAL_MID);
   const wall = new THREE.MeshStandardMaterial({
     color: sideHex,
     roughness: 0.84,
@@ -527,6 +532,18 @@ export function makeOceanMesh(width, height) {
   mesh.receiveShadow = false;
   mesh.userData.kind = 'ocean';
   return mesh;
+}
+
+export function applyLodTooth(landMats, band) {
+  const near = band === 'near';
+  const n = near ? TOOTH_NORMAL_NEAR : TOOTH_NORMAL_MID;
+  const r = near ? TOOTH_ROUGH_NEAR : TOOTH_ROUGH_MID;
+  if (!landMats) return { n, r, near };
+  for (const mats of landMats.values()) {
+    if (mats?.top?.normalMap) mats.top.normalScale.set(n, n);
+    if (mats?.top) mats.top.roughness = r;
+  }
+  return { n, r, near };
 }
 
 export function hexColorInt(hex) {
