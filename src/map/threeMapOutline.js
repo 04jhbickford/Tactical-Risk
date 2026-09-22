@@ -191,8 +191,8 @@ export function territoryOutlineRings(territory) {
 const HEAL_CACHE = new WeakMap();
 
 export function healLandRings(territory) {
-  // P38 HARD: dissolve ears / slivers at multi-border joins (Australia class).
-  // Always raster-union so a concave 900-pt ring cannot keep spike lobes.
+  // P39: ink-path helper only. Mesh fill uses dropSliverPolygons so a
+  // force-union cannot stretch plates into neighbor overlaps.
   if (!territory) return [];
   const hit = HEAL_CACHE.get(territory);
   if (hit) return hit;

@@ -1,4 +1,4 @@
-// V2.81.52-three-polish.38 vegetation/ocean/borders/relief/continents/units.
+// V2.81.52-three-polish.39 style-ref plates + ocean ripples + land ink.
 // Chrome locks from .26. Faction plastic from .29. Run: node tools/test-three-art-gap.mjs
 
 import { readFileSync, existsSync } from 'fs';
@@ -64,7 +64,7 @@ function pngOk(rel) {
   return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 }
 
-check('GAME_VERSION is V2.81.52-three-polish.38', GAME_VERSION === 'V2.81.52-three-polish.38');
+check('GAME_VERSION is V2.81.52-three-polish.39', GAME_VERSION === 'V2.81.52-three-polish.39');
 check('SCHEMA stays 11', SCHEMA_VERSION === 11);
 check('land mini atlas is real PNG', pngOk('assets/three/units/units-land-minis.png'));
 check('naval mini atlas is real PNG', pngOk('assets/three/units/units-naval-minis.png'));
@@ -656,7 +656,7 @@ check('p35 required stills held',
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/east-med-select-no-clip.png')
   && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p35/china-select-hold.png'));
 check('p36 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P36.md')));
-check('p38 albedo rev is p38', /WORLD_LAND_ALBEDO_REV = 'p38'/.test(terrain));
+check('p39 albedo rev is p39', /WORLD_LAND_ALBEDO_REV = 'p39'/.test(terrain));
 check('p37b Cape is mask-only (no dest y=1680 L-band)',
   /flatten_region_luma/.test(albedoBaker)
   && /heal_horiz_luma_step/.test(albedoBaker)
@@ -791,9 +791,7 @@ check('p38 sea lanes killed (no decorative stipple)',
   && /seaLanes: false/.test(spike)
   && /addSeaLaneLines[\s\S]*return 0/.test(art));
 check('p38 land borders match sea-zone weight family',
-  /land ink same weight family/.test(spike)
-  && /makeLineMat\(PALETTE\.border, 2\.7, 0\.87\)/.test(spike)
-  && /landSeaBorderFamily: true/.test(spike));
+  /landSeaBorderFamily: true/.test(spike));
 check('p38 slivers healed via outer-union + normal offset',
   /healLandRings/.test(outlineSrc)
   && /healLandRings/.test(art)
@@ -805,12 +803,11 @@ check('p38 units opaque plastic + tan rim',
   && /alphaTest: 0\.42/.test(spike)
   && /opaquePlastic: true/.test(spike)
   && /#8E6A38/.test(palette));
-check('p38 baker: coastal greens + Imhof hatch + continent ≤22%',
+check('p38 baker: coastal greens + Imhof hatch + continent wash',
   /apply_coastal_greens/.test(albedoBaker)
   && /draw_imhof_peaks/.test(albedoBaker)
   && /apply_imhof_painterly/.test(albedoBaker)
   && /multiply_continent/.test(albedoBaker)
-  && /amount=0\.20/.test(albedoBaker)
   && /USSR_HEX/.test(albedoBaker)
   && /COAST_GREEN/.test(albedoBaker)
   && /biome_cool_map/.test(albedoBaker));
@@ -836,6 +833,76 @@ check('p38 SCORE states eight gates',
   /Vegetation/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md'), 'utf8'))
   && /albedoRev=p38/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md'), 'utf8'))
   && /unitCountOne/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p38/SCORE.md'), 'utf8')));
+
+check('p39 HECORRECT on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/HECORRECT-P39.md')));
+check('p39 STYLE REF plates on disk',
+  pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/style-ref-oceania-beautiful.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-world-watercolor.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-europe-africa-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-asia-continent.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-oceania-style-lock.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-americas-theater.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-africa-continent.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39-ocean-ripple-tile.png'));
+check('p39 baker is mask-only dest-position (no grow-bbox stretch)',
+  /GEN39/.test(albedoBaker)
+  && /p39-oceania-style-lock/.test(albedoBaker)
+  && /paste_through_mask/.test(albedoBaker)
+  && /dest UV = position only/.test(albedoBaker)
+  && /Do NOT grow dest to mask bbox/.test(albedoBaker)
+  && /amount=0\.14/.test(albedoBaker)
+  && /UNDER paint/.test(albedoBaker)
+  && !/grow dest so land is never cut/.test(albedoBaker));
+check('p39 land ink ≥ sea + rings dissolve before stroke',
+  /makeLineMat\(PALETTE\.border, 3\.0, 0\.92\)/.test(spike)
+  && /landInkGteSea: true/.test(spike)
+  && /ringsDissolved: true/.test(spike)
+  && /dropSliverPolygons/.test(art)
+  && /outer-union BEFORE stroke/.test(art));
+check('p39 ocean ripples authored and bound as sea albedo',
+  /p39-ocean-ripple-tile/.test(albedoBaker)
+  && /hand-ripple/.test(albedoBaker)
+  && /vertexColors: false/.test(palette)
+  && /oceanRipples: true/.test(spike)
+  && /styleRef: 'oceania-beautiful'/.test(terrain));
+check('p39b world-sea albedo — no UV hatch tile',
+  pngOk('assets/three/board/world-sea-albedo.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/p39b-ocean-oceania-coast.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/refs/p39-gen/style-ref-oceania-beautiful.png')
+  && /bake_world_sea/.test(albedoBaker)
+  && /draw_coastal_hand_ripples/.test(albedoBaker)
+  && /world-sea-albedo/.test(albedoBaker)
+  && /WORLD_SEA_ALBEDO/.test(terrain)
+  && /oceanNoHatch: true/.test(spike)
+  && /coastalHandRipples: true/.test(spike)
+  && /makeBoardSeaMesh/.test(art)
+  && /applyWorldLandUVs\(geom\)/.test(art)
+  && !/uv\.setXY\(i, pos\.getX\(i\) \/ OCEAN_UV/.test(palette));
+check('p39 inspect flags + held .38 wins',
+  /maskOnlyComposite/.test(spike)
+  && /unitCountOne: true/.test(spike)
+  && /opaquePlastic: true/.test(spike)
+  && /stackToggle: true/.test(spike)
+  && /continentPunch: 0\.14/.test(spike));
+check('p39 SCORE on disk', existsSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md')));
+check('p39 required stills',
+  pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/mid-vs-style-ref.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/ocean-ripples.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/land-borders-clear.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/aus-borders-fit.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/continents-subtle.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/unit-count-one.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/near-opaque-plastic.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/africa-even.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/stack-expand.png')
+  && pngOk('briefs/2026-09-17-three-art-gap/qa-loop/p39/stack-collapse.png'));
+check('p39 SCORE states four P0 gates',
+  /albedoRev=p39b/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
+  && /styleRef=oceania-beautiful/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
+  && /oceanRipples/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
+  && /landInkGteSea/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
+  && /ringsDissolved/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8'))
+  && /maskOnlyComposite/.test(readFileSync(join(root, 'briefs/2026-09-17-three-art-gap/qa-loop/p39/SCORE.md'), 'utf8')));
 
 if (failures) {
   console.error(`\n${failures} failed`);

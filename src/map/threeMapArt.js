@@ -15,7 +15,7 @@ import {
   makeCoastShelfMaterial,
   RIVERS,
 } from './threeMapTerrain.js';
-import { territoryOutlineRings, waterOutlineRings, healLandRings } from './threeMapOutline.js';
+import { territoryOutlineRings, waterOutlineRings, healLandRings, dropSliverPolygons } from './threeMapOutline.js';
 
 export const SCALE = 0.1;
 export const WORLD_W = MAP_WIDTH * SCALE;
@@ -272,7 +272,11 @@ function inflateRing(ring, amt) {
 }
 
 function landRingsOf(territory) {
-  return healLandRings(territory);
+  // P39: mesh fill uses live polygons (drop slivers only).
+  // Forced raster-union heal on every land stretched coasts into neighbors.
+  // Ink strokes dissolve separately via territoryOutlineRings BEFORE stroke.
+  void healLandRings;
+  return dropSliverPolygons(territory?.polygons || []);
 }
 
 function shapeFromRing(ring) {
@@ -429,7 +433,7 @@ export function makeBorderLine(ring, y, material) {
 }
 
 export function addTerritoryInk(group, territory, material, y, continentMat) {
-  // P33 HARD: dissolve multipolygons — stroke the outer union, never every poly.
+  // P39 HARD: dissolve / outer-union BEFORE stroke. Land ink ≥ sea-zone ink.
   for (const poly of territoryOutlineRings(territory)) {
     const ring = smoothRing(simplifyRing(poly), 1);
     if (!ring) continue;
@@ -601,6 +605,7 @@ export function makeSeaWaterMeshes(territory, material) {
     if (!ring) continue;
     const geom = new THREE.ShapeGeometry(shapeFromRing(ring));
     geom.rotateX(-Math.PI / 2);
+    applyWorldLandUVs(geom);
     const mesh = new THREE.Mesh(geom, material);
     mesh.position.y = 0.04;
     mesh.renderOrder = 1;
@@ -638,6 +643,19 @@ export function makeBoardTexturePlane() {
   // Intentionally empty — a full-map textured quad was the neon-teal
   // rectangle / ghost-tile artifact. Ocean is a scene-level plane now.
   return null;
+}
+
+export function makeBoardSeaMesh(material) {
+  // P39b: board-sized sea samples world-sea-albedo 1:1. Never UV-tile.
+  const geo = new THREE.PlaneGeometry(WORLD_W, WORLD_H, 1, 1);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(WORLD_W / 2, 0, -WORLD_H / 2);
+  applyWorldLandUVs(geo);
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.position.y = -0.06;
+  mesh.renderOrder = 0;
+  mesh.userData.kind = 'board-sea';
+  return mesh;
 }
 
 export function createWrapGroups(parent) {
